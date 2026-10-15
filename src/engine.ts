@@ -1,0 +1,3676 @@
+import { createHash } from 'node:crypto'
+
+export const ENGINE_SCHEMA_VERSION = 1
+
+export type VarValue = number | boolean
+
+export type GuardOp = '==' | '!=' | '<' | '<=' | '>' | '>='
+
+export interface LeafGuard {
+  variable: string
+  op: GuardOp
+  value: VarValue
+}
+
+export interface AllGuard {
+  all: GuardNode[]
+}
+
+export interface AnyGuard {
+  any: GuardNode[]
+}
+
+export interface NotGuard {
+  not: GuardNode
+}
+
+export type GuardNode = LeafGuard | AllGuard | AnyGuard | NotGuard
+
+export interface StateSpec {
+  id: string
+  terminal?: boolean
+  /** Actions fired automatically when the state is entered. They do not change state or variables; checks such as A4 Pair Symmetry treat them as implicit acquire/release events so lock/unlock hidden inside entry actions is verified. */
+  onEntry?: string[]
+  /** Actions fired automatically when the state is left. Same semantics as onEntry. */
+  onExit?: string[]
+  /** Deadline (A14): the state must be left within this many declared tick events of entering it. */
+  maxTicks?: number
+}
+
+export interface UpdateSpec {
+  variable: string
+  op: 'set' | 'inc' | 'dec'
+  value?: number
+}
+
+export interface TransitionSpec {
+  from: string
+  event: string
+  to: string
+  /** Absent guard is the else/default branch for the same (from, event) group. */
+  guard?: GuardNode
+  updates?: UpdateSpec[]
+  /** Execution cost of firing this transition (e.g. cycles, microseconds). Absent cost defaults to 1, so an unannotated machine keeps step-count semantics. Checked by A12 against budget invariants. */
+  cost?: number
+  /** Relative probability weight when a probability invariant is declared (DTMC interpretation). Absent weight = 1; weight 0 means the branch never fires probabilistically. */
+  weight?: number
+}
+
+export interface TransitionScenarioSpec {
+  from: string
+  event: string
+  /** Natural language: what this (state, event) combination represents in the real scenario. */
+  scenario: string
+}
+
+export interface ModelNarrative {
+  /** Natural-language meaning of each state id. */
+  states?: Record<string, string>
+  /** Natural-language meaning of each event id. */
+  events?: Record<string, string>
+  /** Natural-language scenario for each distinct (from, event) combination. */
+  scenarios?: TransitionScenarioSpec[]
+}
+
+export interface VariableSpec {
+  name: string
+  kind: 'integer' | 'boolean'
+  init: number | boolean
+  min?: number
+  max?: number
+  monotonic?: 'inc' | 'dec'
+}
+
+/**
+ * Scope filter for a state-predicate invariant (see `InvariantSpec`): the range is
+ * only required to hold in runtime states that satisfy the filter. Exactly one of
+ * `state` / guard-node form must be present.
+ */
+export interface StateGuard {
+  /** Only runtime states whose id is this state are checked. */
+  state: string
+}
+
+/** A `when` filter: either a single-state scope or the ordinary guard language. */
+export type InvariantWhen = StateGuard | GuardNode
+
+export function isStateGuard(when: InvariantWhen): when is StateGuard {
+  return 'state' in when
+}
+
+/** Allowed keys per invariant kind — the schema is closed, so anything else is a typo or an unsupported feature. */
+const INVARIANT_KEYS: Record<string, Set<string>> = {
+  'never-states': new Set(['id', 'description', 'kind', 'states']),
+  'var-in-range': new Set(['id', 'description', 'kind', 'variable', 'min', 'max', 'when']),
+  'event-before-state': new Set(['id', 'description', 'kind', 'event', 'state']),
+  'leads-to': new Set(['id', 'description', 'kind', 'from', 'to']),
+  'sequence': new Set(['id', 'description', 'kind', 'events']),
+  'atomicity': new Set(['id', 'description', 'kind', 'events', 'commit', 'rollback']),
+  'budget': new Set(['id', 'description', 'kind', 'budget']),
+  'probability': new Set(['id', 'description', 'kind', 'target', 'op', 'p']),
+}
+
+const KNOWN_INVARIANT_KINDS = new Set(Object.keys(INVARIANT_KEYS))
+
+/**
+ * Declared keys per model part. The model schema is closed: a key that is not
+ * declared is a typo or an unsupported feature, and silently ignoring it can make
+ * the engine report a property that the model does not actually have (a mistyped
+ * guard variable reads as an always-false guard, which prunes real paths and can
+ * yield a false "no deadlock"). Rejecting is the only safe option for a verifier.
+ */
+const MODEL_KEYS = {
+  root: new Set(['schemaVersion', 'init', 'states', 'transitions', 'variables', 'invariants', 'concurrentPairs', 'boundaryChecks', 'resourcePairs', 'idempotentEvents', 'tickEvents', 'narrative']),
+  state: new Set(['id', 'terminal', 'onEntry', 'onExit', 'maxTicks']),
+  transition: new Set(['from', 'event', 'to', 'guard', 'updates', 'cost', 'weight']),
+  update: new Set(['variable', 'op', 'value']),
+  variable: new Set(['name', 'kind', 'init', 'min', 'max', 'monotonic']),
+  // LogicModelV1 boundary checks are (variable, values). The data-model engine has
+  // its own (entity, field) shape and its own validator — the two must not be mixed.
+  boundaryCheck: new Set(['variable', 'values']),
+  resourcePair: new Set(['resource', 'acquireEvent', 'releaseEvent', 'failEvent']),
+  narrative: new Set(['states', 'events', 'scenarios']),
+  scenario: new Set(['from', 'event', 'scenario']),
+}
+
+export type InvariantSpec =
+  | { id: string; description: string; kind: 'never-states'; states: string[] }
+  | {
+      id: string
+      description: string
+      kind: 'var-in-range'
+      variable: string
+      min?: number
+      max?: number
+      /**
+       * Optional scope. `when` is evaluated against the POST-state of every transition
+       * (and, for the `{ state }` form, against the initial state regardless), so a
+       * `{ state }` scope is sound: for every reachable runtime state inside the scope
+       * the variable is in range. A guard-node scope that references the constrained
+       * variable can mask its own violation — prefer `{ state }` or an independent
+       * control variable. Not offered on trace-property kinds (leads-to, sequence, ...),
+       * whose scope over a path would be ambiguous.
+       */
+      when?: InvariantWhen
+    }
+  | { id: string; description: string; kind: 'event-before-state'; event: string; state: string }
+  | { id: string; description: string; kind: 'leads-to'; from: string; to: string | string[] }
+  | { id: string; description: string; kind: 'sequence'; events: string[] }
+  | { id: string; description: string; kind: 'atomicity'; events: string[]; commit: string; rollback?: string }
+  | { id: string; description: string; kind: 'budget'; budget: number }
+  | { id: string; description: string; kind: 'probability'; target: string; op: '>=' | '<=' | '>' | '<'; p: number }
+
+export interface ResourcePairSpec {
+  resource: string
+  acquireEvent: string
+  releaseEvent: string
+  failEvent?: string
+}
+
+export interface BoundaryCheckSpec {
+  variable: string
+  values: number[]
+}
+
+export interface LogicModelV1 {
+  schemaVersion: 1
+  init: string
+  states: StateSpec[]
+  transitions: TransitionSpec[]
+  variables?: VariableSpec[]
+  invariants?: InvariantSpec[]
+  concurrentPairs?: [string, string][]
+  boundaryChecks?: BoundaryCheckSpec[]
+  resourcePairs?: ResourcePairSpec[]
+  idempotentEvents?: string[]
+  /** Events that advance the discrete clock by one tick; used by A14 deadline checks. */
+  tickEvents?: string[]
+  /** Natural-language descriptions of states, events, and (state, event) scenarios. */
+  narrative?: ModelNarrative
+}
+
+export interface VerificationOptions {
+  maxStates?: number
+  maxPermutationEvents?: number
+  beforeModel?: unknown
+  stateMapping?: Record<string, string>
+  /** Hash specification used for modelHash. Defaults to the current published spec (`v1`). */
+  hashSpec?: HashSpec
+}
+
+export interface PathStep {
+  from: string
+  event: string
+  to: string
+}
+
+export interface Finding {
+  code: string
+  /**
+   * `info` is a note, not a defect: it is reported so a machine-readable reader can see it,
+   * and it never contributes to `verdict`, `summary.errors` or `summary.warnings`.
+   */
+  severity: 'error' | 'warning' | 'info'
+  message: string
+  /** Longer explanation: the shortest-path note, the per-machine reasons, the quoted source lines. */
+  detail?: string
+  /** The artefact the finding is about (a diagram name, a file path) — set when one report covers several. */
+  file?: string
+  /** 1-based line in that artefact, when the check knows it. */
+  line?: number
+  path?: PathStep[]
+  evidence?: Record<string, unknown>
+}
+
+export interface CheckResult {
+  id: string
+  name: string
+  status: 'pass' | 'fail' | 'skip'
+  detail: string
+  findings: Finding[]
+}
+
+export interface VerificationReport {
+  /**
+   * The engine ran and the input was well-formed enough to produce this report.
+   * It does NOT mean the review passed — read `verdict` for that.
+   */
+  ok: boolean
+  /** The tool executed and produced a report. False only when a tool refused the request before the engine ran. */
+  ran: boolean
+  /** The review outcome. `ok: true` with `verdict: "fail"` is a failing review, not a passing one. */
+  verdict: Verdict
+  /** Why the verdict came out that way, e.g. `2 error finding(s) (first: S2_NO_TRANSITIONS)`. */
+  verdictReason: string
+  /** The versioned report contract this result follows. */
+  schema: ReportSchema
+  schemaVersion: 1
+  /** Which published specification `modelHash` follows (see references/hash-spec.md). */
+  hashSpec: HashSpec
+  modelHash: string
+  /** Every hash this report carries, in one place, for a baseline diff or an archive record. */
+  hashes: { hashSpec: HashSpec; modelHash: string; beforeModelHash?: string; afterModelHash?: string }
+  /** Paths of the `_`-prefixed metadata keys found in the input and ignored by the schema. */
+  metadataKeys?: string[]
+  /** How much of the model the narrative documents; absent when there is no narrative. */
+  narrativeCoverage?: NarrativeCoverage
+  /** Echo of the model's natural-language narrative, when present. */
+  narrative?: ModelNarrative
+  summary: {
+    states: number
+    transitions: number
+    errors: number
+    warnings: number
+    checksRun: number
+    truncated?: boolean
+  }
+  checks: CheckResult[]
+  comparison?: ComparisonSummary
+  /** What to do next, derived from the findings — never empty. */
+  nextSteps: string[]
+  /** Informational notes about semantic dimensions this model references (timing, preemption)
+   * that this engine does not verify. Heuristic, vocabulary-based — never a substitute for the checks. */
+  coverageNotes?: string[]
+}
+
+/**
+ * The next-steps list every verification report carries. Derived only from the checks
+ * and the narrative coverage, so two runs over the same model produce the same list.
+ */
+function verificationNextSteps(checks: CheckResult[], coverage: NarrativeCoverage | undefined): string[] {
+  const steps: string[] = []
+  const failed = checks.filter((check) => check.status === 'fail').map((check) => check.id + ' ' + check.name)
+  const warningCodes = [...new Set(checks.flatMap((check) => check.findings).filter((finding) => finding.severity === 'warning').map((finding) => finding.code))].sort()
+  if (failed.length > 0) steps.push('Resolve the failing checks first: ' + failed.join(', ') + '.')
+  if (warningCodes.length > 0) steps.push('Review the warning findings (' + warningCodes.join(', ') + '): they are not failures, but they are not silence either.')
+  if (coverage !== undefined && !narrativeComplete(coverage)) {
+    steps.push('Complete the narrative (states ' + coverage.states + ', events ' + coverage.events + ', scenarios ' + coverage.scenarios + ') — a partial narrative is valid, but a reader still has to re-derive the missing symbols.')
+  }
+  steps.push('Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4).')
+  return steps
+}
+
+/**
+ * Repair guidance for a rejected model. A refusal reports the offending path and the rule
+ * it broke, but not what to write instead; for fields whose absence is a documented trap,
+ * that is the difference between "fix it" and "guess again". Derived only from the
+ * validation messages, so the list stays deterministic.
+ */
+function refusalGuidance(errors: string[]): string[] {
+  const steps: string[] = []
+  if (errors.some((message) => message.includes('.description'))) {
+    steps.push('Add the required "description" string to every invariant (for example "description": "what this invariant guarantees"); a `_`-prefixed key is not a substitute, and the value takes part in `modelHash`.')
+  }
+  return steps
+}
+
+export interface ComparisonSummary {
+  beforeModelHash: string
+  afterModelHash: string
+  stateMapping: Record<string, string>
+  beforeStates: number
+  beforeTransitions: number
+  afterStates: number
+  afterTransitions: number
+  addedStates: string[]
+  removedStates: string[]
+  addedEvents: string[]
+  removedEvents: string[]
+  addedTransitions: TransitionSpec[]
+  removedTransitions: TransitionSpec[]
+}
+
+export interface RuntimeState {
+  state: string
+  vars: Record<string, VarValue>
+}
+
+type NormalizedOptions = Required<Pick<VerificationOptions, 'maxStates' | 'maxPermutationEvents'>>
+
+const DEFAULT_MAX_STATES = 10_000
+const DEFAULT_MAX_PERMUTATION_EVENTS = 5
+/**
+ * Budget for the leads-to walk, as a multiple of `maxStates`. That walk is depth-first
+ * over run states, so `maxStates` does not bound it the way it bounds the breadth-first
+ * explorations: an `inc`/`dec` counter whose updates are not pinned by a guard has an
+ * unbounded reachable set, every run state is distinct, and the walk never revisits one.
+ * The budget is shared across every start state of a single check, so a wide search
+ * space cannot multiply it by the number of starts.
+ */
+const LEADS_TO_WALK_FACTOR = 20
+
+function leadsToWalkBudget(options: NormalizedOptions): number {
+  return Math.max(1_000, options.maxStates * LEADS_TO_WALK_FACTOR)
+}
+
+interface LeadsToWalk {
+  /** Nodes still allowed, shared across every start state of one check. */
+  remaining: number
+}
+
+interface LeadsToOutcome {
+  /** A run from the start state that reaches none of the targets. */
+  violation?: { path: PathStep[]; reason: string }
+  /** The budget ran out: the property is neither refuted nor proven. */
+  undecided: boolean
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return '[' + value.map((item) => stableStringify(item)).join(',') + ']'
+  const record = value as Record<string, unknown>
+  return '{' + Object.keys(record).sort().map((key) => JSON.stringify(key) + ':' + stableStringify(record[key])).join(',') + '}'
+}
+
+/**
+ * The hash of any model this plugin carries: the same normalization as `modelHash`,
+ * over whatever object the family defines. A use case diagram and a state machine are
+ * hashed by one rule, so a report can name either.
+ */
+export function valueHash(value: unknown, spec: HashSpec = DEFAULT_HASH_SPEC): string {
+  return createHash('sha256').update(stableStringify(hashPayload(value, spec))).digest('hex')
+}
+
+export function modelHash(model: LogicModelV1, spec: HashSpec = DEFAULT_HASH_SPEC): string {
+  return valueHash(model, spec)
+}
+
+
+/**
+ * Deterministic JSON (sorted keys, no insignificant whitespace) — the serialization the
+ * hash specification is defined over. Exported so every report hashes inputs the same way.
+ */
+export function canonicalJson(value: unknown): string {
+  return stableStringify(value)
+}
+
+// ---------------------------------------------------------------------------
+// Report contract: ran / verdict (P0-1) and metadata keys + hash specs (P0-3/P0-4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Published model-hash specifications. The full normalization rules, the list of
+ * excluded keys and a one-line recompute command are in `references/hash-spec.md`.
+ *
+ * - `v1` (1.0.0) drops every `_`-prefixed metadata key at every level before hashing,
+ *   so archiving `_source` / `_verified` next to a model cannot change its hash.
+ * - `v0` is the pre-1.0.0 behaviour (no metadata filtering), kept so an archived hash
+ *   can still be checked against the old engine.
+ *
+ * For a model that carries no `_` keys the two specs are byte-identical.
+ */
+export type HashSpec = 'v0' | 'v1'
+
+export const PUBLISHED_HASH_SPECS: readonly HashSpec[] = ['v0', 'v1']
+export const DEFAULT_HASH_SPEC: HashSpec = 'v1'
+
+/**
+ * Versioned report contracts. Every tool result carries `schema`, so a consumer can
+ * branch on the contract instead of sniffing fields, and a change to a report's shape
+ * is a version bump here rather than a silent break. `findings[]` keeps the same
+ * stable core in every family: `{code, severity, message, detail?, evidence?, path?}`.
+ */
+export const REPORT_SCHEMAS = {
+  verify: 'model-everything/verify/v1',
+  compose: 'model-everything/compose/v1',
+  datamodel: 'model-everything/datamodel/v1',
+  concurrency: 'model-everything/concurrency/v1',
+  export: 'model-everything/export/v1',
+  umlRender: 'model-everything/uml/render/v1',
+  umlParse: 'model-everything/uml/parse/v1',
+  umlReview: 'model-everything/uml/review/v1',
+  umlExplainLabels: 'model-everything/uml/explain-labels/v1',
+  structure: 'model-everything/structure/v1',
+  granularity: 'model-everything/granularity/v1',
+  baseline: 'model-everything/baseline/v1',
+} as const
+
+export type ReportSchema = typeof REPORT_SCHEMAS[keyof typeof REPORT_SCHEMAS]
+
+/**
+ * How much of the model the `narrative` block actually documents, as `covered/total`
+ * per dimension. A partial narrative is valid — writing the states first and the
+ * events later is the natural order — so this is a coverage report, not a gate.
+ * `scenarios` counts distinct modelled (from, event) groups: one scenario per group.
+ */
+export interface NarrativeCoverage {
+  states: string
+  events: string
+  scenarios: string
+}
+
+export function narrativeCoverageOf(model: LogicModelV1): NarrativeCoverage | undefined {
+  const narrative = model.narrative
+  if (narrative === undefined) return undefined
+  const describedStates = narrative.states === undefined ? 0 : Object.keys(narrative.states).length
+  const describedEvents = narrative.events === undefined ? 0 : Object.keys(narrative.events).length
+  const groups = new Set(model.transitions.map((transition) => transition.from + '|' + transition.event))
+  const describedGroups = narrative.scenarios === undefined
+    ? 0
+    : new Set(narrative.scenarios.map((scenario) => scenario.from + '|' + scenario.event)).size
+  const events = new Set(model.transitions.map((transition) => transition.event))
+  return {
+    states: String(describedStates) + '/' + String(model.states.length),
+    events: String(describedEvents) + '/' + String(events.size),
+    scenarios: String(describedGroups) + '/' + String(groups.size),
+  }
+}
+
+/** True when every dimension of the coverage is fully described. */
+export function narrativeComplete(coverage: NarrativeCoverage | undefined): boolean {
+  if (coverage === undefined) return false
+  return coverage.states.split('/')[0] === coverage.states.split('/')[1]
+    && coverage.events.split('/')[0] === coverage.events.split('/')[1]
+    && coverage.scenarios.split('/')[0] === coverage.scenarios.split('/')[1]
+}
+
+/**
+ * The review outcome, kept separate from `ok` (= "the tool ran"). Collapsing the two
+ * is how a failed review gets read as a passing one.
+ */
+export type Verdict = 'pass' | 'pass_with_findings' | 'fail'
+
+export interface VerdictSummary {
+  verdict: Verdict
+  verdictReason: string
+}
+
+/** A tool that refused the request before running anything: it neither passed nor failed a review. */
+export function refusalVerdict(reason: string): VerdictSummary {
+  return { verdict: 'fail', verdictReason: 'the tool did not run: ' + reason }
+}
+
+/**
+ * Decide the verdict from finding counts. Any error-severity finding fails the review
+ * even though the tool ran successfully — that gap is exactly what `verdict` closes.
+ */
+export function verdictOf(errors: number, warnings: number, firstCode?: string): VerdictSummary {
+  if (errors > 0) {
+    return {
+      verdict: 'fail',
+      verdictReason: String(errors) + ' error finding(s)' + (firstCode === undefined ? '' : ' (first: ' + firstCode + ')'),
+    }
+  }
+  if (warnings > 0) {
+    return { verdict: 'pass_with_findings', verdictReason: 'no error findings; ' + String(warnings) + ' warning finding(s)' }
+  }
+  return { verdict: 'pass', verdictReason: 'no error or warning findings' }
+}
+
+export function verdictOfFindings(findings: Array<{ code: string; severity: string }>): VerdictSummary {
+  const errors = findings.filter((finding) => finding.severity === 'error')
+  const warnings = findings.filter((finding) => finding.severity === 'warning')
+  return verdictOf(errors.length, warnings.length, errors[0]?.code)
+}
+
+/**
+ * Finding codes that mean "the search stopped before deciding", as opposed to "the
+ * model is wrong". They must reach `summary.truncated`, or a caller reading only that
+ * flag would take an unfinished search for a clean one.
+ */
+const UNDECIDED_CODES = new Set(['S7_UNDECIDED', 'A7_UNDECIDED', 'A9_LEADS_TO_UNDECIDED', 'D2_UNDECIDED'])
+
+function hasUndecidedFinding(checks: CheckResult[]): boolean {
+  return checks.some((check) => check.findings.some((finding) => UNDECIDED_CODES.has(finding.code)))
+}
+
+/**
+ * Paths of every `_`-prefixed key in the input, sorted (`_source`, `_verified`,
+ * `states[0]._note`; a metadata key's own children are not listed, since the subtree is
+ * metadata as a whole). The schema ignores these keys as annotation metadata; echoing
+ * them in the report makes the ignored metadata auditable instead of invisible.
+ */
+export function metadataKeysOf(input: unknown): string[] {
+  const keys: string[] = []
+  const walk = (value: unknown, path: string): void => {
+    if (value === null || typeof value !== 'object') return
+    if (Array.isArray(value)) {
+      value.forEach((entry, index) => walk(entry, path + '[' + String(index) + ']'))
+      return
+    }
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      const child = path === '' ? key : path + '.' + key
+      if (key.startsWith('_')) keys.push(child)
+      walk(entry, child)
+    }
+  }
+  walk(input, '')
+  return keys.sort()
+}
+
+function withoutMetadata(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map((entry) => withoutMetadata(entry))
+  const out: Record<string, unknown> = {}
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (key.startsWith('_')) continue
+    out[key] = withoutMetadata(entry)
+  }
+  return out
+}
+
+/**
+ * The exact payload a hash spec hashes. Exported so the specification has one
+ * implementation and the documentation can be checked against it.
+ */
+export function hashPayload(model: unknown, spec: HashSpec = DEFAULT_HASH_SPEC): unknown {
+  return spec === 'v1' ? withoutMetadata(model) : model
+}
+
+export function validateModel(input: unknown): { ok: true; model: LogicModelV1 } | { ok: false; errors: string[] } {
+  const errors: string[] = []
+  const bad = (path: string, message: string): void => {
+    errors.push(path + ': ' + message)
+  }
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return { ok: false, errors: ['model: must be an object'] }
+  }
+  const root = input as Record<string, unknown>
+  // `_`-prefixed keys are annotation metadata (provenance, verification snapshots,
+  // extraction caveats). They are ignored here and excluded from the hash, so a model
+  // can carry its own archive record without a sidecar that drifts away from it.
+  // Everything else stays closed: a mistyped `sttes` must still be an error.
+  const rejectUnknownKeys = (value: Record<string, unknown>, allowed: Set<string>, path: string): void => {
+    const unexpected = Object.keys(value).filter((key) => !allowed.has(key) && !key.startsWith('_'))
+    if (unexpected.length > 0) {
+      bad(path + '.' + unexpected[0], 'unknown field (allowed: ' + [...allowed].join(', ') + ')')
+    }
+  }
+  rejectUnknownKeys(root, MODEL_KEYS.root, 'model')
+  if (root.schemaVersion !== 1) bad('schemaVersion', 'must be 1')
+  if (typeof root.init !== 'string' || root.init.length === 0) bad('init', 'must be a non-empty string')
+  if (!Array.isArray(root.states) || root.states.length === 0) {
+    bad('states', 'must be a non-empty array')
+  } else {
+    const seen = new Set<string>()
+    root.states.forEach((entry, index) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        bad('states[' + index + ']', 'must be an object')
+        return
+      }
+      const state = entry as Record<string, unknown>
+      rejectUnknownKeys(state, MODEL_KEYS.state, 'states[' + index + ']')
+      if (typeof state.id !== 'string' || state.id.length === 0) bad('states[' + index + '].id', 'must be a non-empty string')
+      else if (seen.has(state.id)) bad('states[' + index + '].id', 'duplicate state id ' + state.id)
+      else seen.add(state.id)
+      if (state.terminal !== undefined && typeof state.terminal !== 'boolean') bad('states[' + index + '].terminal', 'must be a boolean')
+      for (const kind of ['onEntry', 'onExit'] as const) {
+        const actions = state[kind]
+        if (actions !== undefined) {
+          if (!Array.isArray(actions)) bad('states[' + index + '].' + kind, 'must be an array of action names')
+          else if (actions.length > 64) bad('states[' + index + '].' + kind, 'must not exceed 64 actions')
+          else actions.forEach((action, actionIndex) => {
+            if (typeof action !== 'string' || action.length === 0) bad('states[' + index + '].' + kind + '[' + actionIndex + ']', 'must be a non-empty string')
+          })
+        }
+      }
+    })
+    if (typeof root.init === 'string' && root.init.length > 0 && !seen.has(root.init)) bad('init', 'must name a declared state')
+  }
+  if (!Array.isArray(root.transitions)) {
+    bad('transitions', 'must be an array')
+  } else {
+    const stateIds = new Set<string>(Array.isArray(root.states) ? (root.states as StateSpec[]).map((state) => state.id) : [])
+    root.transitions.forEach((entry, index) => {
+      const path = 'transitions[' + index + ']'
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        bad(path, 'must be an object')
+        return
+      }
+      const transition = entry as Record<string, unknown>
+      rejectUnknownKeys(transition, MODEL_KEYS.transition, path)
+      if (typeof transition.from !== 'string' || transition.from.length === 0) bad(path + '.from', 'must be a non-empty string')
+      else if (!stateIds.has(transition.from)) bad(path + '.from', 'unknown state ' + transition.from)
+      if (typeof transition.event !== 'string' || transition.event.length === 0) bad(path + '.event', 'must be a non-empty string')
+      if (typeof transition.to !== 'string' || transition.to.length === 0) bad(path + '.to', 'must be a non-empty string')
+      else if (!stateIds.has(transition.to)) bad(path + '.to', 'unknown state ' + transition.to)
+      if (transition.guard !== undefined) validateGuard(transition.guard, path + '.guard', errors, bad)
+      if (transition.updates !== undefined) {
+        if (!Array.isArray(transition.updates)) bad(path + '.updates', 'must be an array')
+        else transition.updates.forEach((update, updateIndex) => {
+          const updatePath = path + '.updates[' + updateIndex + ']'
+          if (typeof update !== 'object' || update === null || Array.isArray(update)) {
+            bad(updatePath, 'must be an object')
+            return
+          }
+          const record = update as Record<string, unknown>
+          rejectUnknownKeys(record, MODEL_KEYS.update, updatePath)
+          if (typeof record.variable !== 'string' || record.variable.length === 0) bad(updatePath + '.variable', 'must be a non-empty string')
+          if (record.op !== 'set' && record.op !== 'inc' && record.op !== 'dec') bad(updatePath + '.op', "must be 'set', 'inc', or 'dec'")
+          if (record.value !== undefined && typeof record.value !== 'number') bad(updatePath + '.value', 'must be a number')
+        })
+      }
+      if (transition.cost !== undefined) {
+        if (typeof transition.cost !== 'number' || !Number.isFinite(transition.cost) || transition.cost < 0) bad(path + '.cost', 'must be a non-negative finite number')
+      }
+      if (transition.weight !== undefined) {
+        if (typeof transition.weight !== 'number' || !Number.isFinite(transition.weight) || transition.weight < 0) bad(path + '.weight', 'must be a non-negative finite number')
+      }
+    })
+  }
+  if (Array.isArray(root.states)) {
+    (root.states as StateSpec[]).forEach((state, index) => {
+      if (state.maxTicks !== undefined && (!Number.isInteger(state.maxTicks) || state.maxTicks < 0)) {
+        bad('states[' + index + '].maxTicks', 'must be a non-negative integer')
+      }
+    })
+  }
+  const variableNames = new Set<string>()
+  if (root.variables !== undefined) {
+    if (!Array.isArray(root.variables)) bad('variables', 'must be an array')
+    else root.variables.forEach((entry, index) => {
+      const path = 'variables[' + index + ']'
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        bad(path, 'must be an object')
+        return
+      }
+      const variable = entry as Record<string, unknown>
+      rejectUnknownKeys(variable, MODEL_KEYS.variable, path)
+      if (typeof variable.name !== 'string' || variable.name.length === 0) bad(path + '.name', 'must be a non-empty string')
+      else if (variableNames.has(variable.name)) bad(path + '.name', 'duplicate variable ' + variable.name)
+      else variableNames.add(variable.name)
+      if (variable.kind !== 'integer' && variable.kind !== 'boolean') bad(path + '.kind', "must be 'integer' or 'boolean'")
+      const expected = variable.kind === 'boolean' ? 'boolean' : 'number'
+      if (typeof variable.init !== expected) bad(path + '.init', 'must be a ' + expected)
+      if (variable.min !== undefined && typeof variable.min !== 'number') bad(path + '.min', 'must be a number')
+      if (variable.max !== undefined && typeof variable.max !== 'number') bad(path + '.max', 'must be a number')
+      if (typeof variable.min === 'number' && typeof variable.max === 'number' && variable.min > variable.max) bad(path + '.max', 'must be >= min')
+      if (variable.monotonic !== undefined && variable.monotonic !== 'inc' && variable.monotonic !== 'dec') bad(path + '.monotonic', "must be 'inc' or 'dec'")
+      if (variable.kind === 'integer' && typeof variable.init === 'number') {
+        if (typeof variable.min === 'number' && variable.init < variable.min) bad(path + '.init', 'must be >= min')
+        if (typeof variable.max === 'number' && variable.init > variable.max) bad(path + '.init', 'must be <= max')
+      }
+    })
+  }
+  const validateVariableRef = (name: unknown, path: string): void => {
+    if (typeof name !== 'string' || name.length === 0) bad(path, 'must be a non-empty string')
+    else if (!variableNames.has(name)) bad(path, 'references unknown variable ' + name)
+  }
+  const invariantStateIds = new Set<string>(Array.isArray(root.states) ? (root.states as StateSpec[]).map((state) => state.id) : [])
+  // Reference sets for invariant targets: denormalising a kind's target into the
+  // report makes a mistyped id look authoritative, so every reference must resolve.
+  const invariantEventIds = new Set<string>(Array.isArray(root.transitions) ? (root.transitions as TransitionSpec[]).map((transition) => transition.event) : [])
+  if (root.invariants !== undefined) {
+    if (!Array.isArray(root.invariants)) bad('invariants', 'must be an array')
+    else root.invariants.forEach((entry, index) => {
+      const path = 'invariants[' + index + ']'
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        bad(path, 'must be an object')
+        return
+      }
+      const invariant = entry as Record<string, unknown>
+      if (typeof invariant.id !== 'string' || invariant.id.length === 0) bad(path + '.id', 'must be a non-empty string')
+      if (typeof invariant.description !== 'string') bad(path + '.description', 'must be a string')
+      // Reject keys the selected kind does not declare instead of silently ignoring
+      // them: an ignored field (e.g. a `when` scope on a kind that cannot honor it)
+      // still shows up in the echoed report and reads as if it took effect. Kinds an
+      // older reader may not know are skipped so they still fail on `.kind` alone.
+      if (KNOWN_INVARIANT_KINDS.has(invariant.kind as string)) {
+        const allowed = INVARIANT_KEYS[invariant.kind as string]
+        const unexpected = Object.keys(invariant).filter((key) => !allowed.has(key) && !key.startsWith('_'))
+        if (unexpected.length > 0) {
+          bad(path + '.' + unexpected[0], 'unknown field for kind ' + String(invariant.kind) + ' (allowed: ' + [...allowed].join(', ') + ')')
+        }
+      }
+      if (invariant.kind === 'never-states') {
+        if (!Array.isArray(invariant.states) || invariant.states.length === 0) bad(path + '.states', 'must be a non-empty array')
+        else invariant.states.forEach((state, stateIndex) => {
+          if (typeof state !== 'string' || state.length === 0) bad(path + '.states[' + stateIndex + ']', 'must be a non-empty string')
+          else if (!invariantStateIds.has(state)) bad(path + '.states[' + stateIndex + ']', 'references unknown state ' + state)
+        })
+      } else if (invariant.kind === 'var-in-range') {
+        validateVariableRef(invariant.variable, path + '.variable')
+        if (invariant.min !== undefined && typeof invariant.min !== 'number') bad(path + '.min', 'must be a number')
+        if (invariant.max !== undefined && typeof invariant.max !== 'number') bad(path + '.max', 'must be a number')
+        if (invariant.min === undefined && invariant.max === undefined) bad(path, 'requires min or max (a range with neither bound is vacuous)')
+        if (invariant.when !== undefined) {
+          const when = invariant.when
+          if (typeof when !== 'object' || when === null || Array.isArray(when)) {
+            bad(path + '.when', 'must be an object')
+          } else if ('state' in when) {
+            const scope = when as Record<string, unknown>
+            for (const key of Object.keys(scope)) {
+              if (key !== 'state' && !key.startsWith('_')) bad(path + '.when.' + key, 'unknown field for a state scope (allowed: state)')
+            }
+            const state = scope.state
+            if (typeof state !== 'string' || state.length === 0) bad(path + '.when.state', 'must be a non-empty string')
+            else if (!invariantStateIds.has(state)) bad(path + '.when.state', 'references unknown state ' + state)
+          } else {
+            validateGuard(when, path + '.when', errors, bad)
+            for (const variable of guardVariables(when as GuardNode)) {
+              if (variable === invariant.variable) {
+                bad(path + '.when', 'must not reference the constrained variable ' + invariant.variable + ' (it can mask its own violation)')
+              } else {
+                validateVariableRef(variable, path + '.when')
+              }
+            }
+          }
+        }
+      } else if (invariant.kind === 'event-before-state') {
+        if (typeof invariant.event !== 'string' || invariant.event.length === 0) bad(path + '.event', 'must be a non-empty string')
+        else if (!invariantEventIds.has(invariant.event)) bad(path + '.event', 'references unknown event ' + invariant.event)
+        if (typeof invariant.state !== 'string' || invariant.state.length === 0) bad(path + '.state', 'must be a non-empty string')
+        else if (!invariantStateIds.has(invariant.state)) bad(path + '.state', 'references unknown state ' + invariant.state)
+      } else if (invariant.kind === 'leads-to') {
+        if (typeof invariant.from !== 'string' || invariant.from.length === 0) bad(path + '.from', 'must be a non-empty string')
+        else if (!invariantStateIds.has(invariant.from)) bad(path + '.from', 'references unknown state ' + invariant.from)
+        // `to` is one state id or a target set. A set with a duplicate member is a
+        // model-authoring slip that would otherwise give one meaning two hashes, so it
+        // is rejected rather than silently deduplicated.
+        if (typeof invariant.to === 'string') {
+          if (invariant.to.length === 0) bad(path + '.to', 'must be a non-empty string')
+          else if (!invariantStateIds.has(invariant.to)) bad(path + '.to', 'references unknown state ' + invariant.to)
+        } else if (Array.isArray(invariant.to)) {
+          if (invariant.to.length === 0) bad(path + '.to', 'must be a non-empty array of state ids')
+          else {
+            const targets = new Set<string>()
+            invariant.to.forEach((target, targetIndex) => {
+              const at = path + '.to[' + targetIndex + ']'
+              if (typeof target !== 'string' || target.length === 0) bad(at, 'must be a non-empty string')
+              else if (!invariantStateIds.has(target)) bad(at, 'references unknown state ' + target)
+              else if (targets.has(target)) bad(at, 'duplicates state ' + target + ' in the target set')
+              else targets.add(target)
+            })
+          }
+        } else {
+          bad(path + '.to', 'must be a state id or a non-empty array of state ids')
+        }
+      } else if (invariant.kind === 'sequence') {
+        if (!Array.isArray(invariant.events) || invariant.events.length === 0) bad(path + '.events', 'must be a non-empty array')
+        else invariant.events.forEach((event, eventIndex) => {
+          if (typeof event !== 'string' || event.length === 0) bad(path + '.events[' + eventIndex + ']', 'must be a non-empty string')
+        })
+      } else if (invariant.kind === 'atomicity') {
+        if (!Array.isArray(invariant.events) || invariant.events.length === 0) bad(path + '.events', 'must be a non-empty array')
+        else invariant.events.forEach((event, eventIndex) => {
+          if (typeof event !== 'string' || event.length === 0) bad(path + '.events[' + eventIndex + ']', 'must be a non-empty string')
+        })
+        if (typeof invariant.commit !== 'string' || invariant.commit.length === 0) bad(path + '.commit', 'must be a non-empty string')
+        if (invariant.rollback !== undefined && typeof invariant.rollback !== 'string') bad(path + '.rollback', 'must be a string')
+      } else if (invariant.kind === 'budget') {
+        if (typeof invariant.budget !== 'number' || !Number.isFinite(invariant.budget) || invariant.budget < 0) bad(path + '.budget', 'must be a non-negative finite number')
+      } else if (invariant.kind === 'probability') {
+        if (typeof invariant.target !== 'string' || invariant.target.length === 0) bad(path + '.target', 'must be a non-empty string')
+        else if (!invariantStateIds.has(invariant.target)) bad(path + '.target', 'references unknown state ' + invariant.target)
+        if (invariant.op !== '>=' && invariant.op !== '<=' && invariant.op !== '>' && invariant.op !== '<') bad(path + '.op', "must be one of '>=', '<=', '>', '<'")
+        if (typeof invariant.p !== 'number' || !Number.isFinite(invariant.p) || invariant.p < 0 || invariant.p > 1) bad(path + '.p', 'must be a number in [0, 1]')
+      } else {
+        bad(path + '.kind', 'unknown invariant kind')
+      }
+    })
+  }
+  if (root.concurrentPairs !== undefined) {
+    if (!Array.isArray(root.concurrentPairs)) bad('concurrentPairs', 'must be an array')
+    else root.concurrentPairs.forEach((entry, index) => {
+      const path = 'concurrentPairs[' + index + ']'
+      if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string' || typeof entry[1] !== 'string') {
+        bad(path, 'must be a [event, event] string pair')
+      }
+    })
+  }
+  if (root.boundaryChecks !== undefined) {
+    if (!Array.isArray(root.boundaryChecks)) bad('boundaryChecks', 'must be an array')
+    else root.boundaryChecks.forEach((entry, index) => {
+      const path = 'boundaryChecks[' + index + ']'
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        bad(path, 'must be an object')
+        return
+      }
+      const check = entry as Record<string, unknown>
+      rejectUnknownKeys(check, MODEL_KEYS.boundaryCheck, path)
+      validateVariableRef(check.variable, path + '.variable')
+      if (!Array.isArray(check.values) || check.values.some((value) => typeof value !== 'number')) bad(path + '.values', 'must be an array of numbers')
+    })
+  }
+  if (root.idempotentEvents !== undefined) {
+    if (!Array.isArray(root.idempotentEvents)) bad('idempotentEvents', 'must be an array')
+    else root.idempotentEvents.forEach((entry, index) => {
+      if (typeof entry !== 'string' || entry.length === 0) bad('idempotentEvents[' + index + ']', 'must be a non-empty string')
+    })
+  }
+  if (root.tickEvents !== undefined) {
+    if (!Array.isArray(root.tickEvents)) bad('tickEvents', 'must be an array')
+    else root.tickEvents.forEach((entry, index) => {
+      if (typeof entry !== 'string' || entry.length === 0) bad('tickEvents[' + index + ']', 'must be a non-empty string')
+    })
+  }
+  if (root.resourcePairs !== undefined) {
+    if (!Array.isArray(root.resourcePairs)) bad('resourcePairs', 'must be an array')
+    else root.resourcePairs.forEach((entry, index) => {
+      const path = 'resourcePairs[' + index + ']'
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        bad(path, 'must be an object')
+        return
+      }
+      const pair = entry as Record<string, unknown>
+      rejectUnknownKeys(pair, MODEL_KEYS.resourcePair, path)
+      if (typeof pair.resource !== 'string' || pair.resource.length === 0) bad(path + '.resource', 'must be a non-empty string')
+      if (typeof pair.acquireEvent !== 'string' || pair.acquireEvent.length === 0) bad(path + '.acquireEvent', 'must be a non-empty string')
+      if (typeof pair.releaseEvent !== 'string' || pair.releaseEvent.length === 0) bad(path + '.releaseEvent', 'must be a non-empty string')
+      if (pair.failEvent !== undefined && typeof pair.failEvent !== 'string') bad(path + '.failEvent', 'must be a string')
+    })
+  }
+  if (root.narrative !== undefined) {
+    const narrativePath = 'narrative'
+    if (typeof root.narrative !== 'object' || root.narrative === null || Array.isArray(root.narrative)) {
+      bad(narrativePath, 'must be an object')
+    } else {
+      const narrative = root.narrative as Record<string, unknown>
+      rejectUnknownKeys(narrative, MODEL_KEYS.narrative, narrativePath)
+      const stateIds = new Set<string>(Array.isArray(root.states) ? (root.states as StateSpec[]).map((state) => state.id) : [])
+      const eventIds = new Set<string>(Array.isArray(root.transitions) ? (root.transitions as TransitionSpec[]).map((transition) => transition.event) : [])
+      // A narrative is allowed to cover part of the model: states first, events and
+      // scenarios later is the natural authoring order, and `narrativeCoverage` reports
+      // what is still missing instead of rejecting the file. What stays an error is a
+      // narrative that is *wrong* (unknown id, empty description, duplicate scenario) or
+      // empty — an empty block claims documentation that does not exist.
+      const declaredDimensions = (['states', 'events', 'scenarios'] as const).filter((key) => narrative[key] !== undefined)
+      if (declaredDimensions.length === 0) {
+        bad(narrativePath, 'declares no dimension: give at least one of states, events or scenarios (a partial narrative is fine)')
+      }
+      if (narrative.states !== undefined) {
+        if (typeof narrative.states !== 'object' || narrative.states === null || Array.isArray(narrative.states)) {
+          bad(narrativePath + '.states', 'must be an object mapping state id -> natural-language description')
+        } else {
+          for (const [id, description] of Object.entries(narrative.states as Record<string, unknown>)) {
+            if (!stateIds.has(id)) bad(narrativePath + '.states', 'references unknown state ' + id)
+            if (typeof description !== 'string' || description.length === 0) bad(narrativePath + '.states.' + id, 'must be a non-empty string')
+          }
+        }
+      }
+      if (narrative.events !== undefined) {
+        if (typeof narrative.events !== 'object' || narrative.events === null || Array.isArray(narrative.events)) {
+          bad(narrativePath + '.events', 'must be an object mapping event id -> natural-language description')
+        } else {
+          for (const [id, description] of Object.entries(narrative.events as Record<string, unknown>)) {
+            if (!eventIds.has(id)) bad(narrativePath + '.events', 'references unknown event ' + id)
+            if (typeof description !== 'string' || description.length === 0) bad(narrativePath + '.events.' + id, 'must be a non-empty string')
+          }
+        }
+      }
+      if (narrative.scenarios !== undefined) {
+        if (!Array.isArray(narrative.scenarios)) {
+          bad(narrativePath + '.scenarios', 'must be an array of { from, event, scenario }')
+        } else {
+          const seen = new Set<string>()
+          narrative.scenarios.forEach((entry, index) => {
+            const scenarioPath = narrativePath + '.scenarios[' + index + ']'
+            if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+              bad(scenarioPath, 'must be an object')
+              return
+            }
+            const scenario = entry as Record<string, unknown>
+            rejectUnknownKeys(scenario, MODEL_KEYS.scenario, scenarioPath)
+            if (typeof scenario.from !== 'string' || scenario.from.length === 0) bad(scenarioPath + '.from', 'must be a non-empty string')
+            else if (!stateIds.has(scenario.from)) bad(scenarioPath + '.from', 'unknown state ' + scenario.from)
+            if (typeof scenario.event !== 'string' || scenario.event.length === 0) bad(scenarioPath + '.event', 'must be a non-empty string')
+            else if (!eventIds.has(scenario.event)) bad(scenarioPath + '.event', 'unknown event ' + scenario.event)
+            if (typeof scenario.scenario !== 'string' || scenario.scenario.length === 0) bad(scenarioPath + '.scenario', 'must be a non-empty string')
+            const key = String(scenario.from) + '|' + String(scenario.event)
+            if (seen.has(key)) bad(scenarioPath, 'duplicate scenario for (' + scenario.from + ', ' + scenario.event + ')')
+            seen.add(key)
+          })
+        }
+      }
+    }
+  }
+  // Guard/update variable references were validated structurally; re-walk for references.
+  if (Array.isArray(root.transitions)) {
+    for (const entry of root.transitions as TransitionSpec[]) {
+      walkGuardReferences(entry.guard, variableNames, errors, bad)
+      for (const update of entry.updates ?? []) {
+        if (!variableNames.has(update.variable)) bad('transitions.updates', 'references unknown variable ' + update.variable)
+        if (update.op !== 'set' && update.value !== undefined && update.value === 0) {
+          // zero delta is harmless; no finding
+        }
+      }
+    }
+  }
+  if (errors.length > 0) return { ok: false, errors }
+  return { ok: true, model: root as unknown as LogicModelV1 }
+}
+
+function validateGuard(input: unknown, path: string, errors: string[], bad: (path: string, message: string) => void): void {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    bad(path, 'must be an object')
+    return
+  }
+  const guard = input as Record<string, unknown>
+  if (guard.variable !== undefined) {
+    if (typeof guard.variable !== 'string' || guard.variable.length === 0) bad(path + '.variable', 'must be a non-empty string')
+    if (guard.op !== '==' && guard.op !== '!=' && guard.op !== '<' && guard.op !== '<=' && guard.op !== '>' && guard.op !== '>=') bad(path + '.op', 'must be a comparison operator')
+    if (typeof guard.value !== 'number' && typeof guard.value !== 'boolean') bad(path + '.value', 'must be a number or boolean')
+    return
+  }
+  if (guard.all !== undefined) {
+    if (!Array.isArray(guard.all)) bad(path + '.all', 'must be an array')
+    else guard.all.forEach((child, index) => validateGuard(child, path + '.all[' + index + ']', errors, bad))
+    return
+  }
+  if (guard.any !== undefined) {
+    if (!Array.isArray(guard.any)) bad(path + '.any', 'must be an array')
+    else guard.any.forEach((child, index) => validateGuard(child, path + '.any[' + index + ']', errors, bad))
+    return
+  }
+  if (guard.not !== undefined) {
+    validateGuard(guard.not, path + '.not', errors, bad)
+    return
+  }
+  bad(path, 'must be a leaf ({ variable, op, value }), { all }, { any }, or { not }')
+}
+
+function walkGuardReferences(guard: GuardNode | undefined, variableNames: Set<string>, errors: string[], bad: (path: string, message: string) => void): void {
+  if (guard === undefined) return
+  if ('variable' in guard) {
+    if (!variableNames.has(guard.variable)) bad('guard', 'references unknown variable ' + guard.variable)
+    return
+  }
+  if ('all' in guard) {
+    for (const child of guard.all) walkGuardReferences(child, variableNames, errors, bad)
+    return
+  }
+  if ('any' in guard) {
+    for (const child of guard.any) walkGuardReferences(child, variableNames, errors, bad)
+    return
+  }
+  if ('not' in guard) walkGuardReferences(guard.not, variableNames, errors, bad)
+}
+
+// ---------------------------------------------------------------------------
+// execution
+// ---------------------------------------------------------------------------
+
+function isLeafGuard(guard: GuardNode): guard is LeafGuard {
+  return 'variable' in guard
+}
+
+export function guardVariables(guard: GuardNode | undefined): string[] {
+  if (guard === undefined) return []
+  if (isLeafGuard(guard)) return [guard.variable]
+  if ('all' in guard) return guard.all.flatMap((child) => guardVariables(child))
+  if ('any' in guard) return guard.any.flatMap((child) => guardVariables(child))
+  if ('not' in guard) return guardVariables(guard.not)
+  return []
+}
+
+function evalGuard(guard: GuardNode, vars: Record<string, VarValue>): boolean {
+  if (isLeafGuard(guard)) {
+    const actual = vars[guard.variable]
+    switch (guard.op) {
+      case '==': return actual === guard.value
+      case '!=': return actual !== guard.value
+      case '<': return (actual as number) < (guard.value as number)
+      case '<=': return (actual as number) <= (guard.value as number)
+      case '>': return (actual as number) > (guard.value as number)
+      case '>=': return (actual as number) >= (guard.value as number)
+    }
+  }
+  if ('all' in guard) return guard.all.every((child) => evalGuard(child, vars))
+  if ('any' in guard) return guard.any.some((child) => evalGuard(child, vars))
+  if ('not' in guard) return !evalGuard(guard.not, vars)
+  return false
+}
+
+function initialState(model: LogicModelV1): RuntimeState {
+  const vars: Record<string, VarValue> = {}
+  for (const variable of model.variables ?? []) vars[variable.name] = variable.init
+  return { state: model.init, vars }
+}
+
+function runtimeKey(runtime: RuntimeState): string {
+  return runtime.state + '|' + stableStringify(runtime.vars)
+}
+
+function applyUpdates(model: LogicModelV1, transition: TransitionSpec, runtime: RuntimeState): RuntimeState {
+  const vars = { ...runtime.vars }
+  for (const update of transition.updates ?? []) {
+    const current = vars[update.variable]
+    if (update.op === 'set') vars[update.variable] = update.value ?? 0
+    else if (update.op === 'inc') vars[update.variable] = ((typeof current === 'number' ? current : 0) + (update.value ?? 1))
+    else vars[update.variable] = ((typeof current === 'number' ? current : 0) - (update.value ?? 1))
+  }
+  return { state: transition.to, vars }
+}
+
+function groupTransitions(model: LogicModelV1): Map<string, TransitionSpec[]> {
+  const groups = new Map<string, TransitionSpec[]>()
+  for (const transition of model.transitions) {
+    const key = transition.from + '|' + transition.event
+    const list = groups.get(key) ?? []
+    list.push(transition)
+    groups.set(key, list)
+  }
+  return groups
+}
+
+function applicableTransitions(group: TransitionSpec[], runtime: RuntimeState): TransitionSpec[] {
+  const guarded: TransitionSpec[] = []
+  const unguarded: TransitionSpec[] = []
+  for (const transition of group) {
+    if (transition.guard === undefined) unguarded.push(transition)
+    else guarded.push(transition)
+  }
+  const matched = guarded.filter((transition) => evalGuard(transition.guard!, runtime.vars))
+  if (matched.length > 0) return matched
+  return unguarded
+}
+
+function stepRuntime(model: LogicModelV1, runtime: RuntimeState, event: string): RuntimeState[] {
+  const group = groupTransitions(model).get(runtime.state + '|' + event)
+  if (group === undefined || group.length === 0) return []
+  const seen = new Set<string>()
+  const outcomes: RuntimeState[] = []
+  for (const transition of applicableTransitions(group, runtime)) {
+    const next = applyUpdates(model, transition, runtime)
+    const key = runtimeKey(next)
+    if (!seen.has(key)) {
+      seen.add(key)
+      outcomes.push(next)
+    }
+  }
+  return outcomes
+}
+
+interface Exploration {
+  reachable: RuntimeState[]
+  reachableKeys: Set<string>
+  truncated: boolean
+  initialState: RuntimeState
+}
+
+function explore(model: LogicModelV1, options: NormalizedOptions): Exploration {
+  const init = initialState(model)
+  const reachable: RuntimeState[] = []
+  const reachableKeys = new Set<string>()
+  const queue: RuntimeState[] = [init]
+  let truncated = false
+  while (queue.length > 0) {
+    const runtime = queue.shift()!
+    const key = runtimeKey(runtime)
+    if (reachableKeys.has(key)) continue
+    reachableKeys.add(key)
+    reachable.push(runtime)
+    if (reachable.length > options.maxStates) {
+      truncated = true
+      break
+    }
+    for (const event of allEvents(model)) {
+      for (const next of stepRuntime(model, runtime, event)) {
+        if (!reachableKeys.has(runtimeKey(next))) queue.push(next)
+      }
+    }
+  }
+  return { reachable, reachableKeys, truncated, initialState: init }
+}
+
+function allEvents(model: LogicModelV1): string[] {
+  return [...new Set(model.transitions.map((transition) => transition.event))].sort()
+}
+
+function stateById(model: LogicModelV1, id: string): StateSpec | undefined {
+  return model.states.find((state) => state.id === id)
+}
+
+function isTerminal(model: LogicModelV1, state: string): boolean {
+  return stateById(model, state)?.terminal === true
+}
+
+function uniqueTargets(transitions: TransitionSpec[]): string[] {
+  return [...new Set(transitions.map((transition) => transition.to))]
+}
+
+function checkResult(id: string, name: string, findings: Finding[], detail: string): CheckResult {
+  const errors = findings.filter((finding) => finding.severity === 'error').length
+  const warnings = findings.filter((finding) => finding.severity === 'warning').length
+  return {
+    id,
+    name,
+    // An info finding is a note, not a defect: it must not flip a check to `fail`, or the
+    // check would be dragged into the "resolve the failing checks" list for a remark.
+    status: errors + warnings === 0 ? 'pass' : 'fail',
+    detail: detail + (errors > 0 ? ' (' + errors + ' errors' + (warnings > 0 ? ', ' + warnings + ' warnings' : '') + ')' : warnings > 0 ? ' (' + warnings + ' warnings)' : ''),
+    findings,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// S1-S8
+// ---------------------------------------------------------------------------
+
+function S1_reachability(model: LogicModelV1, exploration: Exploration): CheckResult {
+  const reached = new Set(exploration.reachable.map((runtime) => runtime.state))
+  const unreachable = model.states.filter((state) => !reached.has(state.id)).map((state) => state.id)
+  const findings: Finding[] = unreachable.map((state) => ({
+    code: 'S1_UNREACHABLE_STATE',
+    severity: 'warning',
+    message: 'State ' + state + ' is not reachable from init.',
+  }))
+  return checkResult('S1', 'Reachability', findings, unreachable.length === 0 ? 'All states reachable' : 'Unreachable states: ' + unreachable.join(', '))
+}
+
+function S2_deadlock(model: LogicModelV1): CheckResult {
+  const outgoing = new Set(model.transitions.map((transition) => transition.from))
+  const findings: Finding[] = []
+  for (const state of model.states) {
+    if (state.terminal === true) continue
+    if (!outgoing.has(state.id)) {
+      findings.push({
+        code: 'S2_NO_TRANSITIONS',
+        severity: 'error',
+        message: 'Non-terminal state ' + state.id + ' has no outgoing transitions.',
+      })
+    }
+  }
+  return checkResult('S2', 'Deadlock', findings, findings.length === 0 ? 'No deadlocks' : 'Deadlocks: ' + findings.map((finding) => finding.message).join('; '))
+}
+
+function sccs(model: LogicModelV1): string[][] {
+  const states = model.states.map((state) => state.id)
+  const edges = new Map<string, string[]>()
+  for (const state of states) edges.set(state, [])
+  for (const transition of model.transitions) {
+    const list = edges.get(transition.from)
+    if (list !== undefined) list.push(transition.to)
+  }
+  let index = 0
+  const indices = new Map<string, number>()
+  const low = new Map<string, number>()
+  const onStack = new Set<string>()
+  const stack: string[] = []
+  const components: string[][] = []
+  const visit = (node: string): void => {
+    indices.set(node, index)
+    low.set(node, index)
+    index += 1
+    stack.push(node)
+    onStack.add(node)
+    for (const next of edges.get(node) ?? []) {
+      if (!indices.has(next)) {
+        visit(next)
+        low.set(node, Math.min(low.get(node)!, low.get(next)!))
+      } else if (onStack.has(next)) {
+        low.set(node, Math.min(low.get(node)!, indices.get(next)!))
+      }
+    }
+    if (low.get(node) === indices.get(node)) {
+      const component: string[] = []
+      while (stack.length > 0) {
+        const member = stack.pop()!
+        onStack.delete(member)
+        component.push(member)
+        if (member === node) break
+      }
+      components.push(component)
+    }
+  }
+  for (const state of states) {
+    if (!indices.has(state)) visit(state)
+  }
+  return components
+}
+
+function S3_liveness(model: LogicModelV1): CheckResult {
+  const components = sccs(model)
+  const findings: Finding[] = []
+  for (const component of components) {
+    const componentSet = new Set(component)
+    const internalEdges = model.transitions.filter((transition) => componentSet.has(transition.from) && componentSet.has(transition.to))
+    const escapingEdges = model.transitions.filter((transition) => componentSet.has(transition.from) && !componentSet.has(transition.to))
+    if (internalEdges.length === 0 || escapingEdges.length > 0) continue
+    if (component.some((state) => isTerminal(model, state))) continue
+    findings.push({
+      code: 'S3_CLOSED_SCC',
+      severity: 'error',
+      message: 'Closed SCC has no exit and contains no terminal state: ' + component.sort().join(', '),
+      evidence: { states: component.sort(), transitions: internalEdges.length },
+    })
+  }
+  return checkResult('S3', 'Liveness', findings, findings.length === 0 ? 'No harmful closed SCCs' : 'Closed SCCs: ' + findings.length)
+}
+
+function assignmentsFor(model: LogicModelV1, variables: string[]): Array<Record<string, VarValue>> | null {
+  const specs = (model.variables ?? []).filter((variable) => variables.includes(variable.name))
+  let combinations: Array<Record<string, VarValue>> = [{}]
+  for (const spec of specs) {
+    let values: VarValue[]
+    if (spec.kind === 'boolean') values = [false, true]
+    else {
+      const constants = collectGuardConstants(model).filter((value) => guardLeaves(model).some((leaf) => leaf.variable === spec.name && typeof leaf.value === 'number' && leaf.value === value))
+      if (spec.min !== undefined && spec.max !== undefined) {
+        values = []
+        for (let value = spec.min; value <= spec.max && value <= spec.min + 200; value++) values.push(value)
+      } else {
+        const set = new Set<number>([-1, 0, 1, ...constants])
+        values = [...set].sort((a, b) => a - b)
+      }
+    }
+    const next: Array<Record<string, VarValue>> = []
+    for (const assignment of combinations) {
+      for (const value of values) {
+        next.push({ ...assignment, [spec.name]: value })
+        if (next.length > 10_000) return null
+      }
+    }
+    combinations = next
+  }
+  return combinations
+}
+
+function guardLeaves(model: LogicModelV1): LeafGuard[] {
+  const leaves: LeafGuard[] = []
+  const visit = (guard: GuardNode): void => {
+    if ('variable' in guard) leaves.push(guard)
+    else if ('all' in guard) guard.all.forEach(visit)
+    else if ('any' in guard) guard.any.forEach(visit)
+    else if ('not' in guard) visit(guard.not)
+  }
+  for (const transition of model.transitions) if (transition.guard !== undefined) visit(transition.guard)
+  return leaves
+}
+
+function collectGuardConstants(model: LogicModelV1): number[] {
+  return guardLeaves(model).filter((leaf) => typeof leaf.value === 'number').map((leaf) => leaf.value as number)
+}
+
+/** How a variable value prints in a message. Shared by every finding that quotes one. */
+function varValueLabel(value: VarValue): string {
+  return typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value)
+}
+
+/** Deterministic value order: booleans first, then numbers ascending. */
+function compareVarValues(a: VarValue, b: VarValue): number {
+  const rank = (value: VarValue): [number, number] => typeof value === 'number' ? [1, value] : [0, value ? 1 : 0]
+  const [rankA, numberA] = rank(a)
+  const [rankB, numberB] = rank(b)
+  return rankA === rankB ? numberA - numberB : rankA - rankB
+}
+
+/**
+ * Values each variable can actually hold, as an over-approximation: `init` plus every
+ * `set` constant the model writes. `null` means "unknown", which is what an `inc` or
+ * `dec` update produces — the reachable set is then unbounded and nothing can be
+ * concluded from it.
+ *
+ * The union is taken across the whole model rather than per state, so the answer can
+ * only be too large, never too small. A guard this function calls dead is therefore
+ * dead in every state, while a live guard may still be unreachable in a particular one.
+ */
+function attainableValues(model: LogicModelV1): Map<string, Set<VarValue> | null> {
+  const attainable = new Map<string, Set<VarValue> | null>()
+  for (const variable of model.variables ?? []) attainable.set(variable.name, new Set<VarValue>([variable.init]))
+  for (const transition of model.transitions) {
+    for (const update of transition.updates ?? []) {
+      if (!attainable.has(update.variable)) continue
+      if (update.op === 'inc' || update.op === 'dec') {
+        attainable.set(update.variable, null)
+        continue
+      }
+      const values = attainable.get(update.variable)
+      if (values === null || values === undefined) continue
+      values.add(update.value ?? 0)
+    }
+  }
+  return attainable
+}
+
+/**
+ * Guarded transitions whose guard no reachable variable value can satisfy: the branch
+ * is dead code, and a model that relies on it is not the model the author wrote. This
+ * is the dual of S6_INCOMPLETE_GUARD — a group that never reaches a branch, rather
+ * than one that falls through every branch.
+ *
+ * The test runs over {@link attainableValues}, not over the declared domain: a guard
+ * on a variable the model only ever sets to one of its declared values is satisfiable
+ * on paper and dead in practice, which is exactly the defect worth reporting.
+ */
+function deadGuardFindings(model: LogicModelV1): Finding[] {
+  const attainable = attainableValues(model)
+  const findings: Finding[] = []
+  for (const [key, group] of groupTransitions(model)) {
+    const [from, event] = key.split('|')
+    for (const transition of group) {
+      if (transition.guard === undefined) continue
+      const names = [...new Set(guardVariables(transition.guard))].filter((name) => attainable.has(name)).sort()
+      if (names.length === 0) continue
+      const domains: Array<Set<VarValue>> = []
+      let known = true
+      for (const name of names) {
+        const values = attainable.get(name)
+        if (values === undefined || values === null || values.size === 0) { known = false; break }
+        domains.push(values)
+      }
+      if (!known) continue
+      let size = 1
+      for (const values of domains) size *= values.size
+      if (size > 10_000) continue
+      const assignment: Record<string, VarValue> = {}
+      const satisfiable = (index: number): boolean => {
+        if (index === names.length) return evalGuard(transition.guard!, assignment)
+        for (const value of [...domains[index]].sort(compareVarValues)) {
+          assignment[names[index]] = value
+          if (satisfiable(index + 1)) return true
+        }
+        return false
+      }
+      if (satisfiable(0)) continue
+      findings.push({
+        code: 'S6_DEAD_GUARD',
+        severity: 'warning',
+        message: from + ' + ' + event + ' has a guard that can never hold: ' + names.map((name) =>
+          name + ' is only ever ' + [...(attainable.get(name) as Set<VarValue>)].sort(compareVarValues).map(varValueLabel).join('/')).join(', ') + '. The branch is dead.',
+        evidence: { guard: transition.guard, attainable: names.map((name) => ({ variable: name, values: [...(attainable.get(name) as Set<VarValue>)].sort(compareVarValues).map(varValueLabel) })) },
+      })
+    }
+  }
+  return findings
+}
+
+interface GuardAnalysis {
+  determinism: Finding[]
+  completeness: Finding[]
+  truncated: boolean
+}
+
+function analyzeGuards(model: LogicModelV1): GuardAnalysis {
+  const determinism: Finding[] = []
+  const completeness: Finding[] = []
+  let truncated = false
+  const groups = groupTransitions(model)
+  for (const [key, group] of groups) {
+    const [from, event] = key.split('|')
+    const unguarded = group.filter((transition) => transition.guard === undefined)
+    const guarded = group.filter((transition) => transition.guard !== undefined)
+    if (unguarded.length > 1) {
+      determinism.push({
+        code: 'S4_AMBIGUOUS_DEFAULT',
+        severity: 'error',
+        message: from + ' + ' + event + ' has multiple unconditional transitions: ' + uniqueTargets(unguarded).join(', '),
+      })
+    }
+    if (guarded.length === 0) continue
+    const variables = [...new Set(group.flatMap((transition) => guardVariables(transition.guard)))]
+    const assignments = assignmentsFor(model, variables)
+    if (assignments === null) {
+      completeness.push({ code: 'S6_UNBOUNDED_DOMAIN', severity: 'warning', message: from + ' + ' + event + ': guard domain too large to enumerate; exhaustive check skipped.' })
+      truncated = true
+      continue
+    }
+    const targets = uniqueTargets(group)
+    for (const assignment of assignments) {
+      const trueBranches = guarded.filter((transition) => evalGuard(transition.guard!, assignment))
+      if (trueBranches.length > 1) {
+        determinism.push({
+          code: 'S4_NONDETERMINISTIC_GUARDS',
+          severity: 'error',
+          message: from + ' + ' + event + ' has ' + trueBranches.length + ' simultaneously true guards for assignment ' + stableStringify(assignment) + ': ' + uniqueTargets(trueBranches).join(', '),
+          evidence: { assignment },
+        })
+      }
+      if (trueBranches.length === 0 && unguarded.length === 0) {
+        completeness.push({
+          code: 'S6_INCOMPLETE_GUARD',
+          severity: 'error',
+          message: from + ' + ' + event + ' has no true guard and no default branch for assignment ' + stableStringify(assignment),
+          evidence: { assignment, branches: targets },
+        })
+      }
+      if (determinism.length + completeness.length > 200) {
+        truncated = true
+        break
+      }
+    }
+    if (truncated) break
+  }
+  completeness.push(...deadGuardFindings(model))
+  return { determinism, completeness, truncated }
+}
+
+function S4_determinism(model: LogicModelV1): CheckResult {
+  const analysis = analyzeGuards(model)
+  return checkResult('S4', 'Determinism', analysis.determinism, analysis.determinism.length === 0 ? 'Deterministic' : 'Nondeterminism findings: ' + analysis.determinism.length)
+}
+
+function S6_guardCompleteness(model: LogicModelV1): CheckResult {
+  const analysis = analyzeGuards(model)
+  const dead = analysis.completeness.filter((finding) => finding.code === 'S6_DEAD_GUARD').length
+  const detail = analysis.completeness.length === 0
+    ? 'All guard branches defined'
+    : dead === analysis.completeness.length ? 'Dead guard branches: ' + dead : 'Guard findings: ' + analysis.completeness.length
+  return checkResult('S6', 'Guard Completeness', analysis.completeness, detail)
+}
+
+function S5_eventCompleteness(model: LogicModelV1): CheckResult {
+  const events = allEvents(model)
+  const findings: Finding[] = []
+  for (const state of model.states) {
+    if (state.terminal === true) continue
+    const handled = new Set(model.transitions.filter((transition) => transition.from === state.id).map((transition) => transition.event))
+    for (const event of events) {
+      if (!handled.has(event)) {
+        findings.push({
+          code: 'S5_UNHANDLED_EVENT',
+          severity: 'warning',
+          message: state.id + ' silently ignores event ' + event,
+        })
+      }
+    }
+  }
+  return checkResult('S5', 'Event Completeness', findings, findings.length === 0 ? 'All states handle all relevant events' : findings.length + ' unhandled (state, event) pairs')
+}
+
+interface InvariantViolation {
+  invariant: InvariantSpec
+  path: PathStep[]
+  reason: string
+  /**
+   * The search hit its budget before deciding the property, so neither "holds" nor
+   * "violated" is proven. Every caller must report this as undecided rather than fold
+   * it into a pass: a cap that reads as a pass is the false green the report contract
+   * exists to prevent.
+   */
+  undecided?: boolean
+}
+
+/** Whether a `var-in-range` `when` scope selects this runtime state. */
+function whenScopeHolds(when: InvariantWhen, runtime: RuntimeState): boolean {
+  return isStateGuard(when) ? when.state === runtime.state : evalGuard(when, runtime.vars)
+}
+
+function invariantHolds(invariant: InvariantSpec, runtime: RuntimeState, isInitial = false): boolean {
+  if (invariant.kind === 'never-states') return !invariant.states.includes(runtime.state)
+  if (invariant.kind === 'var-in-range') {
+    // The initial runtime state is checked unconditionally: a machine must never be
+    // able to escape the range simply by starting outside the scope.
+    if (!isInitial && invariant.when !== undefined && !whenScopeHolds(invariant.when, runtime)) return true
+    const value = runtime.vars[invariant.variable]
+    if (typeof value !== 'number') return false
+    if (invariant.min !== undefined && value < invariant.min) return false
+    if (invariant.max !== undefined && value > invariant.max) return false
+    return true
+  }
+  return true
+}
+
+function shortestViolationForInvariant(model: LogicModelV1, options: NormalizedOptions, invariant: InvariantSpec): InvariantViolation | undefined {
+  if (invariant.kind === 'event-before-state') {
+    return shortestEventBeforeStateViolation(model, options, invariant)
+  }
+  const init = initialState(model)
+  if (!invariantHolds(invariant, init, true)) {
+    return { invariant, path: [], reason: 'Initial state violates the invariant.' }
+  }
+  const visited = new Set<string>([runtimeKey(init)])
+  const queue: Array<{ runtime: RuntimeState; path: PathStep[] }> = [{ runtime: init, path: [] }]
+  let steps = 0
+  while (queue.length > 0) {
+    const entry = queue.shift()!
+    if (++steps > options.maxStates) break
+    for (const event of allEvents(model)) {
+      for (const next of stepRuntime(model, entry.runtime, event)) {
+        const key = runtimeKey(next)
+        if (visited.has(key)) continue
+        const path = [...entry.path, { from: entry.runtime.state, event, to: next.state }]
+        if (!invariantHolds(invariant, next)) {
+          return { invariant, path, reason: 'Invariant violated after ' + path.length + ' events.' }
+        }
+        visited.add(key)
+        queue.push({ runtime: next, path })
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Whether an invariant asserts a property of whole runs rather than of a single
+ * runtime state. These kinds cannot be decided by a state predicate, so they are not
+ * part of `shortestViolationForInvariant` (and therefore not of S7), which owns the
+ * states; A9-A13 own the verdicts, and `pathPropertyViolation` below makes the same
+ * verdicts available to A7 and D2.
+ */
+function isPathPropertyInvariant(invariant: InvariantSpec): boolean {
+  return invariant.kind === 'leads-to'
+    || invariant.kind === 'sequence'
+    || invariant.kind === 'atomicity'
+    || invariant.kind === 'budget'
+    || invariant.kind === 'probability'
+}
+
+/** Whether a probability invariant's bound fails for the computed hit probability. */
+function probabilityViolated(invariant: Extract<InvariantSpec, { kind: 'probability' }>, probability: number): boolean {
+  const eps = 1e-9
+  if (invariant.op === '>=') return probability < invariant.p - eps
+  if (invariant.op === '>') return probability <= invariant.p + eps
+  if (invariant.op === '<=') return probability > invariant.p + eps
+  return probability >= invariant.p - eps
+}
+
+/** Every runtime state reachable from init, capped like the other searches. */
+function reachableRuntimeStates(model: LogicModelV1, options: NormalizedOptions): RuntimeState[] {
+  const init = initialState(model)
+  const visited = new Set<string>([runtimeKey(init)])
+  const reached: RuntimeState[] = [init]
+  const queue: RuntimeState[] = [init]
+  let steps = 0
+  while (queue.length > 0) {
+    if (++steps > options.maxStates) break
+    const current = queue.shift()!
+    for (const event of allEvents(model)) {
+      for (const next of stepRuntime(model, current, event)) {
+        const key = runtimeKey(next)
+        if (visited.has(key)) continue
+        visited.add(key)
+        reached.push(next)
+        queue.push(next)
+      }
+    }
+  }
+  return reached
+}
+
+/**
+ * Violation of a path-property invariant, or undefined when it holds. Each kind
+ * delegates to the search its dedicated probe uses (A9 leads-to, A10 sequence, A11
+ * atomicity, A12 budget, A13 probability), so a verdict reported here can never
+ * disagree with the probe that owns the kind.
+ */
+function pathPropertyViolation(model: LogicModelV1, options: NormalizedOptions, invariant: InvariantSpec): InvariantViolation | undefined {
+  if (invariant.kind === 'leads-to') {
+    const targets = new Set(leadsToTargets(invariant))
+    const label = leadsToTargetLabel(invariant)
+    const budget = leadsToWalkBudget(options)
+    const walk: LeadsToWalk = { remaining: budget }
+    for (const runtime of reachableRuntimeStates(model, options)) {
+      if (runtime.state !== invariant.from) continue
+      const outcome = findLeadsToBadPath(model, runtime, targets, label, walk)
+      if (outcome.undecided) {
+        return { invariant, path: [], reason: 'the walk spent its budget of ' + budget + ' steps without finding a run that avoids ' + label + ', or proving that none exists', undecided: true }
+      }
+      if (outcome.violation !== undefined) return { invariant, path: outcome.violation.path, reason: outcome.violation.reason }
+    }
+    return undefined
+  }
+  if (invariant.kind === 'sequence') return findSequenceViolation(model, options, invariant)
+  if (invariant.kind === 'atomicity') return findAtomicityViolation(model, options, invariant)
+  if (invariant.kind === 'budget') {
+    const violation = findBudgetViolation(model, options, invariant)
+    if (violation === undefined) return undefined
+    return {
+      invariant,
+      path: violation.path,
+      reason: violation.unbounded
+        ? 'a reachable cycle keeps accumulating cost, so no finite budget holds'
+        : 'a run accumulates cost ' + String(violation.cost) + ', above the declared budget ' + String(invariant.budget),
+    }
+  }
+  if (invariant.kind === 'probability') {
+    const { probability, converged } = computeHitProbability(model, options, invariant.target)
+    if (!probabilityViolated(invariant, probability)) return undefined
+    return {
+      invariant,
+      path: [],
+      reason: 'P(hit ' + invariant.target + ') = ' + probability.toFixed(6) + ' does not satisfy ' + invariant.op + ' ' + String(invariant.p)
+        + (converged ? '' : ' (value iteration did not converge)'),
+    }
+  }
+  return undefined
+}
+
+function shortestEventBeforeStateViolation(model: LogicModelV1, options: NormalizedOptions, invariant: Extract<InvariantSpec, { kind: 'event-before-state' }>): InvariantViolation | undefined {
+  const init = initialState(model)
+  const seenInitially = false
+  if (init.state === invariant.state && !seenInitially) {
+    return { invariant, path: [], reason: 'Target state ' + invariant.state + ' is initial and the required event ' + invariant.event + ' has not occurred.' }
+  }
+  const key = (runtime: RuntimeState, seen: boolean): string => runtimeKey(runtime) + '|' + (seen ? '1' : '0')
+  const visited = new Set<string>([key(init, false)])
+  const queue: Array<{ runtime: RuntimeState; seen: boolean; path: PathStep[] }> = [{ runtime: init, seen: false, path: [] }]
+  let steps = 0
+  while (queue.length > 0) {
+    const entry = queue.shift()!
+    if (++steps > options.maxStates) break
+    for (const event of allEvents(model)) {
+      for (const next of stepRuntime(model, entry.runtime, event)) {
+        const seen = entry.seen || event === invariant.event
+        const nextKey = key(next, seen)
+        if (visited.has(nextKey)) continue
+        const path = [...entry.path, { from: entry.runtime.state, event, to: next.state }]
+        if (next.state === invariant.state && !seen) {
+          return { invariant, path, reason: 'Target state ' + invariant.state + ' is reachable without event ' + invariant.event + ' in ' + path.length + ' steps.' }
+        }
+        visited.add(nextKey)
+        queue.push({ runtime: next, seen, path })
+      }
+    }
+  }
+  return undefined
+}
+
+function runInvariants(model: LogicModelV1, options: NormalizedOptions, includePathProperties = false): InvariantViolation[] {
+  const violations: InvariantViolation[] = []
+  for (const invariant of model.invariants ?? []) {
+    const violation = includePathProperties && isPathPropertyInvariant(invariant)
+      ? pathPropertyViolation(model, options, invariant)
+      : shortestViolationForInvariant(model, options, invariant)
+    if (violation !== undefined) violations.push(violation)
+  }
+  return violations
+}
+
+function S7_invariants(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const violations = runInvariants(model, options)
+  const findings: Finding[] = violations.map((violation) => violation.undecided ? {
+    code: 'S7_UNDECIDED',
+    severity: 'warning' as const,
+    message: 'Invariant "' + violation.invariant.id + '" (' + violation.invariant.description + ') could not be decided: ' + violation.reason + '. Absence is not proven.',
+    evidence: { invariant: violation.invariant },
+  } : {
+    code: 'S7_INVARIANT_VIOLATION',
+    severity: 'error' as const,
+    message: 'Invariant "' + violation.invariant.id + '" (' + violation.invariant.description + ') violated: ' + violation.reason,
+    path: violation.path,
+    evidence: { invariant: violation.invariant },
+  })
+  const undecided = findings.some((finding) => finding.code === 'S7_UNDECIDED')
+  return checkResult('S7', 'Invariant Validity', findings, violations.length === 0
+    ? 'All invariants hold'
+    : undecided && findings.every((finding) => finding.code === 'S7_UNDECIDED') ? 'Invariants undecided: the search budget ran out' : 'Invariant violations: ' + violations.length)
+}
+
+// ---------------------------------------------------------------------------
+// A1-A14
+// ---------------------------------------------------------------------------
+
+function A1_unexpectedEvents(model: LogicModelV1): CheckResult {
+  const events = allEvents(model)
+  const findings: Finding[] = []
+  for (const state of model.states) {
+    if (state.terminal === true) continue
+    const handled = new Set(model.transitions.filter((transition) => transition.from === state.id).map((transition) => transition.event))
+    for (const event of events) {
+      if (!handled.has(event)) {
+        findings.push({
+          code: 'A1_UNHANDLED_EVENT',
+          severity: 'warning',
+          message: 'Event ' + event + ' in state ' + state.id + ' has no defined transition (silent ignore).',
+        })
+      }
+    }
+  }
+  return checkResult('A1', 'Unexpected Event Injection', findings, findings.length === 0 ? 'All event/state combinations defined' : findings.length + ' unhandled combinations')
+}
+
+function firstOutcome(runtime: RuntimeState, outcomes: RuntimeState[]): RuntimeState | undefined {
+  return outcomes[0]
+}
+
+function A2_raceInterleaving(model: LogicModelV1, exploration: Exploration): CheckResult {
+  const findings: Finding[] = []
+  for (const [e1, e2] of model.concurrentPairs ?? []) {
+    for (const runtime of exploration.reachable) {
+      const first = firstOutcome(runtime, stepRuntime(model, runtime, e1))
+      const second = firstOutcome(runtime, stepRuntime(model, runtime, e2))
+      if (first === undefined && second === undefined) continue
+      const final12 = first === undefined ? runtime : firstOutcome(first, stepRuntime(model, first, e2)) ?? first
+      const final21 = second === undefined ? runtime : firstOutcome(second, stepRuntime(model, second, e1)) ?? second
+      if (runtimeKey(final12) !== runtimeKey(final21)) {
+        findings.push({
+          code: 'A2_ORDER_DEPENDENT',
+          severity: 'warning',
+          message: 'Events ' + e1 + ' and ' + e2 + ' produce order-dependent outcomes from state ' + runtime.state,
+          evidence: { e1ThenE2: final12, e2ThenE1: final21 },
+        })
+      }
+    }
+  }
+  return checkResult('A2', 'Race Interleaving', findings, findings.length === 0 ? 'No race conditions detected' : 'Order-dependent outcomes: ' + findings.length)
+}
+
+function stepSequence(model: LogicModelV1, init: RuntimeState, events: string[]): RuntimeState {
+  let runtime = init
+  for (const event of events) {
+    const next = firstOutcome(runtime, stepRuntime(model, runtime, event))
+    if (next === undefined) continue
+    runtime = next
+  }
+  return runtime
+}
+
+function permutations<T>(items: T[]): T[][] {
+  if (items.length === 0) return [[]]
+  const result: T[][] = []
+  for (let index = 0; index < items.length; index++) {
+    const rest = items.slice(0, index).concat(items.slice(index + 1))
+    for (const suffix of permutations(rest)) result.push([items[index], ...suffix])
+  }
+  return result
+}
+
+function A3_orderPermutation(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const events = allEvents(model).slice(0, options.maxPermutationEvents)
+  if (events.length < 2) return checkResult('A3', 'Order Permutation', [], 'Fewer than 2 events — skipped')
+  const init = initialState(model)
+  const outcomes = new Map<string, string[]>()
+  for (const permutation of permutations(events)) {
+    const final = stepSequence(model, init, permutation)
+    const key = runtimeKey(final)
+    const list = outcomes.get(key) ?? []
+    if (list.length < 3) list.push(permutation.join(','))
+    outcomes.set(key, list)
+  }
+  if (outcomes.size > 1) {
+    const examples = [...outcomes.entries()].map(([key, sequences]) => ({ final: key.split('|')[0], example: sequences[0] }))
+    return checkResult('A3', 'Order Permutation', [{
+      code: 'A3_ORDER_DEPENDENT',
+      severity: 'warning',
+      message: 'Same event set produces ' + outcomes.size + ' different outcomes depending on order.',
+      evidence: { examples },
+    }], 'Order-dependent outcomes: ' + outcomes.size)
+  }
+  return checkResult('A3', 'Order Permutation', [], 'Order-independent (sampled first ' + events.length + ' events)')
+}
+
+function stateActionList(model: LogicModelV1, stateId: string, kind: 'onEntry' | 'onExit'): string[] {
+  const state = model.states.find((entry) => entry.id === stateId)
+  const list = state === undefined ? undefined : state[kind]
+  return list ?? []
+}
+
+function actionsDeclared(model: LogicModelV1): boolean {
+  return model.states.some((state) => (state.onEntry ?? []).length > 0 || (state.onExit ?? []).length > 0)
+}
+
+/** Apply an ordered action list to the held flag. Actions never change state or variables; they only matter to pairing checks. */
+function applyActionList(list: string[], acquireEvent: string, releaseEvent: string, held: boolean): { held: boolean; reacquired: boolean } {
+  let next = held
+  let reacquired = false
+  for (const action of list) {
+    if (action === acquireEvent) {
+      if (next) reacquired = true
+      next = true
+    } else if (action === releaseEvent) {
+      next = false
+    }
+  }
+  return { held: next, reacquired }
+}
+
+function A4_pairSymmetry(model: LogicModelV1): CheckResult {
+  const findings: Finding[] = []
+  const hasActions = actionsDeclared(model)
+  const transitionEvents = new Set(model.transitions.map((transition) => transition.event))
+  const actionEvents = new Set<string>()
+  if (hasActions) {
+    for (const state of model.states) {
+      for (const action of stateActionList(model, state.id, 'onEntry')) actionEvents.add(action)
+      for (const action of stateActionList(model, state.id, 'onExit')) actionEvents.add(action)
+    }
+  }
+  const pairHasEvent = (event: string): boolean => transitionEvents.has(event) || actionEvents.has(event)
+  const releaseReachableFrom = (stateId: string, releaseEvent: string): boolean => {
+    const reachable = stateGraphReachable(model, stateId)
+    return [...reachable].some((state) =>
+      model.transitions.some((transition) => transition.from === state && transition.event === releaseEvent)
+      || (hasActions && (stateActionList(model, state, 'onEntry').includes(releaseEvent) || stateActionList(model, state, 'onExit').includes(releaseEvent))))
+  }
+  const edges = stateGraphEdges(model)
+  for (const pair of model.resourcePairs ?? []) {
+    const acquireTransitions = model.transitions.filter((transition) => transition.event === pair.acquireEvent)
+    const actionAcquire = hasActions && model.states.some((state) =>
+      stateActionList(model, state.id, 'onEntry').includes(pair.acquireEvent) || stateActionList(model, state.id, 'onExit').includes(pair.acquireEvent))
+    const releaseExists = pairHasEvent(pair.releaseEvent)
+    if (acquireTransitions.length === 0 && !actionAcquire && !releaseExists) continue
+    if ((acquireTransitions.length > 0 || actionAcquire) && !releaseExists) {
+      findings.push({
+        code: 'A4_NO_RELEASE_EVENT',
+        severity: 'error',
+        message: 'Resource "' + pair.resource + '": acquire event ' + pair.acquireEvent + ' exists but release event ' + pair.releaseEvent + ' is never defined.',
+      })
+      continue
+    }
+    // Collect acquire sites: transitions whose event acquires, and state entry/exit actions that end holding the resource.
+    const seeds: Array<{ state: string; held: boolean; path: PathStep[] }> = []
+    for (const acquire of acquireTransitions) {
+      if (!releaseReachableFrom(acquire.to, pair.releaseEvent)) {
+        findings.push({
+          code: 'A4_NO_RELEASE_REACHABLE',
+          severity: 'error',
+          message: 'Resource "' + pair.resource + '": after ' + pair.acquireEvent + ' into ' + acquire.to + ', no ' + pair.releaseEvent + ' is reachable.',
+          evidence: { acquireTransition: acquire },
+        })
+        continue
+      }
+      seeds.push({ state: acquire.to, held: true, path: [] })
+    }
+    if (hasActions) {
+      for (const state of model.states) {
+        // acquire fired by onEntry: resource is held for the whole stay in the state
+        const entry = stateActionList(model, state.id, 'onEntry')
+        if (entry.includes(pair.acquireEvent)) {
+          const sim = applyActionList(entry, pair.acquireEvent, pair.releaseEvent, false)
+          if (sim.reacquired) {
+            findings.push({
+              code: 'A4_REACQUIRE_WITHOUT_RELEASE',
+              severity: 'warning',
+              message: 'Resource "' + pair.resource + '" is acquired more than once inside onEntry of ' + state.id + ' before ' + pair.releaseEvent + '.',
+            })
+          }
+          if (sim.held) seeds.push({ state: state.id, held: true, path: [] })
+        }
+        // acquire fired by onExit: happens on every outgoing edge, never on a terminal state
+        const exit = stateActionList(model, state.id, 'onExit')
+        if (exit.includes(pair.acquireEvent) && !state.terminal) {
+          const sim = applyActionList(exit, pair.acquireEvent, pair.releaseEvent, false)
+          if (sim.reacquired) {
+            findings.push({
+              code: 'A4_REACQUIRE_WITHOUT_RELEASE',
+              severity: 'warning',
+              message: 'Resource "' + pair.resource + '" is acquired more than once inside onExit of ' + state.id + ' before ' + pair.releaseEvent + '.',
+            })
+          }
+          if (sim.held) seeds.push({ state: state.id, held: false, path: [] })
+        }
+      }
+    }
+    // Path-sensitive probe: track the held flag along state-graph paths, firing
+    // onExit of the source state before each transition and onEntry of the target after it.
+    for (const seed of seeds) {
+      const visited = new Set<string>()
+      const queue: Array<{ state: string; held: boolean; path: PathStep[] }> = [seed]
+      let steps = 0
+      while (queue.length > 0) {
+        const entry = queue.shift()!
+        if (++steps > 1000) break
+        const key = entry.state + '|' + (entry.held ? '1' : '0')
+        if (visited.has(key)) continue
+        visited.add(key)
+        if (entry.held && isTerminal(model, entry.state)) {
+          findings.push({
+            code: 'A4_TERMINAL_WITH_RESOURCE',
+            severity: 'error',
+            message: 'Resource "' + pair.resource + '" is still held when entering terminal state ' + entry.state + '.',
+            path: entry.path,
+          })
+          continue
+        }
+        for (const transition of edges.get(entry.state) ?? []) {
+          let held = entry.held
+          if (hasActions) {
+            const sim = applyActionList(stateActionList(model, entry.state, 'onExit'), pair.acquireEvent, pair.releaseEvent, held)
+            if (sim.reacquired) {
+              findings.push({
+                code: 'A4_REACQUIRE_WITHOUT_RELEASE',
+                severity: 'warning',
+                message: 'Resource "' + pair.resource + '" is acquired again in onExit of ' + entry.state + ' before ' + pair.releaseEvent + '.',
+                path: entry.path,
+              })
+              continue
+            }
+            held = sim.held
+          }
+          if (transition.event === pair.releaseEvent) held = false
+          else if (transition.event === pair.acquireEvent) {
+            if (held) {
+              findings.push({
+                code: 'A4_REACQUIRE_WITHOUT_RELEASE',
+                severity: 'warning',
+                message: 'Resource "' + pair.resource + '" is acquired again in state ' + entry.state + ' before ' + pair.releaseEvent + '.',
+                path: [...entry.path, { from: entry.state, event: transition.event, to: transition.to }],
+              })
+              continue
+            }
+            held = true
+          }
+          if (hasActions) {
+            const sim = applyActionList(stateActionList(model, transition.to, 'onEntry'), pair.acquireEvent, pair.releaseEvent, held)
+            if (sim.reacquired) {
+              findings.push({
+                code: 'A4_REACQUIRE_WITHOUT_RELEASE',
+                severity: 'warning',
+                message: 'Resource "' + pair.resource + '" is acquired again inside onEntry of ' + transition.to + ' before ' + pair.releaseEvent + '.',
+                path: [...entry.path, { from: entry.state, event: transition.event, to: transition.to }],
+              })
+              continue
+            }
+            held = sim.held
+          }
+          queue.push({ state: transition.to, held, path: [...entry.path, { from: entry.state, event: transition.event, to: transition.to }] })
+        }
+      }
+    }
+  }
+  return checkResult('A4', 'Pair Symmetry', findings, findings.length === 0 ? 'All pairs balanced' : 'Asymmetric pairs: ' + findings.length)
+}
+
+function stateGraphEdges(model: LogicModelV1): Map<string, TransitionSpec[]> {
+  const edges = new Map<string, TransitionSpec[]>()
+  for (const state of model.states) edges.set(state.id, [])
+  for (const transition of model.transitions) edges.get(transition.from)?.push(transition)
+  return edges
+}
+
+function stateGraphReachable(model: LogicModelV1, start: string): Set<string> {
+  const edges = new Map<string, string[]>()
+  for (const state of model.states) edges.set(state.id, [])
+  for (const transition of model.transitions) edges.get(transition.from)?.push(transition.to)
+  const visited = new Set<string>()
+  const queue = [start]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if (visited.has(current)) continue
+    visited.add(current)
+    for (const next of edges.get(current) ?? []) queue.push(next)
+  }
+  return visited
+}
+
+function A5_boundaryBlast(model: LogicModelV1): CheckResult {
+  const findings: Finding[] = []
+  for (const check of model.boundaryChecks ?? []) {
+    const variable = (model.variables ?? []).find((entry) => entry.name === check.variable)
+    if (variable === undefined) continue
+    for (const value of check.values) {
+      if (variable.min !== undefined && value < variable.min) {
+        findings.push({ code: 'A5_OUT_OF_DOMAIN', severity: 'warning', message: 'Boundary value ' + value + ' for ' + check.variable + ' is below min ' + variable.min })
+      }
+      if (variable.max !== undefined && value > variable.max) {
+        findings.push({ code: 'A5_OUT_OF_DOMAIN', severity: 'warning', message: 'Boundary value ' + value + ' for ' + check.variable + ' is above max ' + variable.max })
+      }
+      const assignment = { ...(model.variables ?? []).reduce<Record<string, VarValue>>((result, entry) => { result[entry.name] = entry.init; return result }, {}), [check.variable]: value }
+      for (const [key, group] of groupTransitions(model)) {
+        const [from, event] = key.split('|')
+        if (!group.some((transition) => guardVariables(transition.guard).includes(check.variable))) continue
+        const guarded = group.filter((transition) => transition.guard !== undefined)
+        const unguarded = group.filter((transition) => transition.guard === undefined)
+        const matched = guarded.filter((transition) => evalGuard(transition.guard!, assignment))
+        if (matched.length === 0 && unguarded.length === 0) {
+          findings.push({
+            code: 'A5_GUARD_HOLE',
+            severity: 'warning',
+            message: from + ' + ' + event + ' has no branch for ' + check.variable + '=' + value,
+            evidence: { assignment },
+          })
+        }
+        if (matched.length > 1) {
+          findings.push({
+            code: 'A5_GUARD_OVERLAP',
+            severity: 'warning',
+            message: from + ' + ' + event + ' has ' + matched.length + ' true branches for ' + check.variable + '=' + value,
+            evidence: { assignment },
+          })
+        }
+      }
+    }
+  }
+  return checkResult('A5', 'Boundary Blast', findings, findings.length === 0 ? 'Boundary checks passed' : 'Boundary findings: ' + findings.length)
+}
+
+function A6_resourceInjection(model: LogicModelV1): CheckResult {
+  const findings: Finding[] = []
+  for (const pair of model.resourcePairs ?? []) {
+    if (pair.failEvent === undefined) continue
+    const acquireStates = new Set(model.transitions.filter((transition) => transition.event === pair.acquireEvent).map((transition) => transition.from))
+    for (const state of acquireStates) {
+      const handled = model.transitions.some((transition) => transition.from === state && transition.event === pair.failEvent)
+      if (!handled) {
+        findings.push({
+          code: 'A6_NO_FAILURE_HANDLER',
+          severity: 'warning',
+          message: 'State ' + state + ' can ' + pair.acquireEvent + ' for "' + pair.resource + '" but has no ' + pair.failEvent + ' transition.',
+        })
+      }
+    }
+  }
+  return checkResult('A6', 'Resource Injection', findings, findings.length === 0 ? 'No resource vulnerabilities detected' : 'Resource failure paths missing: ' + findings.length)
+}
+
+function A7_shortestViolations(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  // Path-property invariants are included: "for any invariant that fails" is this
+  // check's contract, and a check that silently skips five of the eight kinds cannot
+  // honour it. The searches for the state kinds, for sequence, atomicity and budget
+  // are breadth-first, so their first witness is the shortest one; the leads-to walk
+  // and the probability bound have no such guarantee, and their message says what it
+  // found instead of claiming minimality.
+  const violations = runInvariants(model, options, true)
+  const findings: Finding[] = violations.map((violation) => {
+    if (violation.undecided) {
+      return {
+        code: 'A7_UNDECIDED',
+        severity: 'warning' as const,
+        message: 'Invariant "' + violation.invariant.id + '" could not be decided: ' + violation.reason + '. Absence is not proven, so there is no shortest counterexample to report.',
+        evidence: { invariant: violation.invariant.id },
+      }
+    }
+    const pathLength = violation.path.length
+    const message = isPathPropertyInvariant(violation.invariant)
+      ? 'Invariant "' + violation.invariant.id + '" violated: ' + violation.reason
+        + (pathLength === 0 ? '' : ' (witness path length: ' + pathLength + ')')
+      : 'Invariant "' + violation.invariant.id + '" shortest violating path length: ' + pathLength + (pathLength === 0 ? ' (initial state)' : '')
+    return {
+      code: 'A7_SHORTEST_COUNTEREXAMPLE',
+      severity: 'warning' as const,
+      message,
+      path: violation.path,
+      evidence: { invariant: violation.invariant.id },
+    }
+  })
+  return checkResult('A7', 'Minimal Counter-Example', findings, violations.length === 0 ? 'All invariants hold for all reachable paths' : 'Violated invariants: ' + findings.length)
+}
+
+function mapStateId(mapping: Record<string, string>, state: string): string {
+  return mapping[state] ?? state
+}
+
+function D1_behavioralPreservation(before: LogicModelV1, after: LogicModelV1, mapping: Record<string, string>): CheckResult {
+  const findings: Finding[] = []
+  const afterStates = new Set(after.states.map((state) => state.id))
+  const afterByFromEvent = new Map<string, Set<string>>()
+  for (const transition of after.transitions) {
+    const key = transition.from + '|' + transition.event
+    const set = afterByFromEvent.get(key) ?? new Set<string>()
+    set.add(transition.to)
+    afterByFromEvent.set(key, set)
+  }
+  const beforeInitMapped = mapStateId(mapping, before.init)
+  if (beforeInitMapped !== after.init) {
+    findings.push({
+      code: 'D1_INIT_MISMATCH',
+      severity: 'warning',
+      message: 'Mapped BEFORE init ' + beforeInitMapped + ' does not match AFTER init ' + after.init + '.',
+      evidence: { beforeInit: before.init, mappedInit: beforeInitMapped, afterInit: after.init },
+    })
+  }
+  for (const state of before.states) {
+    const mapped = mapStateId(mapping, state.id)
+    if (!afterStates.has(mapped)) {
+      findings.push({
+        code: 'D1_MAPPED_STATE_MISSING',
+        severity: 'error',
+        message: 'BEFORE state ' + state.id + ' maps to ' + mapped + ', which is not declared in AFTER.',
+        evidence: { beforeState: state.id, mappedState: mapped },
+      })
+      continue
+    }
+    for (const transition of before.transitions.filter((entry) => entry.from === state.id)) {
+      const key = mapped + '|' + transition.event
+      const targets = afterByFromEvent.get(key)
+      if (targets === undefined || targets.size === 0) {
+        findings.push({
+          code: 'D1_EVENT_DISABLED',
+          severity: 'error',
+          message: 'BEFORE can fire event ' + transition.event + ' from ' + state.id + ' (mapped to ' + mapped + '), but AFTER has no transition for that (state, event).',
+          path: [{ from: state.id, event: transition.event, to: transition.to }],
+          evidence: { beforeState: state.id, mappedState: mapped, event: transition.event },
+        })
+      }
+    }
+  }
+  return checkResult('D1', 'Behavioral Preservation', findings, findings.length === 0 ? 'BEFORE event behavior is preserved in AFTER' : 'Behavioral preservation findings: ' + findings.length)
+}
+
+function mapInvariantForComparison(invariant: InvariantSpec, mapping: Record<string, string>): InvariantSpec {
+  if (invariant.kind === 'never-states') {
+    return {
+      ...invariant,
+      id: invariant.id + ':before',
+      description: invariant.description + ' (from BEFORE)',
+      states: invariant.states.map((state) => mapStateId(mapping, state)),
+    }
+  }
+  if (invariant.kind === 'event-before-state') {
+    return {
+      ...invariant,
+      id: invariant.id + ':before',
+      description: invariant.description + ' (from BEFORE)',
+      state: mapStateId(mapping, invariant.state),
+    }
+  }
+  if (invariant.kind === 'var-in-range') {
+    const mapped = { ...invariant, id: invariant.id + ':before', description: invariant.description + ' (from BEFORE)' }
+    // A state scope must follow the state rename, otherwise D2 reports a spurious
+    // regression when the scope later refers to a state id that no longer exists.
+    if (mapped.when !== undefined && isStateGuard(mapped.when)) {
+      mapped.when = { state: mapStateId(mapping, mapped.when.state) }
+    }
+    return mapped
+  }
+  if (invariant.kind === 'leads-to') {
+    // A target set maps member by member; a rename that drops a state is reported by
+    // D2's own mapped-state check rather than silently changing the property.
+    return {
+      ...invariant,
+      id: invariant.id + ':before',
+      description: invariant.description + ' (from BEFORE)',
+      from: mapStateId(mapping, invariant.from),
+      to: typeof invariant.to === 'string' ? mapStateId(mapping, invariant.to) : invariant.to.map((state) => mapStateId(mapping, state)),
+    }
+  }
+  if (invariant.kind === 'probability') {
+    return {
+      ...invariant,
+      id: invariant.id + ':before',
+      description: invariant.description + ' (from BEFORE)',
+      target: mapStateId(mapping, invariant.target),
+    }
+  }
+  return { ...invariant, id: invariant.id + ':before', description: invariant.description + ' (from BEFORE)' }
+}
+
+function D2_invariantContinuity(before: LogicModelV1, after: LogicModelV1, options: NormalizedOptions, mapping: Record<string, string>): CheckResult {
+  const findings: Finding[] = []
+  const afterStates = new Set(after.states.map((state) => state.id))
+  const afterVariables = new Set((after.variables ?? []).map((variable) => variable.name))
+  for (const invariant of before.invariants ?? []) {
+    const mapped = mapInvariantForComparison(invariant, mapping)
+    if (mapped.kind === 'never-states') {
+      for (const state of mapped.states) {
+        if (!afterStates.has(state)) {
+          findings.push({
+            code: 'D2_MAPPED_STATE_MISSING',
+            severity: 'warning',
+            message: 'BEFORE invariant "' + invariant.id + '" maps to state ' + state + ', which is not declared in AFTER.',
+            evidence: { invariant: invariant.id, state },
+          })
+        }
+      }
+    } else if (mapped.kind === 'event-before-state') {
+      if (!afterStates.has(mapped.state)) {
+        findings.push({
+          code: 'D2_MAPPED_STATE_MISSING',
+          severity: 'warning',
+          message: 'BEFORE invariant "' + invariant.id + '" maps to state ' + mapped.state + ', which is not declared in AFTER.',
+          evidence: { invariant: invariant.id, state: mapped.state },
+        })
+      }
+    } else if (mapped.kind === 'var-in-range') {
+      if (!afterVariables.has(mapped.variable)) {
+        findings.push({
+          code: 'D2_VARIABLE_MISSING',
+          severity: 'warning',
+          message: 'BEFORE invariant "' + invariant.id + '" references variable ' + mapped.variable + ', which is not declared in AFTER.',
+          evidence: { invariant: invariant.id, variable: mapped.variable },
+        })
+        continue
+      }
+    } else if (mapped.kind === 'leads-to') {
+      // The state references of a path-property invariant must follow stateMapping too,
+      // otherwise a pure rename searches for a state AFTER does not declare.
+      for (const state of [mapped.from, ...leadsToTargets(mapped)]) {
+        if (!afterStates.has(state)) {
+          findings.push({
+            code: 'D2_MAPPED_STATE_MISSING',
+            severity: 'warning',
+            message: 'BEFORE invariant "' + invariant.id + '" maps to state ' + state + ', which is not declared in AFTER.',
+            evidence: { invariant: invariant.id, state },
+          })
+        }
+      }
+    } else if (mapped.kind === 'probability') {
+      if (!afterStates.has(mapped.target)) {
+        findings.push({
+          code: 'D2_MAPPED_STATE_MISSING',
+          severity: 'warning',
+          message: 'BEFORE invariant "' + invariant.id + '" maps to state ' + mapped.target + ', which is not declared in AFTER.',
+          evidence: { invariant: invariant.id, state: mapped.target },
+        })
+      }
+    }
+    // Every invariant the engine can decide is re-decided against AFTER. Path-property
+    // kinds go through the same searches their dedicated probes use, so D2 can no
+    // longer report "all BEFORE invariants continue to hold" while A9-A13 fail on the
+    // very same model.
+    const violation = isPathPropertyInvariant(mapped)
+      ? pathPropertyViolation(after, options, mapped)
+      : shortestViolationForInvariant(after, options, mapped)
+    if (violation !== undefined) {
+      findings.push(violation.undecided ? {
+        code: 'D2_UNDECIDED',
+        severity: 'warning' as const,
+        message: 'BEFORE invariant "' + invariant.id + '" could not be re-decided against AFTER: ' + violation.reason + '. Absence is not proven.',
+        evidence: { beforeInvariant: invariant, afterInvariant: mapped },
+      } : {
+        code: 'D2_INVARIANT_REGRESSION',
+        severity: 'error' as const,
+        message: 'BEFORE invariant "' + invariant.id + '" no longer holds in AFTER: ' + violation.reason,
+        path: violation.path,
+        evidence: { beforeInvariant: invariant, afterInvariant: mapped },
+      })
+    }
+  }
+  return checkResult('D2', 'Invariant Continuity', findings, findings.length === 0 ? 'All BEFORE invariants continue to hold' : 'Invariant continuity findings: ' + findings.length)
+}
+
+function D3_regressionDelta(before: LogicModelV1, after: LogicModelV1, mapping: Record<string, string>): CheckResult {
+  const afterStateIds = new Set(after.states.map((state) => state.id))
+  const beforeMappedIds = new Set(before.states.map((state) => mapStateId(mapping, state.id)))
+  const addedStates = after.states.filter((state) => !beforeMappedIds.has(state.id)).map((state) => state.id).sort()
+  const removedStates = before.states.filter((state) => !afterStateIds.has(mapStateId(mapping, state.id))).map((state) => state.id).sort()
+  const beforeEvents = new Set(before.transitions.map((transition) => transition.event))
+  const afterEvents = new Set(after.transitions.map((transition) => transition.event))
+  const addedEvents = [...afterEvents].filter((event) => !beforeEvents.has(event)).sort()
+  const removedEvents = [...beforeEvents].filter((event) => !afterEvents.has(event)).sort()
+  const removedTransitions = before.transitions.filter((transition) => !after.transitions.some((candidate) =>
+    candidate.from === mapStateId(mapping, transition.from) &&
+    candidate.event === transition.event &&
+    candidate.to === mapStateId(mapping, transition.to)
+  ))
+  const addedTransitions = after.transitions.filter((transition) => !before.transitions.some((candidate) =>
+    mapStateId(mapping, candidate.from) === transition.from &&
+    candidate.event === transition.event &&
+    mapStateId(mapping, candidate.to) === transition.to
+  ))
+  const findings: Finding[] = []
+  for (const state of removedStates) {
+    findings.push({ code: 'D3_REMOVED_STATE', severity: 'warning', message: 'BEFORE state ' + state + ' is not present in AFTER under the given mapping.', evidence: { state } })
+  }
+  for (const event of removedEvents) {
+    findings.push({ code: 'D3_REMOVED_EVENT', severity: 'warning', message: 'BEFORE event ' + event + ' is not present in AFTER.', evidence: { event } })
+  }
+  for (const transition of removedTransitions) {
+    findings.push({
+      code: 'D3_REMOVED_TRANSITION',
+      severity: 'warning',
+      message: 'BEFORE transition ' + transition.from + ' -' + transition.event + '-> ' + transition.to + ' has no exact AFTER counterpart.',
+      evidence: { transition },
+    })
+  }
+  const detail = 'Delta: +' + addedStates.length + ' states, -' + removedStates.length + ' states, +' + addedEvents.length + ' events, -' + removedEvents.length + ' events, +' + addedTransitions.length + ' transitions, -' + removedTransitions.length + ' transitions'
+  return checkResult('D3', 'Regression Delta', findings, detail)
+}
+
+function deadlockStateIds(model: LogicModelV1): string[] {
+  const outgoing = new Set(model.transitions.map((transition) => transition.from))
+  return model.states.filter((state) => state.terminal !== true && !outgoing.has(state.id)).map((state) => state.id)
+}
+
+function closedSccStateSets(model: LogicModelV1): string[][] {
+  return sccs(model)
+    .filter((component) => {
+      const componentSet = new Set(component)
+      const internalEdges = model.transitions.some((transition) => componentSet.has(transition.from) && componentSet.has(transition.to))
+      const escapingEdges = model.transitions.some((transition) => componentSet.has(transition.from) && !componentSet.has(transition.to))
+      return internalEdges && !escapingEdges && !component.some((state) => isTerminal(model, state))
+    })
+    .map((component) => component.sort())
+}
+
+function D4_deadlockLivenessRegression(before: LogicModelV1, after: LogicModelV1, mapping: Record<string, string>): CheckResult {
+  const findings: Finding[] = []
+  const beforeDeadlock = new Set(deadlockStateIds(before).map((state) => mapStateId(mapping, state)))
+  const afterDeadlock = deadlockStateIds(after)
+  for (const state of afterDeadlock) {
+    if (!beforeDeadlock.has(state)) {
+      findings.push({
+        code: 'D4_DEADLOCK_REGRESSION',
+        severity: 'error',
+        message: 'AFTER introduces deadlock in state ' + state + ' that was not deadlocked in BEFORE.',
+        evidence: { state },
+      })
+    }
+  }
+  const beforeScc = new Set(closedSccStateSets(before).map((component) => component.map((state) => mapStateId(mapping, state)).sort().join(',')))
+  const afterScc = closedSccStateSets(after)
+  for (const component of afterScc) {
+    const key = component.join(',')
+    if (!beforeScc.has(key)) {
+      findings.push({
+        code: 'D4_LIVENESS_REGRESSION',
+        severity: 'error',
+        message: 'AFTER introduces a closed SCC with no exit and no terminal state: ' + key,
+        evidence: { states: component },
+      })
+    }
+  }
+  return checkResult('D4', 'Deadlock/Liveness Regression', findings, findings.length === 0 ? 'No new deadlock or liveness regressions' : 'Regression findings: ' + findings.length)
+}
+
+function buildComparisonSummary(before: LogicModelV1, after: LogicModelV1, mapping: Record<string, string>): ComparisonSummary {
+  const afterStateIds = new Set(after.states.map((state) => state.id))
+  const beforeMappedIds = new Set(before.states.map((state) => mapStateId(mapping, state.id)))
+  const addedStates = after.states.filter((state) => !beforeMappedIds.has(state.id)).map((state) => state.id).sort()
+  const removedStates = before.states.filter((state) => !afterStateIds.has(mapStateId(mapping, state.id))).map((state) => state.id).sort()
+  const beforeEvents = new Set(before.transitions.map((transition) => transition.event))
+  const afterEvents = new Set(after.transitions.map((transition) => transition.event))
+  const addedEvents = [...afterEvents].filter((event) => !beforeEvents.has(event)).sort()
+  const removedEvents = [...beforeEvents].filter((event) => !afterEvents.has(event)).sort()
+  const removedTransitions = before.transitions.filter((transition) => !after.transitions.some((candidate) =>
+    candidate.from === mapStateId(mapping, transition.from) &&
+    candidate.event === transition.event &&
+    candidate.to === mapStateId(mapping, transition.to)
+  ))
+  const addedTransitions = after.transitions.filter((transition) => !before.transitions.some((candidate) =>
+    mapStateId(mapping, candidate.from) === transition.from &&
+    candidate.event === transition.event &&
+    mapStateId(mapping, candidate.to) === transition.to
+  ))
+  return {
+    beforeModelHash: modelHash(before),
+    afterModelHash: modelHash(after),
+    stateMapping: mapping,
+    beforeStates: before.states.length,
+    beforeTransitions: before.transitions.length,
+    afterStates: after.states.length,
+    afterTransitions: after.transitions.length,
+    addedStates,
+    removedStates,
+    addedEvents,
+    removedEvents,
+    addedTransitions,
+    removedTransitions,
+  }
+}
+function A8_idempotentReplay(model: LogicModelV1, exploration: Exploration): CheckResult {
+  const events = model.idempotentEvents ?? []
+  const findings: Finding[] = []
+  for (const event of events) {
+    for (const runtime of exploration.reachable) {
+      const onceOptions = stepRuntime(model, runtime, event)
+      if (onceOptions.length === 0) continue
+      for (const once of onceOptions) {
+        const twiceOptions = stepRuntime(model, once, event)
+        if (twiceOptions.length === 0) {
+          findings.push({
+            code: 'A8_NOT_REPLAYABLE',
+            severity: 'warning',
+            message: 'Idempotent event ' + event + ' is not replayable after first application from ' + runtime.state + '.',
+            path: [{ from: runtime.state, event, to: once.state }],
+            evidence: { state: runtime.state, event },
+          })
+          continue
+        }
+        for (const twice of twiceOptions) {
+          if (runtimeKey(twice) !== runtimeKey(once)) {
+            findings.push({
+              code: 'A8_NOT_IDEMPOTENT',
+              severity: 'error',
+              message: 'Idempotent event ' + event + ' changes state when applied twice from ' + runtime.state + '.',
+              path: [{ from: runtime.state, event, to: once.state }, { from: once.state, event, to: twice.state }],
+              evidence: { state: runtime.state, event, afterOnce: once, afterTwice: twice },
+            })
+            break
+          }
+        }
+      }
+    }
+  }
+  return checkResult('A8', 'Idempotent Replay', findings, findings.length === 0 ? 'Idempotent events are replay-safe' : 'Idempotent replay findings: ' + findings.length)
+}
+/**
+ * Whether the guard proves `variable` stays at or below `bound` wherever it holds.
+ *
+ * Deliberately conservative in one direction only: a guard this function cannot read
+ * answers `false`, so an unreadable guard is reported as "not proven" rather than as
+ * "enforced". A conjunction bounds the value if any conjunct does; a disjunction has to
+ * bound it on every branch; a negation is never reasoned about.
+ */
+function guardImpliesUpperBound(guard: GuardNode | undefined, variable: string, bound: number): boolean {
+  if (guard === undefined) return false
+  if ('variable' in guard) {
+    if (guard.variable !== variable || typeof guard.value !== 'number') return false
+    if (guard.op === '<') return guard.value - 1 <= bound
+    if (guard.op === '<=' || guard.op === '==') return guard.value <= bound
+    return false
+  }
+  if ('all' in guard) return guard.all.some((child) => guardImpliesUpperBound(child, variable, bound))
+  if ('any' in guard) return guard.any.every((child) => guardImpliesUpperBound(child, variable, bound))
+  return false
+}
+
+/** Mirror of {@link guardImpliesUpperBound} for the lower bound. */
+function guardImpliesLowerBound(guard: GuardNode | undefined, variable: string, bound: number): boolean {
+  if (guard === undefined) return false
+  if ('variable' in guard) {
+    if (guard.variable !== variable || typeof guard.value !== 'number') return false
+    if (guard.op === '>') return guard.value + 1 >= bound
+    if (guard.op === '>=' || guard.op === '==') return guard.value >= bound
+    return false
+  }
+  if ('all' in guard) return guard.all.some((child) => guardImpliesLowerBound(child, variable, bound))
+  if ('any' in guard) return guard.any.every((child) => guardImpliesLowerBound(child, variable, bound))
+  return false
+}
+
+/**
+ * Whether the model's own declarations about a variable hold against what its
+ * transitions do. `inc` and `dec` are never clamped to `min`/`max` — the declared
+ * range is a property to check, not a bound on the search — so a counter whose guard
+ * does not pin it ranges past its own declaration, and the reachable set is unbounded
+ * however narrow the declaration looks.
+ *
+ * Reporting the declaration rather than silently clamping is deliberate. Clamping would
+ * delete the very states a range violation is witnessed by, turning a counterexample
+ * into a false pass.
+ */
+function declaredDomainFindings(model: LogicModelV1): Finding[] {
+  const findings: Finding[] = []
+  for (const transition of model.transitions) {
+    for (const update of transition.updates ?? []) {
+      const variable = (model.variables ?? []).find((entry) => entry.name === update.variable)
+      if (variable === undefined) continue
+      const delta = typeof update.value === 'number' ? update.value : 1
+      const at = transition.from + ' + ' + transition.event
+      if (update.op === 'inc' && variable.max !== undefined && !guardImpliesUpperBound(transition.guard, variable.name, variable.max - delta)) {
+        findings.push({
+          code: 'S8_DOMAIN_NOT_ENFORCED',
+          severity: 'warning',
+          message: at + ' increments ' + variable.name + ', but ' + variable.name + ' declares max ' + variable.max + ' and no guard keeps it there: the declared range is not a bound on reachable values.',
+          evidence: { variable: variable.name, declaredMax: variable.max, transition: at },
+        })
+      }
+      if (update.op === 'dec' && variable.min !== undefined && !guardImpliesLowerBound(transition.guard, variable.name, variable.min + delta)) {
+        findings.push({
+          code: 'S8_DOMAIN_NOT_ENFORCED',
+          severity: 'warning',
+          message: at + ' decrements ' + variable.name + ', but ' + variable.name + ' declares min ' + variable.min + ' and no guard keeps it there: the declared range is not a bound on reachable values.',
+          evidence: { variable: variable.name, declaredMin: variable.min, transition: at },
+        })
+      }
+      if (update.op === 'set' && typeof update.value === 'number') {
+        if (variable.min !== undefined && update.value < variable.min) {
+          findings.push({
+            code: 'S8_DOMAIN_SET_OUTSIDE',
+            severity: 'error',
+            message: at + ' sets ' + variable.name + ' to ' + update.value + ', below its declared min ' + variable.min + '.',
+            evidence: { variable: variable.name, value: update.value, declaredMin: variable.min },
+          })
+        }
+        if (variable.max !== undefined && update.value > variable.max) {
+          findings.push({
+            code: 'S8_DOMAIN_SET_OUTSIDE',
+            severity: 'error',
+            message: at + ' sets ' + variable.name + ' to ' + update.value + ', above its declared max ' + variable.max + '.',
+            evidence: { variable: variable.name, value: update.value, declaredMax: variable.max },
+          })
+        }
+      }
+    }
+  }
+  return findings
+}
+
+function S8_monotonicVariables(model: LogicModelV1): CheckResult {
+  const findings: Finding[] = []
+  for (const variable of model.variables ?? []) {
+    if (variable.monotonic === undefined) continue
+    for (const transition of model.transitions) {
+      for (const update of transition.updates ?? []) {
+        if (update.variable !== variable.name) continue
+        if (variable.monotonic === 'inc' && update.op === 'dec') {
+          findings.push({ code: 'S8_MONOTONIC_DECREASE', severity: 'error', message: 'Monotonic (inc) variable ' + variable.name + ' is decreased by ' + transition.event + '.', evidence: { variable: variable.name, transition } })
+        } else if (variable.monotonic === 'dec' && update.op === 'inc') {
+          findings.push({ code: 'S8_MONOTONIC_INCREASE', severity: 'error', message: 'Monotonic (dec) variable ' + variable.name + ' is increased by ' + transition.event + '.', evidence: { variable: variable.name, transition } })
+        } else if (update.op === 'set') {
+          findings.push({ code: 'S8_MONOTONIC_SET_REVIEW', severity: 'warning', message: 'Monotonic variable ' + variable.name + ' uses set in ' + transition.event + '; verify it cannot move backwards.', evidence: { variable: variable.name, transition } })
+        }
+      }
+    }
+  }
+  findings.push(...declaredDomainFindings(model))
+  return checkResult('S8', 'Variable Declarations', findings, findings.length === 0 ? 'Variable declarations are respected' : 'Variable declaration findings: ' + findings.length)
+}
+
+/**
+ * Target states of a `leads-to` invariant. The schema accepts one state id or a
+ * non-empty array of them, so "reach any of these" needs no separate invariant kind.
+ */
+function leadsToTargets(invariant: Extract<InvariantSpec, { kind: 'leads-to' }>): string[] {
+  return typeof invariant.to === 'string' ? [invariant.to] : invariant.to
+}
+
+/** Target list as findings print it. A single target renders as its bare id, so existing messages stay byte-identical. */
+function leadsToTargetLabel(invariant: Extract<InvariantSpec, { kind: 'leads-to' }>): string {
+  return leadsToTargets(invariant).join(', ')
+}
+
+/**
+ * Find a run from `start` that reaches none of `targets`, or return undefined when
+ * every run reaches at least one of them. The property is universal (see the A9 row
+ * in `SKILL.md`): one branch that loops forever, or that stops before any target,
+ * refutes it.
+ *
+ * The search is a depth-first walk of the run graph with three colours, and runs at a
+ * target are success leaves that are never expanded:
+ *
+ * - a node reached while it is on the current walk (GRAY) closes a cycle that avoids
+ *   every target, so some run never reaches one;
+ * - a node with no outgoing step at all stops the machine where it stands, which is
+ *   the same violation for a different reason;
+ * - a node whose walk completed without a violation is BLACK, and reaching it again
+ *   from another branch is a shared sub-graph, not a cycle.
+ *
+ * That last point is why the colour map cannot be a plain visited set: a diamond
+ * (two branches rejoining) is acyclic and must pass, while a genuine cycle must not.
+ * A run is identified by its state plus its variable values, so the same state id
+ * with different values is a different node.
+ *
+ * Two properties keep the walk from taking the host down, and both are load-bearing:
+ * the walk is **budgeted**, and it stores a **parent link** per node instead of a copy
+ * of the path. Without the budget an unbounded counter makes the run graph infinite, so
+ * the three colours above never repeat a key and the walk never returns; without the
+ * parent link every frame retains its own copy of the path, which grows the walk's
+ * memory quadratically in its depth. Either one alone turns "the model is wrong" into
+ * an out-of-memory abort, which is the failure this function must not have.
+ *
+ * An exhausted budget is reported as `undecided`, never as `undefined`: a walk that
+ * did not finish has not proven that every run reaches a target.
+ */
+function findLeadsToBadPath(model: LogicModelV1, start: RuntimeState, targets: Set<string>, label: string, walk: LeadsToWalk): LeadsToOutcome {
+  if (targets.has(start.state)) return { undecided: false }
+  const GRAY = 1
+  const BLACK = 2
+  interface LeadFrame {
+    runtime: RuntimeState
+    parent: LeadFrame | undefined
+    step: PathStep | undefined
+    /** Outgoing steps, filled on first expansion; `undefined` means "not expanded yet". */
+    nexts: Array<{ next: RuntimeState; event: string }> | undefined
+    index: number
+  }
+  const pathOf = (frame: LeadFrame): PathStep[] => {
+    const steps: PathStep[] = []
+    let node: LeadFrame | undefined = frame
+    while (node !== undefined && node.step !== undefined) {
+      steps.push(node.step)
+      node = node.parent
+    }
+    return steps.reverse()
+  }
+  const color = new Map<string, number>()
+  const stack: LeadFrame[] = [{ runtime: start, parent: undefined, step: undefined, nexts: undefined, index: 0 }]
+  color.set(runtimeKey(start), GRAY)
+  while (stack.length > 0) {
+    if (walk.remaining <= 0) return { undecided: true }
+    walk.remaining -= 1
+    const frame = stack[stack.length - 1]
+    if (frame.nexts === undefined) {
+      const nexts: Array<{ next: RuntimeState; event: string }> = []
+      for (const event of allEvents(model)) {
+        for (const next of stepRuntime(model, frame.runtime, event)) nexts.push({ next, event })
+      }
+      frame.nexts = nexts
+      if (nexts.length === 0) return { violation: { path: pathOf(frame), reason: 'Dead end before target ' + label }, undecided: false }
+    }
+    if (frame.index >= frame.nexts.length) {
+      color.set(runtimeKey(frame.runtime), BLACK)
+      stack.pop()
+      continue
+    }
+    const { next, event } = frame.nexts[frame.index]
+    frame.index += 1
+    const step: PathStep = { from: frame.runtime.state, event, to: next.state }
+    if (targets.has(next.state)) continue
+    const key = runtimeKey(next)
+    const seen = color.get(key)
+    if (seen === GRAY) return { violation: { path: [...pathOf(frame), step], reason: 'Cycle avoids target ' + label }, undecided: false }
+    if (seen === BLACK) continue
+    color.set(key, GRAY)
+    stack.push({ runtime: next, parent: frame, step, nexts: undefined, index: 0 })
+  }
+  // Every branch either reached a target or rejoined a branch that did.
+  return { undecided: false }
+}
+
+function A9_leadsTo(model: LogicModelV1, exploration: Exploration, options: NormalizedOptions): CheckResult {
+  const findings: Finding[] = []
+  for (const invariant of model.invariants ?? []) {
+    if (invariant.kind !== 'leads-to') continue
+    const targets = new Set(leadsToTargets(invariant))
+    const label = leadsToTargetLabel(invariant)
+    const budget = leadsToWalkBudget(options)
+    const walk: LeadsToWalk = { remaining: budget }
+    for (const runtime of exploration.reachable) {
+      if (runtime.state !== invariant.from) continue
+      const outcome = findLeadsToBadPath(model, runtime, targets, label, walk)
+      if (outcome.undecided) {
+        findings.push({
+          code: 'A9_LEADS_TO_UNDECIDED',
+          severity: 'warning',
+          message: 'Leads-to invariant "' + invariant.id + '" is undecided: the walk spent its budget of ' + budget + ' steps from ' + invariant.from + ' without finding a run that avoids ' + label + ', or proving that none exists. Absence is not proven.',
+          evidence: { invariant },
+        })
+        break
+      }
+      if (outcome.violation !== undefined) {
+        findings.push({
+          code: 'A9_LEADS_TO_VIOLATION',
+          severity: 'error',
+          message: 'Leads-to invariant "' + invariant.id + '" violated from ' + invariant.from + ': ' + outcome.violation.reason,
+          path: outcome.violation.path,
+          evidence: { invariant },
+        })
+        break
+      }
+    }
+  }
+  const undecided = findings.some((finding) => finding.code === 'A9_LEADS_TO_UNDECIDED')
+  return checkResult('A9', 'Leads-To', findings, findings.length === 0
+    ? 'All leads-to invariants hold'
+    : undecided ? 'Leads-to undecided: the search budget ran out' : 'Leads-to findings: ' + findings.length)
+}
+
+function findSequenceViolation(model: LogicModelV1, options: NormalizedOptions, invariant: Extract<InvariantSpec, { kind: 'sequence' }>): InvariantViolation | undefined {
+  const events = invariant.events
+  const init = initialState(model)
+  const key = (runtime: RuntimeState, progress: number): string => runtimeKey(runtime) + '|' + progress
+  const visited = new Set<string>([key(init, 0)])
+  const queue: Array<{ runtime: RuntimeState; progress: number; path: PathStep[] }> = [{ runtime: init, progress: 0, path: [] }]
+  let steps = 0
+  while (queue.length > 0) {
+    const entry = queue.shift()!
+    if (++steps > options.maxStates) break
+    for (const event of allEvents(model)) {
+      for (const next of stepRuntime(model, entry.runtime, event)) {
+        let progress = entry.progress
+        let violation = false
+        if (progress < events.length && event === events[progress]) {
+          progress += 1
+        } else {
+          const index = events.indexOf(event)
+          if (index > progress) violation = true
+        }
+        const path = [...entry.path, { from: entry.runtime.state, event, to: next.state }]
+        if (violation) {
+          return { invariant, path, reason: 'Event ' + event + ' occurred before ' + events[progress] }
+        }
+        const nextKey = key(next, progress)
+        if (!visited.has(nextKey)) {
+          visited.add(nextKey)
+          queue.push({ runtime: next, progress, path })
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+function A10_sequenceOrder(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const findings: Finding[] = []
+  for (const invariant of model.invariants ?? []) {
+    if (invariant.kind !== 'sequence') continue
+    const violation = findSequenceViolation(model, options, invariant)
+    if (violation !== undefined) {
+      findings.push({
+        code: 'A10_SEQUENCE_VIOLATION',
+        severity: 'error',
+        message: 'Sequence invariant "' + invariant.id + '" violated: ' + violation.reason,
+        path: violation.path,
+        evidence: { invariant },
+      })
+    }
+  }
+  return checkResult('A10', 'Sequence Order', findings, findings.length === 0 ? 'All sequence invariants hold' : 'Sequence findings: ' + findings.length)
+}
+
+function findAtomicityViolation(model: LogicModelV1, options: NormalizedOptions, invariant: Extract<InvariantSpec, { kind: 'atomicity' }>): InvariantViolation | undefined {
+  const atomic = new Set(invariant.events)
+  const init = initialState(model)
+  const key = (runtime: RuntimeState, started: boolean, closed: boolean): string => runtimeKey(runtime) + '|' + (started ? '1' : '0') + '|' + (closed ? '1' : '0')
+  const visited = new Set<string>([key(init, false, false)])
+  const queue: Array<{ runtime: RuntimeState; started: boolean; closed: boolean; path: PathStep[] }> = [{ runtime: init, started: false, closed: false, path: [] }]
+  let steps = 0
+  while (queue.length > 0) {
+    const entry = queue.shift()!
+    if (++steps > options.maxStates) break
+    for (const event of allEvents(model)) {
+      for (const next of stepRuntime(model, entry.runtime, event)) {
+        const started = entry.started || atomic.has(event)
+        const closed = entry.closed || event === invariant.commit || (invariant.rollback !== undefined && event === invariant.rollback)
+        const path = [...entry.path, { from: entry.runtime.state, event, to: next.state }]
+        if (entry.started && !entry.closed && !atomic.has(event) && event !== invariant.commit && event !== invariant.rollback) {
+          return { invariant, path, reason: 'Left atomic scope via ' + event + ' without commit/rollback' }
+        }
+        if (started && !closed && isTerminal(model, next.state)) {
+          return { invariant, path, reason: 'Terminal state reached with incomplete atomic group' }
+        }
+        const nextKey = key(next, started, closed)
+        if (!visited.has(nextKey)) {
+          visited.add(nextKey)
+          queue.push({ runtime: next, started, closed, path })
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+function A11_atomicity(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const findings: Finding[] = []
+  for (const invariant of model.invariants ?? []) {
+    if (invariant.kind !== 'atomicity') continue
+    const violation = findAtomicityViolation(model, options, invariant)
+    if (violation !== undefined) {
+      findings.push({
+        code: 'A11_ATOMICITY_VIOLATION',
+        severity: 'error',
+        message: 'Atomicity invariant "' + invariant.id + '" violated: ' + violation.reason,
+        path: violation.path,
+        evidence: { invariant },
+      })
+    }
+  }
+  return checkResult('A11', 'Atomicity', findings, findings.length === 0 ? 'All atomicity invariants hold' : 'Atomicity findings: ' + findings.length)
+}
+
+// ---------------------------------------------------------------------------
+// A12 — Budget (worst-case path cost)
+// ---------------------------------------------------------------------------
+
+function transitionCost(transition: TransitionSpec): number {
+  return transition.cost ?? 1
+}
+
+interface BudgetViolation {
+  path: PathStep[]
+  /** Accumulated cost when the violation was detected (unbounded-cycle witnesses carry no total). */
+  cost?: number
+  /** True when the witness is a repeatable positive-cost runtime cycle: cost can grow without bound. */
+  unbounded: boolean
+}
+
+interface RuntimeEdge {
+  to: string
+  step: PathStep
+  cost: number
+}
+
+interface RuntimeGraph {
+  edges: Map<string, RuntimeEdge[]>
+  keys: string[]
+  initKey: string
+}
+
+function runtimeGraph(model: LogicModelV1, options: NormalizedOptions): RuntimeGraph {
+  const groupMap = groupTransitions(model)
+  const exploration = explore(model, options)
+  const edges = new Map<string, RuntimeEdge[]>()
+  for (const runtime of exploration.reachable) {
+    const out: RuntimeEdge[] = []
+    for (const event of allEvents(model)) {
+      const group = groupMap.get(runtime.state + '|' + event)
+      if (group === undefined || group.length === 0) continue
+      for (const transition of applicableTransitions(group, runtime)) {
+        const next = applyUpdates(model, transition, runtime)
+        out.push({
+          to: runtimeKey(next),
+          step: { from: runtime.state, event: transition.event, to: next.state },
+          cost: transitionCost(transition),
+        })
+      }
+    }
+    edges.set(runtimeKey(runtime), out)
+  }
+  return {
+    edges,
+    keys: exploration.reachable.map((runtime) => runtimeKey(runtime)),
+    initKey: runtimeKey(exploration.initialState),
+  }
+}
+
+/** Shortest path from init to targetKey over the runtime graph, or undefined when unreachable. */
+function runtimePathToKey(graph: RuntimeGraph, targetKey: string): PathStep[] | undefined {
+  const parent = new Map<string, PathStep>()
+  const visited = new Set<string>([graph.initKey])
+  const queue: string[] = [graph.initKey]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if (current === targetKey) {
+      const steps: PathStep[] = []
+      let key = targetKey
+      while (key !== graph.initKey) {
+        const step = parent.get(key)
+        if (step === undefined) break
+        steps.unshift(step)
+        key = step.from === undefined ? graph.initKey : keyOfFromStep(graph, step, key)
+      }
+      return steps
+    }
+    for (const edge of graph.edges.get(current) ?? []) {
+      if (visited.has(edge.to)) continue
+      visited.add(edge.to)
+      parent.set(edge.to, edge.step)
+      queue.push(edge.to)
+    }
+  }
+  return undefined
+}
+
+function keyOfFromStep(graph: RuntimeGraph, step: PathStep, targetKey: string): string {
+  // Reconstruct the source key by scanning predecessors of targetKey whose step matches.
+  for (const [from, edges] of graph.edges) {
+    for (const edge of edges) {
+      if (edge.to === targetKey && edge.step.event === step.event && edge.step.from === step.from && edge.step.to === step.to) {
+        return from
+      }
+    }
+  }
+  return graph.initKey
+}
+
+/** Find a reachable cycle whose total cost is positive; return a witness path init -> one full round. */
+function findUnboundedCycle(model: LogicModelV1, options: NormalizedOptions): PathStep[] | undefined {
+  const graph = runtimeGraph(model, options)
+  const color = new Map<string, number>()
+  for (const start of graph.keys) {
+    if (color.has(start)) continue
+    const nodeStack: string[] = [start]
+    const idxStack: number[] = [0]
+    const depthOf = new Map<string, number>([[start, 0]])
+    const costAt = new Map<string, number>([[start, 0]])
+    const prevKey = new Map<string, string>()
+    const prevStep = new Map<string, PathStep>()
+    color.set(start, 1)
+    while (nodeStack.length > 0) {
+      const node = nodeStack[nodeStack.length - 1]
+      const outs = graph.edges.get(node) ?? []
+      if (idxStack[idxStack.length - 1] < outs.length) {
+        const edge = outs[idxStack[idxStack.length - 1]++]
+        const seen = color.get(edge.to)
+        if (seen === undefined) {
+          color.set(edge.to, 1)
+          depthOf.set(edge.to, depthOf.get(node)! + 1)
+          costAt.set(edge.to, costAt.get(node)! + edge.cost)
+          prevKey.set(edge.to, node)
+          prevStep.set(edge.to, edge.step)
+          nodeStack.push(edge.to)
+          idxStack.push(0)
+        } else if (seen === 1) {
+          // Back edge on the current path: this is a true cycle.
+          const cycleCost = costAt.get(node)! + edge.cost - costAt.get(edge.to)!
+          if (cycleCost > 0) {
+            const entry = runtimePathToKey(graph, edge.to) ?? []
+            const round: PathStep[] = []
+            let cursor = node
+            while (cursor !== edge.to && prevStep.has(cursor)) {
+              round.unshift(prevStep.get(cursor)!)
+              cursor = prevKey.get(cursor)!
+            }
+            round.push(edge.step)
+            return [...entry, ...round]
+          }
+        }
+      } else {
+        color.set(node, 2)
+        nodeStack.pop()
+        idxStack.pop()
+        depthOf.delete(node)
+        costAt.delete(node)
+        prevKey.delete(node)
+        prevStep.delete(node)
+      }
+    }
+  }
+  return undefined
+}
+
+function findBudgetViolation(
+  model: LogicModelV1,
+  options: NormalizedOptions,
+  invariant: Extract<InvariantSpec, { kind: 'budget' }>,
+): BudgetViolation | undefined {
+  const groupMap = groupTransitions(model)
+  const init = initialState(model)
+  const bestCost = new Map<string, number>([[runtimeKey(init), 0]])
+  const queue: Array<{ runtime: RuntimeState; cost: number; path: PathStep[] }> = [{ runtime: init, cost: 0, path: [] }]
+  let steps = 0
+  while (queue.length > 0) {
+    const entry = queue.shift()!
+    if (++steps > options.maxStates) break
+    for (const event of allEvents(model)) {
+      const group = groupMap.get(entry.runtime.state + '|' + event)
+      if (group === undefined || group.length === 0) continue
+      for (const transition of applicableTransitions(group, entry.runtime)) {
+        const next = applyUpdates(model, transition, entry.runtime)
+        const cost = entry.cost + transitionCost(transition)
+        const path = [...entry.path, { from: entry.runtime.state, event: transition.event, to: next.state }]
+        // Costs are non-negative, so the first step that pushes the accumulated cost
+        // over the budget is already a witness.
+        if (cost > invariant.budget) return { path, cost, unbounded: false }
+        const key = runtimeKey(next)
+        const best = bestCost.get(key)
+        if (best === undefined || cost < best) {
+          bestCost.set(key, cost)
+          queue.push({ runtime: next, cost, path })
+        }
+      }
+    }
+  }
+  // No finite path exceeds the budget within reachable space; a reachable positive-cost
+  // cycle still makes the worst-case unbounded. Plain DAG merges are not cycles.
+  const cycle = findUnboundedCycle(model, options)
+  if (cycle !== undefined) return { path: cycle, unbounded: true }
+  return undefined
+}
+
+function A12_budget(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const budgets = (model.invariants ?? []).filter((invariant) => invariant.kind === 'budget') as Array<Extract<InvariantSpec, { kind: 'budget' }>>
+  const usesCost = model.transitions.some((transition) => transition.cost !== undefined)
+  const findings: Finding[] = []
+  if (usesCost && budgets.length === 0) {
+    findings.push({
+      code: 'A12_COST_WITHOUT_BUDGET',
+      severity: 'warning',
+      message: 'Transitions declare cost, but no budget invariant is declared, so worst-case path cost is not verified. Add an invariant of kind budget to check it.',
+    })
+  }
+  for (const invariant of budgets) {
+    const violation = findBudgetViolation(model, options, invariant)
+    if (violation !== undefined) {
+      findings.push({
+        code: 'A12_BUDGET_OVER',
+        severity: 'error',
+        message: violation.unbounded
+          ? 'Budget invariant "' + invariant.id + '" (' + invariant.description + ') exceeded: a reachable positive-cost cycle lets path cost grow without bound, so no finite budget ' + invariant.budget + ' holds.'
+          : 'Budget invariant "' + invariant.id + '" (' + invariant.description + ') exceeded: worst-case path cost ' + violation.cost + ' is over budget ' + invariant.budget + '.',
+        path: violation.path,
+        evidence: violation.unbounded ? { invariant, unbounded: true } : { invariant, totalCost: violation.cost, unbounded: false },
+      })
+    }
+  }
+  return checkResult('A12', 'Budget', findings, findings.length === 0 ? (budgets.length === 0 ? 'No budget invariants declared' : 'All budget invariants hold') : 'Budget findings: ' + findings.length)
+}
+// ---------------------------------------------------------------------------
+// A13 — Probability reachability (DTMC)
+// ---------------------------------------------------------------------------
+
+function probabilityOutcomes(model: LogicModelV1, runtime: RuntimeState): Map<string, { state: string; weight: number }> {
+  const groupMap = groupTransitions(model)
+  const outcomes = new Map<string, { state: string; weight: number }>()
+  for (const event of allEvents(model)) {
+    const group = groupMap.get(runtime.state + '|' + event)
+    if (group === undefined || group.length === 0) continue
+    for (const transition of applicableTransitions(group, runtime)) {
+      const weight = transition.weight ?? 1
+      if (!(weight > 0)) continue
+      const next = applyUpdates(model, transition, runtime)
+      const key = runtimeKey(next)
+      const current = outcomes.get(key)
+      if (current === undefined) outcomes.set(key, { state: next.state, weight })
+      else current.weight += weight
+    }
+  }
+  return outcomes
+}
+
+/**
+ * Probability of ever reaching targetState from the initial state under the DTMC
+ * interpretation: at each runtime state every applicable transition with weight > 0 is an
+ * outcome chosen proportionally to its weight. Solved by value iteration (least fixed
+ * point of the absorbing chain).
+ */
+function computeHitProbability(model: LogicModelV1, options: NormalizedOptions, targetState: string): { probability: number; converged: boolean } {
+  const exploration = explore(model, options)
+  const reachable = exploration.reachable
+  const n = reachable.length
+  const keyIndex = new Map<string, number>()
+  reachable.forEach((runtime, i) => keyIndex.set(runtimeKey(runtime), i))
+  const fixedValue = new Array<number | null>(n).fill(null)
+  const chains: Array<Array<{ j: number; w: number }>> = []
+  for (let i = 0; i < n; i++) {
+    const runtime = reachable[i]
+    if (runtime.state === targetState) {
+      fixedValue[i] = 1
+      chains.push([])
+      continue
+    }
+    const outs = probabilityOutcomes(model, runtime)
+    let sum = 0
+    const list: Array<{ j: number; w: number }> = []
+    for (const [key, entry] of outs) {
+      const j = keyIndex.get(key)
+      if (j === undefined) continue
+      list.push({ j, w: entry.weight })
+      sum += entry.weight
+    }
+    if (sum <= 0) {
+      fixedValue[i] = 0
+      chains.push([])
+      continue
+    }
+    chains.push(list.map((item) => ({ j: item.j, w: item.w / sum })))
+  }
+  const p = new Array<number>(n).fill(0)
+  let converged = false
+  for (let iter = 0; iter < 20000; iter++) {
+    let maxDelta = 0
+    for (let i = 0; i < n; i++) {
+      if (fixedValue[i] !== null) continue
+      const list = chains[i]
+      let acc = 0
+      for (const item of list) {
+        const fixed = fixedValue[item.j]
+        acc += item.w * (fixed === null ? p[item.j] : fixed)
+      }
+      const delta = Math.abs(acc - p[i])
+      if (delta > maxDelta) maxDelta = delta
+      p[i] = acc
+    }
+    if (maxDelta < 1e-9) {
+      converged = true
+      break
+    }
+  }
+  const initIndex = keyIndex.get(runtimeKey(exploration.initialState)) ?? 0
+  const fixed = fixedValue[initIndex]
+  return { probability: fixed === null ? p[initIndex] : fixed, converged }
+}
+
+function A13_probability(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const findings: Finding[] = []
+  for (const invariant of model.invariants ?? []) {
+    if (invariant.kind !== 'probability') continue
+    const { probability, converged } = computeHitProbability(model, options, invariant.target)
+    if (probabilityViolated(invariant, probability)) {
+      findings.push({
+        code: 'A13_PROBABILITY_VIOLATION',
+        severity: 'error',
+        message: 'Probability invariant "' + invariant.id + '" (' + invariant.description + ') violated: P(hit ' + invariant.target + ') = ' + probability.toFixed(6) + ' does not satisfy ' + invariant.op + ' ' + invariant.p + '.',
+        evidence: { invariant, computed: probability, converged },
+      })
+    } else if (!converged) {
+      findings.push({
+        code: 'A13_NO_CONVERGENCE',
+        severity: 'warning',
+        message: 'Probability invariant "' + invariant.id + '" passes, but value iteration did not fully converge within the iteration cap.',
+        evidence: { invariant, computed: probability, converged },
+      })
+    }
+  }
+  return checkResult('A13', 'Probability Reachability', findings, findings.length === 0 ? 'No probability invariants declared or all hold' : 'Probability findings: ' + findings.length)
+}
+
+// ---------------------------------------------------------------------------
+// A14 — Deadline (discrete tick clock)
+// ---------------------------------------------------------------------------
+
+function A14_deadline(model: LogicModelV1, options: NormalizedOptions): CheckResult {
+  const findings: Finding[] = []
+  const tickEvents = new Set(model.tickEvents ?? [])
+  const limits = new Map<string, number>()
+  let hasLimit = false
+  for (const state of model.states) {
+    if (state.maxTicks !== undefined) {
+      limits.set(state.id, state.maxTicks)
+      hasLimit = true
+    }
+  }
+  if (!hasLimit) {
+    return checkResult('A14', 'Deadline', [], 'No state declares maxTicks')
+  }
+  if (tickEvents.size === 0) {
+    return checkResult('A14', 'Deadline', [{
+      code: 'A14_NO_TICK_EVENTS',
+      severity: 'warning',
+      message: 'States declare maxTicks, but no tickEvents are declared, so deadline compliance cannot be verified.',
+    }], 'Missing tick events')
+  }
+  const groupMap = groupTransitions(model)
+  const init = initialState(model)
+  const limitOf = (stateId: string): number | undefined => limits.get(stateId)
+  const queue: Array<{ runtime: RuntimeState; ticks: number; path: PathStep[] }> = [{ runtime: init, ticks: 0, path: [] }]
+  const seen = new Set<string>()
+  let steps = 0
+  while (queue.length > 0) {
+    const entry = queue.shift()!
+    if (++steps > options.maxStates) break
+    const key = runtimeKey(entry.runtime) + '|' + entry.ticks
+    if (seen.has(key)) continue
+    seen.add(key)
+    for (const event of allEvents(model)) {
+      const group = groupMap.get(entry.runtime.state + '|' + event)
+      if (group === undefined || group.length === 0) continue
+      for (const transition of applicableTransitions(group, entry.runtime)) {
+        const next = applyUpdates(model, transition, entry.runtime)
+        const isTick = tickEvents.has(event)
+        const stays = next.state === entry.runtime.state
+        const path = [...entry.path, { from: entry.runtime.state, event: transition.event, to: next.state }]
+        let ticks: number
+        if (isTick && stays) {
+          const lim = limitOf(next.state)
+          if (lim !== undefined && entry.ticks + 1 > lim) {
+            findings.push({
+              code: 'A14_DEADLINE_MISS',
+              severity: 'error',
+              message: 'Deadline missed: state ' + next.state + ' can remain resident for more than ' + lim + ' tick(s).',
+              path,
+              evidence: { state: next.state, maxTicks: lim, ticks: entry.ticks + 1 },
+            })
+            continue
+          }
+          ticks = entry.ticks + 1
+        } else if (isTick && !stays) {
+          ticks = 0
+        } else if (!isTick && stays) {
+          ticks = entry.ticks
+        } else {
+          ticks = 0
+        }
+        const nextKey = runtimeKey(next) + '|' + ticks
+        if (!seen.has(nextKey)) queue.push({ runtime: next, ticks, path })
+      }
+    }
+  }
+  return checkResult('A14', 'Deadline', findings, findings.length === 0 ? 'All deadlines respected' : 'Deadline findings: ' + findings.length)
+}
+
+// ---------------------------------------------------------------------------
+// Coverage notes (informational gap notices)
+// ---------------------------------------------------------------------------
+
+// Underscore-separated identifiers like watchdog_timeout or isr_cmd are common in
+// state machines, so boundaries must treat '_' as a separator rather than a word char.
+const TIMING_VOCABULARY = /(?<![a-z0-9])(timeout|watchdog|timer|tick|deadline|period|delay|elapsed|latency)(?![a-z0-9])/i
+const PREEMPTION_VOCABULARY = /(?<![a-z0-9])(isr|irq|interrupt|task|thread|preempt|rtos)(?![a-z0-9])/i
+const HYBRID_VOCABULARY = /(?<![a-z0-9])(pid|plant|feedback|control.?loop|stability|stable|settling|damping|oscillat|chatter|kalman|foc|field.?weaken|motor|torque)(?![a-z0-9])/i
+const PROBABILISTIC_VOCABULARY = /(?<![a-z0-9])(mtbf|mttf|failure.?rate|reliability|probability|probabilistic|markov|stochastic|fault.?tree|fmea)(?![a-z0-9])/i
+
+function computeCoverageNotes(model: LogicModelV1): string[] {
+  const names: string[] = []
+  for (const state of model.states) {
+    names.push(state.id)
+    for (const action of state.onEntry ?? []) names.push(action)
+    for (const action of state.onExit ?? []) names.push(action)
+  }
+  for (const transition of model.transitions) names.push(transition.event)
+  const corpus = names.join(' ')
+  const notes: string[] = []
+  if (TIMING_VOCABULARY.test(corpus)) {
+    notes.push('The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).')
+  }
+  if (PREEMPTION_VOCABULARY.test(corpus)) {
+    notes.push('The model references preemption/concurrency vocabulary (ISR/IRQ/task/interrupt...). This plugin models event-order interleavings (A2/A3) but not preemptive concurrency; absolute claims such as thread-safe or interrupt-safe need dedicated verification (TSan, CBMC, or a model checker such as TLA+).')
+  }
+  if (HYBRID_VOCABULARY.test(corpus)) {
+    notes.push('The model references control/hybrid vocabulary (pid/plant/feedback/stability/motor...). This plugin verifies discrete transitions only; stability, settling time, and mode-switch dynamics over a continuous plant need hybrid verification (SpaceEx, Flow*, or Simulink/Stateflow analysis).')
+  }
+  if (PROBABILISTIC_VOCABULARY.test(corpus)) {
+    notes.push('The model references probabilistic/reliability vocabulary (mtbf/failure rate/probability...). This plugin is a qualitative model checker; reliability or probability claims need a stochastic model checker (PRISM, Storm) or fault-tree analysis.')
+  }
+  return notes
+}
+
+// ---------------------------------------------------------------------------
+// main entry
+// ---------------------------------------------------------------------------
+
+export function runVerification(input: unknown, options: VerificationOptions = {}): VerificationReport {
+  const normalized: NormalizedOptions = {
+    maxStates: options.maxStates ?? DEFAULT_MAX_STATES,
+    maxPermutationEvents: options.maxPermutationEvents ?? DEFAULT_MAX_PERMUTATION_EVENTS,
+  }
+  const hashSpec = options.hashSpec ?? DEFAULT_HASH_SPEC
+  const metadataKeys = metadataKeysOf(input)
+  const metadata = metadataKeys.length === 0 ? {} : { metadataKeys }
+  const validation = validateModel(input)
+  if (!validation.ok) {
+    const findings: Finding[] = validation.errors.map((message) => ({ code: 'MODEL_INVALID', severity: 'error', message }))
+    const modelCheck: CheckResult = {
+      id: 'MODEL',
+      name: 'Model Validation',
+      status: 'fail',
+      detail: 'Model schema validation failed: ' + validation.errors.length + ' errors',
+      findings,
+    }
+    return {
+      ok: false,
+      ran: true,
+      ...verdictOfFindings(findings),
+      schema: REPORT_SCHEMAS.verify,
+      schemaVersion: 1,
+      hashSpec,
+      modelHash: '',
+      hashes: { hashSpec, modelHash: '' },
+      ...metadata,
+      summary: { states: 0, transitions: 0, errors: validation.errors.length, warnings: 0, checksRun: 0 },
+      checks: [modelCheck],
+      nextSteps: [...refusalGuidance(validation.errors), ...verificationNextSteps([modelCheck], undefined)],
+    }
+  }
+  const model = validation.model
+  const exploration = explore(model, normalized)
+  const checks: CheckResult[] = [
+    S1_reachability(model, exploration),
+    S2_deadlock(model),
+    S3_liveness(model),
+    S4_determinism(model),
+    S5_eventCompleteness(model),
+    S6_guardCompleteness(model),
+    S7_invariants(model, normalized),
+    S8_monotonicVariables(model),
+    A1_unexpectedEvents(model),
+    A2_raceInterleaving(model, exploration),
+    A3_orderPermutation(model, normalized),
+    A4_pairSymmetry(model),
+    A5_boundaryBlast(model),
+    A6_resourceInjection(model),
+    A7_shortestViolations(model, normalized),
+    A8_idempotentReplay(model, exploration),
+    A9_leadsTo(model, exploration, normalized),
+    A10_sequenceOrder(model, normalized),
+    A11_atomicity(model, normalized),
+    A12_budget(model, normalized),
+    A13_probability(model, normalized),
+    A14_deadline(model, normalized),
+  ]
+  let comparison: ComparisonSummary | undefined
+  if (options.beforeModel !== undefined) {
+    const beforeValidation = validateModel(options.beforeModel)
+    if (!beforeValidation.ok) {
+      const beforeFindings: Finding[] = beforeValidation.errors.map((message) => ({ code: 'BEFORE_MODEL_INVALID', severity: 'error', message }))
+      const allFindings: Finding[] = [...checks.flatMap((check) => check.findings), ...beforeFindings]
+      return {
+        ok: false,
+        ran: true,
+        ...verdictOfFindings(allFindings),
+        schema: REPORT_SCHEMAS.verify,
+        schemaVersion: 1,
+        hashSpec,
+        modelHash: modelHash(model, hashSpec),
+        hashes: { hashSpec, modelHash: modelHash(model, hashSpec), afterModelHash: modelHash(model, hashSpec) },
+        ...metadata,
+        summary: {
+          states: model.states.length,
+          transitions: model.transitions.length,
+          errors: beforeValidation.errors.length,
+          warnings: 0,
+          checksRun: checks.length + 1,
+          truncated: exploration.truncated || hasUndecidedFinding(checks),
+        },
+        checks: [
+          ...checks,
+          {
+            id: 'BEFORE_MODEL',
+            name: 'Before Model Validation',
+            status: 'fail',
+            detail: 'Before model schema validation failed: ' + beforeValidation.errors.length + ' errors',
+            findings: beforeFindings,
+          },
+        ],
+        nextSteps: verificationNextSteps(checks, narrativeCoverageOf(model)),
+      }
+    }
+    const before = beforeValidation.model
+    const mapping = options.stateMapping ?? {}
+    checks.push(
+      D1_behavioralPreservation(before, model, mapping),
+      D2_invariantContinuity(before, model, normalized, mapping),
+      D3_regressionDelta(before, model, mapping),
+      D4_deadlockLivenessRegression(before, model, mapping),
+    )
+    comparison = buildComparisonSummary(before, model, mapping)
+  }
+  const errors = checks.reduce((sum, check) => sum + check.findings.filter((finding) => finding.severity === 'error').length, 0)
+  const warnings = checks.reduce((sum, check) => sum + check.findings.filter((finding) => finding.severity === 'warning').length, 0)
+  const coverageNotes = computeCoverageNotes(model)
+  const narrativeCoverage = narrativeCoverageOf(model)
+  // R3: a partial narrative is valid, but the gap must be machine-readable instead of only a
+  // sentence in `nextSteps`. It rides on S5 — the check that already reports undocumented
+  // (state, event) combinations — so the documented check count stays 22.
+  if (narrativeCoverage !== undefined && !narrativeComplete(narrativeCoverage)) {
+    checks.find((check) => check.id === 'S5')?.findings.push({
+      code: 'NARRATIVE_PARTIAL',
+      severity: 'info',
+      message: 'Narrative coverage is partial (states ' + narrativeCoverage.states + ', events ' + narrativeCoverage.events + ', scenarios ' + narrativeCoverage.scenarios + '): the checks still run over the whole model, but the undocumented symbols have to be re-derived by the reader.',
+    })
+  }
+  return {
+    ok: true,
+    ran: true,
+    ...verdictOfFindings(checks.flatMap((check) => check.findings)),
+    schema: REPORT_SCHEMAS.verify,
+    schemaVersion: 1,
+    hashSpec,
+    modelHash: modelHash(model, hashSpec),
+    hashes: {
+      hashSpec,
+      modelHash: modelHash(model, hashSpec),
+      ...(comparison === undefined ? {} : { beforeModelHash: comparison.beforeModelHash, afterModelHash: comparison.afterModelHash }),
+    },
+    ...metadata,
+    ...(narrativeCoverage === undefined ? {} : { narrativeCoverage }),
+    summary: {
+      states: model.states.length,
+      transitions: model.transitions.length,
+      errors,
+      warnings,
+      checksRun: checks.length,
+      truncated: exploration.truncated || hasUndecidedFinding(checks),
+    },
+    checks,
+    nextSteps: verificationNextSteps(checks, narrativeCoverage),
+    ...(model.narrative === undefined ? {} : { narrative: model.narrative }),
+    ...(comparison === undefined ? {} : { comparison }),
+    ...(coverageNotes.length === 0 ? {} : { coverageNotes }),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composition verification (N machines, D6)
+// ---------------------------------------------------------------------------
+
+export interface CompositionStep {
+  event: string
+  /** Indices of the machines that advanced together on this step. */
+  machines: number[]
+}
+
+export interface CompositionOptions {
+  /** Events that require a synchronized multi-machine step (handshake). */
+  rendezvous?: string[]
+  maxStates?: number
+  /** Hash specification used for the per-machine modelHash. Defaults to the current published spec (`v1`). */
+  hashSpec?: HashSpec
+}
+
+export interface CompositionSummary {
+  machineCount: number
+  machines: Array<{ modelHash: string; states: number; transitions: number }>
+  compositeStates: number
+  errors: number
+  warnings: number
+  truncated: boolean
+}
+
+export interface CompositionReport {
+  /** Historical meaning: the composition has no error-severity finding. Read `verdict` for the review outcome. */
+  ok: boolean
+  ran: boolean
+  verdict: Verdict
+  verdictReason: string
+  /** The versioned report contract this result follows. */
+  schema: ReportSchema
+  /** Which published specification the per-machine `modelHash` values follow. */
+  hashSpec: HashSpec
+  /** Every hash this report carries, in one place. */
+  hashes: { hashSpec: HashSpec; machines: string[] }
+  summary: CompositionSummary
+  checks: CheckResult[]
+  /** What to do next, derived from the findings — never empty. */
+  nextSteps: string[]
+}
+
+interface CompositionNode {
+  runtimes: RuntimeState[]
+  path: CompositionStep[]
+}
+
+interface CompositionMove {
+  next: CompositionNode
+  event: string
+  machines: number[]
+}
+
+/**
+ * N-machine composition semantics (documented in dsh-model-schema.md):
+ * - a non-rendezvous event advances exactly ONE non-terminal machine that fires it;
+ * - a rendezvous event (handshake) fires only when AT LEAST TWO machines declare it in
+ *   their alphabet and EVERY such non-terminal machine has it enabled (guards held);
+ *   all participants then advance simultaneously. A machine that is terminal, or whose
+ *   alphabet does not include the event, does not participate;
+ * - a terminal machine is stopped and takes no further part.
+ * Checks: C1 composition deadlock (reachable node where no machine can advance while at
+ * least one is not terminal) and C2 rendezvous that can never fire.
+ */
+export function runCompositionVerification(machinesInput: unknown[], options: CompositionOptions = {}): CompositionReport {
+  const hashSpec = options.hashSpec ?? DEFAULT_HASH_SPEC
+  const models: LogicModelV1[] = []
+  const hashes: string[] = []
+  const modelFindings: Finding[] = []
+  machinesInput.forEach((input, index) => {
+    const validation = validateModel(input)
+    if (!validation.ok) {
+      modelFindings.push({ code: 'MODEL_INVALID', severity: 'error', message: 'machine ' + index + ' invalid: ' + validation.errors.join('; ') })
+    } else {
+      models.push(validation.model)
+      hashes.push(modelHash(validation.model, hashSpec))
+    }
+  })
+  const machineSummary = models.map((m, i) => ({ modelHash: hashes[i] ?? '', states: m.states.length, transitions: m.transitions.length }))
+  if (modelFindings.length > 0 || models.length < 2) {
+    if (models.length < 2 && modelFindings.length === 0) {
+      modelFindings.push({ code: 'MODEL_INVALID', severity: 'error', message: 'composition requires at least two machines' })
+    }
+    return {
+      ok: false,
+      ran: true,
+      ...verdictOfFindings(modelFindings),
+      schema: REPORT_SCHEMAS.compose,
+      hashSpec,
+      hashes: { hashSpec, machines: hashes },
+      summary: { machineCount: models.length, machines: machineSummary, compositeStates: 0, errors: modelFindings.length, warnings: 0, truncated: false },
+      checks: [{ id: 'MODEL', name: 'Machine Validation', status: 'fail', detail: 'composition input validation failed', findings: modelFindings }],
+      nextSteps: ['Fix the machine that failed validation, then re-run the composition.'],
+    }
+  }
+  const rendezvous = new Set(options.rendezvous ?? [])
+  const maxStates = options.maxStates ?? DEFAULT_MAX_STATES
+  const machineEventSets = models.map((model) => new Set(model.transitions.map((transition) => transition.event)))
+
+  const compositionMoves = (node: CompositionNode): CompositionMove[] => {
+    const moves: CompositionMove[] = []
+    // single-machine (non-rendezvous) steps
+    for (let i = 0; i < models.length; i++) {
+      if (isTerminal(models[i], node.runtimes[i].state)) continue
+      for (const event of allEvents(models[i])) {
+        if (rendezvous.has(event)) continue
+        for (const next of stepRuntime(models[i], node.runtimes[i], event)) {
+          const runtimes = node.runtimes.slice()
+          runtimes[i] = next
+          moves.push({ next: { runtimes, path: [] }, event, machines: [i] })
+        }
+      }
+    }
+    // synchronized rendezvous steps (>= 2 participants, all enabled)
+    for (const event of rendezvous) {
+      const participants: number[] = []
+      for (let i = 0; i < models.length; i++) {
+        if (isTerminal(models[i], node.runtimes[i].state)) continue
+        if (!machineEventSets[i].has(event)) continue
+        participants.push(i)
+      }
+      if (participants.length < 2) continue // handshake needs a partner
+      const outcomes = participants.map((i) => stepRuntime(models[i], node.runtimes[i], event))
+      if (outcomes.some((list) => list.length === 0)) continue // not all participants ready
+      let combos: Array<RuntimeState[]> = [node.runtimes.slice()]
+      participants.forEach((i, slot) => {
+        const nextCombos: Array<RuntimeState[]> = []
+        for (const combo of combos) {
+          for (const outcome of outcomes[slot]) {
+            const copy = combo.slice()
+            copy[i] = outcome
+            nextCombos.push(copy)
+          }
+        }
+        combos = nextCombos
+      })
+      for (const runtimes of combos) {
+        moves.push({ next: { runtimes, path: [] }, event, machines: participants })
+      }
+    }
+    return moves
+  }
+
+  const keyOf = (node: CompositionNode): string => node.runtimes.map((runtime) => runtimeKey(runtime)).join('|')
+  const init: CompositionNode = { runtimes: models.map((model) => initialState(model)), path: [] }
+  const visited = new Set<string>()
+  const queue: CompositionNode[] = [init]
+  let compositeStates = 0
+  let truncated = false
+  const firedCount = new Map<string, number>()
+  for (const event of rendezvous) firedCount.set(event, 0)
+  // Per-machine enablement, collected while the state space is explored: a rendezvous
+  // that never fires needs to say *which* machine never had it enabled, not just that
+  // the handshake did not happen.
+  const everEnabled = new Map<string, Set<number>>()
+  const enabledStates = new Map<string, string[][]>()
+  const coEnabledNodes = new Map<string, number>()
+  for (const event of rendezvous) {
+    everEnabled.set(event, new Set<number>())
+    enabledStates.set(event, models.map(() => []))
+    coEnabledNodes.set(event, 0)
+  }
+  const c1Findings: Finding[] = []
+  while (queue.length > 0) {
+    const node = queue.shift()!
+    const key = keyOf(node)
+    if (visited.has(key)) continue
+    visited.add(key)
+    compositeStates += 1
+    if (compositeStates > maxStates) {
+      truncated = true
+      break
+    }
+    const moves = compositionMoves(node)
+    const allTerminal = node.runtimes.every((runtime, i) => isTerminal(models[i], runtime.state))
+    // Enablement census for C2: which machines could fire each rendezvous here.
+    for (const event of rendezvous) {
+      const declaring: number[] = []
+      for (let i = 0; i < models.length; i++) if (machineEventSets[i].has(event)) declaring.push(i)
+      if (declaring.length === 0) continue
+      let allEnabled = declaring.length >= 2
+      for (const i of declaring) {
+        const enabled = !isTerminal(models[i], node.runtimes[i].state) && stepRuntime(models[i], node.runtimes[i], event).length > 0
+        if (!enabled) { allEnabled = false; continue }
+        everEnabled.get(event)?.add(i)
+        const states = enabledStates.get(event)?.[i]
+        if (states !== undefined && !states.includes(node.runtimes[i].state) && states.length < 8) states.push(node.runtimes[i].state)
+      }
+      if (allEnabled) coEnabledNodes.set(event, (coEnabledNodes.get(event) ?? 0) + 1)
+    }
+    if (moves.length === 0 && !allTerminal) {
+      // Why nobody can advance, per machine: its state, its alphabet, and for every event
+      // either the rendezvous partner that is not ready or the transition that does not fire.
+      const perMachine = node.runtimes.map((runtime, i) => {
+        const terminal = isTerminal(models[i], runtime.state)
+        const blocked = terminal ? [] : allEvents(models[i]).map((event) => {
+          const enabled = stepRuntime(models[i], runtime, event).length > 0
+          // A rendezvous event is not fireable just because this machine has a transition:
+          // it needs every declaring machine enabled at the same time. Check that first, or
+          // the deadlock census would report "enabled" for a handshake nobody can complete.
+          if (!rendezvous.has(event)) return { event, reason: enabled ? 'enabled' : 'no-enabled-transition' }
+          const declaring: number[] = []
+          for (let j = 0; j < models.length; j++) if (machineEventSets[j].has(event)) declaring.push(j)
+          if (declaring.length < 2) return { event, reason: 'rendezvous-needs-partner' }
+          const partnersReady = declaring.every((j) => !isTerminal(models[j], node.runtimes[j].state)
+            && stepRuntime(models[j], node.runtimes[j], event).length > 0)
+          if (!partnersReady) return { event, reason: 'rendezvous-partner-not-ready' }
+          return { event, reason: enabled ? 'enabled' : 'no-enabled-transition' }
+        })
+        return { index: i, state: runtime.state, terminal, blocked }
+      })
+      const reasons = perMachine
+        .filter((machine) => !machine.terminal)
+        .map((machine) => 'machine ' + String(machine.index) + ' at ' + machine.state + ': ' + (machine.blocked.length === 0
+          ? 'empty event alphabet'
+          : machine.blocked.map((entry) => entry.event + ' (' + entry.reason + ')').join(', ')))
+      // A non-terminal state with no outgoing transition anywhere in its own model is a
+      // modelling gap, not a design defect: without this note the census reads as
+      // "the architecture deadlocks" when the model was simply left unfinished.
+      const gaps = node.runtimes
+        .map((runtime, index) => ({ index, state: runtime.state }))
+        .filter((entry) => !isTerminal(models[entry.index], entry.state)
+          && !models[entry.index].transitions.some((transition) => transition.from === entry.state))
+      const gapNote = gaps.length === 0
+        ? ''
+        : ' Modelling note: ' + gaps.map((gap) => 'machine ' + String(gap.index) + ' state ' + gap.state).join(', ') + ' has no outgoing transition in its own model, so this deadlock may be a modelling gap rather than a design defect.'
+      c1Findings.push({
+        code: 'C1_COMPOSITION_DEADLOCK',
+        severity: 'error',
+        message: 'Composition deadlock: no machine can advance from (' + node.runtimes.map((runtime) => runtime.state).join(', ') + ') while at least one is not terminal.',
+        detail: 'Shortest counterexample (breadth-first): ' + String(node.path.length) + ' step(s) to reach it. ' + reasons.join(' | ') + gapNote,
+        evidence: { steps: node.path, states: node.runtimes.map((runtime) => runtime.state), depth: node.path.length, perMachine, reasons },
+      })
+      continue
+    }
+    for (const move of moves) {
+      if (move.machines.length > 1) firedCount.set(move.event, (firedCount.get(move.event) ?? 0) + 1)
+      const nextKey = keyOf(move.next)
+      if (visited.has(nextKey)) continue
+      queue.push({ runtimes: move.next.runtimes, path: [...node.path, { event: move.event, machines: move.machines }] })
+    }
+  }
+  const c2Findings: Finding[] = []
+  const allEventsSet = new Set<string>()
+  for (const set of machineEventSets) for (const event of set) allEventsSet.add(event)
+  for (const event of rendezvous) {
+    if (!allEventsSet.has(event)) continue
+    if ((firedCount.get(event) ?? 0) === 0) {
+      // Why the handshake never happens: who declares it, who ever had it enabled, and
+      // whether the enabling states could ever coincide.
+      const machines = models.map((model, index) => ({
+        index,
+        declares: machineEventSets[index].has(event),
+        everEnabled: everEnabled.get(event)?.has(index) === true,
+        enabledAt: enabledStates.get(event)?.[index] ?? [],
+      }))
+      const declaring = machines.filter((machine) => machine.declares)
+      const neverEnabled = declaring.filter((machine) => !machine.everEnabled)
+      const coEnabled = coEnabledNodes.get(event) ?? 0
+      let reason: string
+      if (declaring.length < 2) {
+        reason = 'only ' + String(declaring.length) + ' machine(s) declare it (machine ' + declaring.map((machine) => machine.index).join(', ') + '); a handshake needs at least two'
+      } else if (neverEnabled.length > 0) {
+        reason = 'machine ' + neverEnabled.map((machine) => machine.index).join(', ') + ' declares it but never has it enabled (no transition, or the guard never holds)'
+      } else {
+        reason = 'every declaring machine enables it somewhere, but never at the same time (' + String(coEnabled) + ' composite state(s) had all of them ready)'
+      }
+      // A truncated exploration cannot prove that a handshake never happens: it may simply
+      // not have reached the composite state where both machines are ready.
+      const caveat = truncated ? ' The search was truncated at ' + String(maxStates) + ' composite states, so this may be an artefact of the cap rather than a property of the model.' : ''
+      c2Findings.push({
+        code: 'C2_RENDEZVOUS_NEVER_FIRES',
+        severity: 'error',
+        message: 'Rendezvous event ' + event + ' can never fire: ' + reason + '.' + caveat,
+        detail: machines.map((machine) => 'machine ' + String(machine.index) + (machine.declares ? ' declares' : ' does not declare')
+          + (machine.everEnabled ? ', enabled at ' + (machine.enabledAt.length === 0 ? 'no visited state' : machine.enabledAt.join('/')) : ', never enabled')).join(' | '),
+        evidence: { event, machines, declaring: declaring.map((machine) => machine.index), coEnabledNodes: coEnabled, reason, truncated },
+      })
+    }
+  }
+  // C2 is an error, not a warning: a rendezvous that can never fire means the composition
+  // cannot advance through that handshake — the same "stuck forever" outcome C1 reports,
+  // so a gate that only reads `verdict` must be able to stop on it.
+  const errors = c1Findings.length + c2Findings.length
+  const warnings = 0
+  const c1Detail = c1Findings.length > 0
+    ? 'Composition deadlocks: ' + String(c1Findings.length)
+    : truncated
+      ? 'No composition deadlock found, but the search was truncated at ' + String(maxStates) + ' composite states: absence is not proven'
+      : 'No composition deadlock reachable'
+  const c2Detail = c2Findings.length > 0
+    ? 'Rendezvous errors: ' + String(c2Findings.length)
+    : truncated
+      ? 'All rendezvous events fired, but the search was truncated at ' + String(maxStates) + ' composite states'
+      : 'All rendezvous events can fire'
+  const checks: CheckResult[] = [
+    checkResult('C1', 'Composition Deadlock', c1Findings, c1Detail),
+    checkResult('C2', 'Rendezvous Sync', c2Findings, c2Detail),
+  ]
+  const nextSteps: string[] = []
+  if (errors > 0) {
+    const why = c1Findings.length > 0
+      ? 'the composition deadlocks at a reachable state, so at least one machine is missing an exit or a handshake partner'
+      : 'a rendezvous event can never fire, so the composition cannot advance through that handshake'
+    nextSteps.push('Resolve the error findings first: ' + why + '.')
+  }
+  // Composition couples machines only through rendezvous: each machine's `variables` are
+  // private to it, so two machines cannot share one predicate. Name them when the input
+  // looks like it is trying to (two or more machines each declare variables).
+  const owners = models
+    .map((entry, index) => ({ index, names: (entry.variables ?? []).map((variable) => variable.name) }))
+    .filter((entry) => entry.names.length > 0)
+  if (owners.length >= 2) {
+    nextSteps.push('Each machine\'s variables are private to it (' + owners.map((entry) => 'machine ' + String(entry.index) + ': ' + entry.names.join(', ')).join('; ') + '): composition couples machines only through rendezvous, so a value two machines must agree on has to be modelled as a handshake, or inside a single machine.')
+  }
+  nextSteps.push('Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal.')
+  return {
+    ok: errors === 0,
+    ran: true,
+    ...verdictOf(errors, warnings, c1Findings[0]?.code ?? c2Findings[0]?.code),
+    schema: REPORT_SCHEMAS.compose,
+    hashSpec,
+    hashes: { hashSpec, machines: hashes },
+    summary: { machineCount: models.length, machines: machineSummary, compositeStates, errors, warnings, truncated },
+    checks,
+    nextSteps,
+  }
+}

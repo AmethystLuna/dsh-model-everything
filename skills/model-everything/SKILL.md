@@ -1,0 +1,481 @@
+---
+name: model-everything
+description: "Use when verifying something about code: a design doc, spec, plan, review note, README or refactor asserting API names, paths, enums, feasibility, state-machine or protocol behaviour, timing guarantees, or 'always/never' properties. It enumerates the claims, verifies each against the code (file:line), then escalates to model checks (S1-S8 + A1-A14) when behaviour is at stake. Diagrams: model-everything-uml; concurrency: model-everything-concurrency; data: model-everything-datamodel."
+---
+
+# Model Everything
+
+For an unverified design, failure is only a matter of time. Complex code becomes clear once you model it and run it. Check every claim before you act on it.
+
+## When This Skill Applies
+
+**This is the entry point.** If you have any thought of checking whether something about the code is actually true — however small, however informal the claim — load this skill. It owns the doctrine (enumerate the claims, verify each against the code, cite `file:line`, read `verdict` and never `ok`) and the executable verification for behaviour. When the task lands in a neighbouring domain, its routing table below hands it over rather than stretching the doctrine to cover it.
+
+| The task involves… | What it does |
+|---|---|
+| Any claim about code you want to check — a design doc, spec, plan, review comment, README, commit message, refactor proposal, or a "this is safe / this always holds / this can't deadlock" assertion | Enumerate the verifiable claims (Phase 1), verify each against the codebase with `file:line` evidence (Phase 2), classify the gaps (Phase 3) |
+| A state machine or protocol — ≥3 states, guards, ACK/NACK/retry, lock/unlock, start/stop ordering | Build an executable model: S1-S8 structural checks, A1-A14 adversarial probes |
+| A quantitative or temporal guarantee — worst-case path cost ≤ budget, "≥90% of runs reach SAFE", "must leave within 2 ticks" | A12 budget, A13 probabilistic reachability, A14 deadlines, each with a counterexample path |
+| A handshake or power-up sequencing across two or more components | `model_compose_verify`: C1 composition deadlock, C2 rendezvous that never fires |
+| A refactoring that changes state topology or guard conditions | BEFORE/AFTER models compared for behavioral preservation, invariant continuity and deadlock regression (D1-D4) |
+| Explicit request to prove code correct, formally verify a module, or check a migration for breakage | Route by domain — the table under [Routing to the Sibling Skills](#routing-to-the-sibling-skills) — and keep the doctrine |
+| An architecture or dependency question about a component/package/class diagram | `model-everything-structure`: parse the diagram into a dependency graph and judge every edge against the dependency matrix |
+
+**Catalog budget**: DSH renders only the frontmatter `description`, and truncates it at 500 characters (`dsh-tool-skill`, `DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH`). Every description in this plugin is written to fit that budget, and the triggers that do not fit live in this table. `tests/skills/run.mjs` fails when any skill's catalog line would be cut, or would lose one of its use-case triggers.
+
+<HARD-GATE>
+
+## Verification Depth (Plan-Mode Gate)
+
+When loaded as a plan-mode verification gate, this skill's execution is **mandatory**. The model has no discretion to bypass it. Depth classification is gated on objective plan features extracted in Phase 0.
+
+### Phase 0: Feature Extraction (Mandatory)
+
+Before any verification, output the plan's feature summary to context:
+
+```text
+Plan features:
+  Files: [N]
+  Functions added/modified: [list or "none"]
+  Behavioral claims: [none / "invariants listed" / "always/never/guaranteed assertions"]
+  State machine changes: [none / describe topology delta]
+→ Depth: LIGHTWEIGHT | STANDARD | ESCALATED
+```
+
+This step is NOT skippable — it creates an explicit, auditable record of what the plan claims before verification begins.
+
+### Depth Classification
+
+| Plan Feature | Depth |
+|-------------|-------|
+| Single file, zero function signatures added/modified, no behavioral claims of any kind | LIGHTWEIGHT |
+| Multi-file, OR new/modified function signatures, OR implicit behavioral claims (invariants, equivalence assertions, "behavior is unchanged") | STANDARD |
+| "Always"/"never"/"guaranteed" language, OR state machine topology changes (≥1 state or ≥2 transitions modified) | ESCALATED |
+
+**"No behavioral claims" is narrow**: if the plan asserts anything about behavior preservation — including listing invariants, claiming equivalence, or saying "refactoring only, no behavior change" — that IS a behavioral claim. The absence of the literal words "always"/"never" does NOT mean there are no behavioral claims.
+
+### Output Requirements
+
+| Depth | Required |
+|-------|----------|
+| LIGHTWEIGHT | All 5 checklist items (file paths, API/type names, line numbers, behavioral claims, mechanism feasibility) answered in context with explicit results per item |
+| STANDARD | Phase 1-2: enumerate every verifiable claim → verify each against codebase with evidence |
+| ESCALATED | Full pipeline: Phase 1-5 including Logic Primitive Verification (Phase 2a structural, Phase 2b adversarial) |
+
+### Plan Verification Block
+
+After verification, append a summary to the plan file:
+
+```markdown
+## Plan Verification
+
+- **Depth**: [LIGHTWEIGHT / STANDARD / ESCALATED]
+- **Scope**: [N] file paths, [M] API/type names, [K] line citations confirmed
+- **Escalation**: [skipped — no behavioral claims detected] or [see transcript for N-check results]
+```
+
+This block is the audit trail. A future reviewer must be able to see what was verified and when.
+</HARD-GATE>
+
+## Methodology
+
+### Phase 1: Enumerate Claims
+
+Read the document fully. Extract every claim that is verifiable:
+
+- Numeric claims (counts, sizes, frequencies)
+- API/type/enum names
+- File paths and line numbers
+- Mechanism descriptions ("compile-time resolution", "static dispatch")
+
+### Phase 2: Verify Against Codebase
+
+For each claim, run the relevant verification:
+
+- **Numeric claims**: `grep -c` or `grep -rn` to get the real count
+- **API/type names**: extract actual signatures from headers
+- **Enum/constant values**: list actual values from BSP/config headers
+- **Mechanism feasibility**: check language standard and compiler support
+
+### Phase 2 Trigger: Escalate to Logic Primitive?
+
+If the document under review contains ANY of the following, escalate to [Logic Primitive Verification](#logic-primitive-verification) IMMEDIATELY:
+
+- State machine or statechart with ≥3 states OR with guard conditions on transitions
+- Protocol handshake, ACK/NACK, retry, or timeout sequence logic
+- Claims using absolute language: "always", "never", "guaranteed", "all paths", "cannot", "impossible"
+- Lock/unlock, alloc/free, start/stop paired operations where ordering matters
+- Any logic where correctness depends on transition completeness or event ordering
+- **Refactoring that modifies state topology**: splitting/merging states, adding/removing transitions, changing guard conditions, extracting sub-machines
+
+**Heuristic**: If the transition-to-state ratio > 1.5 or any transition has a guard condition, the machine is complex enough to warrant verification — regardless of state count. For refactoring, trigger if the refactoring changes ≥1 state or ≥2 transitions from the original model.
+
+### Phase 3: Gap Analysis
+
+Classify findings by severity:
+
+1. **Architecture-level**: claims that make the design unimplementable (fake APIs, missing modules)
+2. **Mechanism-level**: claims the language/compiler cannot fulfill
+3. **Consistency-level**: internal contradictions across documents
+
+### Phase 4: Root Cause
+
+For each error, identify why it happened:
+
+- Wrong mental model (C++ constexpr thinking in C99)?
+- Incomplete search scope?
+- Copy-paste from other projects without verification?
+- Misunderstanding of compiler/linker behavior?
+
+### Phase 5: Structured Output
+
+Each finding includes:
+
+- Exact location (file:line or section)
+- What the document claims
+- What the codebase actually contains (with evidence — grep output, line numbers)
+- Correction direction
+
+---
+
+## Logic Primitive Verification
+
+When Phase 2 triggers escalation, do NOT proceed to Phase 3 until the verification pipeline below is complete. Trust models, not intuition.
+
+### Pipeline Overview
+
+```text
+Document claims → Extract model → Runtime check:
+  ├── DSH + `model_verify` tool available → build Model schema v1 (references/dsh-model-schema.md) → call the tool → structured report
+  └── No engine available → Manual Verification Mode (see references/logic-verification-guide.md#manual-verification-mode)
+
+Refactoring variant:
+  Old code + Refactoring plan → Extract BEFORE model + AFTER model
+    → Run the pipeline on the AFTER model (the same checks)
+    → Compare BEFORE vs AFTER: behavioral preservation, regression, complexity delta
+    → Flag any invariant that held in BEFORE but fails in AFTER
+
+UML modelling variant (the task is to draw a flow, not to check a claim):
+  Code flow → model with a citation per element → uml_render → diagram
+    → uml_review → modelling findings + render/parse round-trip fidelity
+    → model_verify → the behavioural checks (S1-S8 / A1-A14)
+```
+
+### Budgeting the Model Before You Run It
+
+Search cost is the declared domain times the number of states — and a declared range is
+not a bound on the search.
+
+- **`inc`/`dec` are never clamped to `min`/`max`.** The declaration is a property the
+  checks verify, not a limit the engine enforces. A counter whose guard does not pin it
+  ranges past its own declaration, so the reachable set is unbounded however small the
+  declared range looks; S8 reports that as `S8_DOMAIN_NOT_ENFORCED`.
+- **Bound a counter with a guard, not a narrower declaration.** `max: 4` with a guard
+  `retry < 4` closes the loop. `max: 4` alone does not.
+- **Say the budget before running**: values per variable x states. A product in the
+  10^5-and-up range will hit the cap and come back undecided.
+- **Model the check where the code performs it.** A cap check that lives inside the tick
+  handler is a guarded branch of the tick event, not a separate event: as a separate event
+  the environment can starve it, and the leads-to failure you then read is an artefact of
+  the model rather than a property of the code.
+
+### Native dsh Tools
+
+| Tool | Covers |
+|------|--------|
+| `model_verify` | S1-S8 structural + A1-A14 adversarial, including A12 budget / worst-case path cost, A13 probabilistic reachability over a DTMC, and A14 discrete-tick deadlines. `beforeModel` + `stateMapping` add the D1-D4 before/after regression. |
+| `model_datamodel_verify` | Data models and schema migrations: DS/DA checks plus the DD1-DD4 data regression. See the `model-everything-datamodel` skill. |
+| `model_compose_verify` | Two or more machines checked together (rendezvous handshake semantics): C1 composition deadlock, C2 rendezvous never fires. |
+| `model_concurrency_scan` | Mines concurrency claims (thread-safe, lock-free, race condition, mutex, ISR-safe) and routes them to dedicated verification. It does not prove concurrency safety. |
+| `model_export` | Emits external-checker input from a verified model: UPPAAL, TLA+, PRISM, SPIN. |
+| `uml_render` | model → Mermaid/PlantUML source, for any family the notation can draw; a view it cannot draw is refused with the reason. |
+| `uml_parse` | diagram text → the model of the family it declares, so a hand-drawn diagram can be checked. |
+| `uml_review` | audit the modelling: structural defects, documentation gaps and the render-and-read-back fidelity check. |
+| `uml_explain_labels` | print the label and comment contract the parser accepts, for one notation. |
+| `uml_structure_verify` | Reviews a structure diagram as a dependency graph. It reports isolated nodes, dangling endpoints, cycles, disallowed edges, layer violations and missing required edges, and it checks refinement across declared levels. The diagram domain belongs to the `model-everything-structure` skill. |
+| `report_diff` | Compares two reports of the same family. A finding's identity is its check, its code and its machine-readable locator, so reworded prose reads as changed rather than new. This is slice acceptance computed instead of eyeballed. |
+
+These tools are the engine: every capability this plugin claims is one of the tools above. What is not on that list is out of scope, and the skills name where it is answered instead.
+
+### Reading a Report: `ok` Is Not a Verdict
+
+Every tool report carries the same outcome contract. **`ok` says a report was produced; `verdict` says how the review went.** A report may be `ok: true` and still be a failed review — gating on `ok` is how a failing verification gets read as a passing one.
+
+| Field | Meaning |
+|-------|---------|
+| `schema` | The versioned report contract (`model-everything/verify/v1`, `model-everything/uml/review/v1`, …). Branch on this instead of sniffing fields. |
+| `ran` | The tool executed and produced this report. `false` only when the tool refused the request before running (see `errorCode`/`error`). |
+| `verdict` | `pass` \| `pass_with_findings` \| `fail`. **This is the outcome you act on.** |
+| `verdictReason` | Why, e.g. `2 error finding(s) (first: S2_NO_TRANSITIONS)` or `no error findings; 3 warning finding(s)`. |
+| `findings[]` | `{code, severity, message, detail?, evidence?, path?}`. Any `severity: "error"` forces `verdict: "fail"`. |
+| `hashSpec` | Which published model-hash specification `modelHash` follows — see `references/hash-spec.md`. |
+| `hashes` | Every hash the report carries, in one place (a model hash, a diagram hash, before/after hashes). |
+| `nextSteps[]` | What to do next, derived from the findings; never empty, and identical for two runs over the same input. |
+| `metadataKeys[]` | Paths of the `_`-prefixed annotation keys the schema ignored, e.g. `["_source", "_verified", "states[0]._note"]` (present only when the input carried any). |
+| `narrativeCoverage` | `{states: "5/5", events: "3/9", scenarios: "0/12"}` when the model carries a narrative — a partial narrative is valid, and this is how much is still undocumented. The gap is also a `NARRATIVE_PARTIAL` (info) finding, so a gate can read it without parsing `nextSteps` text. |
+
+A tool prints a body, not JSON. Passing checks stay in the `CHECKS` inventory line, and a fact that several checks report is listed once. Only error findings inline their evidence. Pass `reportView: "full"` when you need the structured report itself, for example to hand it to `report_diff`.
+
+Turn the verdict into an answer, never into a summary of `ok`:
+
+- `verdict: "pass"` — no error and no warning finding. Safe to report as verified, still with the scope the model covered.
+- `verdict: "pass_with_findings"` — verification ran clean, but warnings exist (e.g. `S5` implicit-ignore events, `UML012_NO_TERMINAL`). Report the pass **and** the warnings; do not silently upgrade it to "no issues".
+- `verdict: "fail"` — an error-severity finding exists, or the input was rejected (`MODEL_INVALID`). Say plainly that the claim is **not** verified, quote the counterexample path the finding carries, and only then propose a correction. Never describe a `fail` as "the tool ran successfully".
+
+Exit codes: `0` for `pass` / `pass_with_findings`, `2` for `fail`, a refusal, or an unreadable input. In DSH the native tools return the report as data — read `verdict`, and treat `errorCode`/`error` as the refusal path.
+
+`summary.truncated: true`, or a finding whose code ends in `_UNDECIDED`
+(`S7_UNDECIDED`, `A7_UNDECIDED`, `A9_LEADS_TO_UNDECIDED`, `D2_UNDECIDED`), means the search
+stopped before deciding. That is **not** a pass: name the invariant that went undecided,
+and say the property is undecided rather than reading the silence as success.
+
+### Writing the Answer: Name the Finding, Not Its Code
+
+`S2_NO_TRANSITIONS`, `UML019`, `DA2` are values of `findings[].code`, not names. A reader
+who has not memorized the schema learns nothing from one, and cannot tell whether their
+machine is sound or stuck.
+
+- **Say what it means**, in the user's language and in the terms of their own code:
+  「启动超时后 ERROR 没有任何出口迁移，机器会停在那里」, not 「S2 命中」. The finding's
+  `message` is written for the report; the sentence for the user is written from it.
+- **Keep the identifier where the identifier is the subject**: a report field quoted
+  verbatim, a baseline diff, a test name, or a question about the check itself.
+- **Name the property, not the checking.** "This path locks without unlocking" beats
+  "A4 failed". A check's name earns its place when the reader asked about the checking.
+- **Carry the verdict in words.** "Not verified" or "verified, within the scope of this
+  model" — never a bare pass, and never a warning presented without its label.
+
+A reader who cannot tell what failed will either trust a report they cannot read, or
+ignore one they should act on.
+
+### Slice Acceptance: Baseline Diffs
+
+The acceptance criterion for a refactoring slice is usually "no **new** findings", not
+"zero findings". Do not compare two JSON reports by eye — run the comparison:
+
+- DSH: `report_diff { baseline: <earlier report>, current: <new report> }`
+- Any host without the tools: run the repository engine against the same JSON.
+  (also available on `compose`, `structure` and `uml-review`)
+
+A finding's identity is its **check id + code + canonical locator** (built from
+`evidence`/`path`; the message only when a finding carries neither), so a reworded
+message reads as `changed`, never as a new finding. The diff's `verdict` describes the
+**delta** — a newly added error finding fails it — while `currentVerdict` keeps the
+absolute result visible, and a clean delta over a still-failing report says so in
+`nextSteps` rather than passing quietly. Two runs over the same input add zero findings:
+run that self-check before trusting any baseline.
+
+### Archiving a Model: `_`-Prefixed Metadata
+
+Keep provenance with the model instead of in a sidecar that drifts:
+
+- Any key starting with `_` at any level (`_source`, `_verified`, `_uml`, `_extraction_caveats`, `states[0]._note`) is **annotation metadata**: the schema ignores it, `modelHash` excludes it, and the report echoes it as `metadataKeys`.
+- Everything else stays closed — a mistyped `sttes` is still a validation error, and that is deliberate.
+- Because the hash ignores `_` keys, "the model as archived" and "the model with metadata stripped" hash identically; record the reported `hashSpec` next to the hash so a later reader can reproduce it (`verify model.json --hash-check <hex>` answers whether a recorded hash belongs to a published spec at all).
+
+### Refactoring Verification Mode
+
+When the document under review is a refactoring plan (modifying existing state machine logic, not designing from scratch), adapt the pipeline:
+
+1. **Extract the BEFORE model** from the existing codebase (not the plan — verify what the code actually does, not what the plan claims it does)
+2. **Extract the AFTER model** from the refactoring plan
+3. **Show both tables AND their model narratives** to the user side by side and confirm the delta is intentional
+4. **Run Phase 2a + 2b on the AFTER model** — the same checks a new design gets
+5. **Compare BEFORE vs AFTER**:
+
+   | Check | Method | Severity if Violated |
+   |-------|--------|:---:|
+   | Behavioral preservation | Every event sequence accepted by BEFORE must also be accepted by AFTER (or explicitly removed per plan) | Error — regression |
+   | Invariant continuity | Any invariant that held in BEFORE must hold in AFTER (unless the refactoring explicitly changes it) | Error — undocumented behavior change |
+   | Deadlock regression | New states or transitions must not introduce deadlocks not present in BEFORE | Error |
+   | Complexity claim | If plan claims "simpler": count states + transitions + guards. Is AFTER objectively simpler? | Warning — unsubstantiated claim |
+   | Unreachable code | New states added in AFTER must be reachable (otherwise they're dead code from the start) | Warning |
+
+   In DSH, pass `beforeModel` and optional `stateMapping` to `model_verify`; the engine runs D1 Behavioral Preservation, D2 Invariant Continuity, D3 Regression Delta, and D4 Deadlock/Liveness Regression automatically.
+
+6. **Flag any behavioral delta not documented in the plan** — the most common refactoring bug is an unintended side effect that the plan doesn't acknowledge
+
+Run the checks with the native `model_verify` tool (model JSON, structured guard DSL, path-aware invariants) — see `references/dsh-model-schema.md`. A host without the tools can run the repository engine against the same JSON. For probe patterns, extraction methodology and manual procedures, load `references/logic-verification-guide.md`.
+
+### Phase 2a: Structural Primitives
+
+Run these FIRST. They establish basic well-formedness before adversarial probing.
+
+| # | Primitive | Method | Severity if Violated |
+|:--:|-----------|--------|:---:|
+| S1 | **Reachability** | BFS from init state; flag all states not in visited set | Warning — dead code |
+| S2 | **Deadlock** | Any non-terminal state with zero outgoing transitions? | Error — machine can get stuck |
+| S3 | **Liveness** | Does the transition graph contain an absorbing cycle that excludes expected terminal/recovery states? (e.g. ERROR→RECOVERING→ERROR→... with no exit) | Error — infinite loop |
+| S4 | **Determinism** | Same state + same event → multiple different targets? | Error — ambiguous behavior |
+| S5 | **Event completeness** | For each state, are there plausible events with no defined transition? | Warning — implicit ignore |
+| S6 | **Guard completeness** | For each transition with a guard condition, are ALL branch outcomes defined? `if (cnt<3) RETRY else FATAL` → both paths must exist in model | Error — undefined behavior path |
+| S7 | **Invariant validity** | Does every reachable state satisfy the plan's stated "always/never/guaranteed" assertions? | Error — plan claim is false |
+| S8 | **Monotonic variables** | If a variable is declared `monotonic: inc/dec`, do all updates respect that direction? | Error — counter can move backwards |
+
+### Phase 2b: Adversarial Probes
+
+Run these SECOND. Each probe actively tries to BREAK the model. If any probe succeeds (finds a violation), the plan has a behavior gap.
+
+| # | Attack | Method | Target Claim |
+|:--:|--------|--------|-------------|
+| A1 | **Unexpected event** | For each state S, inject every event E where no transition is defined for (S, E). Log whether the model silently ignores or crashes. | "All events are handled in all states" |
+| A2 | **Race interleaving** | For every pair of concurrent events (E1, E2), simulate arrival in both orders: E1-then-E2 vs E2-then-E1. Flag if terminal state differs. | "Behavior is independent of event ordering" |
+| A3 | **Order permutation** | For N independent events, permute arrival order. Flag if different permutations produce different final states or violate invariants. | "Outcome is order-independent" |
+| A4 | **Pair symmetry** | Match every `start/stop`, `lock/unlock`, `alloc/free` pair. Flag if any state allows a path where a pair is unbalanced (start without stop, lock without unlock). State `onEntry`/`onExit` actions are treated as implicit acquire/release. | "Resources are always released" |
+| A5 | **Boundary blast** | Probe counters at 0, 1, max-1, max, max+1. Probe timestamps at 0, tick_wraparound. Flag overflow, underflow, or undefined behavior. | "Handles all counter/timer values" |
+| A6 | **Resource injection** | Simulate `malloc→NULL`, `queue→full`, `semaphore→timeout` at each state that calls them. Flag if any state has no recovery path. | "Graceful degradation under resource pressure" |
+| A7 | **Counter-example witness** | For any invariant that fails, find the event sequence that violates it and output the exact path. Breadth-first searches (state predicates, sequence, atomicity, budget) yield the shortest witness; the leads-to walk and the probability bound report the witness they found without claiming minimality. | "This invariant holds" → refuted by a concrete path |
+| A8 | **Idempotent replay** | For each event declared in `idempotentEvents`, apply it twice from every reachable state. Flag if the second application changes state or is not replayable. | "This event is safe to retry/replay" |
+| A9 | **Leads-to** | From a declared source state, every path must eventually reach the target state, or reach one member of a declared target set. | "This state always progresses to completion" |
+| A10 | **Sequence order** | Events declared in a sequence must occur in the specified order. | "backup before modify before commit" |
+| A11 | **Atomicity** | Once an atomic event starts, the machine must commit or roll back before leaving the scope or terminating. | "all-or-nothing transaction" |
+| A12 | **Budget (worst-case path cost)** | With `cost` on transitions (absent = 1) and a `budget` invariant, every reachable path must stay within budget; reports the shortest over-budget counterexample and flags reachable positive-cost cycles as unbounded. | "Worst-case path cost ≤ budget" |
+| A13 | **Probability reachability (DTMC)** | With `weight` on transitions (absent = 1) and a `probability` invariant, P(ever hitting the target) must satisfy the bound; solved by value iteration over the absorbing chain. | "≥ 90% of runs reach SAFE" |
+| A14 | **Deadline (discrete tick clock)** | State `maxTicks` plus top-level `tickEvents`: a tick step may not keep a state resident past its deadline; reports the over-residency path. | "must leave within 2 ticks" |
+
+### Integration Back to Phase 3
+
+For every probe failure:
+
+1. **Quote** the plan claim verbatim
+2. **Show** the counter-example event sequence
+3. **Classify** severity (Architecture / Mechanism / Consistency)
+4. **Propose** correction direction — never fix inline
+
+### Extraction Rule
+
+Before writing any verification code, output the model in one of the rendering
+forms below. Default is Form A; switch forms when the machine is large or the
+display area is narrow — never let a table row wrap.
+
+**Form A — integrated transition table (default)**: formal symbols with their
+natural-language meaning inlined; the scenario each (state, event) combination
+represents is the last column:
+
+```text
+状态（含义）             | 事件（含义）          | 下一状态（含义）      | Guard?  | 场景（状态+事件）
+------------------------|-----------------------|----------------------|---------|--------------------
+INIT（上电待就绪）       | power_ready（电源就绪）| IDLE（空闲待命）     | -       | 就绪后进入待命
+IDLE（空闲待命）         | start_cmd（启动命令） | STARTING（启动中）   | -       | 收到命令开始启动
+STARTING（启动中）       | ack_received（收到ACK）| ACTIVE（运行中）    | -       | 启动成功进入运行
+STARTING（启动中）       | timeout（等待超时）   | ERROR（出错待恢复）  | retry==0 | 首次超时进入重试
+STARTING（启动中）       | timeout（等待超时）   | FATAL（不可恢复）    | retry>=1 | 重试耗尽转致命
+ERROR（出错待恢复）      | cooldown_elapsed（冷却结束）| RECOVERING（重初始化）| -     | 冷却结束开始恢复
+```
+
+Width discipline (Form A): keep parenthetical meanings short (state/event ≤ 6
+characters, scenario ≤ 10) and estimate every row's display width (CJK counts as
+2) to fit the available area. If any row would wrap, shorten the meanings; if it
+still will not fit, switch to Form C. A wrapped table row loses column alignment
+and is harder to read than no table at all.
+
+**Form B — sentence blocks (reading-accessible)**: one transition per block,
+scenario sentence first, fixed three-line frame. Use for detailed confirmation,
+users with reading difficulties, or machines with ≤ 10 transitions:
+
+```text
+第 1 步：就绪后进入待命
+    状态 INIT（上电待就绪）
+    发生 power_ready（电源就绪）
+    进入 IDLE（空闲待命）
+```
+
+**Form C — grouped by source state (large machines / narrow panes)**: one
+section per state, each rendered as its own small 3-column table
+（事件（含义）| 下一状态（含义）| 场景）; no cross-group column alignment to track:
+
+```text
+DEGRADED_LOADING（降级加载）
+  事件（含义）          | 下一状态（含义）      | 场景
+  first_data（首帧数据）| OK_READY（正常就绪）  | 收到首帧转就绪
+  fault（故障）         | FAULT（故障锁存）     | 故障锁存
+  power_off（下电）     | POWER_OFF（下电）     | 下电
+```
+
+Each group table is narrow (3 columns, roughly ≤ 60 display columns with short
+meanings). If one group's table would still wrap, fall back to a one-line-per-event
+bullet list for that group only.
+
+Reading rule: every row/block is one sentence — "在【状态（含义）】下发生【事件（含义）】
+→ 进入【下一状态（含义）】，即【实际场景】"。Meanings repeat on purpose: each entry is
+self-contained. The machine-readable model keeps the same information in its
+`narrative` block (`narrative.states`, `narrative.events`, `narrative.scenarios`).
+
+**CRITICAL**: Show the chosen form to the user and ask for confirmation before
+generating the harness. Because the natural language is inlined, any entry that
+reads wrong to the user — a state/event meaning that is off, or a scenario that
+does not match reality — means the model is wrong even if the symbols are
+consistent. The #1 failure mode of verification is extracting the wrong model. If
+the plan is ambiguous, flag it as a finding first — don't guess.
+
+**Exception**: If the user has already told you to proceed without confirmation in this session, do NOT call
+`ask_user_question`. Instead: (a) cite evidence for every cell/entry — each
+state/event meaning and each scenario must trace to a source sentence, (b)
+round-trip the filled model (including its `narrative` block) back into the SAME
+rendering form and compare it with the extraction, and (c) mark the report
+`UNCONFIRMED`.
+
+### Code-Level Behavioral Suggestion
+
+When the task is NOT document/plan review but involves code-level behavioral questions — e.g., the user is editing source files and asks:
+
+- "check this timing sequence for bugs"
+- "could this state machine deadlock here"
+- "is this retry limit safe"
+- "what happens if event X arrives during state Y"
+
+→ **Proactively suggest** this plugin as an optional verification pass. Do NOT escalate automatically — plan-level verification was likely already done. The suggestion is: "I can run a logic-primitive verification on this state machine to check for deadlocks, unreachable states, and boundary issues. Want me to?"
+
+If the user says yes, extract the model from the existing code (not a plan document), and run the standard pipeline. Output the findings as suggestions, not requirements.
+
+This covers the gap where behavioral verification is useful even when no design document is being reviewed.
+
+### When NOT to Escalate
+
+Skip logic-primitive verification when:
+
+- The document makes no behavioral/logic claims (pure API listings, config tables, data schemas)
+- The state machine has ≤2 states, no guards, and trivial transitions (IDLE↔ACTIVE)
+- The claim is purely structural (file paths, type names, numeric constants) — Phase 2 grep verification is sufficient
+
+### Routing to the Sibling Skills
+
+This skill owns behavioural claims. Three neighbouring domains have their own skill, and loading the wrong one wastes the verification:
+
+| Domain | Skill |
+|---|---|
+| Drawing a code flow as UML, or auditing a diagram somebody drew (render / parse / review / explain-labels, round-trip fidelity, component and class diagrams refused) | `model-everything-uml` |
+| Reviewing architecture, module structure or a dependency diagram (isolated nodes, dangling endpoints, cycles, allowed-dependency and layer violations, missing required edges) | `model-everything-structure` |
+| Concurrency claims — "thread-safe", "lock-free", "no data race", "ISR-safe" — mined and routed to TSan/Helgrind/CBMC/TLA+, never proven here | `model-everything-concurrency` |
+| Entities, fields, relationships, data invariants, schema migrations (DS1-DS4, DA1-DA12, DD1-DD4) | `model-everything-datamodel` |
+
+---
+
+## Warning Signs
+
+If you catch yourself thinking any of these, stop:
+
+| You think | Reality |
+|-----------|---------|
+| "Too simple to check" | The check is cheap. The silent skip is not. |
+| "I read the code, so I know" | Knowing is not evidence. Cite `file:line`, or run the model, or call the claim unverified. |
+| "The spec or the diagram says so" | Both are claims about the code. Reconcile them with a source-side scan. |
+| "I'll check while implementing" | Check before the decision, not after. |
+| "Reasoning is enough" | Reasoning is not a run. One counter-example kills a universal claim. |
+| "The report passed, so the code is fine" | The report covers the model you gave it. Reconcile it, and say what you did not check. |
+| "The declared range limits the search" | The declaration is a property to verify. `inc`/`dec` are never clamped to it; only a guard bounds the value. |
+| "The check found nothing" | Read the verdict: `truncated` and `_UNDECIDED` mean the search stopped, not that the property holds. |
+
+## Rules
+
+1. Never trust a document's claim without codebase verification.
+2. Be honest about mechanism boundaries — if the language standard can't do it, say so.
+3. Cite evidence with specific file:line references.
+4. Don't fix during review — point the way, let implementation happen after approval.
+5. **For behavioral claims: verify with code, not reasoning.** If a plan says "always", "never", or "guaranteed", generate and run a model. One counter-example is enough to refute a universal claim.
+6. **Confirm the model before running it** — unless the user has already told you to proceed without confirmation in this session. Extraction errors are the dominant failure mode of formal verification. In auto mode, substitute evidence-cited extraction + round-trip validation and mark the report `UNCONFIRMED`.
+7. **Don't verify what the code already checks.** If the existing codebase has compile-time assertions, static analysis, or runtime checks for a property, cite those — don't re-verify in a model.
+8. **Hand a neighbouring domain to its own skill.** A diagram is a model, not evidence: modelling or auditing one belongs to `model-everything-uml`. A concurrency claim is mined and routed, never proven here: that is `model-everything-concurrency`. Schema, data invariants and migrations are `model-everything-datamodel`. This skill keeps the doctrine and the behavioural checks.
+9. **Say what this does not prove.** For dimensions this toolbox does not verify — hard real time (deadlines, periods), preemptive concurrency, hybrid-control stability, probabilistic reliability, execution-cost budgets — route to the dedicated tool named in `references/gap-routing-guide.md`. `model_verify` reports carry the same routing as informational `coverageNotes` on matching models.
+10. **A declared range is a property, not a bound, and a capped search is not a pass.** `inc`/`dec` are never clamped to `min`/`max`; only a guard that pins the value bounds it. When a report is `truncated` or a check is `_UNDECIDED`, say the property is undecided and narrow the model — never report it as verified.
+11. **Write-site analysis is out of scope, and stays there.** "Only the ISR writes this flag", "one owner per register" — this toolbox verifies models and diagrams, not *who writes what in the source*. That claim needs a source-side AST/rule check or a static analyzer; this plugin's contribution is to flag the claim as unverified and route it (`model_concurrency_scan` does exactly that). Do not imply the diagram or the model settled it.

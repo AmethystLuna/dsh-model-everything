@@ -1,0 +1,45 @@
+---
+name: model-everything-concurrency
+description: "Use when a design or plan claims concurrency safety (thread-safe, lock-free, no data race, ISR-safe) or names shared state, mutexes, atomics or interrupts. Mines the claims and routes each to dedicated verification (TSan, Helgrind, CBMC, TLA+); it does not prove concurrency safety. Doctrine: the model-everything skill."
+---
+
+# Model Everything — Concurrency Claims
+
+This skill does **not** prove concurrency safety, and no report from it should ever be read as a proof. It mines a document, plan or code review for concurrency claims, marks them `UNVERIFIED`, and routes each one to the tool that can actually decide it.
+
+The claim-verification doctrine it inherits — enumerate verifiable claims, cite `file:line`, read `verdict` and never `ok` — lives in the `model-everything` skill. Load that one when the task is behavioural verification of a state machine rather than a judgement about concurrency claims.
+
+## When This Skill Applies
+
+**Only after confirming the target actually has concurrency requirements or behaviour** — multiple threads, async tasks, interrupts, shared state, or parallel execution. If the target is purely sequential, do not invoke concurrency mining; there is nothing to mine.
+
+| The claim | How it is treated |
+|---|---|
+| Absolute: "thread-safe", "lock-free", "no data race", "interrupt-safe", "ISR-safe" | error / `UNVERIFIED` unless dedicated evidence is provided |
+| Risk keyword: "race condition", "shared variable", "mutex", "atomic", "shared memory", "critical section", `ISR`, `IRQ`, `NMI`, `disable_irq` / `enable_irq` | warning — review whether the plan actually addresses it |
+| Lock/unlock, alloc/free, start/stop pairing where ordering matters | routed to `model_verify` (A4 pair symmetry), which can decide balance inside the modelled machine |
+
+In DSH, run the `model_concurrency_scan` tool. For manual review, follow [`references/concurrency-risk-guide.md`](references/concurrency-risk-guide.md).
+
+## Routing: What Decides Each Claim
+
+Mining a claim is not verifying it. Hand each one to a tool that can:
+
+| Dimension | Tool that decides it |
+|---|---|
+| Data races, lock-ordering, lock-free algorithms | ThreadSanitizer, Helgrind, or a model checker over the real code (CBMC) |
+| Interrupt/ISR races, critical sections | RTOS-aware interrupt analysis, or a TLA+ model of the ISR/task interleaving |
+| Protocol-level interleaving of discrete events | `model_verify` (S1-S8 / A1-A14) and `model_compose_verify` (C1/C2) |
+| Hard real time: deadlines, periods, preemption | Scheduling analysis (RMA/EDF) and a timing tool — not this toolbox |
+| Probability or reliability claims | PRISM/Storm, fault-tree analysis |
+
+The full routing table, including hard-real-time, hybrid-control and execution-cost dimensions, is [`../model-everything/references/gap-routing-guide.md`](../model-everything/references/gap-routing-guide.md). `model_verify` reports carry the same routing as informational `coverageNotes` on matching models.
+
+## Rules for This Mode
+
+1. **Mining, not proof.** Report a concurrency claim as `UNVERIFIED` with the routing target; never as passing.
+2. **No absolute language in the answer.** "This is thread-safe" is exactly the claim being mined, not a result this skill can produce.
+3. **One counterexample is enough to refute.** If a race is suspected, the deliverable is the interleaving that breaks it plus the harness that demonstrates it (TSan/Helgrind output), not an argument.
+4. **Sequential targets are out of scope.** If nothing runs concurrently, say so and stop.
+5. **The scanner is `model_concurrency_scan`.** If it is not registered in this deployment, mine the text by hand against the keyword table above and route each claim the same way.
+6. **Name the claim and its routing in words.** 「QoS 1 只投递一次」plus the tool that decides it, never a bare check name. A reader who has not memorized this skill's tables learns nothing from an enumeration. The full rule is under "Writing the Answer" in the `model_verify` skill.

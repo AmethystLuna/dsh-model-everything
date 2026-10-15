@@ -1,0 +1,26 @@
+# Keeps the plugin dependencies current.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # Only devDependencies move on their own. The @deepseek-ai/* entries in
+    # `peerDependencies` are the compatibility claim this repository makes one DSH
+    # release at a time (see dsh.compatibility in package.json): an automatic range
+    # bump there would declare support for a release nothing has verified.
+    allow:
+      - dependency-type: "development"
+    groups:
+      # One PR for all @deepseek-ai/* dev-dependency bumps (dsh API mirrors).
+      dsh-ecosystem:
+        patterns:
+          - "@deepseek-ai/*"
+
+  # GitHub Actions are pinned to commit SHAs; Dependabot opens the bump PRs.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

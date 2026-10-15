@@ -1,0 +1,1987 @@
+import { readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { runVerification, runCompositionVerification, modelHash } from '../../lib/engine.js'
+
+const root = new URL('./fixtures/', import.meta.url)
+
+// DSH tool results must be lossless JSON: a property whose value is
+// `undefined` is rejected at the host boundary even though JSON.stringify
+// would silently drop it. This guards against regressions like
+// `truncated: exploration.truncated || undefined`.
+function assertNoUndefinedValues(value, path = 'root') {
+  if (value === undefined) {
+    throw new Error(`lossless JSON violation: undefined at ${path}`)
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoUndefinedValues(entry, `${path}[${index}]`))
+    return
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      assertNoUndefinedValues(entry, `${path}.${key}`)
+    }
+  }
+}
+
+const cases = [
+  {
+    name: 'absorbing-scc.json',
+    errors: 1,
+    findings: [{ check: 'S3', code: 'S3_CLOSED_SCC' }],
+  },
+  {
+    name: 'init-violation.json',
+    errors: 1,
+    findings: [
+      { check: 'S7', code: 'S7_INVARIANT_VIOLATION' },
+      { check: 'A7', code: 'A7_SHORTEST_COUNTEREXAMPLE' },
+    ],
+    assert(report) {
+      const a7 = report.checks.find((check) => check.id === 'A7')
+      const finding = a7?.findings.find((entry) => entry.code === 'A7_SHORTEST_COUNTEREXAMPLE')
+      if (finding === undefined || finding.path === undefined || finding.path.length !== 0) {
+        throw new Error('init violation must be reported with an empty shortest path')
+      }
+    },
+  },
+  {
+    name: 'unbalanced-lock.json',
+    errors: 1,
+    findings: [{ check: 'A4', code: 'A4_NO_RELEASE_EVENT' }],
+  },
+  {
+    name: 'event-before-state.json',
+    errors: 1,
+    findings: [
+      { check: 'S7', code: 'S7_INVARIANT_VIOLATION' },
+      { check: 'A7', code: 'A7_SHORTEST_COUNTEREXAMPLE' },
+    ],
+    assert(report) {
+      const a7 = report.checks.find((check) => check.id === 'A7')
+      const finding = a7?.findings.find((entry) => entry.code === 'A7_SHORTEST_COUNTEREXAMPLE')
+      const path = finding?.path
+      if (path === undefined || path.length !== 1 || path[0].from !== 'INIT' || path[0].event !== 'go' || path[0].to !== 'ACTIVE') {
+        throw new Error('event-before-state violation must report INIT -go-> ACTIVE, got ' + JSON.stringify(path))
+      }
+    },
+  },
+  {
+    name: 'var-in-range-scoped-violation.json',
+    errors: 1,
+    findings: [
+      { check: 'S7', code: 'S7_INVARIANT_VIOLATION' },
+      { check: 'A7', code: 'A7_SHORTEST_COUNTEREXAMPLE' },
+    ],
+    assert(report) {
+      const a7 = report.checks.find((check) => check.id === 'A7')
+      const finding = a7?.findings.find((entry) => entry.code === 'A7_SHORTEST_COUNTEREXAMPLE')
+      const path = finding?.path
+      // counter leaves [0,1] inside A itself: A -bump-> A -bump-> A (counter 2)
+      if (path === undefined || path.length !== 2 || path[0].from !== 'A' || path.some((step) => step.to !== 'A')) {
+        throw new Error('counter must be caught leaving the range inside the scoped state A, got ' + JSON.stringify(path))
+      }
+    },
+  },
+  {
+    // Control for the case above: the same range, but the scope names A while the
+    // counter only leaves [0,1] after the machine has moved to B. Ignoring `when`
+    // would flag this identically to the fixture above; honoring it still flags it,
+    // but the counterexample points at B (the scoped state A is never violated).
+    name: 'var-in-range-scoped-other-state.json',
+    errors: 1,
+    findings: [
+      { check: 'S7', code: 'S7_INVARIANT_VIOLATION' },
+      { check: 'A7', code: 'A7_SHORTEST_COUNTEREXAMPLE' },
+    ],
+    assert(report) {
+      const a7 = report.checks.find((check) => check.id === 'A7')
+      const finding = a7?.findings.find((entry) => entry.code === 'A7_SHORTEST_COUNTEREXAMPLE')
+      const path = finding?.path
+      // A itself is in range; the counter only leaves it in B, which this scope names.
+      if (path === undefined || path.length !== 1 || path[0].from !== 'A' || path[0].to !== 'B') {
+        throw new Error('the violation must be located in scoped post-state B, got ' + JSON.stringify(path))
+      }
+      const s7 = report.checks.find((check) => check.id === 'S7')
+      const s7Finding = s7?.findings.find((entry) => entry.code === 'S7_INVARIANT_VIOLATION')
+      if (s7Finding?.evidence?.invariant?.when?.state !== 'B') {
+        throw new Error('the echoed invariant must retain its scope, got ' + JSON.stringify(s7Finding?.evidence))
+      }
+    },
+  },
+  {
+    name: 'var-in-range-scoped-holds.json',
+    errors: 0,
+    findings: [],
+    assert(report) {
+      const s7 = report.checks.find((check) => check.id === 'S7')
+      if (s7?.status !== 'pass') throw new Error('a satisfied scoped range must pass S7, got ' + String(s7?.status))
+    },
+  },
+  {
+    name: 'var-in-range-scoped-init-violation.json',
+    errors: 1,
+    findings: [
+      { check: 'S7', code: 'S7_INVARIANT_VIOLATION' },
+      { check: 'A7', code: 'A7_SHORTEST_COUNTEREXAMPLE' },
+    ],
+    assert(report) {
+      const a7 = report.checks.find((check) => check.id === 'A7')
+      const finding = a7?.findings.find((entry) => entry.code === 'A7_SHORTEST_COUNTEREXAMPLE')
+      if (finding?.path === undefined || finding.path.length !== 0) {
+        throw new Error('an initial-state violation must carry an empty path even when `when` selects it, got ' + JSON.stringify(finding?.path))
+      }
+    },
+  },
+  {
+    name: 'boundary-guard.json',
+    errors: 1,
+    findings: [
+      { check: 'S6', code: 'S6_INCOMPLETE_GUARD' },
+      { check: 'A5', code: 'A5_GUARD_HOLE' },
+    ],
+  },
+  {
+    name: 'happy-path.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'narrative-complete.json',
+    errors: 0,
+    findings: [],
+    assert(report) {
+      const model = JSON.parse(readFileSync(new URL('narrative-complete.json', root), 'utf8'))
+      if (JSON.stringify(report.narrative) !== JSON.stringify(model.narrative)) {
+        throw new Error('report must echo the model narrative block')
+      }
+    },
+  },
+  {
+    name: 'retry-bounded.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'retry-unbounded.json',
+    errors: 1,
+    findings: [{ check: 'A12', code: 'A12_BUDGET_OVER' }],
+    assert(report) {
+      const a12 = report.checks.find((check) => check.id === 'A12')
+      const finding = a12?.findings.find((entry) => entry.code === 'A12_BUDGET_OVER')
+      const path = finding?.path
+      if (finding?.evidence?.unbounded !== true) throw new Error('unbounded retry must be flagged as unbounded')
+      if (path === undefined || path.length < 2 || path[path.length - 1].event !== 'timeout') {
+        throw new Error('unbounded retry witness must loop back through timeout, got ' + JSON.stringify(path))
+      }
+    },
+  },
+  {
+    name: 'deadline-over.json',
+    errors: 1,
+    findings: [{ check: 'A14', code: 'A14_DEADLINE_MISS' }],
+    assert(report) {
+      const a14 = report.checks.find((check) => check.id === 'A14')
+      const finding = a14?.findings.find((entry) => entry.code === 'A14_DEADLINE_MISS')
+      const path = finding?.path
+      if (path === undefined || path.length < 3 || path[path.length - 1].event !== 'tick') {
+        throw new Error('deadline miss must carry the over-residency tick path, got ' + JSON.stringify(path))
+      }
+    },
+  },
+  {
+    name: 'deadline-ok.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'probability-ok.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'probability-fail.json',
+    errors: 1,
+    findings: [{ check: 'A13', code: 'A13_PROBABILITY_VIOLATION' }],
+    assert(report) {
+      const a13 = report.checks.find((check) => check.id === 'A13')
+      const finding = a13?.findings.find((entry) => entry.code === 'A13_PROBABILITY_VIOLATION')
+      const computed = finding?.evidence?.computed
+      if (typeof computed !== 'number' || Math.abs(computed - 0.5) > 1e-6) {
+        throw new Error('expected computed P(hit B) = 0.5, got ' + JSON.stringify(computed))
+      }
+    },
+  },
+  {
+    name: 'budget-over.json',
+    errors: 1,
+    findings: [{ check: 'A12', code: 'A12_BUDGET_OVER' }],
+    assert(report) {
+      const a12 = report.checks.find((check) => check.id === 'A12')
+      const finding = a12?.findings.find((entry) => entry.code === 'A12_BUDGET_OVER')
+      const path = finding?.path
+      if (path === undefined || path.length !== 2 || path[0].event !== 'start' || path[1].event !== 'finish') {
+        throw new Error('budget violation must report the full over-budget path, got ' + JSON.stringify(path))
+      }
+      if (finding?.evidence === undefined || finding.evidence.totalCost !== 70) {
+        throw new Error('budget finding must carry totalCost 70, got ' + JSON.stringify(finding?.evidence))
+      }
+    },
+  },
+  {
+    name: 'budget-ok.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'entry-exit-balanced.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'entry-exit-unbalanced.json',
+    errors: 1,
+    findings: [{ check: 'A4', code: 'A4_NO_RELEASE_EVENT' }],
+  },
+  {
+    name: 'entry-exit-terminal.json',
+    errors: 1,
+    findings: [{ check: 'A4', code: 'A4_TERMINAL_WITH_RESOURCE' }],
+  },
+  // A9 leads-to. The property is universal: every run from `from` must reach `to`.
+  // These cases pin both directions, so the check cannot regress into an existential
+  // "some run reaches it" test, and a shared node cannot be mistaken for a cycle.
+  {
+    name: 'leads-to-direct.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'leads-to-chain.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'leads-to-diamond.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'leads-to-self-target.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'leads-to-cycle-avoids.json',
+    errors: 1,
+    findings: [{ check: 'A9', code: 'A9_LEADS_TO_VIOLATION' }],
+    assert: (report) => {
+      const finding = leadsToFinding(report)
+      if (!finding.message.includes('Cycle avoids target B')) {
+        throw new Error('expected the cycle reason, got: ' + finding.message)
+      }
+    },
+  },
+  {
+    name: 'leads-to-dead-end.json',
+    errors: 2,
+    findings: [
+      { check: 'A9', code: 'A9_LEADS_TO_VIOLATION' },
+      { check: 'S2', code: 'S2_NO_TRANSITIONS' },
+    ],
+    assert: (report) => {
+      const finding = leadsToFinding(report)
+      if (!finding.message.includes('Dead end before target B')) {
+        throw new Error('expected the dead-end reason, got: ' + finding.message)
+      }
+    },
+  },
+  // A target set says "reach any one of these". The property stays universal, so a
+  // branch that reaches none of them still refutes it.
+  {
+    name: 'leads-to-set-target.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'leads-to-set-single.json',
+    errors: 0,
+    findings: [],
+  },
+  {
+    name: 'leads-to-set-avoids.json',
+    errors: 1,
+    findings: [{ check: 'A9', code: 'A9_LEADS_TO_VIOLATION' }],
+    assert: (report) => {
+      const finding = leadsToFinding(report)
+      if (!finding.message.includes('Cycle avoids target B, C')) {
+        throw new Error('expected the whole target set in the reason, got: ' + finding.message)
+      }
+    },
+  },
+]
+
+/** The single A9 violation a leads-to fixture is expected to carry. */
+function leadsToFinding(report) {
+  const check = report.checks.find((entry) => entry.id === 'A9')
+  const finding = check?.findings.find((entry) => entry.code === 'A9_LEADS_TO_VIOLATION')
+  if (finding === undefined) throw new Error('expected an A9_LEADS_TO_VIOLATION finding')
+  return finding
+}
+
+let failures = 0
+for (const testCase of cases) {
+  try {
+    const text = await readFile(new URL(testCase.name, root), 'utf8')
+    const model = JSON.parse(text)
+    const report = runVerification(model)
+    if (!report.ok) throw new Error('model did not validate: ' + JSON.stringify(report.checks[0]?.findings ?? []))
+    if (report.summary.errors !== testCase.errors) {
+      throw new Error('expected ' + testCase.errors + ' errors, got ' + report.summary.errors)
+    }
+    for (const expected of testCase.findings) {
+      const check = report.checks.find((entry) => entry.id === expected.check)
+      if (check === undefined || !check.findings.some((finding) => finding.code === expected.code)) {
+        throw new Error('missing finding ' + expected.check + '/' + expected.code)
+      }
+    }
+    if (testCase.assert !== undefined) testCase.assert(report)
+    assertNoUndefinedValues(report)
+    console.log('PASS', testCase.name)
+  } catch (error) {
+    failures += 1
+    console.log('FAIL', testCase.name, '-', error instanceof Error ? error.message : String(error))
+  }
+}
+
+// Before/after regression comparison (D1-D4)
+async function runDiffTests() {
+  const before = {
+    schemaVersion: 1,
+    init: 'INIT',
+    states: [
+      { id: 'INIT' },
+      { id: 'ACTIVE', terminal: true },
+    ],
+    transitions: [
+      { from: 'INIT', event: 'go', to: 'ACTIVE' },
+    ],
+    invariants: [
+      { id: 'go-before-active', description: 'go must precede ACTIVE', kind: 'event-before-state', event: 'go', state: 'ACTIVE' },
+    ],
+  }
+  const after = {
+    schemaVersion: 1,
+    init: 'INIT',
+    states: [
+      { id: 'INIT' },
+      { id: 'ACTIVE' },
+    ],
+    transitions: [
+      { from: 'INIT', event: 'skip', to: 'ACTIVE' },
+    ],
+  }
+  const report = runVerification(after, { beforeModel: before })
+  if (!report.ok) throw new Error('diff report should be ok: ' + JSON.stringify(report.checks[0]?.findings ?? []))
+  const ids = report.checks.map((check) => check.id)
+  for (const id of ['D1', 'D2', 'D3', 'D4']) {
+    if (!ids.includes(id)) throw new Error('missing diff check ' + id)
+  }
+  const d1 = report.checks.find((check) => check.id === 'D1')
+  if (!d1?.findings.some((finding) => finding.code === 'D1_EVENT_DISABLED')) throw new Error('missing D1_EVENT_DISABLED')
+  const d2 = report.checks.find((check) => check.id === 'D2')
+  if (!d2?.findings.some((finding) => finding.code === 'D2_INVARIANT_REGRESSION')) throw new Error('missing D2_INVARIANT_REGRESSION')
+  const d4 = report.checks.find((check) => check.id === 'D4')
+  if (!d4?.findings.some((finding) => finding.code === 'D4_DEADLOCK_REGRESSION')) throw new Error('missing D4_DEADLOCK_REGRESSION')
+  if (report.comparison === undefined) throw new Error('missing comparison summary')
+  assertNoUndefinedValues(report)
+  console.log('PASS before-after-regression')
+
+  const beforeRename = {
+    schemaVersion: 1,
+    init: 'IDLE',
+    states: [
+      { id: 'IDLE' },
+      { id: 'DONE', terminal: true },
+    ],
+    transitions: [
+      { from: 'IDLE', event: 'go', to: 'DONE' },
+    ],
+  }
+  const afterRename = {
+    schemaVersion: 1,
+    init: 'READY',
+    states: [
+      { id: 'READY' },
+      { id: 'DONE', terminal: true },
+    ],
+    transitions: [
+      { from: 'READY', event: 'go', to: 'DONE' },
+    ],
+  }
+  const renameReport = runVerification(afterRename, { beforeModel: beforeRename, stateMapping: { IDLE: 'READY' } })
+  if (!renameReport.ok) throw new Error('rename diff report should be ok')
+  const renameD1 = renameReport.checks.find((check) => check.id === 'D1')
+  if (renameD1 === undefined || renameD1.findings.length !== 0) throw new Error('rename D1 should pass')
+  const renameD3 = renameReport.checks.find((check) => check.id === 'D3')
+  if (renameD3 === undefined || renameD3.findings.length !== 0) throw new Error('rename D3 should pass')
+  assertNoUndefinedValues(renameReport)
+  console.log('PASS before-after-rename-mapping')
+}
+
+// Path-property invariants (leads-to, sequence, atomicity, budget, probability) assert
+// a property of whole runs. They have their own probes (A9-A13), but D2 and A7 used to
+// decide them with a single-runtime predicate that always held, so a refactoring that
+// broke one was reported as "all BEFORE invariants continue to hold". These cases pin
+// both directions: the regression must be found, and a pure rename must stay clean.
+async function runPathPropertyContinuityTests() {
+  const leadsToBefore = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+    invariants: [{ id: 'inv', description: 'progress', kind: 'leads-to', from: 'A', to: 'B' }],
+  }
+  const cases = [
+    {
+      name: 'leads-to',
+      before: leadsToBefore,
+      after: {
+        ...leadsToBefore,
+        transitions: [{ from: 'A', event: 'go', to: 'B' }, { from: 'A', event: 'wait', to: 'A' }],
+      },
+    },
+    {
+      name: 'sequence',
+      before: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+        transitions: [{ from: 'A', event: 'a', to: 'B' }, { from: 'B', event: 'b', to: 'C' }],
+        invariants: [{ id: 'inv', description: 'order', kind: 'sequence', events: ['a', 'b'] }],
+      },
+      after: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+        transitions: [{ from: 'A', event: 'a', to: 'B' }, { from: 'B', event: 'b', to: 'C' }, { from: 'A', event: 'b', to: 'C' }],
+        invariants: [{ id: 'inv', description: 'order', kind: 'sequence', events: ['a', 'b'] }],
+      },
+    },
+    {
+      name: 'atomicity',
+      before: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+        transitions: [{ from: 'A', event: 'write', to: 'B' }, { from: 'B', event: 'commit', to: 'C' }],
+        invariants: [{ id: 'inv', description: 'all-or-nothing', kind: 'atomicity', events: ['write'], commit: 'commit', rollback: 'rollback' }],
+      },
+      after: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }, { id: 'D', terminal: true }],
+        transitions: [{ from: 'A', event: 'write', to: 'B' }, { from: 'B', event: 'commit', to: 'C' }, { from: 'B', event: 'leave', to: 'D' }],
+        invariants: [{ id: 'inv', description: 'all-or-nothing', kind: 'atomicity', events: ['write'], commit: 'commit', rollback: 'rollback' }],
+      },
+    },
+    {
+      name: 'budget',
+      before: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [{ from: 'A', event: 'go', to: 'B', cost: 5 }],
+        invariants: [{ id: 'inv', description: 'within budget', kind: 'budget', budget: 10 }],
+      },
+      after: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [{ from: 'A', event: 'go', to: 'B', cost: 50 }],
+        invariants: [{ id: 'inv', description: 'within budget', kind: 'budget', budget: 10 }],
+      },
+    },
+    {
+      name: 'probability',
+      before: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+        transitions: [{ from: 'A', event: 'go', to: 'B', weight: 9 }, { from: 'A', event: 'go', to: 'C', weight: 1 }],
+        invariants: [{ id: 'inv', description: 'mostly succeeds', kind: 'probability', target: 'B', op: '>=', p: 0.9 }],
+      },
+      after: {
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+        transitions: [{ from: 'A', event: 'go', to: 'B', weight: 1 }, { from: 'A', event: 'go', to: 'C', weight: 1 }],
+        invariants: [{ id: 'inv', description: 'mostly succeeds', kind: 'probability', target: 'B', op: '>=', p: 0.9 }],
+      },
+    },
+  ]
+
+  for (const testCase of cases) {
+    // The dedicated probe must own the verdict on AFTER alone...
+    const solo = runVerification(testCase.after)
+    const a7 = solo.checks.find((check) => check.id === 'A7')
+    const witness = a7?.findings.find((finding) => finding.code === 'A7_SHORTEST_COUNTEREXAMPLE')
+    if (witness === undefined) throw new Error(testCase.name + ': A7 should report the failing path-property invariant')
+    // ...and its message must not claim minimality for a search that cannot guarantee it.
+    if (witness.message.includes('shortest')) throw new Error(testCase.name + ': path-property witness must not claim to be shortest: ' + witness.message)
+
+    // ...and D2 must re-decide it against AFTER instead of reporting that it still holds.
+    const cmp = runVerification(testCase.after, { beforeModel: testCase.before })
+    const d2 = cmp.checks.find((check) => check.id === 'D2')
+    if (d2?.findings.some((finding) => finding.code === 'D2_INVARIANT_REGRESSION') !== true) {
+      throw new Error(testCase.name + ': D2 should report D2_INVARIANT_REGRESSION, got ' + JSON.stringify(d2?.findings ?? []))
+    }
+    assertNoUndefinedValues(cmp)
+  }
+  console.log('PASS path-property-continuity')
+
+  // A rename must not turn into a regression: the state references of these kinds have
+  // to follow stateMapping like the state-predicate kinds already do.
+  const renameBefore = {
+    schemaVersion: 1,
+    init: 'IDLE',
+    states: [{ id: 'IDLE' }, { id: 'DONE', terminal: true }, { id: 'FAILED', terminal: true }],
+    transitions: [
+      { from: 'IDLE', event: 'go', to: 'DONE', weight: 9 },
+      { from: 'IDLE', event: 'fail', to: 'FAILED', weight: 1 },
+    ],
+    invariants: [
+      { id: 'reaches-outcome', description: 'either outcome', kind: 'leads-to', from: 'IDLE', to: ['DONE', 'FAILED'] },
+      { id: 'mostly-succeeds', description: 'usually succeeds', kind: 'probability', target: 'DONE', op: '>=', p: 0.9 },
+    ],
+  }
+  const renameAfter = {
+    schemaVersion: 1,
+    init: 'READY',
+    states: [{ id: 'READY' }, { id: 'DONE', terminal: true }, { id: 'FAILED', terminal: true }],
+    transitions: [
+      { from: 'READY', event: 'go', to: 'DONE', weight: 9 },
+      { from: 'READY', event: 'fail', to: 'FAILED', weight: 1 },
+    ],
+    invariants: [
+      { id: 'reaches-outcome', description: 'either outcome', kind: 'leads-to', from: 'READY', to: ['DONE', 'FAILED'] },
+      { id: 'mostly-succeeds', description: 'usually succeeds', kind: 'probability', target: 'DONE', op: '>=', p: 0.9 },
+    ],
+  }
+  const renameCmp = runVerification(renameAfter, { beforeModel: renameBefore, stateMapping: { IDLE: 'READY' } })
+  const renameD2 = renameCmp.checks.find((check) => check.id === 'D2')
+  if (renameD2 === undefined || renameD2.findings.length !== 0) {
+    throw new Error('a pure rename must not produce D2 findings: ' + JSON.stringify(renameD2?.findings ?? []))
+  }
+  assertNoUndefinedValues(renameCmp)
+  console.log('PASS path-property-rename-mapping')
+}
+
+// Idempotent replay (A8)
+async function runIdempotencyTests() {
+  const nonIdempotent = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [
+      { id: 'A' },
+      { id: 'B' },
+      { id: 'C', terminal: true },
+    ],
+    transitions: [
+      { from: 'A', event: 'tick', to: 'B' },
+      { from: 'B', event: 'tick', to: 'C' },
+    ],
+    idempotentEvents: ['tick'],
+  }
+  const report = runVerification(nonIdempotent)
+  const a8 = report.checks.find((check) => check.id === 'A8')
+  if (a8 === undefined || !a8.findings.some((finding) => finding.code === 'A8_NOT_IDEMPOTENT')) {
+    throw new Error('missing A8_NOT_IDEMPOTENT')
+  }
+  assertNoUndefinedValues(report)
+
+  const idempotent = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [
+      { id: 'A' },
+      { id: 'B' },
+    ],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B' },
+      { from: 'A', event: 'noop', to: 'A' },
+      { from: 'B', event: 'noop', to: 'B' },
+    ],
+    idempotentEvents: ['noop'],
+  }
+  const okReport = runVerification(idempotent)
+  const okA8 = okReport.checks.find((check) => check.id === 'A8')
+  if (okA8 === undefined || okA8.findings.length !== 0) {
+    throw new Error('A8 should pass for noop self-loops: ' + JSON.stringify(okA8?.findings ?? []))
+  }
+  assertNoUndefinedValues(okReport)
+  console.log('PASS idempotent-replay')
+}
+
+// Advanced domain constraints (S8, A9-A11)
+async function runAdvancedConstraintTests() {
+  const monotonic = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'bump', to: 'A', updates: [{ variable: 'count', op: 'inc' }] },
+      { from: 'A', event: 'lower', to: 'B', updates: [{ variable: 'count', op: 'dec' }] },
+    ],
+    variables: [{ name: 'count', kind: 'integer', init: 0, monotonic: 'inc' }],
+  }
+  const monoReport = runVerification(monotonic)
+  const s8 = monoReport.checks.find((check) => check.id === 'S8')
+  if (s8 === undefined || !s8.findings.some((finding) => finding.code === 'S8_MONOTONIC_DECREASE')) throw new Error('missing S8_MONOTONIC_DECREASE')
+  assertNoUndefinedValues(monoReport)
+
+  const leadsBad = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C' }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B' },
+      { from: 'A', event: 'loop', to: 'C' },
+      { from: 'C', event: 'loop', to: 'C' },
+    ],
+    invariants: [{ id: 'l1', description: 'A leads to B', kind: 'leads-to', from: 'A', to: 'B' }],
+  }
+  const leadsReport = runVerification(leadsBad)
+  const a9 = leadsReport.checks.find((check) => check.id === 'A9')
+  if (a9 === undefined || !a9.findings.some((finding) => finding.code === 'A9_LEADS_TO_VIOLATION')) throw new Error('missing A9_LEADS_TO_VIOLATION')
+  assertNoUndefinedValues(leadsReport)
+
+  const seqBad = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'b', to: 'B' }],
+    invariants: [{ id: 's1', description: 'a then b', kind: 'sequence', events: ['a', 'b'] }],
+  }
+  const seqReport = runVerification(seqBad)
+  const a10 = seqReport.checks.find((check) => check.id === 'A10')
+  if (a10 === undefined || !a10.findings.some((finding) => finding.code === 'A10_SEQUENCE_VIOLATION')) throw new Error('missing A10_SEQUENCE_VIOLATION')
+  assertNoUndefinedValues(seqReport)
+
+  const atomicBad = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'write', to: 'B' }],
+    invariants: [{ id: 'at1', description: 'write must commit or rollback', kind: 'atomicity', events: ['write'], commit: 'commit', rollback: 'rollback' }],
+  }
+  const atomicReport = runVerification(atomicBad)
+  const a11 = atomicReport.checks.find((check) => check.id === 'A11')
+  if (a11 === undefined || !a11.findings.some((finding) => finding.code === 'A11_ATOMICITY_VIOLATION')) throw new Error('missing A11_ATOMICITY_VIOLATION')
+  assertNoUndefinedValues(atomicReport)
+
+  const atomicOk = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'write', to: 'B' },
+      { from: 'B', event: 'commit', to: 'C' },
+    ],
+    invariants: [{ id: 'at2', description: 'write must commit or rollback', kind: 'atomicity', events: ['write'], commit: 'commit', rollback: 'rollback' }],
+  }
+  const atomicOkReport = runVerification(atomicOk)
+  const okA11 = atomicOkReport.checks.find((check) => check.id === 'A11')
+  if (okA11 === undefined || okA11.findings.length !== 0) throw new Error('A11 should pass for commit path')
+  assertNoUndefinedValues(atomicOkReport)
+
+  console.log('PASS advanced-constraints')
+}
+
+await runAdvancedConstraintTests()
+
+async function runBudgetTests() {
+  // cost declared without any budget invariant -> advisory warning, no error
+  const noBudget = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B', cost: 7 },
+    ],
+  }
+  const warnReport = runVerification(noBudget)
+  if (warnReport.summary.errors !== 0) throw new Error('cost-without-budget must not produce errors')
+  const a12w = warnReport.checks.find((check) => check.id === 'A12')
+  if (a12w === undefined || !a12w.findings.some((finding) => finding.code === 'A12_COST_WITHOUT_BUDGET')) {
+    throw new Error('missing A12_COST_WITHOUT_BUDGET advisory')
+  }
+  assertNoUndefinedValues(warnReport)
+
+  // over-budget reachable only through a positive-cost cycle
+  const loopOver = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }],
+    transitions: [
+      { from: 'A', event: 'work', to: 'B', cost: 5 },
+      { from: 'B', event: 'work', to: 'A', cost: 5 },
+    ],
+    invariants: [{ id: 'b1', description: 'spin budget', kind: 'budget', budget: 100 }],
+  }
+  const loopReport = runVerification(loopOver)
+  const a12l = loopReport.checks.find((check) => check.id === 'A12')
+  if (a12l === undefined || !a12l.findings.some((finding) => finding.code === 'A12_BUDGET_OVER')) {
+    throw new Error('a positive-cost cycle must exceed the budget')
+  }
+  assertNoUndefinedValues(loopReport)
+
+  // guard-split same event with different costs: only the expensive branch overshoots
+  const guarded = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'retry', guard: { variable: 'fast', op: '==', value: true }, to: 'B', cost: 10 },
+      { from: 'A', event: 'retry', guard: { variable: 'fast', op: '==', value: false }, to: 'B', cost: 90 },
+      { from: 'B', event: 'done', to: 'C', cost: 5 },
+    ],
+    variables: [{ name: 'fast', kind: 'boolean', init: false }],
+    invariants: [{ id: 'b2', description: 'branch budget', kind: 'budget', budget: 50 }],
+  }
+  const guardedReport = runVerification(guarded)
+  const a12g = guardedReport.checks.find((check) => check.id === 'A12')
+  if (a12g === undefined || !a12g.findings.some((finding) => finding.code === 'A12_BUDGET_OVER')) {
+    throw new Error('expensive guarded branch must exceed budget')
+  }
+  assertNoUndefinedValues(guardedReport)
+
+  // DAG merge (several paths into one terminal) must NOT be treated as an unbounded cycle
+  const dagMerge = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'x', to: 'B', cost: 10 },
+      { from: 'A', event: 'y', to: 'C', cost: 30 },
+      { from: 'B', event: 'z', to: 'C', cost: 5 },
+    ],
+    invariants: [{ id: 'b3', description: 'dag budget', kind: 'budget', budget: 100 }],
+  }
+  const dagReport = runVerification(dagMerge)
+  const a12d = dagReport.checks.find((check) => check.id === 'A12')
+  if (a12d === undefined || a12d.findings.length !== 0) {
+    throw new Error('a DAG merge must not be flagged as an unbounded cycle: ' + JSON.stringify(a12d?.findings))
+  }
+  assertNoUndefinedValues(dagReport)
+
+  // legacy machine without cost/budget: A12 passes cleanly and total checks stay 20
+  const legacy = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  }
+  const legacyReport = runVerification(legacy)
+  const a12 = legacyReport.checks.find((check) => check.id === 'A12')
+  if (a12 === undefined || a12.findings.length !== 0 || a12.status !== 'pass') throw new Error('A12 must pass cleanly for legacy machines')
+  if (legacyReport.summary.checksRun !== 22) throw new Error('expected 22 checks, got ' + legacyReport.summary.checksRun)
+  assertNoUndefinedValues(legacyReport)
+  console.log('PASS budget-tests')
+}
+
+await runBudgetTests()
+
+async function runActionTests() {
+  // reacquire inside a single onEntry list -> warning
+  const reacquire = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', onEntry: ['lock', 'lock'], onExit: ['unlock'] }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B' },
+      { from: 'B', event: 'finish', to: 'C' },
+    ],
+    resourcePairs: [{ resource: 'mutex', acquireEvent: 'lock', releaseEvent: 'unlock' }],
+  }
+  const reacquireReport = runVerification(reacquire)
+  const a4r = reacquireReport.checks.find((check) => check.id === 'A4')
+  if (a4r === undefined || !a4r.findings.some((finding) => finding.code === 'A4_REACQUIRE_WITHOUT_RELEASE')) {
+    throw new Error('double acquire inside onEntry must warn')
+  }
+  assertNoUndefinedValues(reacquireReport)
+
+  // acquire inside onExit fires on every outgoing edge
+  const exitAcquire = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A', onExit: ['lock'] }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'toB', to: 'B' },
+      { from: 'A', event: 'toC', to: 'C' },
+    ],
+    resourcePairs: [{ resource: 'mutex', acquireEvent: 'lock', releaseEvent: 'unlock' }],
+  }
+  // unlock is never defined anywhere -> A4_NO_RELEASE_EVENT
+  const exitReport = runVerification(exitAcquire)
+  const a4e = exitReport.checks.find((check) => check.id === 'A4')
+  if (a4e === undefined || !a4e.findings.some((finding) => finding.code === 'A4_NO_RELEASE_EVENT')) {
+    throw new Error('exit-acquire with no release anywhere must be flagged')
+  }
+  assertNoUndefinedValues(exitReport)
+
+  // malformed onEntry -> model validation failure
+  const badActions = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A', onEntry: [5] }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  }
+  const badReport = runVerification(badActions)
+  if (badReport.ok || !badReport.checks[0].findings.some((finding) => finding.message.includes('onEntry'))) {
+    throw new Error('non-string onEntry must fail model validation')
+  }
+  assertNoUndefinedValues(badReport)
+  console.log('PASS action-tests')
+}
+
+await runActionTests()
+
+async function runCoverageNoteTests() {
+  // timing + preemption vocabulary triggers informational notes
+  const control = {
+    schemaVersion: 1,
+    init: 'IDLE',
+    states: [{ id: 'IDLE' }, { id: 'RUN' }, { id: 'SAFE', terminal: true }],
+    transitions: [
+      { from: 'IDLE', event: 'start', to: 'RUN' },
+      { from: 'RUN', event: 'watchdog_timeout', to: 'SAFE' },
+      { from: 'RUN', event: 'isr_cmd', to: 'RUN' },
+    ],
+  }
+  const report = runVerification(control)
+  if (!report.ok) throw new Error('control model should verify')
+  if (!Array.isArray(report.coverageNotes) || report.coverageNotes.length !== 2) {
+    throw new Error('expected two coverage notes (timing + preemption), got ' + JSON.stringify(report.coverageNotes))
+  }
+  if (!report.coverageNotes.some((note) => note.includes('UPPAAL'))) throw new Error('timing note should route to UPPAAL')
+  if (!report.coverageNotes.some((note) => note.includes('preemptive'))) throw new Error('preemption note must be present')
+  assertNoUndefinedValues(report)
+
+  // hybrid + probabilistic vocabulary routes to SpaceEx/PRISM
+  const hybridProb = {
+    schemaVersion: 1,
+    init: 'IDLE',
+    states: [{ id: 'IDLE' }, { id: 'RUN' }, { id: 'SAFE', terminal: true }],
+    transitions: [
+      { from: 'IDLE', event: 'pid_tune', to: 'RUN' },
+      { from: 'RUN', event: 'mtbf_report', to: 'SAFE' },
+    ],
+  }
+  const hpReport = runVerification(hybridProb)
+  if (!Array.isArray(hpReport.coverageNotes) || hpReport.coverageNotes.length !== 2) {
+    throw new Error('expected two coverage notes (hybrid + probabilistic), got ' + JSON.stringify(hpReport.coverageNotes))
+  }
+  if (!hpReport.coverageNotes.some((note) => note.includes('SpaceEx'))) throw new Error('hybrid note should route to SpaceEx')
+  if (!hpReport.coverageNotes.some((note) => note.includes('PRISM'))) throw new Error('probabilistic note should route to PRISM')
+  assertNoUndefinedValues(hpReport)
+
+  // plain machine with no risky vocabulary: no coverage notes at all
+  const plain = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  }
+  const plainReport = runVerification(plain)
+  if (plainReport.coverageNotes !== undefined) throw new Error('plain model must not carry coverage notes')
+  assertNoUndefinedValues(plainReport)
+  console.log('PASS coverage-note-tests')
+}
+
+await runCoverageNoteTests()
+
+async function runProbabilityTests() {
+  // DTMC with a cycle: P(hit B) converges to 1
+  const cycle = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'retry', to: 'A', weight: 1 },
+      { from: 'A', event: 'ok', to: 'B', weight: 1 },
+    ],
+    invariants: [{ id: 'pc', description: 'almost surely reaches B', kind: 'probability', target: 'B', op: '>=', p: 0.9999 }],
+  }
+  const cycleReport = runVerification(cycle)
+  const a13c = cycleReport.checks.find((check) => check.id === 'A13')
+  if (a13c === undefined || a13c.findings.length !== 0) {
+    throw new Error('P(hit B)=1 cycle must satisfy >=0.9999: ' + JSON.stringify(a13c?.findings))
+  }
+  assertNoUndefinedValues(cycleReport)
+
+  // skewed weights: P = 9/10
+  const skewed = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'ok', to: 'B', weight: 9 },
+      { from: 'A', event: 'bad', to: 'C', weight: 1 },
+    ],
+    invariants: [{ id: 'ps', description: 'success rate 90%', kind: 'probability', target: 'B', op: '>=', p: 0.85 }],
+  }
+  const skewedReport = runVerification(skewed)
+  const a13s = skewedReport.checks.find((check) => check.id === 'A13')
+  if (a13s === undefined || a13s.findings.length !== 0) throw new Error('skewed 9:1 must satisfy >=0.85')
+  assertNoUndefinedValues(skewedReport)
+
+  // weight 0 = branch never fires probabilistically -> P = 1
+  const zeroWeight = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'ok', to: 'B', weight: 1 },
+      { from: 'A', event: 'bad', to: 'C', weight: 0 },
+    ],
+    invariants: [{ id: 'pz', description: 'bad branch disabled', kind: 'probability', target: 'B', op: '>=', p: 0.999 }],
+  }
+  const zeroReport = runVerification(zeroWeight)
+  const a13z = zeroReport.checks.find((check) => check.id === 'A13')
+  if (a13z === undefined || a13z.findings.length !== 0) throw new Error('zero-weight branch must not fire')
+  assertNoUndefinedValues(zeroReport)
+
+  // malformed probability invariants must fail model validation
+  const badP = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }], invariants: [{ id: 'x', description: 'x', kind: 'probability', target: 'B', op: '>=', p: 1.5 }] }
+  if (runVerification(badP).ok) throw new Error('p=1.5 must fail validation')
+  const badW = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B', weight: -1 }] }
+  if (runVerification(badW).ok) throw new Error('weight=-1 must fail validation')
+  console.log('PASS probability-tests')
+}
+
+await runProbabilityTests()
+
+async function runCompositionTests() {
+  // textbook handshake: A sends req, B acks — rendezvous keeps both in lockstep
+  const machineA = {
+    schemaVersion: 1, init: 'A0',
+    states: [{ id: 'A0' }, { id: 'A_REQ' }, { id: 'A_WAIT' }, { id: 'A_DONE', terminal: true }],
+    transitions: [
+      { from: 'A0', event: 'start', to: 'A_REQ' },
+      { from: 'A_REQ', event: 'req', to: 'A_WAIT' },
+      { from: 'A_WAIT', event: 'ack', to: 'A_DONE' },
+    ],
+  }
+  const machineB = {
+    schemaVersion: 1, init: 'B0',
+    states: [{ id: 'B0' }, { id: 'B_BUSY' }, { id: 'B_DONE', terminal: true }],
+    transitions: [
+      { from: 'B0', event: 'req', to: 'B_BUSY' },
+      { from: 'B_BUSY', event: 'ack', to: 'B_DONE' },
+    ],
+  }
+  const okReport = runCompositionVerification([machineA, machineB], { rendezvous: ['req', 'ack'] })
+  if (!okReport.ok || okReport.summary.errors !== 0) throw new Error('handshake composition must pass: ' + JSON.stringify(okReport.checks))
+  const c2ok = okReport.checks.find((check) => check.id === 'C2')
+  if (c2ok === undefined || c2ok.findings.length !== 0) throw new Error('rendezvous should fire: ' + JSON.stringify(c2ok?.findings))
+  assertNoUndefinedValues(okReport)
+
+  // classic bug: B can never be ready for req -> A is left blocked (composition deadlock)
+  const stuckB = {
+    schemaVersion: 1, init: 'B0',
+    states: [{ id: 'B0' }, { id: 'B_DONE', terminal: true }],
+    transitions: [{ from: 'B0', event: 'ack', to: 'B_DONE' }],
+  }
+  const deadReport = runCompositionVerification([machineA, stuckB], { rendezvous: ['req', 'ack'] })
+  const c1 = deadReport.checks.find((check) => check.id === 'C1')
+  if (c1 === undefined || !c1.findings.some((finding) => finding.code === 'C1_COMPOSITION_DEADLOCK')) {
+    throw new Error('blocked handshake must deadlock: ' + JSON.stringify(deadReport.checks))
+  }
+  if (deadReport.summary.errors === 0) throw new Error('expected composition errors')
+  assertNoUndefinedValues(deadReport)
+
+  // rendezvous against a machine that is terminal from the start can never fire
+  const terminalB = {
+    schemaVersion: 1, init: 'B_DONE',
+    states: [{ id: 'B_DONE', terminal: true }],
+    transitions: [],
+  }
+  const termA = {
+    schemaVersion: 1, init: 'A0',
+    states: [{ id: 'A0' }, { id: 'A1', terminal: true }],
+    transitions: [{ from: 'A0', event: 'req', to: 'A1' }],
+  }
+  const termReport = runCompositionVerification([termA, terminalB], { rendezvous: ['req'] })
+  const c1t = termReport.checks.find((check) => check.id === 'C1')
+  if (c1t === undefined || !c1t.findings.some((finding) => finding.code === 'C1_COMPOSITION_DEADLOCK')) {
+    throw new Error('terminal peer must block the rendezvous (deadlock at init)')
+  }
+  assertNoUndefinedValues(termReport)
+
+  // 3-machine chain: all three must be jointly ready on req and on ack
+  const chainA = { schemaVersion: 1, init: 'A0', states: [{ id: 'A0' }, { id: 'A1' }, { id: 'A2' }, { id: 'A3', terminal: true }], transitions: [{ from: 'A0', event: 'start', to: 'A1' }, { from: 'A1', event: 'req', to: 'A2' }, { from: 'A2', event: 'ack', to: 'A3' }] }
+  const chainB = { schemaVersion: 1, init: 'B0', states: [{ id: 'B0' }, { id: 'B1' }, { id: 'B2', terminal: true }], transitions: [{ from: 'B0', event: 'req', to: 'B1' }, { from: 'B1', event: 'ack', to: 'B2' }] }
+  const chainC = { schemaVersion: 1, init: 'C0', states: [{ id: 'C0' }, { id: 'C1' }, { id: 'C2', terminal: true }], transitions: [{ from: 'C0', event: 'req', to: 'C1' }, { from: 'C1', event: 'ack', to: 'C2' }] }
+  const chainOk = runCompositionVerification([chainA, chainB, chainC], { rendezvous: ['req', 'ack'] })
+  if (!chainOk.ok || chainOk.summary.errors !== 0) throw new Error('3-machine chain must pass: ' + JSON.stringify(chainOk.checks))
+  if (chainOk.summary.machineCount !== 3) throw new Error('machineCount should be 3')
+  const c2c = chainOk.checks.find((check) => check.id === 'C2')
+  if (c2c === undefined || c2c.findings.length !== 0) throw new Error('chain rendezvous must fire: ' + JSON.stringify(c2c?.findings))
+  assertNoUndefinedValues(chainOk)
+
+  // 3-machine chain desync: C drops out of the ack handshake -> A/B advance, C is left stranded
+  const chainCdrop = { schemaVersion: 1, init: 'C0', states: [{ id: 'C0' }, { id: 'C1' }], transitions: [{ from: 'C0', event: 'req', to: 'C1' }] }
+  const chainBad = runCompositionVerification([chainA, chainB, chainCdrop], { rendezvous: ['req', 'ack'] })
+  const c1bad = chainBad.checks.find((check) => check.id === 'C1')
+  if (c1bad === undefined || !c1bad.findings.some((finding) => finding.code === 'C1_COMPOSITION_DEADLOCK')) {
+    throw new Error('dropped chain partner must surface as composition deadlock: ' + JSON.stringify(chainBad.checks))
+  }
+  assertNoUndefinedValues(chainBad)
+
+  // fewer than two machines is rejected
+  const one = runCompositionVerification([chainA])
+  if (one.ok) throw new Error('single machine must be rejected')
+  assertNoUndefinedValues(one)
+
+  // invalid machine fails cleanly
+  const bad = runCompositionVerification([machineA, { schemaVersion: 1, init: 'X', states: [{ id: 'Y' }], transitions: [] }])
+  if (bad.ok) throw new Error('invalid machine must fail composition')
+  assertNoUndefinedValues(bad)
+  console.log('PASS composition-tests')
+}
+
+await runCompositionTests()
+
+// Textbook canon: named cases from the formal-methods / systems literature, each mapped
+// to the check it exercises. Expected outcomes are asserted per case.
+async function runTextbookCanonTests() {
+  const load = async (name) => JSON.parse(readFileSync(new URL(name, root), 'utf8'))
+  const code = (report, checkId, want) => {
+    const c = report.checks.find((entry) => entry.id === checkId)
+    return c !== undefined && c.findings.some((finding) => finding.code === want)
+  }
+
+  // Two-Phase Commit (Gray): participant strands in WAITING with no outgoing transition
+  const tpcStuck = await load('twophase-participant-stuck.json')
+  const stuckReport = runVerification(tpcStuck)
+  if (!code(stuckReport, 'S2', 'S2_NO_TRANSITIONS')) throw new Error('2PC participant deadlock: S2 must fire')
+  assertNoUndefinedValues(stuckReport)
+
+  // Vending machine (classic): one coin event ambiguously leads to both DISPENSE and REFUND
+  const vending = await load('vending-ambiguous.json')
+  const vendReport = runVerification(vending)
+  if (!code(vendReport, 'S4', 'S4_AMBIGUOUS_DEFAULT')) throw new Error('vending ambiguity: S4 must fire')
+  assertNoUndefinedValues(vendReport)
+
+  // Two-Phase Commit ordering: commit before prepare must violate prepare-before-commit
+  const tpcOrder = await load('twophase-order.json')
+  const orderReport = runVerification(tpcOrder)
+  if (!code(orderReport, 'A10', 'A10_SEQUENCE_VIOLATION')) throw new Error('2PC commit-before-prepare: A10 must fire')
+  assertNoUndefinedValues(orderReport)
+
+  // TCP half-close (RFC 793 style): ESTABLISHED silently ignores RST that other states handle
+  const tcp = await load('tcp-missing-rst.json')
+  const tcpReport = runVerification(tcp)
+  if (!code(tcpReport, 'S5', 'S5_UNHANDLED_EVENT')) throw new Error('TCP missing RST handler: S5 must fire')
+  assertNoUndefinedValues(tcpReport)
+
+  // Gambler's ruin (Markov chain textbook): P(broke first) = 4/5 from $1 with a fair coin
+  const ruin = await load('gamblers-ruin.json')
+  const ruinReport = runVerification(ruin)
+  const a13r = ruinReport.checks.find((entry) => entry.id === 'A13')
+  if (a13r === undefined || a13r.findings.length !== 0) throw new Error('gambler ruin 0.8 >= 0.75 must pass: ' + JSON.stringify(a13r?.findings))
+  if (ruinReport.summary.errors !== 0) throw new Error('gambler ruin should have no errors')
+  assertNoUndefinedValues(ruinReport)
+  const ruinClaim = JSON.parse(JSON.stringify(ruin))
+  ruinClaim.invariants[0].p = 0.9
+  const ruinFail = runVerification(ruinClaim)
+  if (!code(ruinFail, 'A13', 'A13_PROBABILITY_VIOLATION')) throw new Error('claiming P>=0.9 must violate the true 0.8')
+  assertNoUndefinedValues(ruinFail)
+
+  // ISR vs task shared counter (embedded classic): event order changes the outcome
+  const counterRace = {
+    schemaVersion: 1, init: 'RUN',
+    states: [{ id: 'RUN' }, { id: 'DONE', terminal: true }],
+    variables: [{ name: 'v', kind: 'integer', init: 0 }],
+    transitions: [
+      { from: 'RUN', event: 'isr_write', to: 'RUN', updates: [{ variable: 'v', op: 'set', value: 1 }] },
+      { from: 'RUN', event: 'task_write', to: 'RUN', updates: [{ variable: 'v', op: 'set', value: 2 }] },
+      { from: 'RUN', event: 'stop', to: 'DONE' },
+    ],
+    concurrentPairs: [['isr_write', 'task_write']],
+  }
+  const raceReport = runVerification(counterRace)
+  if (!code(raceReport, 'A2', 'A2_ORDER_DEPENDENT')) throw new Error('ISR/task write race: A2 must fire')
+  assertNoUndefinedValues(raceReport)
+
+  // Semaphore take without a timeout path (embedded classic): allocation can block forever
+  const semTake = {
+    schemaVersion: 1, init: 'WAIT',
+    states: [{ id: 'WAIT' }, { id: 'READY' }, { id: 'RELEASED' }, { id: 'DONE', terminal: true }],
+    transitions: [
+      { from: 'WAIT', event: 'take', to: 'READY' },
+      { from: 'READY', event: 'give', to: 'RELEASED' },
+      { from: 'RELEASED', event: 'finish', to: 'DONE' },
+    ],
+    resourcePairs: [{ resource: 'queue', acquireEvent: 'take', failEvent: 'timeout', releaseEvent: 'give' }],
+  }
+  const semReport = runVerification(semTake)
+  if (semReport.summary.errors !== 0) throw new Error('semaphore model should have no errors')
+  if (!code(semReport, 'A6', 'A6_NO_FAILURE_HANDLER')) throw new Error('missing timeout handler: A6 must fire')
+  assertNoUndefinedValues(semReport)
+
+  // Webhook redelivery (distributed systems classic): notify is not idempotent
+  const webhook = {
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'notify', to: 'B' },
+      { from: 'B', event: 'notify', to: 'C' },
+    ],
+    idempotentEvents: ['notify'],
+  }
+  const webReport = runVerification(webhook)
+  if (!code(webReport, 'A8', 'A8_NOT_IDEMPOTENT')) throw new Error('redelivered notify changes state: A8 must fire')
+  assertNoUndefinedValues(webReport)
+
+  console.log('PASS textbook-canon')
+}
+
+await runTextbookCanonTests()
+
+async function runDeadlineTests() {
+  // advisory: maxTicks declared but no tickEvents -> cannot verify
+  const noTicks = {
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A', maxTicks: 3 }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  }
+  const noTicksReport = runVerification(noTicks)
+  if (noTicksReport.summary.errors !== 0) throw new Error('missing tickEvents must not error')
+  const a14n = noTicksReport.checks.find((check) => check.id === 'A14')
+  if (a14n === undefined || !a14n.findings.some((finding) => finding.code === 'A14_NO_TICK_EVENTS')) {
+    throw new Error('expected A14_NO_TICK_EVENTS advisory')
+  }
+  assertNoUndefinedValues(noTicksReport)
+
+  // deadline respected: every tick leaves the guarded state before the limit
+  const ok = {
+    schemaVersion: 1, init: 'IDLE',
+    states: [{ id: 'IDLE' }, { id: 'BUSY', maxTicks: 2 }, { id: 'DONE', terminal: true }],
+    transitions: [
+      { from: 'IDLE', event: 'fault', to: 'BUSY' },
+      { from: 'BUSY', event: 'tick', to: 'DONE' },
+      { from: 'BUSY', event: 'recover', to: 'DONE' },
+    ],
+    tickEvents: ['tick'],
+  }
+  const okReport = runVerification(ok)
+  const a14o = okReport.checks.find((check) => check.id === 'A14')
+  if (a14o === undefined || a14o.findings.length !== 0) throw new Error('deadline-respecting watchdog must pass')
+  assertNoUndefinedValues(okReport)
+
+  // invalid maxTicks fails validation
+  const bad = { schemaVersion: 1, init: 'A', states: [{ id: 'A', maxTicks: -1 }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
+  if (runVerification(bad).ok) throw new Error('negative maxTicks must fail validation')
+  console.log('PASS deadline-tests')
+}
+
+await runDeadlineTests()
+
+// Textbook canon II: classic concurrent algorithms + biased Markov chains
+async function runCanonTwoTests() {
+  const code = (report, checkId, want) => {
+    const c = report.checks.find((entry) => entry.id === checkId)
+    return c !== undefined && c.findings.some((finding) => finding.code === want)
+  }
+
+  // Peterson mutual exclusion (classic): pc encodes each process state
+  // 0 idle, 1 want/wait, 2 in CS, 3 done (terminal). flag_i is a 0/1 integer var.
+  const peterson = (bug) => {
+    const id = (a, b) => 'P1_' + a + '_P2_' + b
+    const states = []
+    for (let a = 0; a <= 3; a++) for (let b = 0; b <= 3; b++) {
+      states.push({ id: id(a, b), terminal: a === 3 && b === 3 })
+    }
+    const transitions = []
+    const flag1 = { variable: 'flag1', op: '==', value: 1 }
+    const flag2 = { variable: 'flag2', op: '==', value: 1 }
+    for (let a = 0; a <= 3; a++) for (let b = 0; b <= 3; b++) {
+      const from = id(a, b)
+      // process 1
+      if (a === 0) {
+        transitions.push({ from, event: 'p1step', to: id(1, b), updates: [{ variable: 'flag1', op: 'set', value: 1 }, { variable: 'turn', op: 'set', value: 2 }] })
+      } else if (a === 1) {
+        if (!bug) {
+          transitions.push({ from, event: 'p1step', guard: { all: [flag2, { variable: 'turn', op: '==', value: 2 }] }, to: from })
+        }
+        transitions.push({ from, event: 'p1step', to: id(2, b) })
+      } else if (a === 2) {
+        transitions.push({ from, event: 'p1step', to: id(3, b), updates: [{ variable: 'flag1', op: 'set', value: 0 }] })
+      }
+      // process 2 (mirror; waits while flag1 && turn == 1)
+      if (b === 0) {
+        transitions.push({ from, event: 'p2step', to: id(a, 1), updates: [{ variable: 'flag2', op: 'set', value: 1 }, { variable: 'turn', op: 'set', value: 1 }] })
+      } else if (b === 1) {
+        if (!bug) {
+          transitions.push({ from, event: 'p2step', guard: { all: [flag1, { variable: 'turn', op: '==', value: 1 }] }, to: from })
+        }
+        transitions.push({ from, event: 'p2step', to: id(a, 2) })
+      } else if (b === 2) {
+        transitions.push({ from, event: 'p2step', to: id(a, 3), updates: [{ variable: 'flag2', op: 'set', value: 0 }] })
+      }
+    }
+    return {
+      schemaVersion: 1, init: id(0, 0),
+      states,
+      transitions,
+      variables: [
+        { name: 'flag1', kind: 'integer', init: 0, min: 0, max: 1 },
+        { name: 'flag2', kind: 'integer', init: 0, min: 0, max: 1 },
+        { name: 'turn', kind: 'integer', init: 1, min: 1, max: 2 },
+      ],
+      invariants: [{ id: 'mutex', description: 'at most one process in the critical section', kind: 'never-states', states: [id(2, 2)] }],
+    }
+  }
+  const correct = runVerification(peterson(false))
+  if (correct.summary.errors !== 0) throw new Error('Peterson must be deadlock-free and mutually exclusive: ' + JSON.stringify(correct.checks.filter((c) => c.findings.some((f) => f.severity === 'error')).map((c) => c.id + ':' + c.findings.map((f) => f.code))))
+  assertNoUndefinedValues(correct)
+  const buggy = runVerification(peterson(true))
+  if (!code(buggy, 'S7', 'S7_INVARIANT_VIOLATION')) throw new Error('Peterson without the wait condition must violate mutual exclusion')
+  assertNoUndefinedValues(buggy)
+
+  // Producer-consumer with a rendezvous 'put' (single-slot CSP style)
+  const producer = { schemaVersion: 1, init: 'P0', states: [{ id: 'P0' }, { id: 'P1' }], transitions: [{ from: 'P0', event: 'make', to: 'P1' }, { from: 'P1', event: 'put', to: 'P0' }] }
+  const consumer = { schemaVersion: 1, init: 'C0', states: [{ id: 'C0' }, { id: 'C1' }], transitions: [{ from: 'C0', event: 'put', to: 'C1' }, { from: 'C1', event: 'use', to: 'C0' }] }
+  const pcOk = runCompositionVerification([producer, consumer], { rendezvous: ['put'] })
+  if (!pcOk.ok || pcOk.summary.errors !== 0) throw new Error('producer-consumer rendezvous must pass: ' + JSON.stringify(pcOk.checks))
+  assertNoUndefinedValues(pcOk)
+  const stuckConsumer = { schemaVersion: 1, init: 'C0', states: [{ id: 'C0' }, { id: 'C1' }], transitions: [{ from: 'C0', event: 'put', to: 'C1' }] }
+  const pcBad = runCompositionVerification([producer, stuckConsumer], { rendezvous: ['put'] })
+  if (!code(pcBad, 'C1', 'C1_COMPOSITION_DEADLOCK')) throw new Error('consumer that never drains must deadlock the producer')
+  assertNoUndefinedValues(pcBad)
+
+  // Biased gambler: win weight 4, lose weight 6 (p_win = 0.4); P(broke first) from $1, N=$5 = 0.924...
+  const ruin = JSON.parse(readFileSync(new URL('gamblers-ruin.json', root), 'utf8'))
+  for (const t of ruin.transitions) {
+    if (t.event === 'win') t.weight = 4
+    if (t.event === 'lose') t.weight = 6
+  }
+  ruin.invariants = [
+    { id: 'biased-ruin', description: 'P(broke) ~ 0.924 with p_win = 0.4', kind: 'probability', target: 'BROKE', op: '>=', p: 0.9 },
+  ]
+  const biasedOk = runVerification(ruin)
+  if (biasedOk.summary.errors !== 0) throw new Error('biased ruin 0.924 >= 0.9 must pass: ' + JSON.stringify(biasedOk.checks.find((c) => c.id === 'A13')))
+  const ruinClaim = JSON.parse(JSON.stringify(ruin))
+  ruinClaim.invariants[0].p = 0.93
+  if (!code(runVerification(ruinClaim), 'A13', 'A13_PROBABILITY_VIOLATION')) throw new Error('claiming P >= 0.93 must violate the true 0.924')
+  console.log('PASS canon-two')
+}
+
+await runCanonTwoTests()
+
+// Stress: larger machines must terminate and respect caps without hanging
+async function runStressTests() {
+  // 300-state linear chain, all checks
+  const chain = { schemaVersion: 1, init: 's0', states: [], transitions: [] }
+  for (let i = 0; i < 300; i++) chain.states.push({ id: 's' + i, terminal: i === 299 })
+  for (let i = 0; i < 299; i++) chain.transitions.push({ from: 's' + i, event: 'next', to: 's' + (i + 1) })
+  const chainReport = runVerification(chain)
+  if (!chainReport.ok || chainReport.summary.errors !== 0) throw new Error('300-state chain must pass')
+  assertNoUndefinedValues(chainReport)
+
+  // composition of two 80-state machines, then force truncation with a small cap
+  const make = (p) => { const m = { schemaVersion: 1, init: 'm' + p + '_0', states: [], transitions: [] }; for (let i = 0; i < 80; i++) m.states.push({ id: 'm' + p + '_' + i, terminal: i === 79 }); for (let i = 0; i < 79; i++) m.transitions.push({ from: 'm' + p + '_' + i, event: 'step' + p, to: 'm' + p + '_' + (i + 1) }); return m }
+  const bigA = make('a'); const bigB = make('b')
+  const composed = runCompositionVerification([bigA, bigB])
+  if (!composed.ok || composed.summary.truncated) throw new Error('80x80 product should complete: ' + JSON.stringify(composed.summary))
+  assertNoUndefinedValues(composed)
+  const capped = runCompositionVerification([bigA, bigB], { maxStates: 500 })
+  if (!capped.summary.truncated) throw new Error('small maxStates must truncate the product exploration')
+  assertNoUndefinedValues(capped)
+
+  // deep DTMC chain: value iteration must converge, not hang
+  const deep = { schemaVersion: 1, init: 'n0', states: [], transitions: [], invariants: [] }
+  for (let i = 0; i < 120; i++) deep.states.push({ id: 'n' + i, terminal: i === 119 })
+  for (let i = 0; i < 119; i++) deep.transitions.push({ from: 'n' + i, event: 'next', to: 'n' + (i + 1), weight: 1 })
+  deep.invariants.push({ id: 'reaches-end', description: 'deterministic chain reaches the end', kind: 'probability', target: 'n119', op: '>=', p: 0.999999 })
+  const deepReport = runVerification(deep)
+  const a13 = deepReport.checks.find((c) => c.id === 'A13')
+  if (a13 === undefined || a13.findings.length !== 0) throw new Error('deep chain P=1 must pass: ' + JSON.stringify(a13?.findings))
+  assertNoUndefinedValues(deepReport)
+  console.log('PASS stress-tests')
+}
+
+await runStressTests()
+
+// Textbook canon III: order dependence, dead-code reachability, guard coverage positives
+async function runCanonThreeTests() {
+  const code = (report, checkId, want) => {
+    const c = report.checks.find((entry) => entry.id === checkId)
+    return c !== undefined && c.findings.some((finding) => finding.code === want)
+  }
+
+  // Ledger example: book A then B ends in DONE1, B then A in DONE2 (order matters)
+  const nonCommutative = {
+    schemaVersion: 1, init: 'INIT',
+    states: [{ id: 'INIT' }, { id: 'P' }, { id: 'Q' }, { id: 'DONE1', terminal: true }, { id: 'DONE2', terminal: true }],
+    transitions: [
+      { from: 'INIT', event: 'book_a', to: 'P' },
+      { from: 'INIT', event: 'book_b', to: 'Q' },
+      { from: 'P', event: 'book_b', to: 'DONE1' },
+      { from: 'Q', event: 'book_a', to: 'DONE2' },
+    ],
+  }
+  const orderReport = runVerification(nonCommutative)
+  if (!code(orderReport, 'A3', 'A3_ORDER_DEPENDENT')) throw new Error('non-commutative bookings must be order-dependent (A3)')
+  assertNoUndefinedValues(orderReport)
+
+  // Commutative twin: either order ends in the same DONE
+  const commutative = {
+    schemaVersion: 1, init: 'INIT',
+    states: [{ id: 'INIT' }, { id: 'M' }, { id: 'DONE', terminal: true }],
+    transitions: [
+      { from: 'INIT', event: 'book_a', to: 'M' },
+      { from: 'INIT', event: 'book_b', to: 'M' },
+      { from: 'M', event: 'book_a', to: 'DONE' },
+      { from: 'M', event: 'book_b', to: 'DONE' },
+    ],
+  }
+  const commReport = runVerification(commutative)
+  const a3c = commReport.checks.find((entry) => entry.id === 'A3')
+  if (a3c === undefined || a3c.findings.some((finding) => finding.code === 'A3_ORDER_DEPENDENT')) {
+    throw new Error('commutative bookings must be order-independent')
+  }
+  assertNoUndefinedValues(commReport)
+
+  // Refactoring dead code: the legacy V1 path is no longer reachable after the V2 migration
+  const deadCode = {
+    schemaVersion: 1, init: 'NEW_INIT',
+    states: [{ id: 'NEW_INIT' }, { id: 'ACTIVE' }, { id: 'DONE', terminal: true }, { id: 'LEGACY_V1', terminal: true }],
+    transitions: [
+      { from: 'NEW_INIT', event: 'go', to: 'ACTIVE' },
+      { from: 'ACTIVE', event: 'finish', to: 'DONE' },
+    ],
+  }
+  const deadReport = runVerification(deadCode)
+  if (!code(deadReport, 'S1', 'S1_UNREACHABLE_STATE')) throw new Error('LEGACY_V1 must be flagged unreachable')
+  assertNoUndefinedValues(deadReport)
+
+  console.log('PASS canon-three')
+}
+
+await runCanonThreeTests()
+
+
+
+
+
+
+
+await runIdempotencyTests()
+
+await runDiffTests()
+await runPathPropertyContinuityTests()
+
+async function runNarrativeValidationTests() {
+  // A narrative may cover part of the model: states first, events and scenarios later
+  // is the natural authoring order. Coverage is reported; only a *wrong* narrative
+  // (unknown id, empty description, duplicate scenario) or an empty block is rejected.
+  const complete = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+    narrative: {
+      states: { A: 'start', B: 'done' },
+      events: { go: 'go ahead' },
+      scenarios: [{ from: 'A', event: 'go', scenario: 'start -> done' }],
+    },
+  }
+  const okReport = runVerification(complete)
+  if (!okReport.ok) throw new Error('complete narrative should validate: ' + JSON.stringify(okReport.checks[0]?.findings ?? []))
+  if (JSON.stringify(okReport.narrative) !== JSON.stringify(complete.narrative)) {
+    throw new Error('report must echo the narrative block')
+  }
+  if (JSON.stringify(okReport.narrativeCoverage) !== JSON.stringify({ states: '2/2', events: '1/1', scenarios: '1/1' })) {
+    throw new Error('full coverage must be reported: ' + JSON.stringify(okReport.narrativeCoverage))
+  }
+  if (okReport.nextSteps.some((step) => step.includes('Complete the narrative'))) {
+    throw new Error('a complete narrative must not be asked to complete itself')
+  }
+  assertNoUndefinedValues(okReport)
+
+  const clone = (value) => JSON.parse(JSON.stringify(value))
+
+  // The three release valves of P1-9: each partial block validates and reports coverage.
+  const partialCases = [
+    ['states only', { states: { A: 'start', B: 'done' } }, { states: '2/2', events: '0/1', scenarios: '0/1' }],
+    ['states + events', { states: { A: 'start', B: 'done' }, events: { go: 'go ahead' } }, { states: '2/2', events: '1/1', scenarios: '0/1' }],
+    ['scenarios only', { scenarios: [{ from: 'A', event: 'go', scenario: 'start -> done' }] }, { states: '0/2', events: '0/1', scenarios: '1/1' }],
+  ]
+  for (const [label, narrative, coverage] of partialCases) {
+    const model = clone(complete)
+    model.narrative = narrative
+    const report = runVerification(model)
+    if (!report.ok || report.ran !== true) {
+      throw new Error(label + ': a partial narrative must validate: ' + JSON.stringify(report.checks[0]?.findings ?? []))
+    }
+    if (JSON.stringify(report.narrativeCoverage) !== JSON.stringify(coverage)) {
+      throw new Error(label + ': coverage ' + JSON.stringify(report.narrativeCoverage) + ' != ' + JSON.stringify(coverage))
+    }
+    if (!report.nextSteps.some((step) => step.includes('Complete the narrative'))) {
+      throw new Error(label + ': the next steps must name the coverage gap')
+    }
+    assertNoUndefinedValues(report)
+  }
+
+  // An empty narrative block claims documentation that does not exist.
+  const empty = clone(complete)
+  empty.narrative = {}
+  const emptyReport = runVerification(empty)
+  if (emptyReport.ok || !emptyReport.checks[0].findings.some((entry) => entry.message.includes('declares no dimension'))) {
+    throw new Error('an empty narrative block must fail validation: ' + JSON.stringify(emptyReport.checks[0]?.findings ?? []))
+  }
+
+  // A narrative without a single key is just an absent narrative.
+  const absent = clone(complete)
+  delete absent.narrative
+  const absentReport = runVerification(absent)
+  if (!absentReport.ok || 'narrativeCoverage' in absentReport) {
+    throw new Error('an absent narrative must validate without a coverage field')
+  }
+
+  const unknownState = clone(complete)
+  unknownState.narrative.states.Z = 'ghost state'
+  const bad2 = runVerification(unknownState)
+  if (bad2.ok || !bad2.checks[0].findings.some((entry) => entry.message.includes('unknown state'))) {
+    throw new Error('unknown state in narrative must fail validation')
+  }
+
+  const unknownEvent = clone(complete)
+  unknownEvent.narrative.events = { never: 'not an event' }
+  const badEvent = runVerification(unknownEvent)
+  if (badEvent.ok || !badEvent.checks[0].findings.some((entry) => entry.message.includes('unknown event'))) {
+    throw new Error('unknown event in narrative must fail validation')
+  }
+
+  const emptyDescription = clone(complete)
+  emptyDescription.narrative.events = { go: '' }
+  const badDescription = runVerification(emptyDescription)
+  if (badDescription.ok || !badDescription.checks[0].findings.some((entry) => entry.message.includes('non-empty string'))) {
+    throw new Error('an empty description must fail validation')
+  }
+
+  const duplicate = clone(complete)
+  duplicate.narrative.scenarios = [
+    { from: 'A', event: 'go', scenario: 'first' },
+    { from: 'A', event: 'go', scenario: 'second' },
+  ]
+  const bad4 = runVerification(duplicate)
+  if (bad4.ok || !bad4.checks[0].findings.some((entry) => entry.message.includes('duplicate scenario'))) {
+    throw new Error('duplicate scenario must fail validation')
+  }
+
+  for (const bad of [emptyReport, bad2, badEvent, badDescription, bad4]) assertNoUndefinedValues(bad)
+  console.log('PASS narrative-validation')
+}
+
+async function runInvariantScopeValidationTests() {
+  // Closed invariant schema: a key the selected kind does not declare must be
+  // reported, never silently accepted. Accepting it is what let a `when` scope
+  // read as if it took effect while the engine ignored it.
+  const base = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+    variables: [{ name: 'counter', kind: 'integer', init: 0 }],
+  }
+  const withInvariant = (invariant) => ({ ...JSON.parse(JSON.stringify(base)), invariants: [invariant] })
+  const invariantError = (model, expected) => {
+    const report = runVerification(model)
+    if (report.ok) throw new Error('expected validation failure containing ' + JSON.stringify(expected))
+    const messages = report.checks[0].findings.map((entry) => entry.message)
+    if (!messages.some((message) => message.includes(expected))) {
+      throw new Error('expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(messages))
+    }
+    return report
+  }
+
+  const rejects = [
+    // unknown fields, including `when` on a kind that cannot honor it
+    [withInvariant({ id: 'a', description: 'a', kind: 'sequence', events: ['go'], when: { state: 'A' } }), 'unknown field for kind sequence'],
+    [withInvariant({ id: 'a', description: 'a', kind: 'leads-to', from: 'A', to: 'B', when: { state: 'A' } }), 'unknown field for kind leads-to'],
+    [withInvariant({ id: 'a', description: 'a', kind: 'never-states', states: ['B'], when: { state: 'A' } }), 'unknown field for kind never-states'],
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 1, scope: 'A' }), 'unknown field for kind var-in-range'],
+    // a range with neither bound is vacuous
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter' }), 'requires min or max'],
+    // scope must name a declared state
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 1, when: { state: 'GHOST' } }), 'references unknown state GHOST'],
+    // state scopes are closed too
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 1, when: { state: 'A', event: 'go' } }), 'unknown field for a state scope'],
+    // a guard scope must be a well-formed guard and must not reference the constrained variable
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 1, when: { bogus: 1 } }), 'must be a leaf'],
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 1, when: { variable: 'counter', op: '<', value: 3 } }), 'must not reference the constrained variable counter'],
+    [withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 1, when: { variable: 'ghost', op: '<', value: 3 } }), 'references unknown variable ghost'],
+  ]
+  for (const [model, expected] of rejects) assertNoUndefinedValues(invariantError(model, expected))
+
+  // a guard scope over an independent control variable is accepted and enforced
+  const guarded = withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 0, when: { variable: 'counter2', op: '==', value: 1 } })
+  guarded.variables = [{ name: 'counter', kind: 'integer', init: 0 }, { name: 'counter2', kind: 'integer', init: 0 }]
+  guarded.transitions = [{ from: 'A', event: 'go', to: 'B', updates: [{ variable: 'counter', op: 'inc' }, { variable: 'counter2', op: 'set', value: 1 }] }]
+  const guardedReport = runVerification(guarded)
+  if (!guardedReport.ok) throw new Error('guard scope over an independent variable must validate: ' + JSON.stringify(guardedReport.checks[0]?.findings ?? []))
+  // post-state B has counter2 == 1 and counter == 1 > max 0 -> guard is satisfied, range is violated
+  if (!guardedReport.checks.find((check) => check.id === 'S7')?.findings.some((finding) => finding.code === 'S7_INVARIANT_VIOLATION')) {
+    throw new Error('a satisfied guard scope must enforce the range')
+  }
+  assertNoUndefinedValues(guardedReport)
+
+  // A `when` clause is part of the model's identity: two models that differ only in
+  // scope must not hash equal (a dropped field would otherwise pass unnoticed).
+  const scoped = withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 0, when: { state: 'A' } })
+  const unscoped = withInvariant({ id: 'a', description: 'a', kind: 'var-in-range', variable: 'counter', max: 0 })
+  if (modelHash(scoped) === modelHash(unscoped)) throw new Error('a `when` scope must affect the model hash')
+  console.log('PASS invariant-scope-validation')
+}
+
+await runInvariantScopeValidationTests()
+
+async function runClosedModelValidationTests() {
+  // Every part of the model is a closed schema: an undeclared key is a typo or an
+  // unsupported feature, and a verifier that ignores it can report a property the
+  // model does not have. The regression this guards is concrete — on the open schema
+  // `{"kind":"var-in-range","maximum":0}` validated fine, reported errors=0 and S7=pass,
+  // silently turning a range that must fail into a vacuously true invariant.
+  const base = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  }
+  const mutate = (patch) => ({ ...JSON.parse(JSON.stringify(base)), ...patch })
+  const expectRejected = (model, expected) => {
+    const report = runVerification(model)
+    if (report.ok) throw new Error('expected rejection containing ' + JSON.stringify(expected) + ', but the model validated')
+    const messages = report.checks[0].findings.map((entry) => entry.message)
+    if (!messages.some((message) => message.includes(expected))) {
+      throw new Error('expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(messages))
+    }
+    return report
+  }
+
+  const rejections = [
+    // the false-negative hazard, exactly as it was observed
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0 }], transitions: [{ from: 'A', event: 'go', to: 'B', updates: [{ variable: 'c', op: 'inc' }] }], invariants: [{ id: 'c-zero', description: 'c stays 0', kind: 'var-in-range', variable: 'c', maximum: 0 }] }), 'invariants[0].maximum: unknown field for kind var-in-range'],
+    // a typo that would replace an intended bound with a vacuous one
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0 }], invariants: [{ id: 'c-zero', description: 'c stays 0', kind: 'var-in-range', variable: 'c' }] }), 'invariants[0]: requires min or max'],
+    // unknown keys on every model part
+    [mutate({ entites: [] }), 'model.entites: unknown field'],
+    [mutate({ states: [{ id: 'A', stat: 'x' }, { id: 'B', terminal: true }] }), 'states[0].stat: unknown field'],
+    [mutate({ transitions: [{ from: 'A', event: 'go', to: 'B', guard2: 1 }] }), 'transitions[0].guard2: unknown field'],
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0 }], transitions: [{ from: 'A', event: 'go', to: 'B', updates: [{ variable: 'c', op: 'inc', value2: 1 }] }] }), 'transitions[0].updates[0].value2: unknown field'],
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0, monotonic2: 'inc' }] }), 'variables[0].monotonic2: unknown field'],
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0 }], boundaryChecks: [{ variable: 'c', values: [0], entity: 'E' }] }), 'boundaryChecks[0].entity: unknown field'],
+    [mutate({ resourcePairs: [{ resource: 'm', acquireEvent: 'lock', releaseEvent: 'unlock', failEv: 'x' }] }), 'resourcePairs[0].failEv: unknown field'],
+    [mutate({ narrative: { states: { A: 'a', B: 'b' }, events: { go: 'g' }, scenarios: [{ from: 'A', event: 'go', scenario: 's' }], extra: 1 } }), 'narrative.extra: unknown field'],
+    [mutate({ narrative: { states: { A: 'a', B: 'b' }, events: { go: 'g' }, scenarios: [{ from: 'A', event: 'go', scenario: 's', note: 'n' }] } }), 'narrative.scenarios[0].note: unknown field'],
+    // misspelled values that used to be ignored outright
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0 }], transitions: [{ from: 'A', event: 'go', to: 'B', guard: { variable: 'c', op: '===', value: 0 } }] }), 'transitions[0].guard.op: must be a comparison operator'],
+    [mutate({ variables: [{ name: 'c', kind: 'integer', init: 0 }], transitions: [{ from: 'A', event: 'go', to: 'B', updates: [{ variable: 'c', op: 'increment' }] }] }), "transitions[0].updates[0].op: must be 'set', 'inc', or 'dec'"],
+    [mutate({ states: [{ id: 'A', terminal: 'yes' }, { id: 'B', terminal: true }] }), 'states[0].terminal: must be a boolean'],
+    [mutate({ variables: [{ name: 'c', init: 0 }] }), "variables[0].kind: must be 'integer' or 'boolean'"],
+    // invariant targets must resolve, or the check silently becomes vacuous
+    [mutate({ invariants: [{ id: 'n', description: 'd', kind: 'never-states', states: ['C'] }] }), 'invariants[0].states[0]: references unknown state C'],
+    [mutate({ invariants: [{ id: 'l', description: 'd', kind: 'leads-to', from: 'A', to: 'C' }] }), 'invariants[0].to: references unknown state C'],
+    [mutate({ invariants: [{ id: 'l', description: 'd', kind: 'leads-to', from: 'C', to: 'B' }] }), 'invariants[0].from: references unknown state C'],
+    // the target set is a set: empty, duplicated or misspelled members are modelling
+    // slips, and accepting them would give one meaning several model hashes
+    [mutate({ invariants: [{ id: 'l', description: 'd', kind: 'leads-to', from: 'A', to: [] }] }), 'invariants[0].to: must be a non-empty array of state ids'],
+    [mutate({ invariants: [{ id: 'l', description: 'd', kind: 'leads-to', from: 'A', to: ['B', 'B'] }] }), 'invariants[0].to[1]: duplicates state B in the target set'],
+    [mutate({ invariants: [{ id: 'l', description: 'd', kind: 'leads-to', from: 'A', to: ['B', 'C'] }] }), 'invariants[0].to[1]: references unknown state C'],
+    [mutate({ invariants: [{ id: 'l', description: 'd', kind: 'leads-to', from: 'A', to: 5 }] }), 'invariants[0].to: must be a state id or a non-empty array of state ids'],
+    [mutate({ invariants: [{ id: 'p', description: 'd', kind: 'probability', target: 'C', op: '>=', p: 0.5 }] }), 'invariants[0].target: references unknown state C'],
+    [mutate({ invariants: [{ id: 'e', description: 'd', kind: 'event-before-state', event: 'go', state: 'C' }] }), 'invariants[0].state: references unknown state C'],
+    [mutate({ invariants: [{ id: 'e', description: 'd', kind: 'event-before-state', event: 'launch', state: 'B' }] }), 'invariants[0].event: references unknown event launch'],
+  ]
+  for (const [model, expected] of rejections) assertNoUndefinedValues(expectRejected(model, expected))
+
+  // The data model has its own (entity, field) boundary checks and its own validator;
+  // tightening the logic model must not have leaked into it.
+  const { runDataVerification } = await import('../../lib/data-engine.js')
+  const dataModel = {
+    schemaVersion: 1,
+    entities: [{ name: 'User', fields: [{ name: 'age', type: 'integer', required: true, min: 0, max: 120 }] }],
+    boundaryChecks: [{ entity: 'User', field: 'age', values: [0, 120] }],
+  }
+  const dataReport = runDataVerification(dataModel)
+  if (!dataReport.ok) throw new Error('the (entity, field) boundary-check shape must stay valid for data models: ' + JSON.stringify(dataReport.checks[0]?.findings ?? []))
+  console.log('PASS closed-model-validation')
+}
+
+await runClosedModelValidationTests()
+
+await runNarrativeValidationTests()
+
+// ---------------------------------------------------------------------------
+// Report contract (P0-1), metadata keys and hash specs (P0-3/P0-4)
+// ---------------------------------------------------------------------------
+
+function expectFail(name, report) {
+  if (report.verdict !== 'fail') throw new Error(name + ': expected verdict fail, got ' + report.verdict)
+  if (report.verdictReason === '') throw new Error(name + ': verdictReason must not be empty')
+  assertNoUndefinedValues(report)
+}
+
+async function runReportContractTests() {
+  // The exact false guarantee this contract closes: `ok: true` while a check failed.
+  const deadlocked = runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] })
+  if (deadlocked.ok !== true || deadlocked.ran !== true) throw new Error('the engine ran; ok/ran must both be true')
+  expectFail('deadlock', deadlocked)
+  if (deadlocked.verdictReason !== '1 error finding(s) (first: S2_NO_TRANSITIONS)') {
+    throw new Error('unexpected verdictReason: ' + deadlocked.verdictReason)
+  }
+  if (deadlocked.summary.errors !== 1) throw new Error('the summary must still count the error')
+
+  // A validation failure is a refusal of the model, not of the tool: ran stays true, verdict fail.
+  const invalid = runVerification({ schemaVersion: 2, init: 'A', states: [{ id: 'A' }], transitions: [] })
+  if (invalid.ok !== false || invalid.ran !== true) throw new Error('a rejected model still ran the validation')
+  expectFail('invalid model', invalid)
+  if (!invalid.verdictReason.startsWith('1 error finding(s) (first: MODEL_INVALID)')) {
+    throw new Error('unexpected verdictReason: ' + invalid.verdictReason)
+  }
+
+  // Warnings alone are not a failure, but they are not silence either.
+  const warnings = runVerification({
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }, { from: 'B', event: 'stray', to: 'B' }],
+  })
+  if (warnings.verdict !== 'pass_with_findings') throw new Error('expected pass_with_findings, got ' + warnings.verdict)
+
+  const clean = runVerification(JSON.parse(readFileSync(new URL('leads-to-direct.json', root), 'utf8')))
+  if (clean.verdict !== 'pass') throw new Error('expected pass, got ' + clean.verdict)
+  if (clean.verdictReason !== 'no error or warning findings') throw new Error('unexpected reason: ' + clean.verdictReason)
+  // A model with warnings only is not a failure — and not silence either.
+  const happy = runVerification(JSON.parse(readFileSync(new URL('happy-path.json', root), 'utf8')))
+  if (happy.verdict !== 'pass_with_findings' || happy.summary.errors !== 0) {
+    throw new Error('a warning-only model must be pass_with_findings, got ' + happy.verdict)
+  }
+
+  // Composition carries the same contract.
+  const machine = (prefix) => ({
+    schemaVersion: 1,
+    init: prefix + '0',
+    states: [{ id: prefix + '0' }, { id: prefix + '1', terminal: true }],
+    transitions: [{ from: prefix + '0', event: 'go', to: prefix + '1' }],
+  })
+  const composed = runCompositionVerification([machine('A'), machine('B')])
+  if (composed.ran !== true || composed.verdict !== 'pass') throw new Error('clean composition must pass')
+  const stuck = runCompositionVerification([{ schemaVersion: 1, init: 'S', states: [{ id: 'S' }], transitions: [] }, machine('B')])
+  expectFail('composition deadlock', stuck)
+
+  // `_`-prefixed keys anywhere are annotation metadata: ignored, echoed, and excluded
+  // from the hash — so an archived model hashes like the model with metadata stripped.
+  const bare = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  }
+  const archived = {
+    ...JSON.parse(JSON.stringify(bare)),
+    _source: 'docs/uml/order-service.model.json',
+    _verified: { modelHash: '00000000000000000000000000000000000000000000000000000000deadbeef', at: '2026-10-09' },
+    _extraction_caveats: ['guards approximated'],
+    states: [{ id: 'A', _note: 'power-on' }, { id: 'B', terminal: true }],
+  }
+  const archivedReport = runVerification(archived)
+  if (!archivedReport.ok) throw new Error('a model with `_` metadata must validate: ' + JSON.stringify(archivedReport.checks[0]?.findings ?? []))
+  if (archivedReport.verdict !== 'pass') throw new Error('metadata must not change the verdict')
+  const expectedKeys = ['_extraction_caveats', '_source', '_verified', 'states[0]._note']
+  if (JSON.stringify(archivedReport.metadataKeys) !== JSON.stringify(expectedKeys)) {
+    throw new Error('metadataKeys mismatch: ' + JSON.stringify(archivedReport.metadataKeys))
+  }
+  if (modelHash(archived) !== modelHash(bare)) throw new Error('`_` metadata must not change the model hash')
+  if (JSON.stringify(archivedReport.checks) !== JSON.stringify(runVerification(bare).checks)) {
+    throw new Error('`_` metadata must not change a single check result')
+  }
+  // A typo without the prefix is still a rejection: the exemption is namespaced, not a loosening.
+  const typo = { ...JSON.parse(JSON.stringify(bare)), sttes: [] }
+  if (runVerification(typo).ok) throw new Error('a mistyped top-level key must still be rejected')
+
+  // hashSpec: v1 excludes metadata, v0 is the pre-1.0.0 behaviour, and both are
+  // byte-identical for a model without `_` keys (so archived hashes stay valid).
+  if (archivedReport.hashSpec !== 'v1') throw new Error('the report must name the hash spec it used')
+  if (modelHash(archived, 'v1') === modelHash(archived, 'v0')) throw new Error('v0 and v1 must differ when metadata is present')
+  if (modelHash(bare, 'v1') !== modelHash(bare, 'v0')) throw new Error('v0 and v1 must agree without metadata')
+  const legacy = runVerification(bare, { hashSpec: 'v0' })
+  if (legacy.hashSpec !== 'v0' || legacy.modelHash !== modelHash(bare, 'v0')) throw new Error('hashSpec option not honoured')
+
+  // P2-13: every report names its contract, carries its hashes in one place, and ends
+  // with next steps — derived from the findings, so two runs agree byte for byte.
+  if (deadlocked.schema !== 'model-everything/verify/v1') throw new Error('verify schema: ' + deadlocked.schema)
+  if (JSON.stringify(deadlocked.hashes) !== JSON.stringify({ hashSpec: 'v1', modelHash: modelHash({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] }) })) {
+    throw new Error('verify hashes: ' + JSON.stringify(deadlocked.hashes))
+  }
+  if (!Array.isArray(deadlocked.nextSteps) || deadlocked.nextSteps.length === 0) throw new Error('verify nextSteps must not be empty')
+  if (!deadlocked.nextSteps.some((step) => step.includes('S2 Deadlock'))) {
+    throw new Error('the failing check must be named in nextSteps: ' + JSON.stringify(deadlocked.nextSteps))
+  }
+  const repeat = runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] })
+  if (JSON.stringify(repeat.nextSteps) !== JSON.stringify(deadlocked.nextSteps)) throw new Error('nextSteps must be deterministic')
+  if (!invalid.nextSteps.some((step) => step.includes('MODEL Model Validation'))) {
+    throw new Error('a rejected model must name the validation check')
+  }
+
+  const composedForContract = runCompositionVerification([
+    { schemaVersion: 1, init: 'A0', states: [{ id: 'A0' }, { id: 'A1', terminal: true }], transitions: [{ from: 'A0', event: 'go', to: 'A1' }] },
+    { schemaVersion: 1, init: 'B0', states: [{ id: 'B0' }, { id: 'B1', terminal: true }], transitions: [{ from: 'B0', event: 'go', to: 'B1' }] },
+  ])
+  if (composedForContract.schema !== 'model-everything/compose/v1') throw new Error('compose schema: ' + composedForContract.schema)
+  if (composedForContract.hashes.machines.length !== 2 || composedForContract.hashes.machines.some((hash) => hash === '')) {
+    throw new Error('compose hashes: ' + JSON.stringify(composedForContract.hashes))
+  }
+  if (composedForContract.nextSteps.length === 0) throw new Error('compose nextSteps must not be empty')
+
+  // Backward compatibility, pinned: the 0.9.0 hashes of two fixtures. A change to the
+  // normalization must be a new hashSpec, never a silent change to this one.
+  const pinned = [
+    ['happy-path.json', 'f583202888b827922ac512a312758fa2d8cf9055b102205ecad18f81a0a7d539'],
+    ['narrative-complete.json', '962e5b131c142b553286d2fba2fc49afe9783e8387402efa7d21a93a626e2a09'],
+  ]
+  for (const [file, expected] of pinned) {
+    const model = JSON.parse(readFileSync(new URL(file, root), 'utf8'))
+    const actual = modelHash(model)
+    if (actual !== expected) throw new Error(file + ' hashSpec v1 drift: ' + actual + ' != ' + expected)
+    if (modelHash(model, 'v0') !== expected) throw new Error(file + ' must hash the same under v0 (no metadata present)')
+  }
+
+  console.log('PASS report-contract')
+}
+
+await runReportContractTests()
+
+// ---------------------------------------------------------------------------
+// Composition explainability (P1-10): shortest counterexample, per-machine
+// reasons, and the asynchronous semantics that stand in for a tempo ratio.
+// ---------------------------------------------------------------------------
+
+function compositionChecks(report) {
+  return {
+    c1: report.checks.find((check) => check.id === 'C1'),
+    c2: report.checks.find((check) => check.id === 'C2'),
+  }
+}
+
+// The 2026-10-14 host OOM. An unbounded counter plus a leads-to invariant: \`maxStates\`
+// cannot bound that walk, because it is depth-first over run states rather than
+// breadth-first over the state graph, and every run state of a counter is distinct. The
+// walk must stop inside its own budget and say that it stopped, instead of growing the
+// heap until the host process aborts.
+async function runIncidentRegressionTests() {
+  const unbounded = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'tick', to: 'A', updates: [{ variable: 'x', op: 'inc', value: 1 }] }],
+    variables: [{ name: 'x', kind: 'integer', init: 0, min: 0, max: 3 }],
+    invariants: [{ id: 'a-must-reach-b', description: 'A must reach B', kind: 'leads-to', from: 'A', to: ['B'] }],
+  }
+  const started = Date.now()
+  const report = runVerification(unbounded, { maxStates: 10 })
+  const elapsed = Date.now() - started
+  if (elapsed > 5000) throw new Error('the leads-to walk must stay inside its budget; took ' + elapsed + 'ms')
+  const a9 = report.checks.find((check) => check.id === 'A9')
+  if (a9 === undefined) throw new Error('A9 must always be present')
+  if (!a9.findings.some((finding) => finding.code === 'A9_LEADS_TO_UNDECIDED')) {
+    throw new Error('an exhausted leads-to walk must report A9_LEADS_TO_UNDECIDED, got ' + JSON.stringify(a9.findings.map((finding) => finding.code)))
+  }
+  if (a9.findings.some((finding) => finding.code === 'A9_LEADS_TO_VIOLATION')) {
+    throw new Error('a walk that ran out of budget must not be reported as a violation')
+  }
+  if (a9.detail.includes('hold')) throw new Error('an undecided check must not claim the invariant holds: ' + a9.detail)
+  if (report.summary.truncated !== true) throw new Error('an undecided search must set summary.truncated')
+  const a7 = report.checks.find((check) => check.id === 'A7')
+  if (!a7.findings.some((finding) => finding.code === 'A7_UNDECIDED')) {
+    throw new Error('A7 must report A7_UNDECIDED instead of inventing a counterexample')
+  }
+  assertNoUndefinedValues(report)
+
+  // The budget is a cap, not a refusal to conclude: a finite run graph is still decided,
+  // and its counterexample is still reported.
+  const finite = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B' },
+      { from: 'A', event: 'loop', to: 'C' },
+      { from: 'C', event: 'loop', to: 'C' },
+    ],
+    invariants: [{ id: 'l1', description: 'A leads to B', kind: 'leads-to', from: 'A', to: ['B'] }],
+  }
+  const decided = runVerification(finite).checks.find((check) => check.id === 'A9')
+  if (!decided.findings.some((finding) => finding.code === 'A9_LEADS_TO_VIOLATION')) {
+    throw new Error('a finite counterexample must still be reported, got ' + JSON.stringify(decided.findings.map((finding) => finding.code)))
+  }
+
+  // A declared range that no guard enforces is reported, not silently clamped: clamping
+  // would delete the states a range violation is witnessed by.
+  const loose = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }],
+    transitions: [{ from: 'A', event: 'tick', to: 'A', updates: [{ variable: 'depth', op: 'inc' }] }],
+    variables: [{ name: 'depth', kind: 'integer', init: 0, min: 0, max: 4 }],
+  }
+  const looseS8 = runVerification(loose).checks.find((check) => check.id === 'S8')
+  if (!looseS8.findings.some((finding) => finding.code === 'S8_DOMAIN_NOT_ENFORCED')) {
+    throw new Error('an unguarded inc past a declared max must be reported')
+  }
+  const pinned = { ...loose, transitions: [{ from: 'A', event: 'tick', to: 'A', guard: { variable: 'depth', op: '<', value: 4 }, updates: [{ variable: 'depth', op: 'inc' }] }] }
+  if (runVerification(pinned).checks.find((check) => check.id === 'S8').findings.some((finding) => finding.code === 'S8_DOMAIN_NOT_ENFORCED')) {
+    throw new Error('a guard that proves the bound must silence S8_DOMAIN_NOT_ENFORCED')
+  }
+  const outOfRange = { ...loose, transitions: [{ from: 'A', event: 'reset', to: 'A', updates: [{ variable: 'depth', op: 'set', value: 9 }] }] }
+  if (!runVerification(outOfRange).checks.find((check) => check.id === 'S8').findings.some((finding) => finding.code === 'S8_DOMAIN_SET_OUTSIDE')) {
+    throw new Error('a set above the declared max must be reported')
+  }
+
+  // A guard on a value the model never produces is dead code, even though the declared
+  // domain contains it. The declared domain is what S4/S6 enumerate; reachability is
+  // what decides whether the branch can ever fire.
+  const deadGuard = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'read', to: 'A', guard: { variable: 'code', op: '==', value: 1 }, updates: [{ variable: 'code', op: 'set', value: 1 }] },
+      { from: 'A', event: 'read', to: 'B', guard: { variable: 'code', op: '==', value: 2 } },
+    ],
+    variables: [{ name: 'code', kind: 'integer', init: 1, min: 1, max: 2 }],
+  }
+  if (!runVerification(deadGuard).checks.find((check) => check.id === 'S6').findings.some((finding) => finding.code === 'S6_DEAD_GUARD')) {
+    throw new Error('a guard on a value no update produces must be reported as a dead branch')
+  }
+  const liveGuard = {
+    ...deadGuard,
+    transitions: [
+      { from: 'A', event: 'read', to: 'A', guard: { variable: 'code', op: '==', value: 1 }, updates: [{ variable: 'code', op: 'set', value: 2 }] },
+      { from: 'A', event: 'read', to: 'B', guard: { variable: 'code', op: '==', value: 2 } },
+    ],
+  }
+  if (runVerification(liveGuard).checks.find((check) => check.id === 'S6').findings.some((finding) => finding.code === 'S6_DEAD_GUARD')) {
+    throw new Error('a satisfiable guard must not be reported as dead')
+  }
+  console.log('PASS incident-regression')
+}
+
+async function runCompositionExplainTests() {
+  const stuck = { schemaVersion: 1, init: 'S', states: [{ id: 'S' }], transitions: [] }
+  const waiter = { schemaVersion: 1, init: 'W0', states: [{ id: 'W0' }, { id: 'W1', terminal: true }], transitions: [{ from: 'W0', event: 'req', to: 'W1' }] }
+  const partner = { schemaVersion: 1, init: 'P0', states: [{ id: 'P0' }, { id: 'P1', terminal: true }], transitions: [{ from: 'P0', event: 'other', to: 'P1' }] }
+
+  // C1 must say WHY nobody can advance: per machine, its state and each event's blocker.
+  const deadlock = runCompositionVerification([stuck, waiter, partner], { rendezvous: ['req'] })
+  const { c1, c2 } = compositionChecks(deadlock)
+  const finding = c1.findings.find((entry) => entry.code === 'C1_COMPOSITION_DEADLOCK')
+  if (finding === undefined) throw new Error('expected a C1 deadlock')
+  if (finding.detail === undefined || !finding.detail.includes('Shortest counterexample')) throw new Error('C1 must say the counterexample is shortest: ' + finding.detail)
+  if (finding.evidence.depth !== finding.evidence.steps.length) throw new Error('the reported depth must be the reported path length')
+  const census = finding.evidence.perMachine
+  if (census.length !== 3) throw new Error('every machine must appear in the census')
+  const waiting = census.find((machine) => machine.index === 1)
+  if (waiting.blocked[0].reason !== 'rendezvous-needs-partner') {
+    // The machine has its own transition for `req`, but a handshake needs a partner: the
+    // census must not call that "enabled".
+    throw new Error('a rendezvous without a partner is not fireable: ' + JSON.stringify(waiting.blocked))
+  }
+  if (!finding.detail.includes('rendezvous-needs-partner')) throw new Error('the detail must carry the reason')
+  if (census[0].blocked.length !== 0) throw new Error('a machine with no transitions has an empty alphabet, not blocked events')
+
+  // C2 must say WHY the handshake never happens: here, only one machine declares it.
+  const c2Finding = c2.findings.find((entry) => entry.code === 'C2_RENDEZVOUS_NEVER_FIRES')
+  if (c2Finding === undefined) throw new Error('expected a C2 finding')
+  if (!c2Finding.message.includes('needs at least two') && !c2Finding.message.includes('only 1 machine')) {
+    throw new Error('C2 must name the missing partner: ' + c2Finding.message)
+  }
+  if (c2Finding.evidence.machines.length !== 3) throw new Error('C2 must list every machine')
+
+  // C2's other branch: a declaring machine that never has the event enabled.
+  const blockedByAnother = {
+    schemaVersion: 1,
+    init: 'A0',
+    states: [{ id: 'A0' }, { id: 'A1' }, { id: 'A2', terminal: true }],
+    transitions: [{ from: 'A0', event: 'p', to: 'A1' }, { from: 'A1', event: 'req', to: 'A2' }],
+  }
+  const alsoBlocked = {
+    schemaVersion: 1,
+    init: 'B0',
+    states: [{ id: 'B0' }, { id: 'B1' }, { id: 'B2', terminal: true }],
+    transitions: [{ from: 'B0', event: 'req', to: 'B1' }, { from: 'B1', event: 'q', to: 'B2' }],
+  }
+  const blocked = runCompositionVerification([blockedByAnother, alsoBlocked], { rendezvous: ['p', 'req'] })
+  const reqFinding = blocked.checks.find((check) => check.id === 'C2').findings.find((entry) => entry.evidence.event === 'req')
+  if (reqFinding === undefined) throw new Error('expected a C2 finding for req')
+  if (!reqFinding.message.includes('never has it enabled')) throw new Error('C2 must name the machine that never enables it: ' + reqFinding.message)
+  if (!reqFinding.detail.includes('never enabled')) throw new Error('the detail must say which machine never enabled it')
+
+  // Tempo: there is no rate limit, so a machine may advance arbitrarily many times while
+  // another waits. The composite state count is the evidence: B stays at B0 while A's
+  // tick counter moves on.
+  const ticking = {
+    schemaVersion: 1,
+    init: 'A0',
+    states: [{ id: 'A0' }, { id: 'A1', terminal: true }],
+    transitions: [
+      { from: 'A0', event: 'tick', to: 'A0', updates: [{ variable: 'k', op: 'inc' }] },
+      { from: 'A0', event: 'sync', to: 'A1' },
+    ],
+    variables: [{ name: 'k', kind: 'integer', init: 0 }],
+  }
+  const slowMachine = {
+    schemaVersion: 1,
+    init: 'B0',
+    states: [{ id: 'B0' }, { id: 'B1', terminal: true }],
+    transitions: [{ from: 'B0', event: 'sync', to: 'B1' }],
+  }
+
+  // Absence of a deadlock is not proof when the search was cut short.
+  const truncatedC1 = runCompositionVerification([ticking, slowMachine], { rendezvous: ['sync'], maxStates: 2 })
+  if (truncatedC1.summary.truncated !== true) throw new Error('the cap must be reported')
+  if (!truncatedC1.checks.find((check) => check.id === 'C1').detail.includes('truncated')) {
+    throw new Error('a truncated search must not claim "no deadlock reachable": ' + truncatedC1.checks.find((check) => check.id === 'C1').detail)
+  }
+  const truncatedC2 = runCompositionVerification([stuck, waiter, partner], { rendezvous: ['req'], maxStates: 1 })
+  if (truncatedC2.summary.truncated !== true) throw new Error('the cap must be reported for the C2 case too')
+  const caveated = truncatedC2.checks.find((check) => check.id === 'C2').findings
+  if (caveated.length === 0 || !caveated.every((entry) => entry.message.includes('artefact of the cap'))) {
+    throw new Error('a truncated search must caveat its C2 findings: ' + JSON.stringify(caveated.map((entry) => entry.message)))
+  }
+
+  const overtaken = runCompositionVerification([ticking, slowMachine], { rendezvous: ['sync'], maxStates: 500 })
+  // The counter is unbounded, so the composite space is infinite and the cap bites: that
+  // is itself the evidence that A ticked hundreds of times while B never moved off B0.
+  if (overtaken.summary.truncated !== true) throw new Error('an unbounded counter must be reported as truncated')
+  if (overtaken.summary.compositeStates < 100) {
+    throw new Error('a waiting machine must be overtakeable: only ' + overtaken.summary.compositeStates + ' composite state(s) explored')
+  }
+  const overtakenC2 = overtaken.checks.find((check) => check.id === 'C2')
+  if (overtakenC2.findings.length !== 0) throw new Error('sync does fire: ' + JSON.stringify(overtakenC2.findings.map((entry) => entry.message)))
+
+  console.log('PASS composition-explain')
+}
+
+await runIncidentRegressionTests()
+
+await runCompositionExplainTests()
+
+if (failures > 0) {
+  console.log('engine fixtures failed:', failures)
+  process.exit(1)
+}
+console.log('all engine fixtures passed')
