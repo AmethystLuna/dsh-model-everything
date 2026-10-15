@@ -1,0 +1,432 @@
+# DSH Model Schema v1 — model_verify
+
+The dsh-native `model_verify` tool accepts a structured JSON model. The engine runs the structural and adversarial checks (S1-S8, A1-A14) and returns a JSON report. When `beforeModel` is supplied, it also runs D1-D4 before/after regression checks. Guards and updates are structured data — no code strings, no arbitrary execution.
+
+## Top-level model
+
+```json
+{
+  "schemaVersion": 1,
+  "init": "INIT",
+  "states": [{ "id": "INIT" }, { "id": "ACTIVE", "terminal": true }],
+  "transitions": [
+    { "from": "INIT", "event": "go", "to": "ACTIVE" }
+  ],
+  "variables": [],
+  "invariants": [],
+  "concurrentPairs": [],
+  "boundaryChecks": [],
+  "resourcePairs": [],
+  "idempotentEvents": []
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `schemaVersion` | yes | Must be `1` |
+| `init` | yes | Initial state id |
+| `states` | yes | `{ id, terminal?, onEntry?, onExit?, maxTicks? }`; `terminal` exempts S2/S3/S5/A1; `onEntry`/`onExit` are action-name lists fired on entry/exit and treated by A4 as implicit acquire/release; `maxTicks` is an A14 deadline since entry (needs top-level `tickEvents`) |
+| `transitions` | yes | `{ from, event, to, guard?, updates?, cost?, weight? }`; `cost` (non-negative, absent = 1) is checked by A12 against `budget` invariants; `weight` (non-negative, absent = 1) makes the machine a DTMC under A13 `probability` invariants |
+| `variables` | no | `{ name, kind: integer\|boolean, init, min?, max?, monotonic? }` |
+| `invariants` | no | See invariant kinds below |
+| `concurrentPairs` | no | `["eventA", "eventB"]` pairs for A2 |
+| `boundaryChecks` | no | `{ variable, values: number[] }` for A5 |
+| `resourcePairs` | no | `{ resource, acquireEvent, releaseEvent, failEvent? }` for A4/A6 |
+| `idempotentEvents` | no | Events that must be replay-safe; verified by A8 |
+| `narrative` | no | Natural-language descriptions of states, events, and (state, event) scenarios — echoed in the report |
+
+### The schema is closed
+
+Every object in the model declares a fixed key set, and **an undeclared key is a validation error, never silently ignored**. This is a correctness requirement, not strictness for its own sake: a mistyped field name used to be dropped while the reported result still looked authoritative. The concrete regression this prevents — `{"kind": "var-in-range", "variable": "c", "maximum": 0}` (note `maximum` for `max`) validated cleanly and reported `errors: 0, S7: pass`, turning a range that must fail into a vacuously true invariant. The same class of typo applies to `states` vs `state` on a `never-states` invariant, `guard` vs `gaurd` on a transition, `updates` vs `update`, and so on.
+
+Declared keys per part:
+
+| Part | Allowed keys |
+|---|---|
+| model | `schemaVersion, init, states, transitions, variables, invariants, concurrentPairs, boundaryChecks, resourcePairs, idempotentEvents, tickEvents, narrative` |
+| state | `id, terminal, onEntry, onExit, maxTicks` |
+| transition | `from, event, to, guard, updates, cost, weight` |
+| update | `variable, op, value` |
+| variable | `name, kind, init, min, max, monotonic` |
+| boundaryCheck | `variable, values` |
+| resourcePair | `resource, acquireEvent, releaseEvent, failEvent` |
+| narrative | `states, events, scenarios` |
+| scenario | `from, event, scenario` |
+| invariant | per kind — see [Invariants](#invariants) |
+
+`boundaryChecks` is the one place where two schemas share a field name: `model_verify` uses `{ variable, values }` (a variable's boundary values for A5), while `model_datamodel_verify` uses `{ entity, field, values }` (a field's boundary values for DA2). Each validator enforces its own shape, so an `(entity, field)` check passed to the state-machine engine is rejected rather than half-understood.
+
+### `_`-prefixed keys are annotation metadata (the one exception)
+
+A key whose name starts with `_` is **not** part of the model. At any level — on the
+model, a state, a transition, inside `narrative` — the schema skips it, the hash ignores
+it, and the report lists it under `metadataKeys`:
+
+```json
+{
+  "schemaVersion": 1,
+  "init": "IDLE",
+  "states": [{ "id": "IDLE", "_note": "power-on, not ready" }],
+  "_source": "docs/uml/order-service.model.json",
+  "_verified": { "modelHash": "0000000000000000…", "at": "2026-10-09" },
+  "_extraction_caveats": ["guard thresholds read from the ISR, not the task"]
+}
+```
+
+```json
+"metadataKeys": ["_extraction_caveats", "_source", "_verified", "states[0]._note"]
+```
+
+The list echoes *this input*, it is not a memory: a `_` key the current object does not
+carry is absent, even if an earlier version of the file had it. Nested keys are spelled
+the way the walker sees them (`states[0]._note`, `invariants[0]._probe`,
+`transitions[0]._why`), and the field is absent entirely when the input carries no `_`
+key at all. Read it as "what this run ignored", never as "what this model has ever
+recorded".
+
+Why it exists: provenance, verification snapshots and extraction caveats belong *with*
+the model. Pushed into a sidecar they drift away from it — nobody can say which hash
+belongs to which note. With this exemption the archive record travels inside the file
+and still cannot change the model's identity: `modelHash` excludes `_` keys, so the
+model as archived and the model with the metadata stripped hash identically.
+
+The exemption is namespaced, not a loosening of the closed schema. `_` keys are never
+*read* by any check, so ignoring them cannot produce a false result; a mistyped
+non-prefixed key (`sttes`, `gaurd`, `maximum`) is still a validation error, which is
+the whole point of the closed schema.
+
+### Reading a report: `ran`, `verdict`, `ok`
+
+`model_verify` (and `model_compose_verify`) reports separate "the tool ran"
+from "the review passed":
+
+| Field | Meaning |
+|---|---|
+| `schema` | The versioned report contract, e.g. `model-everything/verify/v1` — branch on this instead of sniffing fields. |
+| `ok` | The engine produced a report. For `verify` this is `false` only when model *validation* failed. It is **not** a verdict. |
+| `ran` | The tool executed. `false` only for a tool-level refusal (`errorCode`/`error` present). |
+| `verdict` | `pass` \| `pass_with_findings` \| `fail`. Any `severity: "error"` finding — or a validation failure — makes this `fail`. |
+| `verdictReason` | e.g. `1 error finding(s) (first: S2_NO_TRANSITIONS)`, `no error findings; 3 warning finding(s)`, `no error or warning findings`. |
+| `hashSpec` | The published hash specification `modelHash` follows — see [hash-spec.md](hash-spec.md). |
+| `hashes` | Every hash the report carries, in one place (`modelHash`, `beforeModelHash`/`afterModelHash` for a comparison). |
+| `metadataKeys` | Present only when the input carried `_` keys (see above). |
+| `narrativeCoverage` | Present only when the input carried a narrative: `covered/total` per dimension. |
+| `nextSteps` | What to do next, derived from the findings; never empty, and identical for two runs over the same model. |
+
+A caller that reads `ok` sees `true` for a model with a deadlock; the verdict is what
+says so. Report the verdict, quote the counterexample path from the finding, and never
+describe a `fail` as "the tool ran fine".
+
+### References must resolve
+
+The same reasoning applies to every id a check names. A reference to a state, event, or variable that the model does not declare cannot be satisfied, and because the engine copies each check's target into its findings (`"target": "DONE"`), an unresolvable id reads as authoritative in the report:
+
+| Reference | Must name |
+|---|---|
+| `states[].id`, `init` | a declared state (unique) |
+| `transitions[].from` / `.to` | a declared state |
+| `transitions[].updates[].variable`, `boundaryChecks[].variable` | a declared variable |
+| `transitions[].guard` variables | a declared variable |
+| `resourcePairs[].acquireEvent` / `.releaseEvent` / `.failEvent` | a declared event |
+| `invariants[].event` (`event-before-state`) | a declared event |
+| `invariants[].state` / `.states[]` / `.from` / `.target` / `.when.state` | a declared state |
+| `invariants[].to` and every member of `invariants[].to[]` (`leads-to`) | a declared state |
+
+A vacuous check is worse than a rejected one: a `leads-to` invariant whose `to` state is misspelled can never be violated, and a `never-states` list holding a nonexistent id can never be reached, so both report "pass" for a model that was never actually checked.
+
+## Model narrative (natural-language context)
+
+The model may carry a `narrative` block explaining, in natural language, what
+every symbol means in the real scenario. It is what gets shown to the user when
+the extracted model is presented for confirmation, and the report echoes it back
+so findings can be read against real scenarios instead of bare ids.
+
+```json
+"narrative": {
+  "states": {
+    "NEW": "订单已创建，等待支付",
+    "PAID": "已支付，等待发货",
+    "SHIPPED": "已发货，等待签收",
+    "DONE": "已完成（终态）",
+    "CANCELLED": "已取消（终态）"
+  },
+  "events": {
+    "pay": "买家完成支付",
+    "ship": "仓库发货",
+    "deliver": "买家签收",
+    "cancel": "取消订单"
+  },
+  "scenarios": [
+    { "from": "NEW", "event": "pay", "scenario": "下单后支付成功，订单进入待发货" },
+    { "from": "PAID", "event": "ship", "scenario": "已支付订单发货，进入运输中" },
+    { "from": "SHIPPED", "event": "deliver", "scenario": "签收完成，订单结束" },
+    { "from": "NEW", "event": "cancel", "scenario": "未支付订单被取消" },
+    { "from": "PAID", "event": "cancel", "scenario": "已支付订单取消并退款" }
+  ]
+}
+```
+
+**Coverage contract**: a narrative may cover **part** of the model — writing the states
+first, then the events, then the scenarios is the natural authoring order, and a partial
+block is valid. What must hold is that whatever is written is *right*:
+
+| Case | Result |
+|---|---|
+| `narrative` absent | Valid. The review reports `UML013_NO_NARRATIVE` (info); `model_verify` reports no coverage at all. |
+| One or two of `states` / `events` / `scenarios` given | Valid. The report adds `narrativeCoverage: {states: "5/5", events: "3/9", scenarios: "0/12"}` (covered/total per dimension), and `nextSteps` names the gap. Both sides also report it as a finding: `model_verify` carries `NARRATIVE_PARTIAL` (info) and a UML review carries `UML027_NARRATIVE_PARTIAL` (info). An `info` finding never changes `verdict`, `summary.errors`, `summary.warnings` or the check count. |
+| `narrative` present but `{}` | **Error**: an empty block claims documentation that does not exist. Give at least one dimension. |
+| Unknown state/event id, empty description, duplicate `(from, event)` scenario | **Error**: the narrative is wrong, not merely incomplete. |
+
+Totals are the model's own: states = declared states, events = distinct transition
+events, scenarios = distinct `(from, event)` groups (so two guarded transitions of one
+event need one scenario, not two). The report's `narrative` field echoes the block
+unchanged.
+
+**Presenting the model**: when showing the extracted model for confirmation, render
+the natural language INLINE in the model presentation, not as a separate block.
+Three rendering forms (all derive from the same `narrative` data):
+
+- **Form A — integrated transition table (default)**: one row per transition with
+  state/event meanings in parentheses and the scenario as the last column. Keep
+  meanings short (state/event ≤ 6 characters, scenario ≤ 10) and estimate row
+  width (CJK counts as 2) so rows fit the display area — a wrapped row loses
+  column alignment and readability collapses.
+- **Form B — sentence blocks (reading-accessible)**: scenario sentence first, then
+  a fixed three-line frame (状态…/发生…/进入…). Use for detailed confirmation,
+  users with reading difficulties, or ≤ 10 transitions.
+- **Form C — grouped by source state (large machines / narrow panes)**: one
+  section per state, each rendered as its own small 3-column table
+  （`event（含义）| NEXT（含义）| 场景`）; no cross-group column alignment to
+  track. Use for ≥ 15 transitions or narrow display areas; if a group table would
+  still wrap, fall back to a one-line-per-event bullet list for that group.
+
+## Guards
+
+A guard is exactly one of:
+
+```json
+{ "variable": "retry", "op": "<", "value": 3 }
+{ "all": [ { "variable": "armed", "op": "==", "value": true }, { "variable": "retry", "op": ">", "value": 0 } ] }
+{ "any": [ { "variable": "mode", "op": "==", "value": 1 }, { "variable": "mode", "op": "==", "value": 2 } ] }
+{ "not": { "variable": "locked", "op": "==", "value": true } }
+```
+
+- Boolean variables only support `==` / `!=`.
+- A transition with **no guard** is the default/else branch for its `(from, event)` group. It fires only when no guarded branch in that group is true.
+- Multiple true guards in one `(from, event)` group are reported as S4 nondeterminism; a group with guards and no default must be exhaustive or S6 flags the missing branch.
+
+## Updates
+
+```json
+{ "variable": "retry", "op": "inc", "value": 1 }
+{ "variable": "retry", "op": "set", "value": 0 }
+{ "variable": "retry", "op": "dec", "value": 1 }
+```
+
+`inc`/`dec` default to 1 when `value` is omitted. `set` defaults to 0.
+
+`inc` and `dec` are **never clamped** to the variable's declared `min`/`max`. The declared
+range is a property the checks verify (S7 `var-in-range`), not a bound on the search: a
+counter whose guard does not pin it ranges past its own declaration, so the reachable set
+is unbounded however narrow the declaration looks. S8 reports that as
+`S8_DOMAIN_NOT_ENFORCED` and names the transition, rather than clamping the value and
+deleting the states a range violation is witnessed by. A `set` constant outside the
+declared range contradicts the declaration and is `S8_DOMAIN_SET_OUTSIDE` (error).
+
+To bound a counter, add a guard that pins it — `"max": 4` with a guard
+`{ "variable": "retry", "op": "<", "value": 4 }` — not a narrower `max`.
+
+## Invariants
+
+Every invariant carries `id` and **`description`** — both required strings — plus a
+`kind` and that kind's own fields. `description` is not decoration: it is echoed into
+the finding a violation produces, and it takes part in `modelHash`, so a model that
+gains one hashes differently. An invariant without it is rejected with `MODEL_INVALID`,
+and the report's `nextSteps` names the field to add; a `_`-prefixed key is not a
+substitute for it.
+
+| Kind | Shape | Checks |
+|---|---|---|
+| `never-states` | `{ states: ["ERROR"] }` | No reachable runtime state may be in the forbidden set |
+| `var-in-range` | `{ variable, min?, max?, when? }` | Every reachable runtime state selected by `when` keeps the variable in range (at least one of `min`/`max` is required) |
+| `event-before-state` | `{ event: "power_ready", state: "ACTIVE" }` | Every path entering `state` must have passed through `event` first |
+| `leads-to` | `{ from: "MIGRATING", to: "DONE" }`, or `to: ["DONE", "FAILED"]` | Every path from `from` must eventually reach `to`. With a target set, every path must reach at least one member. The set must be non-empty and free of duplicates |
+| `sequence` | `{ events: ["backup", "modify", "commit"] }` | Events must occur in the given order |
+| `atomicity` | `{ events: ["write"], commit: "commit", rollback?: "rollback" }` | Atomic group must end with commit/rollback before leaving scope |
+| `budget` | `{ budget: n }` | No reachable path may accumulate transition cost greater than n (A12). Costs are non-negative; a transition without `cost` counts 1, so legacy machines keep step-count semantics |
+| `probability` | `{ target, op: one of >= <= > <, p }` | P(ever hitting target) must satisfy the bound (A13, DTMC from transition `weight`, default 1; value iteration) |
+
+A7 reports a violating path for each failed invariant, and an empty path means the initial state already violates it. The state-predicate kinds, `sequence`, `atomicity` and `budget` are breadth-first, so their witness is the shortest one; `leads-to` and `probability` report a witness without claiming minimality.
+
+### Scoping a range to a state (`when`)
+
+`var-in-range` is the only kind that accepts `when`, and only it needs to: the others either already constrain a state set (`never-states`) or assert a property of a whole path (`leads-to`, `sequence`, `atomicity`, `budget`, `probability`), where "the scope applies at which step of the path" has no single answer. A `when` on any other kind is a validation error rather than a silently ignored field.
+
+```json
+{ "id": "depth-in-probe", "description": "probe depth stays bounded while in PROBE",
+  "kind": "var-in-range", "variable": "depth", "min": 0, "max": 4,
+  "when": { "state": "PROBE" } }
+```
+
+Two scope shapes are accepted:
+
+- `{ "state": "PROBE" }` — the state-scoped form, for "this range applies only here".
+- a guard node (`{ variable, op, value }` / `{ all }` / `{ any }` / `{ not }`) — for "this range applies only while a mode variable says so". It must not reference the constrained variable itself: a scope that depends on the value it constrains can switch itself off exactly when the value drifts out of range, which masks its own violation.
+
+Semantics — `when` is evaluated against the **post-state** of every transition, and the **initial state is checked unconditionally** whatever the scope says. So a `{ state }` scope is exhaustive over that state: for every reachable runtime state whose id is in the scope, the variable is in range, including the case where the machine starts there. This is why scoping away from the state that actually violates the range is not a loophole — it simply produces a machine in which no reachable in-scope state is out of range, i.e. an invariant that holds.
+
+`when` participates in the model hash, so two models differing only in scope are never treated as the same model in before/after comparison; a `{ state }` scope also follows `stateMapping` during D2 continuity checks.
+
+## Permission presets and interaction mode
+
+| Preset | sandbox | approval | plugin behavior |
+|---|---|---|---|
+| `workspace-write` | workspace-write | ask | Evidence stays in workspace; model confirmation defaults to ask |
+| `danger-full-access` | danger-full-access | never | Full file access; interaction resolves to auto; never request sandbox escalation |
+| custom | any | any | The session folds the last `sandbox/mode` and `approval/policy` events; interaction follows approval only |
+
+Confirm the extracted model before treating it as fact. When the user has already told you to proceed without confirmation in this session, round-trip the extracted model into a transition table, compare it against the source extraction, and mark the report `UNCONFIRMED`.
+
+## Cost and budget (A12)
+
+Transitions may carry a non-negative execution cost (`cost`, default 1 per transition — e.g. cycles or microseconds spent in the handler). A `budget` invariant bounds the worst-case accumulated cost over every reachable path:
+
+```json
+{
+  "id": "dispatch-budget",
+  "description": "worst-case dispatch path stays within 100 cycles",
+  "kind": "budget",
+  "budget": 100
+}
+```
+
+A12 reports the shortest over-budget counterexample path. A reachable cycle whose cost is positive is reported as unbounded — under model event semantics it can repeat indefinitely, so no finite budget holds. Budgets on machines with repeatable loops must bound those loops with variables (e.g. a retry counter guard). If transitions declare `cost` but no `budget` invariant exists, A12 emits the advisory `A12_COST_WITHOUT_BUDGET`.
+
+## Probability reachability (A13)
+
+Declare `weight` on transitions (default 1) to interpret the machine as a DTMC, then add a `probability` invariant:
+
+```json
+{ "id": "reliability", "description": "at least 90% of runs reach SAFE", "kind": "probability", "target": "SAFE", "op": ">=", "p": 0.9 }
+```
+
+A13 computes P(ever hitting `target`) from the initial state by value iteration over the absorbing chain (transitions with `weight` 0 never fire; terminals other than the target are absorbing failures) and reports a violation when the bound fails. Converges to the least fixed point; an iteration cap protects against non-convergent models.
+
+## Deadline check (A14)
+
+Declare which events advance the discrete clock (`tickEvents`) and set `maxTicks` on a state that must be left within that many ticks of entering it:
+
+```json
+{ "schemaVersion": 1, "init": "LISTEN", "states": [{ "id": "LISTEN" }, { "id": "CRITICAL", "maxTicks": 2 }, { "id": "SAFE", "terminal": true }], "transitions": [ { "from": "LISTEN", "event": "fault", "to": "CRITICAL" }, { "from": "CRITICAL", "event": "recover", "to": "SAFE" } ], "tickEvents": ["tick"] }
+```
+
+A14 explores residency with a per-entry tick counter: a `tickEvents` step that keeps the machine resident past `maxTicks` reports `A14_DEADLINE_MISS` with the over-residency path. Time advances only when a tick event fires — real-time passage (auto-advancing clocks) is not modeled; dense-time claims still route to timed model checkers. States declaring `maxTicks` without any `tickEvents` yield the advisory `A14_NO_TICK_EVENTS`.
+
+## State entry/exit actions (onEntry / onExit)
+
+States may declare ordered action-name lists that fire automatically:
+
+```json
+{ "id": "ACTIVE", "onEntry": ["sync_lock"], "onExit": ["sync_unlock"] }
+```
+
+Actions never change state or variables. Checks that care about resource discipline see them as implicit events: A4 Pair Symmetry treats an action equal to a pair acquireEvent/releaseEvent as an acquire/release that fires on every entry (resp. exit) of the state, so lock/unlock hidden inside entry/exit actions is verified without hand-written ENTER_x/EXIT_x pseudo-events.
+
+## Composition verification
+
+Two or more machines can be checked together with `runCompositionVerification` (DSH tool `model_compose_verify`):
+
+- non-rendezvous events advance exactly one firing machine;
+- a rendezvous (handshake) event fires only when at least two machines declare it **and** every such non-terminal machine has it jointly enabled (guards held); participants advance simultaneously. A machine whose alphabet does not contain the event does not participate, and a terminal machine is stopped;
+- therefore a machine that is *waiting* for a rendezvous is not blocked from everything else: it may take any number of its own non-rendezvous steps first. That is how different rates are modelled — there is **no rate ratio** and no fairness bound, so "the 1 ms pump runs N times while the ISR waits" is expressed by the pump's own tick event, not by a tempo setting. A bound would only prune interleavings, never add behaviour; if you need to *forbid* a fast machine from overtaking, encode that in the model (a guard on a counter the slow machine resets), not in the composition options.
+- **there is no cross-machine shared state.** Each machine's `variables` are private to
+  it: machine A's `ready` and machine B's `ready` are two different
+  quantities, and no guard can read another machine's variable. Rendezvous events are
+  the *only* coupling between machines. So "two machines must agree on one predicate"
+  cannot be modelled by giving each a copy of it — model the shared condition inside a
+  single machine, or make the agreement an explicit handshake. The report names the
+  variables it saw when two or more machines each declare some, in `nextSteps`.
+
+Inputs: the DSH tool takes an array of model objects (an agent reads the files and passes them); the CLI takes any number of files directly — `compose models/*.json --rendezvous req,ack` — so nothing has to be concatenated by hand.
+
+### Reading C1 and C2
+
+Both findings carry the *why*, not just the *what*:
+
+- **C1_COMPOSITION_DEADLOCK** — the composite state, the number of steps to reach it (**shortest**, because the search is breadth-first), and `evidence.perMachine`: for every machine, its state, whether it is terminal, and every event in its alphabet with a reason — `rendezvous-needs-partner` (fewer than two machines declare it), `rendezvous-partner-not-ready` (a declaring partner is terminal or has no enabled transition), `no-enabled-transition` (guard false or no such transition), or `enabled`. An event this machine can fire on its own is never labelled `enabled` when the handshake itself is missing. In practice a census only ever shows the three blocked reasons: it is emitted only when no machine can move, and "can move" is decided by the same predicate that would label an event `enabled`, so that fourth label is unreachable there. Treat the three observable values as the contract, and keep tolerating the literal.
+- **C2_RENDEZVOUS_NEVER_FIRES** — an **error**, the same severity as C1: a handshake that can never fire leaves the composition unable to advance through it, so a gate that reads only `verdict` stops on it. `evidence.machines` gives, per machine, whether it declares the event, whether it ever had it enabled, and the states where it did. The reason distinguishes "fewer than two machines declare it" from "machine *i* declares it but never enables it".
+
+`maxStates` caps the product space, and the cap is **reported, never hidden**: a truncated run cannot claim "no deadlock reachable" (the C1 check detail says so), and a C2 finding gained under truncation carries "may be an artefact of the cap" in its message. Bump `maxStates` before believing a negative result on a large product. Note that a machine with an unbounded counter produces an infinite composite space and will always truncate.
+
+## Minimal example
+
+```json
+{
+  "schemaVersion": 1,
+  "init": "INIT",
+  "states": [
+    { "id": "INIT" },
+    { "id": "RETRY" },
+    { "id": "FATAL", "terminal": true }
+  ],
+  "transitions": [
+    { "from": "INIT", "event": "timeout", "guard": { "variable": "retry", "op": "<", "value": 3 }, "to": "RETRY", "updates": [{ "variable": "retry", "op": "inc" }] },
+    { "from": "INIT", "event": "timeout", "guard": { "variable": "retry", "op": ">=", "value": 3 }, "to": "FATAL" }
+  ],
+  "variables": [{ "name": "retry", "kind": "integer", "init": 0, "min": 0, "max": 3 }],
+  "boundaryChecks": [{ "variable": "retry", "values": [0, 1, 2, 3] }]
+}
+```
+
+## Before/after comparison (D1-D4)
+
+When `beforeModel` is passed to `model_verify`, the engine treats `model` as AFTER and runs four extra checks after S1-A11:
+
+| Check | Purpose |
+|---|---|
+| D1 Behavioral Preservation | Every BEFORE (state, event) that could fire must still be fireable from the mapped AFTER state |
+| D2 Invariant Continuity | Every BEFORE invariant (mapped through `stateMapping`) must still hold in AFTER. State predicates go through the same reachability search as S7; `leads-to`, `sequence`, `atomicity`, `budget` and `probability` are re-decided by the searches their own probes (A9-A13) use |
+| D3 Regression Delta | Lists added/removed states, events, and transitions |
+| D4 Deadlock/Liveness Regression | New deadlock states or closed SCCs not present in BEFORE |
+
+`stateMapping` maps BEFORE state ids to AFTER state ids. Omit it when state names are unchanged.
+
+Example tool call shape:
+
+```json
+{
+  "model": { "...": "AFTER LogicModelV1" },
+  "beforeModel": { "...": "BEFORE LogicModelV1" },
+  "stateMapping": { "OLD_INIT": "INIT", "OLD_ACTIVE": "ACTIVE" }
+}
+```
+
+The report's `comparison` object includes both model hashes, state/transition counts, and delta arrays.
+
+## Idempotent replay (A8)
+
+List events that must be idempotent in `idempotentEvents`. For every reachable state, applying the event twice must produce the same state as applying it once. This is useful for retries, webhook redelivery, and migration replay.
+
+## Advanced constraints (S6, S8, A9-A14)
+
+- **S6 Guard Completeness** also reports `S6_DEAD_GUARD`: a guarded branch no reachable
+  variable value can satisfy is a branch that can never fire. The test runs over the
+  values the model can produce — each variable's `init` plus every `set` constant — not
+  over the declared domain, so a guard on a value the model never writes is satisfiable on
+  paper and dead in practice.
+- **S8 Variable Declarations**: declare `monotonic: "inc"|"dec"` on a variable; updates must not move in the opposite direction. The same check reads the declared range: `S8_DOMAIN_NOT_ENFORCED` reports an `inc`/`dec` no guard keeps inside `min`/`max`, and `S8_DOMAIN_SET_OUTSIDE` (error) reports a `set` constant outside it.
+- **A9 Leads-To**: `{ kind: "leads-to", from, to }` — every path from `from` must eventually reach `to`. `to` is one state id or a non-empty array of state ids for "reach any one of these"; a duplicated member is a validation error rather than a shorthand. Either way the property stays universal: one branch that loops forever, or that stops before every target, refutes it.
+- **A10 Sequence**: `{ kind: "sequence", events }` — events must appear in order.
+- **A11 Atomicity**: `{ kind: "atomicity", events, commit, rollback? }` — once an atomic event starts, the machine must reach commit/rollback before leaving the atomic scope or terminating.
+- **A12 Budget**: `{ kind: "budget", budget }` — no reachable path may accumulate transition cost above the budget; reports the shortest over-budget path and flags reachable positive-cost cycles as unbounded.
+- **A13 Probability**: `{ kind: "probability", target, op, p }` — P(ever hitting target) must satisfy the bound under the DTMC induced by transition `weight` (default 1).
+- **A14 Deadline**: state `maxTicks` + top-level `tickEvents` — a tick step may not keep a state resident past its deadline; reports the over-residency path.
+
+## Limits
+
+- Each breadth-first exploration caps at `maxStates` (default 10000). The leads-to walk caps at twenty times that, **shared across every start state of one check**: it is depth-first over run states, and an unbounded counter makes every one of them distinct, so it has no shorter bound available.
+- A cap that bites is **reported, never silently passed**. The report sets `summary.truncated`, and the check that stopped carries a finding whose code ends in `_UNDECIDED` — `S7_UNDECIDED`, `A7_UNDECIDED`, `A9_LEADS_TO_UNDECIDED`, `D2_UNDECIDED`. An undecided check has proven neither the violation nor its absence; read it as "not decided", never as a pass.
+- A3 samples the first `maxPermutationEvents` events (default 5).
+- The engine is a finite-state model checker. It cannot prove properties of the real implementation; follow with code-level review.
+- `cost` values are modeler-provided static labels — A12 verifies against them; real execution time/WCET needs binary-level timing analysis.
+- When the model state/event/action names reference semantics the engine does not verify (timing, preemption, hybrid control, probability), the report carries informational `coverageNotes` that route such claims to dedicated tools. These notes are vocabulary-based heuristics, never a substitute for the checks.

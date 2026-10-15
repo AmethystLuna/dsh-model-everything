@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "files": {
+    "package.json": "version",
+    "package-lock.json": "version",
+    ".version-bump.json": "version"
+  },
+  "audit": {
+    "exclude": [
+      "node_modules",
+      ".git",
+      "lib",
+      "RELEASE.md",
+      "scripts/bump-version.mjs",
+      ".github"
+    ]
+  }
+}

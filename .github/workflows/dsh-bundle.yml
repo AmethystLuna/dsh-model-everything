@@ -1,0 +1,40 @@
+name: dsh-bundle
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor `engines.node` declares; 22 is what the maintainers run.
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Regression suites
+        # Every suite in one chain: the engines, the diagram families, the tool
+        # registration smoke test, the skill and memory gates, the exporters, the
+        # report rendering and the optional external-checker round trips (which
+        # skip themselves when the checker is not on PATH).
+        run: npm run test:engine
+      - name: Committed build artifact is current
+        run: git diff --exit-code -- lib
+
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lint the docs
+        run: npx --yes markdownlint-cli@0.42.0 --ignore "**/node_modules/**" .
