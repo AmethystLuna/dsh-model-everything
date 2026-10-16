@@ -22,7 +22,7 @@ export const EXPORT_TOOL_NAME = 'model_export'
 export const modelExportTool = defineTool({
   name: EXPORT_TOOL_NAME,
   description:
-    'Export a LogicModelV1 state machine into native input for an external verification tool (plugin routing). format is one of uppaal (.xta + queries), tla (TLC spec + safety property), prism (.pm + .pctl), spin (Promela + ltl). Booleans are exported as 0/1 integers; invariants the target cannot express are returned as warnings, never silently dropped. Returns { ok, format, primary, extras?, warnings? } or { ok: false, error } when the model is invalid or the PRISM enumeration is too large.',
+    'Translate a LogicModelV1 into the input language of an external checker - UPPAAL, TLA+, PRISM or SPIN - for a property this plugin does not decide itself (symbolic model checking, unbounded induction, expected reward). format is one of uppaal (.xta + queries), tla (TLC spec + safety property), prism (.pm + .pctl), spin (Promela + ltl). This tool does not verify anything: for the checks it can decide use `model_verify`. Booleans are exported as 0/1 integers; invariants the target cannot express are returned as warnings, never silently dropped. Returns { ok, format, primary, extras?, warnings? } or { ok: false, error } when the model is invalid or the PRISM enumeration is too large.',
   parameters: {
     model: {
       type: 'json',

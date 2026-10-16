@@ -1,6 +1,6 @@
 ---
 name: model-everything-design
-description: "Use when reviewing a design rather than a behaviour: whether a layering holds, whether responsibilities match the dependencies they own, whether a subtype may stand in for its supertype, whether an interface is wider than its callers, and what shape the dependency graph has (cycles, load-bearing elements, ranks, fan-in/out). Decides declared contracts and computes graph features; it does not judge a design. Read verdict, never ok. Doctrine: the model-everything skill."
+description: "Use when a design has to keep its own declarations: does the layering hold, do responsibilities match the dependencies they own, can a subtype stand in for its supertype, is an interface wider than its callers. Also reports the graph's shape (cycles and the fewest edges to break them, load-bearing elements, ranks, fan-in/out) without judging the design. A drawing of an architecture audited against a matrix is model-everything-structure. Doctrine: the model-everything skill."
 ---
 
 # Model Everything — Design Review
