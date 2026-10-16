@@ -43,6 +43,7 @@ import { useCaseModule, validateUseCaseModel, type UseCaseModelV1 } from './uml-
 import { structureFamilyModule, type StructureModelV1 } from './uml-structure.js'
 import { timingModule, validateTimingModel, type TimingModelV1 } from './uml-timing.js'
 import { profileModule, validateProfileModel, type ProfileModelV1 } from './uml-profile.js'
+import { compositeModule, validateCompositeModel, type CompositeModelV1 } from './uml-composite.js'
 
 export { UmlError, UML_NOTATIONS } from './uml-syntax.js'
 export type { UmlNotation, UmlFamilyId } from './uml-syntax.js'
@@ -55,6 +56,8 @@ export { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES, parseTimi
 export type { TimingModelV1, TimingSegment, TimingLifeline, TimingFindingCode } from './uml-timing.js'
 export { validateProfileModel, reviewProfileModel, PROFILE_FINDING_CODES, renderProfile, profileModule } from './uml-profile.js'
 export type { ProfileModelV1, ProfileExtension, ProfileApplication, ProfileFindingCode } from './uml-profile.js'
+export { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES, renderComposite, parseComposite, compositeModule } from './uml-composite.js'
+export type { CompositeModelV1, CompositePart, CompositePort, CompositeConnector, CompositeFindingCode } from './uml-composite.js'
 
 /**
  * The diagram families this front end knows, in the engine's order. The name is kept
@@ -94,7 +97,7 @@ export interface UmlRenderResult {
 }
 
 /** What a family's parse produces: a LogicModelV1 for the machine families, the family model otherwise. */
-export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1
+export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1 | CompositeModelV1
 
 export interface UmlParseResult {
   notation: UmlNotation
@@ -480,6 +483,7 @@ const FAMILY_MODULES = {
   'use-case': useCaseModule,
   timing: timingModule,
   profile: profileModule,
+  'composite-structure': compositeModule,
   class: structureFamilyModule('class'),
   object: structureFamilyModule('object'),
   package: structureFamilyModule('package'),

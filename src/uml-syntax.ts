@@ -133,6 +133,19 @@ export interface UmlFamilySpec {
    * branches that were not.
    */
   parseable: boolean
+  /**
+   * Whether this build can read the family back out of a notation that only approximates
+   * it. Absent means no.
+   *
+   * This is not derivable from the notation's fidelity. `fidelity` says how much of the
+   * specification the drawing carries; this says whether what the model *does* carry
+   * survives a round trip, which is a measurement, not a label. A composite structure is
+   * drawn approximately and reads back exactly - nesting, port direction and both
+   * connector ends are all spelled - while a profile is drawn approximately and cannot be
+   * read back at all. Refusing the first because the second is impossible would leave a
+   * working view switched off.
+   */
+  parseThroughApproximation?: boolean
   /** Why a parse is refused, when `parseable` is false. */
   parseRefusal?: string
   /** Code the parse refusal carries; defaults to `UML_NOT_A_STATE_DIAGRAM`. */
@@ -203,8 +216,8 @@ export const UML_FAMILIES: readonly UmlFamilySpec[] = [
     mermaid: { fidelity: 'none', note: 'mermaid architecture-beta draws a cloud architecture, not UML components: the shapes and the ports do not line up, and this build does not emit it under the component name. Render it with notation "plantuml".' },
   },
   {
-    id: 'composite-structure', name: 'composite structure diagram', nameZh: '复合结构图', group: 'structure', machine: false, parseable: true,
-    plantuml: { fidelity: 'approximate', declarations: ['port', 'portin', 'portout'], note: 'plantuml draws parts and ports inside a component or a class, not the full composite structure notation (no collaboration, no connector roles). The view is kept as an approximation: it is rendered, never parsed back.' },
+    id: 'composite-structure', name: 'composite structure diagram', nameZh: '复合结构图', group: 'structure', machine: false, parseable: true, parseThroughApproximation: true,
+    plantuml: { fidelity: 'approximate', declarations: ['port', 'portin', 'portout'], note: 'plantuml documents no composite structure diagram; this build draws one with the deployment diagram\'s vocabulary - a nested element for the classifier, the nestable elements for its parts, `port`/`portin`/`portout` for its boundary, and the arrows for its connectors. Nesting, port direction and both connector ends are spelled, so the text reads back; a part\'s type, a port\'s interfaces, a connector\'s name and a collaboration are not expressible and do not enter the model.' },
     mermaid: { fidelity: 'none', note: 'mermaid has no composite structure diagram. Render it with notation "plantuml".' },
   },
   {
@@ -355,6 +368,20 @@ export function plantumlTimingSyntax(text: string): boolean {
 /** Profile markers: a profile is drawn as a class diagram carrying these stereotypes. */
 const PLANTUML_PROFILE_MARKER = /<<\s*(stereotype|metaclass)\s*>>/i
 
+/**
+ * Composite structure syntax: a port declaration.
+ *
+ * `port`, `portin` and `portout` exist nowhere else in PlantUML, so one of them inside a
+ * block says what the diagram is. Without this the text is read as a component diagram -
+ * the classifier is a component and the ports become components beside it - which is a
+ * different model that happens to parse.
+ */
+const PLANTUML_COMPOSITE_PORT = /^\s*(?:port|portin|portout)\s+[A-Za-z_][A-Za-z0-9_]*\s*$/im
+
+export function plantumlCompositeSyntax(text: string): boolean {
+  return PLANTUML_COMPOSITE_PORT.test(text)
+}
+
 function sequenceMarkers(text: string): boolean {
   return /^\s*participant\b/m.test(text) || /->>\s*/.test(text)
 }
@@ -388,6 +415,10 @@ export function detectUmlFamily(text: string, notation: UmlNotation, options: Um
   // The keyword-free syntaxes come first: a use case diagram has no header at all.
   if (plantumlUseCaseSyntax(text)) return { family: 'use-case', evidence: 'use case syntax (:Actor: / (UseCase))' }
   if (PLANTUML_PROFILE_MARKER.test(text)) return { family: 'profile', evidence: 'profile marker (stereotype / metaclass)' }
+  // A port declaration outranks a nested-element keyword: a composite structure is drawn
+  // with a component block, and the ports are what make it that diagram rather than a
+  // component diagram.
+  if (plantumlCompositeSyntax(text)) return { family: 'composite-structure', evidence: 'composite syntax (port / portin / portout)' }
   if (plantumlTimingSyntax(text)) return { family: 'timing', evidence: 'timing syntax (robust/concise/binary/clock or @tick)' }
 
   // Declaration keywords, most specific family first. component before package
@@ -463,6 +494,9 @@ export function umlCapability(notation: UmlNotation, family: UmlFamilyId, action
   }
   if (support.fidelity !== 'faithful') {
     if (support.fidelity === 'none') return { ok: false, errorCode: 'UML_VIEW_UNREPRESENTABLE', message: support.note ?? (notation + ' cannot draw a ' + spec.name) }
+    // An approximation is readable only when the family says so. The families that do are
+    // the ones whose round trip has been measured; the rest refuse rather than guess.
+    if (spec.parseThroughApproximation === true) return { ok: true, warning: 'UML_PARSE_APPROXIMATE_VIEW: ' + (support.note ?? (notation + ' draws an approximation of a ' + spec.name)) }
     return {
       ok: false,
       errorCode: 'UML_VIEW_UNREPRESENTABLE',
