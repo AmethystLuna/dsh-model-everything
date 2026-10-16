@@ -4,9 +4,8 @@ Every tool returns a report. They share one skeleton, and they differ in where t
 findings. This guide is the reading order: what to look at first, what each field answers, and what
 a report does not tell you.
 
-The structure of this guide is the mind map in [mindmap.mmd](mindmap.mmd), which
-`generate-mindmap.mjs` builds from live reports. A hand-drawn map drifts; this one cannot claim a
-shape the engines do not produce.
+The structure of this guide is the mind map beside it, which is generated from live reports rather
+than drawn. A hand-drawn map drifts; this one cannot claim a shape the engines do not produce.
 
 ## The three questions, in order
 
