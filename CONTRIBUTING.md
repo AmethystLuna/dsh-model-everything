@@ -3,6 +3,11 @@
 Two kinds of contribution arrive here, and they need different things from you. Decide which one you
 have before writing, because the first question a maintainer asks is different in each case.
 
+**Write in Chinese if that is the language you think in.** Every issue template has a Chinese version
+beside it, and a report is judged on being reproducible rather than on its English. The rest of this
+guide is English because the repository is public; the templates are not, because they are forms you
+fill in.
+
 The structure of this guide is a mind map generated from this repository:
 [docs/contributing/mindmap.mmd](docs/contributing/mindmap.mmd). It names the entry points that
 exist, and `docs/contributing/facts.json` carries the counts it quotes.

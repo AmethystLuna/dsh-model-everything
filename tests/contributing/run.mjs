@@ -103,22 +103,54 @@ test('the guide cites no source the repository cannot back', () => {
 test('the issue templates ask for the two shapes', () => {
   const dir = repo + '.github/ISSUE_TEMPLATE/'
   if (!existsSync(dir)) throw new Error('there is no issue template directory')
-  const templates = readdirSync(dir).filter((name) => name.endsWith('.md'))
-  if (templates.length < 2) throw new Error('the two shapes need a template each, found: ' + templates.join(', '))
-  const bodies = templates.map((name) => readFileSync(dir + name, 'utf8').replace(/\s+/g, ' '))
-  // Each shape has to be recognisable from its own template, by the thing only it needs. A method
-  // proposal asks for a citation; a behaviour problem asks for the report's own fields. The check is
-  // on what is ASKED FOR, not on what is mentioned: a proposal legitimately discusses the verdict it
-  // would change.
-  const asksForReport = bodies.some((body) => body.includes('verdictReason') && body.includes('finding codes'))
+  const files = readdirSync(dir).filter((name) => name.endsWith('.md'))
+  if (files.length < 2) throw new Error('the two shapes need a template each, found: ' + files.join(', '))
+  const bodies = files.map((name) => readFileSync(dir + name, 'utf8').replace(/\s+/g, ' '))
+  // The check is on what is ASKED FOR, not on what is mentioned: a proposal legitimately discusses the
+  // verdict it would change. Each shape is identified by the thing only it needs.
+  const asksForReport = bodies.some((body) => body.includes('verdictReason') && /finding codes|发现码/.test(body))
   const asksForSource = bodies.some((body) => body.includes('Citation') && body.includes('provenance'))
   if (!asksForReport) throw new Error('no template asks for the report fields a behaviour problem needs')
   if (!asksForSource) throw new Error('no template asks for the citation and provenance a method proposal needs')
   // Front matter is what makes GitHub show them as templates rather than as ordinary files.
-  for (const name of templates) {
+  for (const name of files) {
     const text = readFileSync(dir + name, 'utf8')
     if (!/^---\n/.test(text) || !/^name:/m.test(text) || !/^about:/m.test(text)) {
       throw new Error(name + ' has no template front matter with a name and an about')
+    }
+  }
+})
+
+test('every issue template has a Chinese sibling that asks for the same things', () => {
+  // A template is not a document the maintainer reads - it is a form the contributor WRITES IN. Asking a
+  // Chinese-speaking reporter to describe behaviour in English degrades the one thing the report needs to
+  // be good at, so each shape ships in both languages and the two have to stay in step.
+  const dir = repo + '.github/ISSUE_TEMPLATE/'
+  const files = readdirSync(dir).filter((name) => name.endsWith('.md'))
+  const english = files.filter((name) => !name.includes('.zh-CN.'))
+  if (english.length === 0) throw new Error('no English template found; this check would pass vacuously')
+
+  // The fields each shape must ask for, in either language. Two forms of the same request count: the
+  // frontmatter keys are always English, the prose is not.
+  const REQUIRED = {
+    report: [['verdict', /`verdict`/], ['verdictReason', /`verdictReason`/], ['schema', /`schema`/], ['the smallest input', /smallest|最小/]],
+    source: [['a citation', /Citation|引用/], ['provenance', /provenance/], ['the mutation', /mutation|变异/], ['the non-goal', /not decide|不决定/]],
+  }
+  for (const name of english) {
+    const sibling = name.replace(/\.md$/, '.zh-CN.md')
+    if (!existsSync(dir + sibling)) throw new Error(name + ' has no Chinese sibling (' + sibling + ')')
+    const source = readFileSync(dir + name, 'utf8')
+    const translated = readFileSync(dir + sibling, 'utf8')
+    const kind = /problem/.test(name) ? 'report' : 'source'
+    for (const [what, pattern] of REQUIRED[kind]) {
+      if (!pattern.test(source)) throw new Error(name + ' does not ask for ' + what)
+      if (!pattern.test(translated)) throw new Error(sibling + ' does not ask for ' + what + ', so a Chinese reporter is asked for less')
+    }
+    // And the identifiers survive: a translated `verdictReason` would name a field that does not exist.
+    for (const identifier of ['`verdict`', '`verdictReason`', '`schema`']) {
+      if (source.includes(identifier) && !translated.includes(identifier)) {
+        throw new Error(sibling + ' dropped the field name ' + identifier)
+      }
     }
   }
 })
