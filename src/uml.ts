@@ -36,6 +36,7 @@ import type { GuardNode, GuardOp, LeafGuard, LogicModelV1, StateSpec, Transition
 import {
   UmlError, UML_FAMILY_IDS, umlCapability, detectUmlNotation, detectUmlFamily, declaredFamily, readUmlDirectives, directiveLine,
   MERMAID_RESERVED_NODE_IDS, UML_PLAIN_ID, UML_UNSAFE_LABEL, commentPrefix, DIRECTIVE_NAMESPACE,
+  isUmlNotation, UML_NOTATIONS,
   umlFamilySpec,
   type UmlNotation, type UmlFamilyId, type UmlFamilyModule, type UmlFamilyParse, type UmlFamilyFinding, type UmlFamilyRender,
 } from './uml-syntax.js'
@@ -1674,7 +1675,24 @@ export interface UmlReviewOptions {
  * - both — "does this diagram match this model?" Any structural difference is a
  *   modelling defect and is reported both as round-trip diffs and as a finding.
  */
+/**
+ * The notation the caller asked for, or a refusal naming it.
+ *
+ * `auto` is the one value that means "decide for me". Anything else must be a notation this engine
+ * reads or writes, because the review's answer depends on it: coercing `'graphviz'` into Mermaid and
+ * reporting a Mermaid review answers a question the caller did not ask.
+ */
+function requireNotation(value: unknown): UmlNotation | 'auto' {
+  if (value === undefined || value === 'auto') return 'auto'
+  if (isUmlNotation(value)) return value
+  throw new UmlError(
+    'notation must be auto, ' + UML_NOTATIONS.join(' or ') + ', got ' + JSON.stringify(value) + '.',
+    'UML_INPUT',
+  )
+}
+
 export function reviewUml(options: UmlReviewOptions): UmlReviewReport {
+  requireNotation(options.notation)
   const warnings: string[] = []
   const findings: UmlFinding[] = []
   const hasModel = options.model !== undefined

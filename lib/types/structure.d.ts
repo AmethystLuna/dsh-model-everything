@@ -146,10 +146,6 @@ export interface StructureReviewOptions {
     /** Dependency matrix: allowed/denied edges, layers, required edges. */
     matrix?: unknown;
 }
-/**
- * Audit a structure diagram. Every check is structural: it reads the drawn graph and
- * the declared matrix, and never claims anything about the code behind them.
- */
 export declare function reviewStructure(options: StructureReviewOptions): StructureReport;
 /** The finding codes this module can emit, for documentation and tests. */
 export declare const STRUCTURE_FINDING_CODES: readonly StructureFindingCode[];

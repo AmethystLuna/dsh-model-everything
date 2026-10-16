@@ -72,8 +72,24 @@ const KEYWORD_RULES: KeywordRule[] = [
   { pattern: /\bspin_lock_irqsave\b/i, label: 'spin_lock_irqsave', absolute: false },
 ]
 
-export function runConcurrencyScan(text: string): ConcurrencyScanReport {
-  const lines = text.split(/\r?\n/)
+/**
+ * The text to scan, or a refusal naming what arrived instead.
+ *
+ * `runConcurrencyScan(undefined)` threw a read of `split` on undefined. The scan proves nothing
+ * either way, so a caller who passed the wrong variable must be told which one was wrong rather
+ * than left with a crash.
+ */
+function requireScanText(value: unknown): string {
+  if (typeof value !== 'string') {
+    const arrived = value === null ? 'null' : Array.isArray(value) ? 'an array' : typeof value
+    throw new Error('text must be a string to scan, got ' + arrived + '. Pass the source or the notes to scan for concurrency claims.')
+  }
+  return value
+}
+
+export function runConcurrencyScan(text: unknown): ConcurrencyScanReport {
+  const source = requireScanText(text)
+  const lines = source.split(/\r?\n/)
   const findings: ConcurrencyFinding[] = []
   const seen = new Set<string>()
   const suggestionsFor = (label: string): string[] => {

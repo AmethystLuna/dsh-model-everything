@@ -1058,6 +1058,73 @@ await test('the nearest case — an unknown tool is scheduled exclusively', () =
 
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The engine refuses what it cannot read
+// ---------------------------------------------------------------------------
+
+// The robustness audit's D6-D12: four entry points answered a question nobody asked. An unknown
+// export format was silently written as Promela, an unknown notation was coerced, a diff of nothing
+// reported agreement, and two text entry points threw a raw TypeError. None of these is a model
+// being wrong - they are the engine being handed something that is not the thing it checks, and the
+// answer has to be a code the caller can route on.
+
+await test('model_export: a format the exporter cannot write is refused, not substituted', async () => {
+  // `exportModel` used to end with `return exportSpin(ex)`, so every one of these produced Promela
+  // with `format: 'spin'` in the report - a different notation's text, and a format nobody asked for.
+  for (const format of ['mermaid', 'graphviz', 'SPIN', '', 'spin\n', 42, null]) {
+    const res = await call('model_export', { model: MACHINE, format })
+    const error = expectToolError(res, `format ${show(format)}`)
+    expect(
+      typeof error?.info?.code === 'string' && error.info.code.length > 0,
+      `format ${show(format)}: a refusal must carry a code, got ${show(error?.info)}`,
+    )
+  }
+  // The nearest miss: each format the exporter does declare still writes its own notation.
+  for (const format of ['uppaal', 'tla', 'prism', 'spin']) {
+    const value = expectReport(await call('model_export', { model: MACHINE, format }), `format ${format}`)
+    expectEq(value.format, format, `format ${format} must be the one that was asked for`)
+  }
+})
+
+await test('uml_review: a notation that is not a notation is refused, not coerced', async () => {
+  for (const notation of ['graphviz', 'dot', 42, '', 'PlantUML']) {
+    const res = await call('uml_review', { model: MACHINE, notation })
+    const error = expectToolError(res, `notation ${show(notation)}`)
+    expect(typeof error?.info?.code === 'string', `notation ${show(notation)}: a refusal must carry a code`)
+  }
+  // `auto` means decide for me, and a real notation is taken as given.
+  expectReport(await call('uml_review', { model: MACHINE, notation: 'auto' }), 'notation auto')
+  expectReport(await call('uml_review', { model: MACHINE, notation: 'mermaid' }), 'notation mermaid')
+})
+
+await test('report_diff: two absent reports are refused, and a wrong-typed one still reports', async () => {
+  // The false green: with no inputs, every comparison found nothing and the report said the two
+  // agree. The absence of an input is not agreement.
+  const missing = expectToolError(await call('report_diff', { baseline: null, current: null }), 'two nulls')
+  expect(missing.message.length > 0, 'the refusal must say something')
+  expectToolError(await call('report_diff', { baseline: MACHINE, current: null }), 'a null current')
+
+  // Deliberately unchanged, and pinned: a wrong-typed value that is at least present reads as two
+  // empty finding lists, and `currentVerdict` carries the fact that the run was not clean.
+  const wrongTyped = expectReport(await call('report_diff', { baseline: 'not a report', current: 'not a report' }), 'two strings')
+  expectEq(wrongTyped.currentVerdict, 'fail', 'a non-report run is not a clean one')
+  expectEq(wrongTyped.summary.added, 0, 'and there is nothing to add')
+})
+
+await test('uml_structure_verify: a diagram that is not text is refused, not thrown', async () => {
+  // `reviewStructure({ diagram: 42 })` threw `text.split is not a function`, and `{}` threw a read
+  // of `undefined` - a TypeError, which is not something a caller can route on.
+  //
+  // A MISSING `diagram` is not in this list on purpose: the tool refuses it before the engine sees
+  // it, with its own message, and the two refusals belong to different layers. The engine-level shape
+  // handling is asserted in tests/engine, where the engine can be called directly.
+  for (const diagram of [42, null, {}, []]) {
+    const res = await call('uml_structure_verify', { diagram })
+    const error = expectToolError(res, `diagram ${show(diagram)}`)
+    expect(/diagram/i.test(error.message), `diagram ${show(diagram)}: the refusal must name the argument, got ${error.message}`)
+  }
+})
+
 if (failures > 0) {
   console.log('tool boundary tests failed:', failures)
   process.exit(1)

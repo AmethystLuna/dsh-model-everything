@@ -61,9 +61,5 @@ export interface BaselineReport {
 export declare function findingIdentity(finding: ReportFinding): string;
 /** Flatten a report of any family into one finding list (`checks[].findings` or `findings[]`). */
 export declare function flattenReportFindings(report: unknown): ReportFinding[];
-/**
- * Compare a baseline report with the current one. The verdict describes the *delta*
- * (a new error fails it), while `currentVerdict` keeps the absolute result visible.
- */
 export declare function diffReports(baseline: unknown, current: unknown): BaselineReport;
 export type { VerdictSummary };

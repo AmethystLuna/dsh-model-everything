@@ -300,18 +300,4 @@ export interface UmlReviewOptions {
     /** What the review is for; a view that cannot serve it is refused before any work. */
     intent?: UmlIntent;
 }
-/**
- * Review a UML model of a code flow.
- *
- * Three inputs are possible and each answers a different question:
- *
- * - `model` only — "is this machine well-modelled?" The review checks the
- *   structure the diagram would draw, then renders and re-parses it to prove the
- *   diagram carries the machine faithfully (round trip).
- * - `diagram` only — "what does this diagram actually say?" The diagram is parsed
- *   into a model, and that model is reviewed; nothing can be said about fidelity
- *   to a machine the caller did not provide.
- * - both — "does this diagram match this model?" Any structural difference is a
- *   modelling defect and is reported both as round-trip diffs and as a finding.
- */
 export declare function reviewUml(options: UmlReviewOptions): UmlReviewReport;

@@ -29,4 +29,4 @@ export interface ConcurrencyScanReport {
     /** What to do next, derived from the findings — never empty. */
     nextSteps: string[];
 }
-export declare function runConcurrencyScan(text: string): ConcurrencyScanReport;
+export declare function runConcurrencyScan(text: unknown): ConcurrencyScanReport;
