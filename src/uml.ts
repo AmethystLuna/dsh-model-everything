@@ -41,9 +41,17 @@ import {
 } from './uml-syntax.js'
 import { useCaseModule, validateUseCaseModel, type UseCaseModelV1 } from './uml-usecase.js'
 import { structureFamilyModule, type StructureModelV1 } from './uml-structure.js'
+import { timingModule, validateTimingModel, type TimingModelV1 } from './uml-timing.js'
 
 export { UmlError, UML_NOTATIONS } from './uml-syntax.js'
 export type { UmlNotation, UmlFamilyId } from './uml-syntax.js'
+
+// Internals a white-box test drives directly, because the tool entry points cannot reach
+// them: the model validator and its refusals, and the segment a parse builds. They are
+// exported for the suite, not for callers - the public surface is renderUml/parseUml/
+// reviewUml and the tools built on them.
+export { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES, parseTiming, renderTiming } from './uml-timing.js'
+export type { TimingModelV1, TimingSegment, TimingLifeline, TimingFindingCode } from './uml-timing.js'
 
 /**
  * The diagram families this front end knows, in the engine's order. The name is kept
@@ -83,7 +91,7 @@ export interface UmlRenderResult {
 }
 
 /** What a family's parse produces: a LogicModelV1 for the machine families, the family model otherwise. */
-export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1
+export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1
 
 export interface UmlParseResult {
   notation: UmlNotation
@@ -467,6 +475,7 @@ function umlFamilyCapability(notation: UmlNotation, family: UmlDiagram, action: 
 /** Families served by a module of their own rather than by the machine path. */
 const FAMILY_MODULES = {
   'use-case': useCaseModule,
+  timing: timingModule,
   class: structureFamilyModule('class'),
   object: structureFamilyModule('object'),
   package: structureFamilyModule('package'),

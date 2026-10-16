@@ -4,6 +4,9 @@
 // from is the defect this suite exists to catch, so every supported notation is
 // round-tripped rather than only asserted on its output text.
 import { renderUml, parseUml, parseFindings, reviewUml, diffModels, explainLabels, guardText, parseGuardText, UmlError } from '../../lib/uml.js'
+// White-box surface: the timing family's own contract, which the entry points reach only
+// through a render or a review. Static, because the module has no dsh dependency.
+import { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES } from '../../lib/uml.js'
 
 let failures = 0
 function test(name, fn) {
@@ -844,6 +847,484 @@ test('use case: the engine refuses a cell no notation has', () => {
   try { renderUml({ schemaVersion: 1, actors: [{ id: 'A' }], useCases: [], relations: [] }, 'plantuml', 'communication') } catch (error) { refusal = error }
   if (!(refusal instanceof UmlError) || refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('communication render refusal: ' + String(refusal))
   if (!refusal.message.includes('numbered message labels')) throw new Error('the refusal must say why: ' + refusal.message)
+})
+
+// ------------------------------------------------------- the timing family --
+
+// A timing diagram is an interaction against a clock. The model deliberately carries no
+// end time on a segment: the notation has no way to say "this state ends here", and a
+// field the diagram cannot express is a field the round trip loses - which is what it did
+// before the field was removed.
+const timingModel = {
+  schemaVersion: 1,
+  unit: 'ms',
+  lifelines: [
+    { id: 'WB', label: 'Browser', kind: 'robust' },
+    { id: 'WU', label: 'User', kind: 'concise' },
+    { id: 'CLK', label: 'Clock', kind: 'clock', period: 10 },
+  ],
+  states: [{ id: 'Idle' }, { id: 'Waiting', label: 'waiting for a URL' }],
+  segments: [
+    { lifeline: 'WB', state: 'Idle', from: 0, atStart: true },
+    { lifeline: 'WU', state: 'Idle', from: 0, atStart: true },
+    { lifeline: 'WU', state: 'Waiting', from: 100 },
+  ],
+  messages: [{ from: 'WU', to: 'WB', time: 100, label: 'URL' }],
+  constraints: [{ fromTime: 100, toTime: 250, label: '{150 ms}' }],
+}
+
+function timingModelOf(text) {
+  const parsed = parseUml(text)
+  if (parsed.family !== 'timing') throw new Error('family: ' + String(parsed.family))
+  return parsed
+}
+
+test('timing: a model renders, reads back structure-for-structure and re-renders verbatim', () => {
+  const rendered = renderUml(timingModel, 'plantuml', 'timing')
+  for (const needle of ['@startuml', "'dsh-model-everything:uml v1 notation=plantuml family=timing", 'robust "Browser" as WB', 'clock "Clock" as CLK with period 10', 'WB at 0 is Idle', 'WU at 0 is Idle', 'WU is "waiting for a URL"', 'WU -> WB @100 : URL', '@100 <-> @250 : {150 ms}', '@enduml']) {
+    if (!rendered.primary.includes(needle)) throw new Error('missing ' + needle + '\n' + rendered.primary)
+  }
+  // The segment model has no `to`, so the round trip is an equality of the whole model.
+  const back = parseUml(rendered.primary)
+  if (JSON.stringify(back.model) !== JSON.stringify(timingModel)) {
+    throw new Error('round trip changed the model:\n' + JSON.stringify(back.model))
+  }
+  if (renderUml(back.model, 'plantuml', 'timing').primary !== rendered.primary) {
+    throw new Error('rendering the parsed model is not the same diagram')
+  }
+})
+
+test('timing: a state change the diagram cannot name is carried by a directive, not invented', () => {
+  // The label is what the diagram draws; the id is what the model means. Only the
+  // directive says which is which, and with it the parse must return the id.
+  const rendered = renderUml(timingModel, 'plantuml', 'timing')
+  if (!rendered.primary.includes("'dsh-model-everything:timingState Waiting = \"waiting for a URL\"")) {
+    throw new Error('the label directive is missing\n' + rendered.primary)
+  }
+  const back = parseUml(rendered.primary)
+  const waiting = back.model.states.find((state) => state.id === 'Waiting')
+  if (waiting === undefined || waiting.label !== 'waiting for a URL') throw new Error('states: ' + JSON.stringify(back.model.states))
+  // Hand-written text with no directive: the drawn name is the id.
+  const hand = timingModelOf(['@startuml', 'concise "User" as WU', '@0', 'WU is Idle', '@100', 'WU is Waiting', '@enduml'].join('\n'))
+  if (JSON.stringify(hand.model.states) !== JSON.stringify([{ id: 'Idle' }, { id: 'Waiting' }])) {
+    throw new Error('hand-written states: ' + JSON.stringify(hand.model.states))
+  }
+  if (hand.model.segments[0].to !== undefined) throw new Error('a segment must not carry an end time')
+})
+
+test('timing: what the notation can say, the parser carries', () => {
+  const kinds = timingModelOf([
+    '@startuml',
+    'clock   "Clock_0"   as C0 with period 50',
+    'clock   "Clock_1"   as C1 with period 50 pulse 15 offset 10',
+    'binary  "Binary"  as B',
+    'concise "Concise" as C',
+    'rectangle "Rectangle" as Re',
+    'robust  "Robust"  as R',
+    'analog  "Analog"  as A',
+    '@0',
+    'C is Idle',
+    'R is Idle',
+    'Re is Idle',
+    'A is 0',
+    '@100',
+    'B is high',
+    'C is Waiting',
+    'Re is Waiting',
+    'R is Processing',
+    'A is 3',
+    '@300',
+    'R is Waiting',
+    'A is 1',
+    '@enduml',
+  ].join('\n'))
+  const kindsById = kinds.model.lifelines.map((lifeline) => lifeline.id + ':' + String(lifeline.kind) + (lifeline.period === undefined ? '' : '@' + String(lifeline.period)))
+  for (const expected of ['C0:clock@50', 'C1:clock@50', 'B:binary', 'C:concise', 'Re:rectangle', 'R:robust', 'A:analog']) {
+    if (!kindsById.includes(expected)) throw new Error('missing ' + expected + ' in ' + JSON.stringify(kindsById))
+  }
+  // `pulse` and `offset` are drawing details: named as discarded, not silently dropped.
+  if (!kinds.discardedConstructs.some((entry) => entry.text.includes('pulse 15'))) {
+    throw new Error('the pulse/offset declaration must be reported: ' + JSON.stringify(kinds.discardedConstructs))
+  }
+})
+
+test('timing: relative times resolve against the marker before them', () => {
+  const parsed = timingModelOf([
+    '@startuml',
+    'robust "DNS Resolver" as DNS',
+    'robust "Web Browser" as WB',
+    'concise "Web User" as WU',
+    '@0',
+    'WU is Idle',
+    'WB is Idle',
+    'DNS is Idle',
+    '@+100',
+    'WU -> WB : URL',
+    'WU is Waiting',
+    'WB is Processing',
+    '@+200',
+    'WB is Waiting',
+    '@+100',
+    'DNS is Processing',
+    '@enduml',
+  ].join('\n'))
+  const times = parsed.model.segments.map((segment) => segment.lifeline + '@' + String(segment.from))
+  for (const expected of ['WU@0', 'WU@100', 'WB@100', 'WB@300', 'DNS@400']) {
+    if (!times.includes(expected)) throw new Error('missing ' + expected + ' in ' + JSON.stringify(times))
+  }
+  const message = parsed.model.messages[0]
+  if (message.time !== 100) throw new Error('the message time: ' + JSON.stringify(message))
+})
+
+test('timing: a clock-relative message keeps its own moment', () => {
+  // The state change lands at 100; the message is sent at 150. Reading the first number
+  // on the line would put both at 100 - and on `WB -> DNS@+50` it would read the `B`.
+  const parsed = timingModelOf([
+    '@startuml',
+    'robust "DNS" as DNS',
+    'concise "Web User" as WU',
+    '@0',
+    'WU is Idle',
+    '@100',
+    'WU is Waiting',
+    'WU -> DNS@+50 : Resolve',
+    '@enduml',
+  ].join('\n'))
+  const message = parsed.model.messages[0]
+  if (message.time !== 150) throw new Error('message time: ' + JSON.stringify(message))
+})
+
+test('timing: quoted state names survive, including one that contains a hash', () => {
+  // `S1 is {0,1} #SlateGrey` is an indeterminate value with a colour, and `is "{1}#Gold"`
+  // is a state whose name contains the colour separator. Stripping at the hash would
+  // rename the state and truncate the time axis.
+  const parsed = timingModelOf([
+    '@startuml',
+    'robust "Signal1" as S1',
+    'robust "Signal2" as S2',
+    'S1 has 0,1,2,hello',
+    'S2 has 0,1,2',
+    '@0',
+    'S1 is 0',
+    'S2 is 0',
+    '@100',
+    'S1 is {0,1} #SlateGrey',
+    'S2 is {0,1}',
+    '@300',
+    'S1 is hello',
+    'S2 is {0,2}',
+    '@enduml',
+  ].join('\n'))
+  const stateIds = parsed.model.states.map((state) => state.id)
+  for (const expected of ['0', '{0,1}', 'hello', '{0,2}']) {
+    if (!stateIds.includes(expected)) throw new Error('missing state ' + expected + ' in ' + JSON.stringify(stateIds))
+  }
+  const colours = parsed.model.segments.map((segment) => String(segment.from))
+  if (!colours.includes('100') || !colours.includes('300')) throw new Error('times: ' + JSON.stringify(colours))
+  // `has` is a drawing order for one lifeline: named as discarded, never read as a change.
+  const hasLines = parsed.discardedConstructs.filter((entry) => entry.construct === 'has')
+  if (hasLines.length !== 2) throw new Error('the has declarations must be reported: ' + JSON.stringify(parsed.discardedConstructs))
+  const back = parseUml(renderUml(parsed.model, 'plantuml', 'timing').primary)
+  if (JSON.stringify(back.model) !== JSON.stringify(parsed.model)) throw new Error('the re-render changed the model')
+})
+
+test('timing: negative times are legal, and a state note is not part of the name', () => {
+  const parsed = timingModelOf([
+    '@startuml',
+    'binary "Binary Serial Data" as D',
+    'robust "Robust" as R',
+    '@-3',
+    'D is low: idle',
+    'R is lo: idle',
+    '@-1',
+    'D is high: start',
+    'R is hi: start',
+    '@0',
+    'D is low: 1 lsb',
+    'R is lo: 1 lsb',
+    '@0 <-> @8 : Serial data bits',
+    '@enduml',
+  ].join('\n'))
+  const lows = parsed.model.segments.filter((segment) => segment.lifeline === 'D').map((segment) => segment.from)
+  if (!lows.includes(-3) || !lows.includes(-1) || !lows.includes(0)) {
+    throw new Error('a negative time must survive: ' + JSON.stringify(lows))
+  }
+  const stateIds = parsed.model.states.map((state) => state.id)
+  if (!stateIds.includes('low') || stateIds.some((id) => id.includes(':'))) {
+    throw new Error('the comment must not join the state name: ' + JSON.stringify(stateIds))
+  }
+  if (parsed.model.constraints[0].toTime !== 8) throw new Error('constraint: ' + JSON.stringify(parsed.model.constraints))
+})
+
+test('timing: constructs the model does not carry are named, never invented', () => {
+  const parsed = timingModelOf([
+    '@startuml',
+    'clock clk with period 1',
+    'binary "enable" as EN',
+    'concise "dataBus" as db',
+    '@0 as :start',
+    '@5 as :en_high',
+    '@:start',
+    'EN is low',
+    'db is "0x0000"',
+    '@:en_high',
+    'EN is high',
+    'highlight 0 to 5 : window',
+    'note top of EN : a note',
+    '@enduml',
+  ].join('\n'))
+  const constructs = parsed.discardedConstructs.map((entry) => entry.construct)
+  for (const expected of ['highlight', 'note']) {
+    if (!constructs.includes(expected)) throw new Error('missing the ' + expected + ' declaration in ' + JSON.stringify(constructs))
+  }
+  // The anchor lines are not states: an unread line is still reported, never dropped.
+  if (!constructs.includes('unread line')) throw new Error('anchor lines must be reported: ' + JSON.stringify(constructs))
+  // `@WB` opens a participant block: nobody addresses it, so it is an unread line, and
+  // the block's per-lifeline times do not become the diagram's axis.
+  const blocked = timingModelOf(['@startuml', 'concise "Web User" as WU', '@WU', '0 is Waiting', '+500 is ok', '@enduml'].join('\n'))
+  const blockedConstructs = blocked.discardedConstructs.map((entry) => entry.construct)
+  if (!blockedConstructs.includes('unread line')) throw new Error('a participant block must be reported: ' + JSON.stringify(blocked.discardedConstructs))
+  // A quoted numeric state is the state's name, not a time.
+  const bus = parsed.model.segments.find((segment) => segment.state === '0x0000')
+  if (bus === undefined) throw new Error('quoted state lost: ' + JSON.stringify(parsed.model.states))
+})
+
+test('timing: mermaid has no timing diagram, in both directions', () => {
+  let onRender
+  try { renderUml(timingModel, 'mermaid', 'timing') } catch (error) { onRender = error }
+  if (!(onRender instanceof UmlError) || onRender.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('render: ' + String(onRender))
+  if (!onRender.message.includes('plantuml')) throw new Error('the refusal must name the notation that works: ' + onRender.message)
+  let onParse
+  try { parseUml('timingDiagram\n  A is Idle', 'mermaid') } catch (error) { onParse = error }
+  if (!(onParse instanceof UmlError)) throw new Error('mermaid timing text must not parse: ' + String(onParse))
+})
+
+test('timing: the review reports what the diagram cannot say about itself', () => {
+  const report = reviewUml({ model: timingModel, diagramKind: 'timing' })
+  if (report.roundTrip === null || !report.roundTrip.ok) throw new Error('the diagram must carry its model: ' + JSON.stringify(report.roundTrip))
+  if (report.verdict === 'fail') throw new Error('a well-formed timing model must not fail: ' + report.verdictReason)
+
+  const broken = reviewUml({
+    diagramKind: 'timing',
+    model: {
+      schemaVersion: 1,
+      lifelines: [{ id: 'A' }, { id: 'B' }],
+      states: [{ id: 'Idle' }, { id: 'Never' }],
+      segments: [
+        { lifeline: 'A', state: 'Idle', from: 100 },
+        { lifeline: 'A', state: 'Never', from: 50 },
+        { lifeline: 'A', state: 'Idle', from: 50 },
+      ],
+      messages: [],
+      constraints: [{ fromTime: 20, toTime: 5 }],
+    },
+  })
+  const codes = broken.findings.map((finding) => finding.code)
+  for (const expected of ['UML043_TIMING_EMPTY_LIFELINE', 'UML044_TIMING_TIME_ORDER', 'UML045_TIMING_SIMULTANEOUS_STATES', 'UML047_TIMING_CONSTRAINT_RANGE']) {
+    if (!codes.includes(expected)) throw new Error(expected + ' missing from ' + JSON.stringify(codes))
+  }
+  if (broken.verdict !== 'fail') throw new Error('a diagram that contradicts itself must fail')
+})
+
+test('timing: an undeclared target is carried as undeclared and reported', () => {
+  const text = ['@startuml', 'concise "User" as WU', '@0', 'WU is Idle', '@100', 'WU -> GHOST : ping', '@enduml'].join('\n')
+  const parsed = timingModelOf(text)
+  if (parsed.model.undeclared === undefined || !parsed.model.undeclared.includes('GHOST')) {
+    throw new Error('undeclared: ' + JSON.stringify(parsed.model.undeclared))
+  }
+  if (!codes(reviewUml({ diagram: text })).includes('UML046_TIMING_UNDECLARED_REFERENCE')) {
+    throw new Error('the review must report the undeclared target')
+  }
+})
+
+test('timing: a model the notation cannot draw is refused, not drawn wrong', () => {
+  let refusal
+  try {
+    renderUml({ ...timingModel, lifelines: [], states: [], segments: [], messages: [], constraints: [], schemaVersion: 2 }, 'plantuml', 'timing')
+  } catch (error) { refusal = error }
+  if (!(refusal instanceof UmlError) || refusal.code !== 'UML_INPUT') throw new Error('schemaVersion 2: ' + String(refusal))
+  let badKind
+  try {
+    renderUml({ ...timingModel, lifelines: [{ id: 'X', kind: 'wobbly' }] }, 'plantuml', 'timing')
+  } catch (error) { badKind = error }
+  if (!(badKind instanceof UmlError) || badKind.code !== 'UML_INPUT') throw new Error('unknown kind: ' + String(badKind))
+  // A segment that names a state the model does not declare would render a state the
+  // reader never agreed to.
+  let dangling
+  try {
+    renderUml({ ...timingModel, segments: [{ lifeline: 'WU', state: 'Ghost', from: 0 }] }, 'plantuml', 'timing')
+  } catch (error) { dangling = error }
+  if (!(dangling instanceof UmlError) || dangling.code !== 'UML_INPUT') throw new Error('dangling state: ' + String(dangling))
+})
+
+// ------------------------------------------------ timing: white box, in the small --
+
+// The checks above drive the public entry points. These drive the module's own contract:
+// every finding code the family can emit has one case here that produces it and nothing
+// else, and every refusal the validator makes is asserted where it is made rather than
+// through a render that happens to fail.
+const timingFindingCases = [
+  ['UML042_TIMING_NO_LIFELINES', { lifelines: [], states: [], segments: [], messages: [], constraints: [] }],
+  ['UML043_TIMING_EMPTY_LIFELINE', { lifelines: [{ id: 'A' }, { id: 'B' }], states: [{ id: 'Idle' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0 }], messages: [], constraints: [] }],
+  ['UML044_TIMING_TIME_ORDER', { lifelines: [{ id: 'A' }], states: [{ id: 'Idle' }], segments: [{ lifeline: 'A', state: 'Idle', from: 100 }, { lifeline: 'A', state: 'Idle', from: 50 }], messages: [], constraints: [] }],
+  ['UML045_TIMING_SIMULTANEOUS_STATES', { lifelines: [{ id: 'A' }], states: [{ id: 'Idle' }, { id: 'Busy' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0 }, { lifeline: 'A', state: 'Busy', from: 0 }], messages: [], constraints: [] }],
+  ['UML046_TIMING_UNDECLARED_REFERENCE', { lifelines: [{ id: 'A' }], states: [{ id: 'Idle' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0 }], messages: [], constraints: [], undeclared: ['GHOST'] }],
+  ['UML047_TIMING_CONSTRAINT_RANGE', { lifelines: [{ id: 'A' }], states: [{ id: 'Idle' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0 }], messages: [], constraints: [{ fromTime: 20, toTime: 5 }] }],
+  ['UML048_TIMING_STATE_UNUSED', { lifelines: [{ id: 'A' }], states: [{ id: 'Idle' }, { id: 'Never' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0 }], messages: [], constraints: [] }],
+  ['UML049_TIMING_UNDOCUMENTED', { lifelines: [{ id: 'A' }], states: [{ id: 'Idle' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0 }], messages: [], constraints: [] }],
+]
+
+for (const [code, model] of timingFindingCases) {
+  test('timing white box: ' + code + ' is produced by its own case', () => {
+    const findings = reviewTimingModel({ schemaVersion: 1, ...model }, {})
+    const produced = findings.map((finding) => finding.code)
+    if (!produced.includes(code)) throw new Error('missing ' + code + ' in ' + JSON.stringify(produced))
+    // The case is about one defect. UML049 sits beside anything (an id with no label is
+    // not a defect of the diagram), so it is allowed; nothing else may appear, or the
+    // case does not show which input produces which code.
+    const others = findings
+      .filter((finding) => finding.code !== code && finding.code !== 'UML049_TIMING_UNDOCUMENTED')
+      .map((finding) => finding.code)
+    if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+  })
+}
+
+test('timing white box: every code the family declares is covered by a case', () => {
+  const covered = new Set(timingFindingCases.map(([code]) => code))
+  const missing = TIMING_FINDING_CODES.filter((code) => !covered.has(code))
+  if (missing.length > 0) throw new Error('codes with no case: ' + missing.join(', '))
+  const unknown = [...covered].filter((code) => !TIMING_FINDING_CODES.includes(code))
+  if (unknown.length > 0) throw new Error('cases for codes the family does not declare: ' + unknown.join(', '))
+})
+
+test('timing white box: the validator normalizes, and refuses by field', () => {
+  // Normalization keeps only the declared shape: an unknown key never travels on.
+  const normalized = validateTimingModel({ schemaVersion: 1, lifelines: [{ id: 'A', label: 'A' }], states: [{ id: 'Idle' }], segments: [{ lifeline: 'A', state: 'Idle', from: 0, to: 99 }], messages: [], constraints: [] })
+  if ('to' in normalized.segments[0]) throw new Error('a segment end must not survive normalization: ' + JSON.stringify(normalized.segments[0]))
+  if (!normalized.segments[0].atStart === undefined) throw new Error('atStart must be absent when it was absent')
+
+  const refusals = [
+    ['must be an object with schemaVersion 1', 'x'],
+    ['must declare schemaVersion 1', { schemaVersion: 2, lifelines: [], states: [], segments: [], messages: [], constraints: [] }],
+    ['every lifeline needs a non-empty string id', { schemaVersion: 1, lifelines: [{ id: '' }], states: [], segments: [], messages: [], constraints: [] }],
+    ['duplicate lifeline id', { schemaVersion: 1, lifelines: [{ id: 'A' }, { id: 'A' }], states: [], segments: [], messages: [], constraints: [] }],
+    ['period must be a positive number', { schemaVersion: 1, lifelines: [{ id: 'A', period: 0 }], states: [], segments: [], messages: [], constraints: [] }],
+    ['duplicate state id', { schemaVersion: 1, lifelines: [], states: [{ id: 'S' }, { id: 'S' }], segments: [], messages: [], constraints: [] }],
+    ['every segment needs the lifeline it belongs to', { schemaVersion: 1, lifelines: [{ id: 'A' }], states: [{ id: 'S' }], segments: [{ lifeline: '', state: 'S', from: 0 }], messages: [], constraints: [] }],
+    ['`from` must be a number', { schemaVersion: 1, lifelines: [{ id: 'A' }], states: [{ id: 'S' }], segments: [{ lifeline: 'A', state: 'S', from: 'x' }], messages: [], constraints: [] }],
+    ['names a lifeline the model does not declare', { schemaVersion: 1, lifelines: [{ id: 'A' }], states: [{ id: 'S' }], segments: [{ lifeline: 'B', state: 'S', from: 0 }], messages: [], constraints: [] }],
+    ['which the model does not declare', { schemaVersion: 1, lifelines: [{ id: 'A' }], states: [{ id: 'S' }], segments: [{ lifeline: 'A', state: 'T', from: 0 }], messages: [], constraints: [] }],
+    ['`time` must be a number', { schemaVersion: 1, lifelines: [{ id: 'A' }], states: [], segments: [], messages: [{ from: 'A', to: 'A', time: 'x' }], constraints: [] }],
+    ['numeric `fromTime` and `toTime`', { schemaVersion: 1, lifelines: [{ id: 'A' }], states: [], segments: [], messages: [], constraints: [{ fromTime: 1 }] }],
+    ['`unit` must be a non-empty string', { schemaVersion: 1, unit: '', lifelines: [], states: [], segments: [], messages: [], constraints: [] }],
+  ]
+  for (const [needle, input] of refusals) {
+    let refusal
+    try { validateTimingModel(input) } catch (error) { refusal = error }
+    if (!(refusal instanceof UmlError) || refusal.code !== 'UML_INPUT') throw new Error(needle + ': not an UML_INPUT refusal: ' + String(refusal))
+    if (!refusal.message.includes(needle)) throw new Error('refusal for "' + needle + '" said: ' + refusal.message)
+  }
+})
+
+test('timing white box: the renderer sorts the axis and says that it did', () => {
+  // Out of order in time: the renderer must still write a non-decreasing axis, because
+  // that is the only order PlantUML reads, and it must say that it sorted.
+  const sorted = renderUml({
+    schemaVersion: 1,
+    lifelines: [{ id: 'A' }, { id: 'B' }],
+    states: [{ id: 'One' }, { id: 'Two' }, { id: 'Three' }],
+    segments: [
+      { lifeline: 'B', state: 'Two', from: 200 },
+      { lifeline: 'A', state: 'One', from: 0, atStart: true },
+      { lifeline: 'A', state: 'Three', from: 300 },
+    ],
+    messages: [],
+    constraints: [],
+  }, 'plantuml', 'timing')
+  const markers = sorted.primary.split('\n').filter((line) => /(?:^|\s)@\d+$/.test(line))
+  if (markers.length === 0) throw new Error('no time markers:\n' + sorted.primary)
+  if (!sorted.warnings.some((warning) => warning.includes('UML_RENDER_TIME_ORDER'))) {
+    throw new Error('a reordered model must be reported: ' + JSON.stringify(sorted.warnings))
+  }
+  // Rendering the same model twice is the same text.
+  const again = renderUml({
+    schemaVersion: 1,
+    lifelines: [{ id: 'A' }, { id: 'B' }],
+    states: [{ id: 'One' }, { id: 'Two' }, { id: 'Three' }],
+    segments: [
+      { lifeline: 'B', state: 'Two', from: 200 },
+      { lifeline: 'A', state: 'One', from: 0, atStart: true },
+      { lifeline: 'A', state: 'Three', from: 300 },
+    ],
+    messages: [],
+    constraints: [],
+  }, 'plantuml', 'timing')
+  if (again.primary !== sorted.primary) throw new Error('rendering is not deterministic')
+})
+
+test('timing white box: a lifeline whose first change is late is drawn, and said so', () => {
+  // The axis origin is the earliest moment in the model (here 0, from lifeline A). A
+  // lifeline that only appears at 100 is drawn from the origin whatever the model says,
+  // so the renderer reports the stretch nobody declared.
+  const rendered = renderUml({
+    schemaVersion: 1,
+    lifelines: [{ id: 'A' }, { id: 'Late' }],
+    states: [{ id: 'Idle' }],
+    segments: [
+      { lifeline: 'A', state: 'Idle', from: 0, atStart: true },
+      { lifeline: 'Late', state: 'Idle', from: 100 },
+    ],
+    messages: [],
+    constraints: [],
+  }, 'plantuml', 'timing')
+  if (!rendered.warnings.some((warning) => warning.includes('UML_RENDER_IMPLICIT_START'))) {
+    throw new Error('the implicit start must be reported: ' + JSON.stringify(rendered.warnings))
+  }
+  const back = parseUml(rendered.primary)
+  const late = back.model.segments.find((segment) => segment.lifeline === 'Late')
+  if (late === undefined || late.atStart !== true) throw new Error('the parser and the renderer must agree: ' + JSON.stringify(late))
+  // A model that says it on purpose is not warned about.
+  const declared = renderUml({
+    schemaVersion: 1,
+    lifelines: [{ id: 'A' }, { id: 'Late' }],
+    states: [{ id: 'Idle' }],
+    segments: [
+      { lifeline: 'A', state: 'Idle', from: 0, atStart: true },
+      { lifeline: 'Late', state: 'Idle', from: 100, atStart: true },
+    ],
+    messages: [],
+    constraints: [],
+  }, 'plantuml', 'timing')
+  if (declared.warnings.some((warning) => warning.includes('UML_RENDER_IMPLICIT_START'))) {
+    throw new Error('atStart is the declaration: ' + JSON.stringify(declared.warnings))
+  }
+})
+
+test('timing white box: a parse names a state it cannot resolve, and names the marker it lacks', () => {
+  // A state change before any marker: it lands at 0, and the report says why.
+  const parsed = parseUml(['@startuml', 'concise "User" as WU', 'WU is Idle', '@enduml'].join('\n'))
+  if (!parsed.warnings.some((warning) => warning.includes('UML_PARSE_STATE_WITHOUT_TIME'))) {
+    throw new Error('a state before any marker must be reported: ' + JSON.stringify(parsed.warnings))
+  }
+  if (parsed.model.segments[0].from !== 0 || parsed.model.segments[0].atStart !== true) {
+    throw new Error('it lands at the origin: ' + JSON.stringify(parsed.model.segments[0]))
+  }
+  // A message before any marker gets the same treatment rather than an invented time.
+  const early = parseUml(['@startuml', 'concise "User" as WU', 'concise "Web" as WB', 'WU -> WB : ping', '@enduml'].join('\n'))
+  if (!early.warnings.some((warning) => warning.includes('UML_PARSE_MESSAGE_WITHOUT_TIME'))) {
+    throw new Error('a message before any marker must be reported: ' + JSON.stringify(early.warnings))
+  }
+  // A decreasing marker is a warning, not silence: the axis is what it is.
+  const backwards = parseUml(['@startuml', 'concise "User" as WU', '@100', 'WU is Waiting', '@50', 'WU is Idle', '@enduml'].join('\n'))
+  if (!backwards.warnings.some((warning) => warning.includes('UML_PARSE_TIME_ORDER'))) {
+    throw new Error('a backwards marker must be reported: ' + JSON.stringify(backwards.warnings))
+  }
+  // A lifeline declared twice keeps the first declaration and says so.
+  const twice = parseUml(['@startuml', 'concise "User" as WU', 'robust "Other" as WU', '@0', 'WU is Idle', '@enduml'].join('\n'))
+  if (!twice.warnings.some((warning) => warning.includes('UML_PARSE_DUPLICATE_LIFELINE'))) {
+    throw new Error('a duplicate lifeline must be reported: ' + JSON.stringify(twice.warnings))
+  }
+  if (twice.model.lifelines[0].kind !== 'concise') throw new Error('the first declaration wins: ' + JSON.stringify(twice.model.lifelines))
 })
 
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }

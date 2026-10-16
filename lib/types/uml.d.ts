@@ -35,8 +35,11 @@ import type { GuardNode, LogicModelV1, UpdateSpec } from './engine.js';
 import { type UmlNotation, type UmlFamilyId } from './uml-syntax.js';
 import { type UseCaseModelV1 } from './uml-usecase.js';
 import { type StructureModelV1 } from './uml-structure.js';
+import { type TimingModelV1 } from './uml-timing.js';
 export { UmlError, UML_NOTATIONS } from './uml-syntax.js';
 export type { UmlNotation, UmlFamilyId } from './uml-syntax.js';
+export { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES, parseTiming, renderTiming } from './uml-timing.js';
+export type { TimingModelV1, TimingSegment, TimingLifeline, TimingFindingCode } from './uml-timing.js';
 /**
  * The diagram families this front end knows, in the engine's order. The name is kept
  * for callers that already use it: it is now the whole UML 2.5 family list rather
@@ -63,7 +66,7 @@ export interface UmlRenderResult {
     warnings: string[];
 }
 /** What a family's parse produces: a LogicModelV1 for the machine families, the family model otherwise. */
-export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1;
+export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1;
 export interface UmlParseResult {
     notation: UmlNotation;
     diagram: UmlDiagram;

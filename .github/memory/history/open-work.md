@@ -13,54 +13,43 @@ metadata:
 
 ## 1. 发布与挂载（由具备插件开发工具集的会话做）
 
-- 装进目标 profile，跑一轮安装、挂载、离线检查、卸载。
-- 实测 `dsh.compatibility.dshReleases`。现在只有 `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.2` 四个键，且全是 `unknown`；测过哪个就把哪个改成 `compatible`。
+- **挂载已实测**：在隔离 `DSH_HOME` 里用 `dsh 0.2.0-rc.2` 装 `file:` 副本、`--dump-config` 看到本插件的行、技能与 `locale/` 都在包里；0.1.7 那一段另用 API 面探针测过（`peerDependencies` 区间因此放宽到 `^0.1.7-alpha.2`）。**还没做**：装完之后跑一次真实调用、以及卸载。
+- `dsh.compatibility.dshReleases` 已按实测写回：`0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`、`0.2.0-rc.2` 标 `compatible`；`0.2.0-rc.1`、`0.2.1-alpha.1`、`0.2.1-alpha.2` 仍是 `unknown`（没测过）。注意 `0.1.7-alpha.1` 装不上（npm 解析 `0.1.7-alpha.1` 那批包时 peer 冲突），不是本插件的问题。
 - 建 GitHub 仓库与 topic、`npm publish`、打 tag。
-- 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `category` 现在写的是 `skill`，与社区索引的分类体系不一致，查规范时一并确认要不要改。
+- 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
 
 ## 2. 未实现的图族模块
 
-`composite-structure`、`profile`、`timing`、`communication`、`interaction-overview` 目前**按名拒绝并给出理由**，没有模块。要真正 render / parse / review，按[架构](../design/architecture.md)加模块：在图族表补一条，再写一个 `UmlFamilyModule`。
+`composite-structure`、`profile`、`communication`、`interaction-overview` 目前**按名拒绝并给出理由**，没有模块。要真正 render / parse / review，按[架构](../design/architecture.md)加模块：在图族表补一条，再写一个 `UmlFamilyModule`。
 
-动手前先读[记号调研](../research/uml-notation-support.md)，确认这种记号的表达能力支持你要做的事；表里 `faithful` 但本构建尚无模块的族，注册表会按名拒绝，不会交给错的解析器。
+动手前先读[记号调研](../research/uml-notation-support.md)，确认这种记号的表达能力支持你要做的事；表里 `faithful` 但本构建尚无模块的族，注册表会按名拒绝，不会交给错的解析器。注意记忆里那张总表把活动图标成「PlantUML faithful」，而**本构建**的图族表对 PlantUML 活动标的是 `none`（结构化流程语法无法承载带汇合或环的图）——以图族表为准。
 
-## 3. 用例族的 severity 校准（待核对）
+### 每加一个图族，这几件事一起做（`timing` 那轮定下的清单）
 
-[审阅清单](../research/uml-review-checklist.md)给出的判定依据是：include 成环是规范约束（应为 error）；只有 extend 成环只是风格问题（warning）；孤立 actor 是 info；actor 指向 actor 的关联是规范约束（error）。
+`timing` 是照这个契约落地的第一个族（`src/uml-timing.ts` + `src/uml.ts` 的 `FAMILY_MODULES`）。它那轮踩过的顺序可以直接照抄：
 
-要核对现有 `UML030`–`UML039` 的 severity 是否与之一致，不一致就改，并把结论回写到清单里（哪几条已被实现、实现成什么等级）。
+1. **图族表**：`UML_FAMILIES` 里该族的 `mermaid` / `plantuml` 能力与 note 要与模块的实际行为一致（表说 `faithful` 而注册表按名拒绝，是违约）。
+2. **模型与校验**：`XxxModelV1` + `validateXxxModel`，未知键与错类型一律 `UML_INPUT` 拒绝；**记号表达不出的字段不要进模型**。`timing` 第一版给 segment 带了 `to`（区间终点），PlantUML 语法里没有它，往返每次都丢；删掉之后才通。
+3. **渲染**：记号说不出的东西用 `dsh-model-everything:` 指令承载（`timing` 用了 `timingUnit` / `timingLifeline` / `timingState` / `timingAtStart`），并且渲染必须确定（同一模型两次渲染逐字节相同）。
+4. **解析**：不承载的构造按名进 `discardedConstructs`，绝不静默丢；渲染器写出的形态必须能被自己的解析器读回**同一个模型**。
+5. **检查码**：另开一段空号，并把每个码写进 `design/uml-check-coverage.md` 的覆盖表。
+6. **测试（白盒，缺一不可）**：往返逐字节稳定；手写（无指令）文本可解析；**每个检查码一条只产出该码的用例**（`UML049` 这类 info 允许共存）；校验器每条拒绝路径单独一条。`timing` 收尾时正是这套用例抓出四个真缺陷：`S1 @300` 取时取成了标识符里的 `1`、颜色剥离把引号内的 `#` 当成颜色分隔、`pulse`/`offset` 被静默吞掉、`has` 声明被读成状态变更。
+7. **技能文档**：新码要在 `skills/` 里可查（`model-everything-uml/references/uml-modeling-guide.md` 各一节）。
+8. **门禁**：`npm run build` 后 `lib/` 与 `src/` 同步；`test:engine` 与 `lint:md` 全绿。
 
-## 4. 插件开发规范的调研（下一会话在创造模式里做）
+## 3. 要不要拆成多个组件（待定）
 
-写第 5 节时，多组件的做法是**从已安装的实例反推**的：`a neighbouring plugin` 用 `exports` 暴露四个子路径，`cordis.patch.yml` 一行一个组件，行级 `disabled` 各自独立。正式文档这次没有找到，这本身就是该查的证据。
+现状：一个包、一行 loader 条目、一个总开关（本插件自己的 `config.enabled`；dsh 那一侧的开关是行级 `disabled`，两者别混）。
 
-下一会话有插件开发工具集，把规范读全，然后回写成一篇记忆——新开一篇，或补进[架构](../design/architecture.md)。要查清的至少有：
-
-- bundle 与 patch 的正式语义：`dsh.bundle.patch`，loader 行的 `id` / `name` / `config` / `disabled`，以及 profile 各层 patch 的覆盖规则（按 id 覆盖整行 config，不做深合并）。
-- 一包多组件：`exports` 子路径的约定，每个组件是否需要独立的 `package.json`，组件之间能否互相依赖。
-- 配置 schema：schemastery 的用法，以及 `enabled` 之外哪些字段适合交给用户。
-- 技能注册：`ctx.skills` filesystem provider 的注册方式；多组件时技能怎么分区。
-- 模型可见目录：`cordis_inspect` provider 的 manifest 约定。
-- 商店与元数据：`dsh.displayName`、`category`、`compatibility`、topic 的字段要求，以及 `dshReleases` 的实测方法。
-
-产出要写「怎么做」，不写「我猜怎么做」。
-
-## 5. 要不要拆成多个组件（待定）
-
-现状：一个包、一行 loader 条目、`enabled` 一个总开关。
-
-机制是现成的：一个包可以用 `exports` 暴露多个子路径，`cordis.patch.yml` 一个组件插一行，每行可以单独 `disabled`。可参照的实例是已安装的 `a neighbouring plugin`——四个独立组件（`a neighbouring plugin/shell`、`/file`、`/background`、`/ptc`），各有自己的 config，互不依赖。
+机制是现成的：一个包可以用 `exports` 暴露多个子路径，`cordis.patch.yml` 一个组件插一行，每行可以单独 `disabled`；组件可以有自己的卡片名（`<子路径>/package.json` + 同目录 `locale/*.json`），跨组件只能走服务注入。可参照的实例是已安装的 `a neighbouring plugin`——四个独立组件，各有自己的 config，互不依赖。机制细节与判据见[插件开发规范](../design/plugin-dev-spec.md)。
 
 拆的收益：只想要某一块能力的人，不必为全部工具的描述付出上下文；卡片上按组件列出，开关也按组件给。
 
-拆的代价：技能要按组件分区，否则禁用某个组件后，技能里会指向不存在的工具；入口技能的路由表要处理「该工具未注册」；工具注册测试要覆盖组合矩阵；插件卡片会从一个变成几个。
+拆的代价：技能要按组件分区，否则禁用某个组件后，技能里会指向不存在的工具（组件行注销时它的技能 provider 一起走，但入口技能的路由表还留着那条路）；工具注册测试要覆盖组合矩阵；插件卡片会从一个变成几个。
 
 倾向：**暂不拆**。等出现明确的「只要图、不要引擎」的用户诉求，或工具描述的体积成为负担时再拆。
 
-## 6. 较小的整理项
+## 4. 较小的整理项
 
-- `examples/` 现在兼具测试夹具与示例两种身份。要分开就分，不分开也行（README 与 `package.json` 的 `files` 都已把它算进去）。
-- `tests/external/run.mjs` 通过 `MODEL_EVERYTHING_SPIN` 与 `MODEL_EVERYTHING_GCC` 找 spin 与 gcc。这两个开关只在测试里用，README 没写；若希望别人也能在本地跑外部检查器往返，就该补进文档。
-- markdownlint 目前靠 `npx --yes` 现取（CI 固定 0.42.0）。装成 devDependency 后本地也能跑，且与 CI 版本一致。
 - 技能触发评估：旧仓库那份针对另一个宿主 CLI 的触发 harness 已随历史重建删除。要为 dsh 做触发评估就按 dsh 的技能目录行重写；五个提示词夹具可从历史备份包取回。

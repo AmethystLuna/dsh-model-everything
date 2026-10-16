@@ -280,6 +280,43 @@ label. The per-family well-formedness constraints those diagrams have in the
 specification are not implemented as findings — see the coverage table in the project
 memory before claiming a structure diagram is clean.
 
+### Timing diagrams
+
+A timing diagram is an interaction against a clock: which participants exist, what state
+each is in over time, and what they send each other. PlantUML is the only notation here
+(`robust`, `concise`, `binary`, `clock` with a period, `analog`, `rectangle`); Mermaid
+has no timing diagram, and the tool refuses by name instead of drawing something else.
+
+The model is `TimingModelV1`: `lifelines`, `states`, `segments`, `messages`,
+`constraints`, and an optional `unit` for the axis. Two rules follow from what the
+notation can actually say, and both are enforced rather than assumed:
+
+- **A segment has no end time.** A lifeline is a list of changes; the next change on the
+  same lifeline *is* the end of the previous state. A model that also carried an end would
+  be carrying a field the diagram cannot express, and the round trip would drop it.
+- **A state exists only where the diagram shows it.** "Which id is this drawn label?" is
+  answered by a `dsh-model-everything:timingState` directive, never by inventing a second
+  state. A state declared in the model but drawn nowhere is `UML048`.
+
+| Code | Severity | What it means |
+|---|---|---|
+| `UML042_TIMING_NO_LIFELINES` | error | No lifeline is declared, so there is no participant whose state over time the diagram could show. |
+| `UML043_TIMING_EMPTY_LIFELINE` | warning | A lifeline carries no state change and no message: it is drawn but says nothing. |
+| `UML044_TIMING_TIME_ORDER` | error | The segments are written out of time order, so an earlier state would end before it begins. Negative times are legal — the run-up before the moment the reader cares about; what is not legal is an axis that goes backwards. |
+| `UML045_TIMING_SIMULTANEOUS_STATES` | error | One lifeline is put into two states at the same moment. A renderer keeps only the last, so the model says something the diagram cannot. |
+| `UML046_TIMING_UNDECLARED_REFERENCE` | error | A message or a segment names an element no declaration introduced. PlantUML draws a bare timeline for it, which is how a typo stays invisible. |
+| `UML047_TIMING_CONSTRAINT_RANGE` | error | A duration constraint ends before it starts. |
+| `UML048_TIMING_STATE_UNUSED` | warning | A state is declared but no lifeline is ever monitored in it. |
+| `UML049_TIMING_UNDOCUMENTED` | info | A lifeline or state carries no name a reader can map back to the system. |
+
+What the module does **not** carry, and names in `discardedConstructs` rather than
+dropping: participant blocks (`@WB` with per-lifeline times), anchor points
+(`@XX as :name`), a state's comment or colour (`is Waiting : note`, `is Waiting #LightCyan`),
+`highlight`, `note top of`, `scale`, date axes, `mode compact`, and the `has` state-order
+declaration. Each is a real construct of the notation and none of them is a state or a
+message, so they are reported by name. A clock's `pulse` and `offset` are reported the
+same way: the model carries the period.
+
 ### What the round trip proves
 
 It proves the diagram is a faithful rendering of the model:
