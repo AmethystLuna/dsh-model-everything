@@ -2605,6 +2605,81 @@ async function runCheckCodeCoverageTests() {
 
 await runCheckCodeCoverageTests()
 
+/**
+ * The engine-level shape refusals, for the entry points that are not tools.
+ *
+ * The robustness audit's D6-D12 found four of them answering a question nobody asked. The tool
+ * boundary has its own cases; these call the engine directly, which is where a raw TypeError used to
+ * surface with no code at all.
+ *
+ * A refusal has to name the argument. A caller who passed the wrong variable needs to know which
+ * one, and `Cannot read properties of undefined` does not say.
+ */
+async function runEntryShapeTests() {
+  const { reviewStructure } = await import('../../lib/structure.js')
+  const { runConcurrencyScan } = await import('../../lib/concurrency.js')
+  const { exportModel, EXPORT_FORMATS } = await import('../../lib/exporters.js')
+  const { diffReports } = await import('../../lib/baseline.js')
+  const { reviewUml, UML_NOTATIONS } = await import('../../lib/uml.js')
+
+  const machine = { schemaVersion: 1, init: 'A', states: [{ id: 'A', terminal: true }], transitions: [] }
+
+  const refusals = [
+    ['structure: a diagram that is not text', () => reviewStructure({ diagram: 42 }), 'diagram'],
+    ['structure: no diagram at all', () => reviewStructure({}), 'diagram'],
+    ['structure: a null diagram', () => reviewStructure({ diagram: null }), 'diagram'],
+    ['structure: an array as a diagram', () => reviewStructure({ diagram: ['component a'] }), 'diagram'],
+    ['concurrency: no text at all', () => runConcurrencyScan(undefined), 'text'],
+    ['concurrency: a null text', () => runConcurrencyScan(null), 'text'],
+    ['concurrency: an array as text', () => runConcurrencyScan(['x']), 'text'],
+    ['export: a format the exporter cannot write', () => exportModel(machine, 'mermaid'), 'format'],
+    ['export: no format at all', () => exportModel(machine, undefined), 'format'],
+    ['export: a number as a format', () => exportModel(machine, 42), 'format'],
+    ['export: a cased format', () => exportModel(machine, 'SPIN'), 'format'],
+    ['diff: no baseline at all', () => diffReports(null, null), 'baseline'],
+    ['diff: no current at all', () => diffReports(machine, undefined), 'current'],
+    ['uml: a notation that does not exist', () => reviewUml({ model: machine, notation: 'graphviz' }), 'notation'],
+    ['uml: a number as a notation', () => reviewUml({ model: machine, notation: 42 }), 'notation'],
+    ['uml: a cased notation', () => reviewUml({ model: machine, notation: 'Mermaid' }), 'notation'],
+  ]
+  for (const [why, call, argument] of refusals) {
+    let threw = false
+    try {
+      call()
+    } catch (error) {
+      threw = true
+      // A TypeError means the shape reached a place that assumed it was right.
+      if (error instanceof TypeError) throw new Error(why + ': a raw TypeError instead of a refusal - ' + error.message)
+      if (!String(error.message).toLowerCase().includes(argument)) {
+        throw new Error(why + ': the refusal must name `' + argument + '`, got ' + error.message)
+      }
+    }
+    if (!threw) throw new Error(why + ': the call must be refused, not answered')
+  }
+
+  // The nearest misses, so the refusals are about the shape and not about the entry point.
+  for (const format of EXPORT_FORMATS) {
+    const result = exportModel(machine, format)
+    if (result.format !== format) throw new Error('export must produce the format that was asked for: ' + format)
+  }
+  for (const notation of UML_NOTATIONS) {
+    const report = reviewUml({ model: machine, notation })
+    if (report.verdict === undefined) throw new Error('a declared notation must be reviewable: ' + notation)
+  }
+  if (reviewStructure({ diagram: 'component a\ncomponent b\na --> b\n' }).verdict === undefined) {
+    throw new Error('a real diagram must still be reviewed')
+  }
+  if (runConcurrencyScan('').verdict === undefined) throw new Error('empty text is still text')
+  // Deliberately NOT refused: a wrong-typed string is at least present, so the diff reads two empty
+  // finding lists and `currentVerdict` carries the fact that the run was not clean.
+  const wrongTyped = diffReports('a', 'b')
+  if (wrongTyped.currentVerdict !== 'fail') throw new Error('a non-report run is not a clean one')
+
+  console.log('PASS entry-shapes')
+}
+
+await runEntryShapeTests()
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)

@@ -354,6 +354,11 @@ export declare function verdictOfFindings(findings: Array<{
  * `states[0]._note`; a metadata key's own children are not listed, since the subtree is
  * metadata as a whole). The schema ignores these keys as annotation metadata; echoing
  * them in the report makes the ignored metadata auditable instead of invisible.
+ *
+ * Iterative, with an explicit stack: this runs before validation on whatever the caller passed, so
+ * a recursive walk overflowed the stack on a deeply nested model and the `RangeError` arrived
+ * instead of any report at all. A guard nested ten thousand deep is nonsense, and it has to be
+ * refused rather than crash the walk that was going to refuse it.
  */
 export declare function metadataKeysOf(input: unknown): string[];
 /**
@@ -388,8 +393,8 @@ export declare function unresolvedEventNames(root: Record<string, unknown>): Arr
     check: string;
 }>;
 /**
- * Every variable a guard names, total over arbitrary JSON for the same reason as
- * walkGuardReferences.
+ * Every variable a guard names, total and iterative for the same reasons as
+ * `walkGuardReferences`.
  */
 export declare function guardVariables(guard: GuardNode | undefined): string[];
 export declare function runVerification(input: unknown, options?: VerificationOptions): VerificationReport;

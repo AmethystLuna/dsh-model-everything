@@ -336,12 +336,34 @@ test('review: without a matrix no edge is judged and edgeVerdicts is absent', ()
   if (report.summary.rules !== 0) throw new Error('no rules may be counted')
 })
 
-// The guide documents this fixture's exact findings; keep the two in step.
+// The guide documents this fixture's findings; keep the two in step. The assertion is relational
+// rather than a fixed list: a repeated code is counted against the graph, not against a number
+// written here, so adding one component to the fixture does not silently break this case.
 test('guide fixture: the documented example still produces the documented codes', () => {
   const report = reviewStructure({ diagram: componentDiagram, matrix })
-  const expected = ['UML021_DANGLING_REFERENCE', 'UML020_ISOLATED_NODE', 'UML022_CYCLE', 'UML023_DISALLOWED_EDGE', 'UML023_DISALLOWED_EDGE', 'UML024_LAYER_VIOLATION']
-  if (JSON.stringify(codes(report)) !== JSON.stringify(expected)) {
-    throw new Error('finding order changed, update references/structure-review-guide.md: ' + JSON.stringify(codes(report)))
+  const actual = codes(report)
+  const order = actual.filter((code, index) => actual.indexOf(code) === index)
+  const expectedOrder = [
+    'UML021_DANGLING_REFERENCE', 'UML020_ISOLATED_NODE', 'UML022_CYCLE',
+    'MATRIX_NODE_UNLAYERED', 'UML023_DISALLOWED_EDGE', 'UML024_LAYER_VIOLATION',
+  ]
+  if (JSON.stringify(order) !== JSON.stringify(expectedOrder)) {
+    throw new Error('the codes or their order changed, update references/structure-review-guide.md: ' + JSON.stringify(actual))
+  }
+  // Every node the matrix gives no layer is reported, and no other node is: a node that satisfies
+  // the layer order and a node the layer order never considered must not read the same.
+  const unlayered = report.graph.nodes.filter((node) => !matrix.layers.some((layer) => layer.members.includes(node.id)))
+  const reported = actual.filter((code) => code === 'MATRIX_NODE_UNLAYERED').length
+  if (reported !== unlayered.length) {
+    throw new Error('unlayered nodes must each be reported once: ' + String(reported) + ' findings for ' + String(unlayered.length) + ' nodes')
+  }
+  // The completeness warnings stay warnings: this fixture fails on its graph and matrix errors
+  // (a dangling reference, a cycle, a disallowed edge, a layer violation), and none of the new codes
+  // may be what makes it fail.
+  const MATRIX_CODES = ['MATRIX_NODE_UNLAYERED', 'MATRIX_LAYER_MEMBER_UNKNOWN', 'MATRIX_JUDGES_NOTHING']
+  for (const finding of report.findings) {
+    if (!MATRIX_CODES.includes(finding.code)) continue
+    if (finding.severity !== 'warning') throw new Error(finding.code + ' must be a warning, got ' + finding.severity)
   }
 })
 

@@ -558,22 +558,31 @@ function hasUndecidedFinding(checks: CheckResult[]): boolean {
  * `states[0]._note`; a metadata key's own children are not listed, since the subtree is
  * metadata as a whole). The schema ignores these keys as annotation metadata; echoing
  * them in the report makes the ignored metadata auditable instead of invisible.
+ *
+ * Iterative, with an explicit stack: this runs before validation on whatever the caller passed, so
+ * a recursive walk overflowed the stack on a deeply nested model and the `RangeError` arrived
+ * instead of any report at all. A guard nested ten thousand deep is nonsense, and it has to be
+ * refused rather than crash the walk that was going to refuse it.
  */
 export function metadataKeysOf(input: unknown): string[] {
   const keys: string[] = []
-  const walk = (value: unknown, path: string): void => {
-    if (value === null || typeof value !== 'object') return
+  const stack: Array<{ value: unknown; path: string }> = [{ value: input, path: '' }]
+  while (stack.length > 0) {
+    const frame = stack.pop() as { value: unknown; path: string }
+    const value = frame.value
+    if (value === null || typeof value !== 'object') continue
     if (Array.isArray(value)) {
-      value.forEach((entry, index) => walk(entry, path + '[' + String(index) + ']'))
-      return
+      for (let index = value.length - 1; index >= 0; index -= 1) {
+        stack.push({ value: value[index], path: frame.path + '[' + String(index) + ']' })
+      }
+      continue
     }
     for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-      const child = path === '' ? key : path + '.' + key
+      const child = frame.path === '' ? key : frame.path + '.' + key
       if (key.startsWith('_')) keys.push(child)
-      walk(entry, child)
+      stack.push({ value: entry, path: child })
     }
   }
-  walk(input, '')
   return keys.sort()
 }
 
@@ -676,7 +685,11 @@ export function validateModel(input: unknown): { ok: true; model: LogicModelV1 }
           rejectUnknownKeys(record, MODEL_KEYS.update, updatePath)
           if (typeof record.variable !== 'string' || record.variable.length === 0) bad(updatePath + '.variable', 'must be a non-empty string')
           if (record.op !== 'set' && record.op !== 'inc' && record.op !== 'dec') bad(updatePath + '.op', "must be 'set', 'inc', or 'dec'")
-          if (record.value !== undefined && typeof record.value !== 'number') bad(updatePath + '.value', 'must be a number')
+          if (record.value !== undefined && (typeof record.value !== 'number' || !Number.isFinite(record.value))) {
+            // `typeof NaN === 'number'`, so the type check alone let a NaN through, and every
+            // comparison against a NaN is false: the update silently did nothing.
+            bad(updatePath + '.value', 'must be a finite number')
+          }
         })
       }
       if (transition.cost !== undefined) {
@@ -711,8 +724,11 @@ export function validateModel(input: unknown): { ok: true; model: LogicModelV1 }
       if (variable.kind !== 'integer' && variable.kind !== 'boolean') bad(path + '.kind', "must be 'integer' or 'boolean'")
       const expected = variable.kind === 'boolean' ? 'boolean' : 'number'
       if (typeof variable.init !== expected) bad(path + '.init', 'must be a ' + expected)
-      if (variable.min !== undefined && typeof variable.min !== 'number') bad(path + '.min', 'must be a number')
-      if (variable.max !== undefined && typeof variable.max !== 'number') bad(path + '.max', 'must be a number')
+      // `typeof NaN === 'number'`, so the type check alone accepts NaN, and a variable initialised
+      // to NaN makes every guard over it false: the model would read as if that branch were dead.
+      else if (expected === 'number' && !Number.isFinite(variable.init as number)) bad(path + '.init', 'must be a finite number')
+      if (variable.min !== undefined && (typeof variable.min !== 'number' || !Number.isFinite(variable.min))) bad(path + '.min', 'must be a finite number')
+      if (variable.max !== undefined && (typeof variable.max !== 'number' || !Number.isFinite(variable.max))) bad(path + '.max', 'must be a finite number')
       if (typeof variable.min === 'number' && typeof variable.max === 'number' && variable.min > variable.max) bad(path + '.max', 'must be >= min')
       if (variable.monotonic !== undefined && variable.monotonic !== 'inc' && variable.monotonic !== 'dec') bad(path + '.monotonic', "must be 'inc' or 'dec'")
       if (variable.kind === 'integer' && typeof variable.init === 'number') {
@@ -1063,93 +1079,150 @@ function withUnresolved(model: LogicModelV1, check: string, findings: Finding[])
   return extra.length === 0 ? findings : [...findings, ...extra]
 }
 
+/**
+ * How deeply a guard may nest.
+ *
+ * A guard is a boolean expression a person writes and reads. The limit is a structural prior
+ * rather than a runtime catch: the depth is decided while walking, so the walk must not itself be
+ * recursive - a recursive validator overflowed the stack BEFORE it could reach a depth of thirty
+ * two, which is the defect this limit was meant to prevent.
+ */
+const MAX_GUARD_DEPTH = 32
+
+/**
+ * Validate a guard tree, iteratively.
+ *
+ * The walk uses an explicit stack for the reason above: recursion here would make the depth limit
+ * unreachable, and a guard nested ten thousand deep has to produce the refusal below rather than a
+ * `RangeError` the caller cannot route on.
+ */
 function validateGuard(input: unknown, path: string, errors: string[], bad: (path: string, message: string) => void): void {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    bad(path, 'must be an object')
-    return
+  const stack: Array<{ node: unknown; path: string; depth: number }> = [{ node: input, path, depth: 0 }]
+  while (stack.length > 0) {
+    const frame = stack.pop() as { node: unknown; path: string; depth: number }
+    const node = frame.node
+    if (frame.depth > MAX_GUARD_DEPTH) {
+      bad(frame.path, 'nests more than ' + String(MAX_GUARD_DEPTH) + ' levels deep. A guard is a boolean expression over model variables; one this deep is not read by a person.')
+      continue
+    }
+    if (typeof node !== 'object' || node === null || Array.isArray(node)) {
+      bad(frame.path, 'must be an object')
+      continue
+    }
+    const guard = node as Record<string, unknown>
+    if (guard.variable !== undefined) {
+      if (typeof guard.variable !== 'string' || guard.variable.length === 0) bad(frame.path + '.variable', 'must be a non-empty string')
+      if (guard.op !== '==' && guard.op !== '!=' && guard.op !== '<' && guard.op !== '<=' && guard.op !== '>' && guard.op !== '>=') {
+        bad(frame.path + '.op', 'must be a comparison operator')
+      }
+      if (typeof guard.value !== 'number' && typeof guard.value !== 'boolean') bad(frame.path + '.value', 'must be a number or boolean')
+      // A NaN operand makes every comparison false, so the branch would read as dead and the model
+      // would say it has a condition it can never satisfy.
+      else if (typeof guard.value === 'number' && !Number.isFinite(guard.value)) bad(frame.path + '.value', 'must be a finite number')
+      continue
+    }
+    let pushed = false
+    for (const key of ['all', 'any'] as const) {
+      const children = guard[key]
+      if (children === undefined) continue
+      pushed = true
+      if (!Array.isArray(children)) {
+        bad(frame.path + '.' + key, 'must be an array')
+        break
+      }
+      if (children.length === 0) {
+        // Vacuously true for `all`, vacuously false for `any`: the first makes a guarded transition
+        // unconditional, the second makes a live branch dead.
+        bad(frame.path + '.' + key, key === 'all'
+          ? 'must not be empty: an empty conjunction is always true, which would make this transition unconditional while it reads as guarded'
+          : 'must not be empty: an empty disjunction is always false, so this transition can never fire')
+        break
+      }
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        stack.push({ node: children[index], path: frame.path + '.' + key + '[' + String(index) + ']', depth: frame.depth + 1 })
+      }
+      break
+    }
+    if (pushed) continue
+    if (guard.not !== undefined) {
+      stack.push({ node: guard.not, path: frame.path + '.not', depth: frame.depth + 1 })
+      continue
+    }
+    bad(frame.path, 'must be a leaf ({ variable, op, value }), { all }, { any }, or { not }')
   }
-  const guard = input as Record<string, unknown>
-  if (guard.variable !== undefined) {
-    if (typeof guard.variable !== 'string' || guard.variable.length === 0) bad(path + '.variable', 'must be a non-empty string')
-    if (guard.op !== '==' && guard.op !== '!=' && guard.op !== '<' && guard.op !== '<=' && guard.op !== '>' && guard.op !== '>=') bad(path + '.op', 'must be a comparison operator')
-    if (typeof guard.value !== 'number' && typeof guard.value !== 'boolean') bad(path + '.value', 'must be a number or boolean')
-    return
-  }
-  if (guard.all !== undefined) {
-    if (!Array.isArray(guard.all)) bad(path + '.all', 'must be an array')
-    else if (guard.all.length === 0) {
-      // Vacuously true, so the transition would be unconditional while reading as guarded.
-      bad(path + '.all', 'must not be empty: an empty conjunction is always true, which would make this transition unconditional while it reads as guarded')
-    } else guard.all.forEach((child, index) => validateGuard(child, path + '.all[' + index + ']', errors, bad))
-    return
-  }
-  if (guard.any !== undefined) {
-    if (!Array.isArray(guard.any)) bad(path + '.any', 'must be an array')
-    else if (guard.any.length === 0) {
-      // Vacuously false: a branch dead on arrival, spelled as if it were live.
-      bad(path + '.any', 'must not be empty: an empty disjunction is always false, so this transition can never fire')
-    } else guard.any.forEach((child, index) => validateGuard(child, path + '.any[' + index + ']', errors, bad))
-    return
-  }
-  if (guard.not !== undefined) {
-    validateGuard(guard.not, path + '.not', errors, bad)
-    return
-  }
-  bad(path, 'must be a leaf ({ variable, op, value }), { all }, { any }, or { not }')
 }
+
 
 /**
  * Every variable a guard names.
  *
- * Total over arbitrary JSON: the validator reports a malformed guard, and this must not be the
- * place that throws instead. A node it does not recognise contributes no references, which is the
- * safe direction - the guard is already an error, so nothing is decided from it either way.
+ * Total over arbitrary JSON, and iterative for the same reason `validateGuard` is: this runs while
+ * validating, so a recursive walk overflows the stack on a deeply nested guard and the caller gets a
+ * `RangeError` instead of the refusal that says the guard is too deep. A node it does not recognise
+ * contributes no references, which is the safe direction - the guard is already an error, so nothing
+ * is decided from it either way.
  */
 function isGuardObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function walkGuardReferences(guard: unknown, variableNames: Set<string>, errors: string[], bad: (path: string, message: string) => void): void {
-  if (guard === undefined) return
-  if (!isGuardObject(guard)) return
-  if (guard.variable !== undefined) {
-    if (typeof guard.variable !== 'string') return
-    if (!variableNames.has(guard.variable)) bad('guard', 'references unknown variable ' + guard.variable)
-    return
+  const stack: unknown[] = [guard]
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (node === undefined) continue
+    if (!isGuardObject(node)) continue
+    if (node.variable !== undefined) {
+      if (typeof node.variable !== 'string') continue
+      if (!variableNames.has(node.variable)) bad('guard', 'references unknown variable ' + node.variable)
+      continue
+    }
+    let descended = false
+    for (const key of ['all', 'any'] as const) {
+      const children = node[key]
+      if (children === undefined) continue
+      descended = true
+      // An empty array is the degenerate answer - true for `all`, false for `any` - and
+      // `validateGuard` refuses it. Here it simply carries no references.
+      if (!Array.isArray(children)) break
+      for (const child of children) stack.push(child)
+      break
+    }
+    if (descended) continue
+    if (node.not !== undefined) stack.push(node.not)
   }
-  for (const key of ['all', 'any'] as const) {
-    const children = guard[key]
-    if (children === undefined) continue
-    // An empty array is the degenerate answer - true for `all`, false for `any` - and
-    // `validateGuard` refuses it. Here it simply carries no references.
-    if (!Array.isArray(children)) return
-    for (const child of children) walkGuardReferences(child, variableNames, errors, bad)
-    return
-  }
-  if (guard.not !== undefined) walkGuardReferences(guard.not, variableNames, errors, bad)
-}
-
-function isLeafGuard(guard: GuardNode): guard is LeafGuard {
-  return 'variable' in guard
 }
 
 /**
- * Every variable a guard names, total over arbitrary JSON for the same reason as
- * walkGuardReferences.
+ * Every variable a guard names, total and iterative for the same reasons as
+ * `walkGuardReferences`.
  */
 export function guardVariables(guard: GuardNode | undefined): string[] {
-  if (guard === undefined) return []
-  if (!isGuardObject(guard)) return []
-  if (isLeafGuard(guard)) return [guard.variable]
-  for (const key of ['all', 'any'] as const) {
-    const children = guard[key]
-    if (children === undefined) continue
-    if (!Array.isArray(children)) return []
-    return children.flatMap((child) => guardVariables(child as GuardNode))
+  const found: string[] = []
+  const stack: unknown[] = [guard]
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (node === undefined) continue
+    if (!isGuardObject(node)) continue
+    if (typeof node.variable === 'string') {
+      found.push(node.variable)
+      continue
+    }
+    let descended = false
+    for (const key of ['all', 'any'] as const) {
+      const children = node[key]
+      if (children === undefined) continue
+      descended = true
+      if (!Array.isArray(children)) break
+      for (const child of children) stack.push(child)
+      break
+    }
+    if (descended) continue
+    if (node.not !== undefined) stack.push(node.not)
   }
-  if (guard.not !== undefined) return guardVariables(guard.not as GuardNode)
-  return []
+  return found
 }
+
 
 /**
  * Whether a guard holds, TOTAL over arbitrary JSON.
@@ -1161,7 +1234,7 @@ export function guardVariables(guard: GuardNode | undefined): string[] {
  */
 function evalGuard(guard: GuardNode, vars: Record<string, VarValue>): boolean {
   if (!isGuardObject(guard)) return false
-  if (isLeafGuard(guard)) {
+  if (typeof guard.variable === 'string') {
     const actual = vars[guard.variable]
     switch (guard.op) {
       case '==': return actual === guard.value

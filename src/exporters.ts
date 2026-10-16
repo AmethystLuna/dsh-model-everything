@@ -337,7 +337,25 @@ function exportSpin(ex: ExportedModel): ExportResult {
   return { format: 'spin', primary: promela, extras, warnings }
 }
 
-export function exportModel(input: unknown, format: ExportFormat): ExportResult {
+/**
+ * Every format this exporter can produce, in one place.
+ *
+ * The absence of this list is what made an unknown format dangerous: the function ended with
+ * `return exportSpin(ex)`, so `'mermaid'`, `42`, `''` and `undefined` all produced Promela and
+ * reported `format: 'spin'`. A caller who named a notation this exporter cannot write received a
+ * different notation's output and a report naming a format they had not asked for.
+ */
+export const EXPORT_FORMATS: readonly ExportFormat[] = ['uppaal', 'tla', 'prism', 'spin']
+
+export function isExportFormat(value: unknown): value is ExportFormat {
+  return typeof value === 'string' && (EXPORT_FORMATS as readonly string[]).includes(value)
+}
+
+export function exportModel(input: unknown, format: unknown): ExportResult {
+  if (!isExportFormat(format)) {
+    const arrived = format === undefined ? 'undefined' : JSON.stringify(format)
+    throw new Error('format must be one of ' + EXPORT_FORMATS.join(' | ') + ', got ' + arrived + '. Each one writes a different notation, so there is no default to fall back to.')
+  }
   const ex = prepareModel(input)
   if (format === 'uppaal') return exportUppaal(ex)
   if (format === 'tla') return exportTla(ex)
