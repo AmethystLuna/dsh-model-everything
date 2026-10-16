@@ -100,6 +100,41 @@ test('the guide cites no source the repository cannot back', () => {
   }
 })
 
+test('the issue templates ask for the two shapes', () => {
+  const dir = repo + '.github/ISSUE_TEMPLATE/'
+  if (!existsSync(dir)) throw new Error('there is no issue template directory')
+  const templates = readdirSync(dir).filter((name) => name.endsWith('.md'))
+  if (templates.length < 2) throw new Error('the two shapes need a template each, found: ' + templates.join(', '))
+  const bodies = templates.map((name) => readFileSync(dir + name, 'utf8').replace(/\s+/g, ' '))
+  // Each shape has to be recognisable from its own template, by the thing only it needs. A method
+  // proposal asks for a citation; a behaviour problem asks for the report's own fields. The check is
+  // on what is ASKED FOR, not on what is mentioned: a proposal legitimately discusses the verdict it
+  // would change.
+  const asksForReport = bodies.some((body) => body.includes('verdictReason') && body.includes('finding codes'))
+  const asksForSource = bodies.some((body) => body.includes('Citation') && body.includes('provenance'))
+  if (!asksForReport) throw new Error('no template asks for the report fields a behaviour problem needs')
+  if (!asksForSource) throw new Error('no template asks for the citation and provenance a method proposal needs')
+  // Front matter is what makes GitHub show them as templates rather than as ordinary files.
+  for (const name of templates) {
+    const text = readFileSync(dir + name, 'utf8')
+    if (!/^---\n/.test(text) || !/^name:/m.test(text) || !/^about:/m.test(text)) {
+      throw new Error(name + ' has no template front matter with a name and an about')
+    }
+  }
+})
+
+test('the template config names the repository that is declared', () => {
+  const dir = repo + '.github/ISSUE_TEMPLATE/'
+  const config = readFileSync(dir + 'config.yml', 'utf8')
+  const declared = JSON.parse(readFileSync(repo + 'package.json', 'utf8')).repository
+  // A contact link that points somewhere else is worse than no link: the guide says so about dangling
+  // pointers, and this is one.
+  if (typeof declared !== 'string') throw new Error('the package declares no repository to check against')
+  if (!config.includes(declared + '/blob/')) {
+    throw new Error('the contact link does not point at the declared repository (' + declared + ')')
+  }
+})
+
 if (failures > 0) {
   console.log('contributing guide tests failed:', failures)
   process.exit(1)
