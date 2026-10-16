@@ -109,7 +109,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 
 ## 示例
 
-`examples/` 里是可以直接跑的样本模型，配 [`examples/README.md`](examples/README.md) 说明各自的看点和预期结果：
+`examples/` 里是可以直接跑的样本模型，配 [`examples/README.md`](examples/README.md) 说明各自的看点和预期结果。它们是文档，不是测试夹具——各测试套件读自己的 `tests/<套件>/fixtures/`：
 
 - `examples/order-state-machine.before.json` 与 `examples/order-state-machine.after.json`：订单流程的前后两份模型，用来跑 D1–D4 回归。
 - `examples/control-dispatcher.json`：带预算与锁配对的分发状态机，预期零错误。
@@ -173,7 +173,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 
 ## 环境要求
 
-- DeepSeek Harness：见 `package.json` 的 `dsh.compatibility`。逐版本兼容性是**实测项**。没实测过的版本一律标 `unknown`。
+- DeepSeek Harness：准入看 `package.json` 的 `peerDependencies`——插件管理器按它决定装不装得下，`dsh.compatibility.dshReleases` 只是记录实测结论。逐版本兼容性是**实测项**，没实测过的版本一律标 `unknown`。
 - Node.js：`>=20`。
 - 无 Python 依赖，无网络调用。
 
@@ -198,10 +198,19 @@ npm run typecheck     # tsc --noEmit
 npm run build         # tsc → lib/（lib/ 必须与 src/ 同步提交）
 npm run test:engine   # 全部回归套件，含记忆门禁
 npm run test:full     # 端到端合并套件
+npm run lint:md       # markdownlint，与 CI 同一个版本
 npm run bump -- <x.y.z>          # 同步声明版本
 npm run bump -- --check          # 版本一致性
 npm run bump -- --audit          # 版本引用审计
 ```
+
+外部检查器往返（`tests/external/run.mjs`）会调用真实的 `spin` 与 `gcc` 跑一遍导出结果。工具不在 PATH 上时整组自动跳过——跳过不算通过。要指向别处的可执行文件，用两个环境变量：
+
+```bash
+MODEL_EVERYTHING_SPIN=/path/to/spin MODEL_EVERYTHING_GCC=/path/to/gcc npm run test:engine
+```
+
+插件自己不调用 `spin`、`gcc`、UPPAAL、TLA+ 或 PRISM：`model_export` 只写出它们能读的输入。
 
 约定、目录地图与硬约束见 [AGENTS.md](AGENTS.md)。项目记忆（调研结论、架构决定、交接）的入口在 [.github/memory/MEMORY.md](.github/memory/MEMORY.md)。
 
