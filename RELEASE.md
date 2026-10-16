@@ -9,6 +9,14 @@ features, new checks or new diagram families; **major** for anything breaking - 
 tool, a changed report contract, a moved schema. Never bump because something changed, and
 always name the target version.
 
+**Before the first publish, the version stays at `0.1.0`.** Semver describes a relationship
+between released versions, and there is no released version to move from: bumping through
+`0.2.0`, `0.3.0` while nothing is on the registry announces a progression no reader can
+consume. The number starts meaning something at the first publish, and from then on the
+policy above applies unchanged. This is why a version bump in this repository is a release
+step (section 0), not a habit - and why the memory never pins the current version: it would
+be stale the moment the first release lands.
+
 ## 0. Pre-flight
 
 - [ ] `git status` is clean, and the release commit is on the branch you mean to ship
@@ -62,7 +70,7 @@ editing the declaration.
 - [ ] the mount round above ran on a dsh release you can name
 - [ ] that release is inside the `peerDependencies` ranges, and the mount was made without `dsh plugin allow-version`
 - [ ] `package.json` `dsh.compatibility.dshReleases` records it as `compatible`; a release that was not measured stays `unknown`
-- [ ] the memory hands any new evidence on: a version bump resets the older claims
+- [ ] the memory hands any new evidence on: a version bump makes any sentence naming the old version wrong, and the `dshReleases` rows are claims about the artifact, so re-check that the suites still hold before the first publish of a new artifact
 
 ## 3. Publish
 
