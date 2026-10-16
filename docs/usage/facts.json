@@ -9,7 +9,7 @@
     "bodies": 77794,
     "references": 151067,
     "referenceFiles": 10,
-    "toolChars": 9511,
+    "toolChars": 10145,
     "toolCount": 12
   },
   "toolsWithWhen": 0,
@@ -20,11 +20,11 @@
   "tools": [
     {
       "name": "model_compose_verify",
-      "chars": 656
+      "chars": 834
     },
     {
       "name": "model_concurrency_scan",
-      "chars": 847
+      "chars": 1004
     },
     {
       "name": "model_datamodel_verify",
@@ -40,7 +40,7 @@
     },
     {
       "name": "report_diff",
-      "chars": 754
+      "chars": 950
     },
     {
       "name": "uml_structure_verify",
@@ -48,7 +48,7 @@
     },
     {
       "name": "uml_explain_labels",
-      "chars": 367
+      "chars": 470
     },
     {
       "name": "uml_parse",

@@ -1,0 +1,106 @@
+{
+  "catalogChars": 3270,
+  "catalogRows": [
+    {
+      "skill": "model-everything",
+      "chars": 493,
+      "body": 36454
+    },
+    {
+      "skill": "model-everything-concurrency",
+      "chars": 341,
+      "body": 4112
+    },
+    {
+      "skill": "model-everything-datamodel",
+      "chars": 450,
+      "body": 6160
+    },
+    {
+      "skill": "model-everything-design",
+      "chars": 478,
+      "body": 8525
+    },
+    {
+      "skill": "model-everything-report-reading",
+      "chars": 420,
+      "body": 5748
+    },
+    {
+      "skill": "model-everything-structure",
+      "chars": 476,
+      "body": 8786
+    },
+    {
+      "skill": "model-everything-uml",
+      "chars": 428,
+      "body": 8009
+    }
+  ],
+  "toolChars": 10145,
+  "tools": [
+    {
+      "name": "model_compose_verify",
+      "chars": 834
+    },
+    {
+      "name": "model_concurrency_scan",
+      "chars": 1004
+    },
+    {
+      "name": "model_datamodel_verify",
+      "chars": 708
+    },
+    {
+      "name": "model_design_review",
+      "chars": 968
+    },
+    {
+      "name": "model_export",
+      "chars": 689
+    },
+    {
+      "name": "report_diff",
+      "chars": 950
+    },
+    {
+      "name": "uml_structure_verify",
+      "chars": 959
+    },
+    {
+      "name": "uml_explain_labels",
+      "chars": 470
+    },
+    {
+      "name": "uml_parse",
+      "chars": 827
+    },
+    {
+      "name": "uml_render",
+      "chars": 826
+    },
+    {
+      "name": "uml_review",
+      "chars": 656
+    },
+    {
+      "name": "model_verify",
+      "chars": 1254
+    }
+  ],
+  "perTurn": {
+    "chars": 13415,
+    "tokens": 3354
+  },
+  "routing": {
+    "rowsWithSibling": 7,
+    "rowsWithNonGoal": 7,
+    "rowCount": 7,
+    "toolsWithSibling": 12,
+    "toolsWithNonGoal": 12,
+    "toolCount": 12,
+    "toolsWithoutSibling": [],
+    "familiesRoutingOnward": 2,
+    "familyCount": 6
+  }
+}
