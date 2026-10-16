@@ -1769,16 +1769,21 @@ test('composite: every code the family declares is produced by its own case', ()
       self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [{ id: 'orphan', direction: 'in' }], connectors: [],
     }],
     ['UML059_COMPOSITE_CONNECTOR_ENDPOINT_MISSING', {
-      self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [], connectors: [{ from: 'a', to: 'ghost' }], undeclared: ['ghost'],
+      self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [], connectors: [{ from: 'a', to: 'ghost' }],
     }],
     ['UML060_COMPOSITE_DUPLICATE_PART', {
+      // PINNED UNREACHABLE through the engine: `validateCompositeModel` refuses a duplicate part id
+      // ("is declared more than once as a part or a port") before any review runs, so this is a
+      // second line of defence. Asserted on the review alone, with the shadowing refusal asserted
+      // underneath, so the case goes red the day either changes.
       self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }, { id: 'a', label: 'A' }], ports: [], connectors: [],
-    }],
+    }, { direct: true }],
     ['UML061_COMPOSITE_PORT_COLLISION', {
-      // The port is connected, so UML058 is not what this case is about.
+      // The port is connected, so UML058 is not what this case is about. Also pinned unreachable:
+      // a port and a part may not share an id, and the validator refuses that before the review.
       self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [{ id: 'a', direction: 'out' }],
       connectors: [{ from: 'a', to: 'a' }],
-    }],
+    }, { direct: true }],
     ['UML062_COMPOSITE_UNDOCUMENTED', {
       self: { id: 's', label: 'S' }, parts: [{ id: 'a' }], ports: [], connectors: [],
     }],
@@ -1786,15 +1791,54 @@ test('composite: every code the family declares is produced by its own case', ()
   const declared = new Set(COMPOSITE_FINDING_CODES)
   for (const [code] of cases) declared.delete(code)
   if (declared.size > 0) throw new Error('codes with no case: ' + [...declared].join(', '))
-  for (const [code, model] of cases) {
-    const produced = reviewCompositeModel({ schemaVersion: 1, ...model }, {})
+  for (const [code, model, options] of cases) {
+    // Through the validator, as the engine does it: `UML059` reads the `undeclared` list the
+    // validator computes from the connectors, so a case that handed the review a raw model would be
+    // testing a path the engine never takes - and would pass only if that list were written out by
+    // hand, which is what hid the fact that the review never saw it. A case marked `direct` is one
+    // the validator refuses before the review could run, and is asserted on the review alone.
+    const direct = options?.direct === true
+    const produced = direct
+      ? reviewCompositeModel({ schemaVersion: 1, ...model }, {})
+      : reviewCompositeModel(validateCompositeModel({ schemaVersion: 1, ...model }), {})
     const codes = produced.map((finding) => finding.code)
     if (!codes.includes(code)) throw new Error(code + ' missing from ' + JSON.stringify(codes))
     // UML062 says an id has no reader-facing name, which is not a defect of the structure,
     // so it may sit beside anything. Nothing else may.
     const others = codes.filter((entry) => entry !== code && entry !== 'UML062_COMPOSITE_UNDOCUMENTED')
     if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+    if (direct) {
+      // The shadowing condition: the validator must refuse this model, or the code is reachable
+      // and this case is testing the wrong path.
+      let refused = false
+      try {
+        validateCompositeModel({ schemaVersion: 1, ...model })
+      } catch {
+        refused = true
+      }
+      if (!refused) throw new Error(code + ' is reachable through the validator now, so it is no longer a pinned-unreachable code')
+    }
   }
+})
+
+/**
+ * The engine's own path: a family model is reviewed through `reviewUml`, which validates first and
+ * then hands the FAMILY'S OWN canonical shape to the review - not the raw input. A review given
+ * the raw model found nothing here while the validated model reported `UML059`, so a connector
+ * ending at a name no declaration introduced was a silent pass.
+ */
+test('composite: a connector that ends at an undeclared name is reported through reviewUml', () => {
+  const dangling = reviewUml({
+    model: {
+      schemaVersion: 1, self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [{ id: 'in1', direction: 'in' }],
+      connectors: [{ from: 'in1', to: 'ghost' }],
+    },
+    diagramKind: 'composite-structure',
+  })
+  const codes = (dangling.findings ?? []).map((finding) => finding.code)
+  if (!codes.includes('UML059_COMPOSITE_CONNECTOR_ENDPOINT_MISSING')) throw new Error('a dangling connector must be reported: ' + JSON.stringify(codes))
+  if (dangling.verdict !== 'fail') throw new Error('and the verdict must say so: ' + dangling.verdict)
+  if (dangling.roundTrip?.ok !== true) throw new Error('the fidelity check must not invent a mismatch for a model that omits self.kind: ' + JSON.stringify(dangling.roundTrip?.diffs))
 })
 
 test('composite: the validator refuses by field', () => {
