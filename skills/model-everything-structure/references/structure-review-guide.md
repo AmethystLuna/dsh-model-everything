@@ -168,6 +168,30 @@ bug. Both need the source-side scan to settle.
 
 A machine-checked rule table (an include/dependency checker, a lint config, a review checklist) can seed the matrix: one rule entry per row, `id` = the row's own number so citations line up, `source`/`allow`/`deny` = the row's patterns, `layers` = the layering the table describes. Review the result before trusting it — a translation that silently widens `deny` into `allow` is worse than no check. Keep both files under version control together, and treat a matrix change as a code change.
 
+## Where each class of check comes from
+
+The distinction matters for how much weight a finding carries. A **published method** has a
+definition and a body of work behind it. A **house convention** is this plugin's own rule: the
+concern is standard, the decision procedure is ours.
+
+| Codes | Method | Provenance |
+|---|---|---|
+| `UML020_ISOLATED_NODE` | Connectivity, and the degree-0 vertices of a graph | Published, as graph theory. The reading - "a declared node with no edge is a dead entry or a forgotten dependency" - is this guide's |
+| `UML021_DANGLING_REFERENCE` | Referential closure: an edge endpoint must name a declared vertex | Published, as graph theory. In UML terms it is the notation's own well-formedness expectation that a relationship has two ends; see the UML review checklist, which separates normative constraints from tool rules |
+| `UML022_CYCLE` | Cycle detection with the shortest cycle named | Published. The algorithm is standard; the **shortest** cycle as the reported witness follows the counterexample-minimality idea the verification engine uses for A7 |
+| `UML023_DISALLOWED_EDGE` | Edge legality against a declared rule set: `deny` beats `allow`, and a `default` decides the rest | **Convention.** Conjunctive rule tables over a graph are common practice; this evaluation order is defined in `src/structure.ts` |
+| `UML024_LAYER_VIOLATION` | Layer order over a declared partition: a later band may not depend on an earlier one | **Convention**, and it checks the *declaration* rather than deriving it. `layerOf` reads `matrix.layers` and nothing else, so a design with no declared layers has no layer order to violate - which is a `skip`, not a pass |
+| `UML025_MISSING_EXPECTED_EDGE` | A declared rule with `require` whose edge the diagram does not draw | **Convention.** The idea of asserting a required dependency is standard; the `require` semantics and the `noSourceMatch` distinction are this plugin's |
+| `UML026_NO_NODES` | Input completeness: no vertex means no graph to audit | **Convention**, and deliberately an error rather than an empty pass: auditing nothing must not read as "nothing wrong" |
+| `UML028`-`UML031` | Refinement between levels: a child must not invent a parent-level dependency, and the parent relation must be a forest | **Convention.** Refinement checking has a literature (alloy/VDM refinement); the specific rules here are defined in `src/granularity.ts` |
+
+Graph theory has more to say about a dependency graph than this audit asks it. Five questions
+are computable today and deliberately not asked here: the minimum feedback arc set (NP-hard,
+Garey & Johnson 1979 - `model_design_review` decides it for small cyclic parts), community
+detection and spectral clustering (Newman & Girvan 2004; Fiedler 1973 - and unreliable at the
+size of a typical design, see `model-everything-design`), betweenness centrality (Freeman 1977),
+and deriving the layers from the graph instead of checking declared ones.
+
 ## Limits
 
 - The graph is what the diagram draws. Function pointers, DI, registries, plugins and dynamic dispatch are invisible.
