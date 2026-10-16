@@ -3777,7 +3777,15 @@ export interface CompositionSummary {
 }
 
 export interface CompositionReport {
-  /** Historical meaning: the composition has no error-severity finding. Read `verdict` for the review outcome. */
+  /**
+   * Historical meaning: the composition has no error-severity finding. Read `verdict` for the review
+   * outcome.
+   *
+   * This field does NOT mean the same thing across the report families, which is why nothing should
+   * route on it: a failing verification report carries `ok: true`, and a failing composition carries
+   * `ok: false`, for the same verdict. The robustness review of the report-reading guide measured
+   * both. `docs/report-reading/guide.md` says so, and `tests/report-reading` holds it.
+   */
   ok: boolean
   ran: boolean
   verdict: Verdict

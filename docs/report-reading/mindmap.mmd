@@ -1,0 +1,59 @@
+mindmap
+root((how to read a report))
+  the three questions in order
+    did it run
+      ran tells a refusal apart from a review
+      a refusal carries no verdict to route on
+    what did it decide
+      verdict is the answer
+      ok is not a verdict, see the misreadings
+      verdictReason is the one-line why
+    what should I do
+      nextSteps is never empty
+      it is derived from the findings
+  the skeleton every report shares
+    ok
+    ran
+    verdict
+    verdictReason
+    schema
+    summary
+    nextSteps
+    hashes and modelHash
+      same input and same spec give the same hash
+      a changed hash means the model changed
+  where the findings are
+    inside each check: verify compose datamodel design
+    at the top level: structure uml concurrency
+    nowhere, compare the three lists: baseline
+  read severity before the code
+    error decides the verdict
+    warning is reported and does not
+    info is context
+    undecided is not a pass
+      truncated says the search stopped early
+      an infinite state space is a finding of its own
+  what each family adds
+    verify adds checks
+    compose adds checks
+    datamodel adds checks
+    design adds the graph numbers and three lists
+    structure adds findings graph notation warnings
+    uml adds findings primary roundTrip source warnings
+    concurrency adds findings
+    baseline adds added changed currentVerdict removed
+    only violations decide, signals do not, facts are numbers
+      no code is in both lists
+  what a report does not tell you
+    it is about the model not the code
+      a clean verdict is evidence about the drawing
+    a truncated search decided nothing
+    a skipped check examined nothing
+      skip and pass are different answers
+  the two easy misreadings
+    ok is not the verdict
+      it means no error finding in most families
+      a composition sets it false where verify sets it true
+    a delta and a run answer different questions
+      verdict is the delta, currentVerdict is the run
+      an unchanged failing report is pass over fail
