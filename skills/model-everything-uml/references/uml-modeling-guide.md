@@ -393,6 +393,39 @@ port's required and provided interfaces, a connector's role names and end compat
 collaborations - need notation that does not exist here, so they are neither checked nor
 guessed at.
 
+### Communication diagrams
+
+A communication diagram is a set of lifelines joined by links, with numbered messages
+travelling along the links. PlantUML has no such diagram type - the page is a 404 - but the
+drawing is expressible with the object diagram's vocabulary, because the sequence number is
+just a label: `C --> O : 1: create`. So this family is drawn approximately and read back
+exactly, like the composite structure.
+
+| Action | What happens |
+|---|---|
+| `uml_render` with `kind: "communication"` | Objects for the lifelines, `--` arrows for the links, `-->` arrows for the messages with the number in the label. An `UML_RENDER_APPROXIMATE_VIEW` warning names what the notation cannot carry. |
+| `uml_parse` | Reads it back. |
+| `uml_review` | Reports the family's own findings, and proves fidelity by rendering the model and reading it back. |
+
+The model is `CommunicationModelV1`: `lifelines` (an id, and either a `classifier` for a
+`:Name:` or a `label`), `links` (what the diagram draws between lifelines), and `messages`
+(a `sequence` string plus its two ends). Links and messages are kept apart because a link
+with no message is a real thing to notice, and so is a message with no link to carry it.
+
+| Code | Severity | What it means |
+|---|---|---|
+| `UML063_COMMUNICATION_NO_LIFELINES` | error | The diagram declares no lifeline. |
+| `UML064_COMMUNICATION_LIFELINE_UNLINKED` | warning | A lifeline takes part in no link and no message. |
+| `UML065_COMMUNICATION_MESSAGE_WITHOUT_LINK` | warning | A message travels between two lifelines the diagram draws no link between. |
+| `UML066_COMMUNICATION_UNDECLARED_ENDPOINT` | error | A link or message names a participant the diagram never declares. |
+| `UML067_COMMUNICATION_SEQUENCE_DUPLICATE` | error | A sequence number is used twice, so the order has two answers. |
+| `UML068_COMMUNICATION_UNDOCUMENTED` | info | A lifeline carries no name a reader can map back to the design. |
+
+One limit is worth stating. `1.1` reads in UML as a nested call of `1`, but that is a claim
+about the design; the diagram draws a label. The model keeps the number as the string the
+diagram wrote, and the review does not check the drawing order against it - the numbers are
+the order, and the order they were drawn in is not a claim.
+
 ### What the round trip proves
 
 It proves the diagram is a faithful rendering of the model:
