@@ -178,11 +178,37 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * The declared keys of every object in the data model.
+ *
+ * The schema is closed for the reason the verification engine gives: an undeclared key is not a
+ * missing feature, it is a different model. `primryKey: ['id']` reads as "no primary key
+ * declared", and the check that would have complained reports a pass instead - a silent pass
+ * produced by a typo.
+ */
+const DATA_MODEL_KEYS = {
+  model: new Set(['schemaVersion', 'entities', 'relationships', 'invariants', 'boundaryChecks']),
+  entity: new Set(['name', 'fields', 'primaryKey', 'uniqueKeys', 'indexes']),
+  field: new Set(['name', 'type', 'required', 'unique', 'nullable', 'default', 'min', 'max', 'minLength', 'maxLength', 'pattern', 'enum', 'ref', 'items', 'monotonic']),
+  invariant: new Set(['id', 'description', 'kind', 'entity', 'field', 'fields', 'refEntity', 'refField', 'sourceEntity', 'sourceField', 'targetEntity', 'targetField', 'min', 'max', 'direction', 'steps', 'from', 'to', 'commit', 'rollback']),
+  boundaryCheck: new Set(['entity', 'field', 'values']),
+}
+
+/** Refuse an undeclared key. Underscore-prefixed keys are metadata and are ignored. */
+function rejectUnknownKeys(value: Record<string, unknown>, allowed: Set<string>, path: string, errors: string[]): void {
+  for (const key of Object.keys(value)) {
+    if (key.startsWith('_')) continue
+    if (allowed.has(key)) continue
+    bad(errors, path + '.' + key, 'unknown field (the schema is closed; a typo would silently change the model under review)')
+  }
+}
+
 function validateField(input: unknown, path: string, errors: string[], fieldNames: Set<string>): FieldSpec | undefined {
   if (!isPlainObject(input)) {
     bad(errors, path, 'must be an object')
     return undefined
   }
+  rejectUnknownKeys(input, DATA_MODEL_KEYS.field, path, errors)
   if (typeof input.name !== 'string' || input.name.length === 0) {
     bad(errors, path + '.name', 'must be a non-empty string')
   } else if (fieldNames.has(input.name)) {
@@ -226,6 +252,7 @@ export function validateDataModel(input: unknown): { ok: true; model: DataModelV
     return { ok: false, errors: ['model: must be an object'] }
   }
   const root = input as Record<string, unknown>
+  rejectUnknownKeys(root, DATA_MODEL_KEYS.model, 'model', errors)
   if (root.schemaVersion !== 1) bad(errors, 'schemaVersion', 'must be 1')
   if (!Array.isArray(root.entities) || root.entities.length === 0) {
     bad(errors, 'entities', 'must be a non-empty array')
@@ -237,6 +264,7 @@ export function validateDataModel(input: unknown): { ok: true; model: DataModelV
         bad(errors, path, 'must be an object')
         return
       }
+      rejectUnknownKeys(entry, DATA_MODEL_KEYS.entity, path, errors)
       if (typeof entry.name !== 'string' || entry.name.length === 0) {
         bad(errors, path + '.name', 'must be a non-empty string')
       } else if (entityNames.has(entry.name)) {
@@ -274,6 +302,7 @@ export function validateDataModel(input: unknown): { ok: true; model: DataModelV
         bad(errors, path, 'must be an object')
         return
       }
+      rejectUnknownKeys(entry, DATA_MODEL_KEYS.invariant, path, errors)
       if (typeof entry.id !== 'string' || entry.id.length === 0) bad(errors, path + '.id', 'must be a non-empty string')
       if (typeof entry.description !== 'string') bad(errors, path + '.description', 'must be a string')
       const kind = entry.kind
@@ -330,6 +359,9 @@ export function validateDataModel(input: unknown): { ok: true; model: DataModelV
   }
   if (root.boundaryChecks !== undefined) {
     if (!Array.isArray(root.boundaryChecks)) bad(errors, 'boundaryChecks', 'must be an array')
+    else root.boundaryChecks.forEach((entry, index) => {
+      if (isPlainObject(entry)) rejectUnknownKeys(entry, DATA_MODEL_KEYS.boundaryCheck, 'boundaryChecks[' + String(index) + ']', errors)
+    })
   }
   if (errors.length > 0) return { ok: false, errors }
   return { ok: true, model: root as unknown as DataModelV1 }
@@ -479,6 +511,71 @@ function DS4_typeNullabilityConsistency(model: DataModelV1): CheckResult {
     }
   }
   return checkResult('DS4', 'Type/Nullability Consistency', findings, findings.length === 0 ? 'Types and nullability are consistent' : 'Type/nullability findings: ' + findings.length)
+}
+
+/**
+ * DS5: the entity and field an invariant names must exist.
+ *
+ * Seven of the thirteen kinds - field-required, no-orphan, unique, referential-integrity, range,
+ * count-equal and field-equal - accepted any string as a name and never looked it up, so an
+ * invariant about a field that does not exist produced no finding at all and the report could say
+ * the model satisfied a claim it had never read.
+ *
+ * This is the same defect `DA2_BOUNDARY_FIELD_MISSING` catches one check over, and it gets its own
+ * check so a reader can see which part of the model failed. The kinds that already resolve their
+ * references keep their own codes: DA9 for monotonic, DA10 for sequence steps, DA11 for leads-to,
+ * DS3 for relationships, DS4 for key fields.
+ */
+function DS5_invariantReferences(model: DataModelV1): CheckResult {
+  const findings: Finding[] = []
+  const entityNames = new Set(model.entities.map((entity) => entity.name))
+  const entityMissing = (invariant: { id: string }, name: unknown, role: string): void => {
+    if (typeof name !== 'string' || entityNames.has(name)) return
+    findings.push({
+      code: 'DS5_INVARIANT_ENTITY_MISSING',
+      severity: 'error',
+      message: 'Invariant "' + invariant.id + '" names ' + role + ' entity ' + JSON.stringify(name) + ', which the model does not declare, so the invariant was never read.',
+      detail: 'A reference that resolves to nothing leaves the check reporting a result for a claim it did not evaluate.',
+      evidence: { invariant, entity: name, role },
+    })
+  }
+  const fieldMissing = (invariant: { id: string }, entity: unknown, field: unknown, role: string): void => {
+    if (typeof entity !== 'string' || typeof field !== 'string') return
+    const declared = model.entities.find((candidate) => candidate.name === entity)
+    // An entity that does not exist is already reported; do not report its fields twice.
+    if (declared === undefined) return
+    if (declared.fields.some((candidate) => candidate.name === field)) return
+    findings.push({
+      code: 'DS5_INVARIANT_FIELD_MISSING',
+      severity: 'error',
+      message: 'Invariant "' + invariant.id + '" names ' + role + ' field ' + JSON.stringify(entity + '.' + field) + ', which the entity does not declare, so the invariant was never read.',
+      detail: 'A reference that resolves to nothing leaves the check reporting a result for a claim it did not evaluate.',
+      evidence: { invariant, entity, field, role },
+    })
+  }
+  for (const invariant of model.invariants ?? []) {
+    if (invariant.kind === 'field-required' || invariant.kind === 'no-orphan' || invariant.kind === 'range') {
+      entityMissing(invariant, invariant.entity, 'its')
+      fieldMissing(invariant, invariant.entity, invariant.field, 'its')
+    } else if (invariant.kind === 'unique') {
+      entityMissing(invariant, invariant.entity, 'its')
+      for (const field of invariant.fields) fieldMissing(invariant, invariant.entity, field, 'a')
+    } else if (invariant.kind === 'referential-integrity') {
+      entityMissing(invariant, invariant.entity, 'its')
+      fieldMissing(invariant, invariant.entity, invariant.field, 'its')
+      entityMissing(invariant, invariant.refEntity, 'the referenced')
+      if (invariant.refField !== undefined) fieldMissing(invariant, invariant.refEntity, invariant.refField, 'the referenced')
+    } else if (invariant.kind === 'count-equal') {
+      entityMissing(invariant, invariant.sourceEntity, 'the source')
+      entityMissing(invariant, invariant.targetEntity, 'the target')
+    } else if (invariant.kind === 'field-equal') {
+      entityMissing(invariant, invariant.sourceEntity, 'the source')
+      fieldMissing(invariant, invariant.sourceEntity, invariant.sourceField, 'the source')
+      entityMissing(invariant, invariant.targetEntity, 'the target')
+      fieldMissing(invariant, invariant.targetEntity, invariant.targetField, 'the target')
+    }
+  }
+  return checkResult('DS5', 'Invariant References', findings, findings.length === 0 ? 'every invariant names a declared entity and field' : 'Unresolved invariant references: ' + findings.length)
 }
 
 function DA1_nullEmptyInjection(model: DataModelV1): CheckResult {
@@ -950,6 +1047,7 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
     DS2_requiredCompleteness(model, options),
     DS3_relationshipIntegrity(model),
     DS4_typeNullabilityConsistency(model),
+    DS5_invariantReferences(model),
     DA1_nullEmptyInjection(model),
     DA2_boundaryBlast(model),
     DA3_uniquenessViolation(model),

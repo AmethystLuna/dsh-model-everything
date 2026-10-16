@@ -249,9 +249,12 @@ test('data atomicity flags missing backup and non-atomic transform', () => {
 })
 
 test('report contract: schema, hashes and next steps are present and deterministic', () => {
+  // `primaryKey` belongs on the entity, not on the field: the engine reads the entity-level array
+  // and never looked at a field-level flag, so this fixture was carrying a key that did nothing
+  // until the schema closed and refused it.
   const model = {
     schemaVersion: 1,
-    entities: [{ name: 'user', fields: [{ name: 'id', type: 'uuid', required: true, primaryKey: true }] }],
+    entities: [{ name: 'user', fields: [{ name: 'id', type: 'uuid', required: true }], primaryKey: ['id'] }],
   }
   const report = runDataVerification(model)
   if (report.schema !== 'model-everything/datamodel/v1') throw new Error('schema: ' + report.schema)
@@ -587,6 +590,77 @@ caseFor(
     migrationMappings: [{ from: 'Kept.x', to: 'Kept.other' }],
   },
 )
+
+/**
+ * The two shapes the robustness audit found in this engine, pinned so they cannot come back.
+ *
+ * Both are the class where a name that resolves to nothing buys an all-clear: a misspelled key
+ * reads as an absent declaration, and an invariant about a field that does not exist produced no
+ * finding at all.
+ */
+function runClosureTests() {
+  // A misspelled key used to read as "no primary key declared", and DS1 then reported a pass for
+  // a model it had not checked.
+  test('data: an undeclared key is refused rather than ignored', () => {
+    const misspelled = { schemaVersion: 1, entities: [entity('U', [field('id', 'uuid')], { primryKey: ['id'] })] }
+    const report = runDataVerification(misspelled)
+    if (report.ok !== false) throw new Error('a misspelled key must be refused, not read as an absent declaration')
+    const message = report.checks[0].findings.map((finding) => finding.message).join(' | ')
+    if (!message.includes('primryKey')) throw new Error('the refusal must name the key: ' + message)
+    if (report.verdict !== 'fail') throw new Error('a refused model must fail: ' + report.verdict)
+
+    // The same key spelled right is accepted, so the check is about the key and not about the
+    // presence of a key like it.
+    const correct = runDataVerification({ schemaVersion: 1, entities: [entity('U', [field('id', 'uuid')], { primaryKey: ['nope'] })] })
+    if (correct.ok !== true) throw new Error('a correctly spelled key must be accepted')
+    if (!codesOf(correct).includes('DS1_PRIMARY_KEY_MISSING')) throw new Error('and the check must then report what it finds')
+  })
+
+  test('data: an invariant naming a field that does not exist is reported', () => {
+    const ghosts = [
+      ['field-required', { kind: 'field-required', entity: 'J', field: 'ghost' }],
+      ['no-orphan', { kind: 'no-orphan', entity: 'J', field: 'ghost' }],
+      ['range', { kind: 'range', entity: 'J', field: 'ghost', min: 0 }],
+      ['unique', { kind: 'unique', entity: 'J', fields: ['ghost'] }],
+      ['referential-integrity', { kind: 'referential-integrity', entity: 'J', field: 'status', refEntity: 'J', refField: 'ghost' }],
+      ['count-equal', { kind: 'count-equal', sourceEntity: 'Ghost', targetEntity: 'J' }],
+      ['field-equal', { kind: 'field-equal', sourceEntity: 'J', sourceField: 'ghost', targetEntity: 'J', targetField: 'status' }],
+    ]
+    for (const [kind, body] of ghosts) {
+      const model = {
+        schemaVersion: 1,
+        entities: [entity('J', [field('status', 'string')])],
+        invariants: [{ id: 'i1', description: kind + ' over a field that does not exist', ...body }],
+      }
+      const report = runDataVerification(model)
+      const codes = codesOf(report)
+      const wanted = body.sourceEntity === 'Ghost' ? 'DS5_INVARIANT_ENTITY_MISSING' : 'DS5_INVARIANT_FIELD_MISSING'
+      if (!codes.includes(wanted)) throw new Error(kind + ': expected ' + wanted + ', got ' + JSON.stringify(codes))
+      const carrier = report.checks.find((check) => check.id === 'DS5')
+      if (carrier === undefined || carrier.status !== 'fail') throw new Error(kind + ': DS5 must carry it and fail')
+    }
+
+    // The near miss: the same shapes naming what exists must produce nothing.
+    const sound = runDataVerification({
+      schemaVersion: 1,
+      entities: [entity('J', [field('status', 'string')]), entity('K', [field('status', 'string')])],
+      invariants: [
+        { id: 'a', description: 'ok', kind: 'field-required', entity: 'J', field: 'status' },
+        { id: 'b', description: 'ok', kind: 'range', entity: 'J', field: 'status', min: 0 },
+        { id: 'c', description: 'ok', kind: 'unique', entity: 'J', fields: ['status'] },
+        { id: 'd', description: 'ok', kind: 'referential-integrity', entity: 'J', field: 'status', refEntity: 'K', refField: 'status' },
+        { id: 'e', description: 'ok', kind: 'count-equal', sourceEntity: 'J', targetEntity: 'K' },
+        { id: 'f', description: 'ok', kind: 'field-equal', sourceEntity: 'J', sourceField: 'status', targetEntity: 'K', targetField: 'status' },
+      ],
+    })
+    const leaked = codesOf(sound).filter((code) => code.startsWith('DS5_'))
+    if (leaked.length > 0) throw new Error('a resolvable invariant must not be reported: ' + JSON.stringify(leaked))
+  })
+
+  console.log('PASS data-closure')
+}
+
+runClosureTests()
 
 if (failures > 0) {
   console.log('data engine tests failed:', failures)
