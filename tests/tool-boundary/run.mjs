@@ -203,7 +203,9 @@ const ORDERED_MACHINE = {
 
 const DATA_MODEL = {
   schemaVersion: 1,
-  entities: [{ name: 'User', fields: [{ name: 'id', type: 'uuid', primaryKey: true }] }],
+  // `primaryKey` is an entity-level array. The engine never read the field-level flag this fixture
+  // used to carry, so it was a key that did nothing until the schema closed and refused it.
+  entities: [{ name: 'User', fields: [{ name: 'id', type: 'uuid' }], primaryKey: ['id'] }],
 }
 
 const STATE_DIAGRAM = 'stateDiagram-v2\n  [*] --> A\n  A --> B : go\n  B --> [*]\n'

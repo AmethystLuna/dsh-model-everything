@@ -873,7 +873,7 @@
       "fields": 4,
       "errors": 0,
       "warnings": 0,
-      "checksRun": 16
+      "checksRun": 17
     },
     "checks": [
       {
@@ -893,6 +893,11 @@
       },
       {
         "id": "DS4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS5",
         "status": "pass",
         "findings": []
       },
@@ -961,21 +966,21 @@
     "nextSteps": [
       "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
     ],
-    "body": "model-everything/datamodel/v1  verdict=pass  no error or warning findings  ok=true  modelHash=d9d5ccf936db… errors=0 warnings=0 checksRun=16\nCHECKS  pass DS1 DS2 DS3 DS4 DA1 DA2 DA3 DA4 DA5 DA6 DA7 DA8 DA9 DA10 DA11 DA12\n\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
+    "body": "model-everything/datamodel/v1  verdict=pass  no error or warning findings  ok=true  modelHash=d9d5ccf936db… errors=0 warnings=0 checksRun=17\nCHECKS  pass DS1 DS2 DS3 DS4 DS5 DA1 DA2 DA3 DA4 DA5 DA6 DA7 DA8 DA9 DA10 DA11 DA12\n\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
   },
   "datamodel: a migration with no mapping": {
     "ok": true,
     "ran": true,
     "verdict": "fail",
-    "verdictReason": "11 error finding(s) (first: DS3_FROM_ENTITY_MISSING)",
+    "verdictReason": "12 error finding(s) (first: DS3_FROM_ENTITY_MISSING)",
     "schema": "model-everything/datamodel/v1",
     "modelHash": "28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83",
     "summary": {
       "entities": 1,
       "fields": 2,
-      "errors": 11,
+      "errors": 12,
       "warnings": 5,
-      "checksRun": 20
+      "checksRun": 21
     },
     "checks": [
       {
@@ -1009,6 +1014,18 @@
         "id": "DS4",
         "status": "pass",
         "findings": []
+      },
+      {
+        "id": "DS5",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DS5_INVARIANT_ENTITY_MISSING",
+            "severity": "error",
+            "message": "Invariant \"counts\" names the source entity \"Order\", which the model does not declare, so the invariant was never read.",
+            "detail": "A reference that resolves to nothing leaves the check reporting a result for a claim it did not evaluate."
+          }
+        ]
       },
       {
         "id": "DA1",
@@ -1168,11 +1185,11 @@
     ],
     "findings": [],
     "nextSteps": [
-      "Resolve the failing checks first: DS2 Required-Field Completeness, DS3 Relationship Integrity, DA5 Migration Coverage, DD1 Data Behavior Preservation, DD2 Data Invariant Continuity, DD3 Delta Summary, DD4 Breaking Change Regression.",
+      "Resolve the failing checks first: DS2 Required-Field Completeness, DS3 Relationship Integrity, DS5 Invariant References, DA5 Migration Coverage, DD1 Data Behavior Preservation, DD2 Data Invariant Continuity, DD3 Delta Summary, DD4 Breaking Change Regression.",
       "Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.",
       "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
     ],
-    "body": "model-everything/datamodel/v1  verdict=fail  11 error finding(s) (first: DS3_FROM_ENTITY_MISSING)  ok=true  modelHash=28f27c82dd4a… errors=11 warnings=5 checksRun=20\nCHECKS  pass DS1 DS4 DA1 DA2 DA3 DA4 DA6 DA7 DA8 DA9 DA10 DA11 DA12 | fail DS2 DS3 DA5 DD1 DD2 DD3 DD4\n\nFAIL DS2 Required-Field Completeness — Required-field findings: 1 (1 warnings) (1 finding(s))\n  [warning/DS2_REQUIRED_FIELD_UNSOURCED] Required field User.fullName has no explicit migration mapping or copy target in a before/after migration\n\nFAIL DS3 Relationship Integrity — Relationship findings: 1 (1 errors) (1 finding(s))\n  [error/DS3_FROM_ENTITY_MISSING] Relationship references unknown fromEntity Order evidence={\"relationship\":{\"fromEntity\":\"Order\",\"fromField\":\"user\",\"toEntity\":\"User\",\"toField\":\"id\",\"onDelete\":\"cascade\"}}\n\nFAIL DA5 Migration Coverage — Migration coverage findings: 3 (3 errors) (3 finding(s))\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field User.email is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"afterField\":\"User.email\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.id is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"afterField\":\"Order.id\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.user is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"afterField\":\"Order.user\"}\n\nFAIL DD1 Data Behavior Preservation — Data behavior findings: 3 (3 errors) (3 finding(s))\n  [error/DD1_FIELD_REMOVED] BEFORE field User.email is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"mapped\":\"User.email\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.id is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"mapped\":\"Order.id\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.user is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"mapped\":\"Order.user\"}\n\nFAIL DD2 Data Invariant Continuity — Data invariant continuity findings: 1 (1 errors) (1 finding(s))\n  [error/DD2_INVARIANT_ENTITY_MISSING] BEFORE count-equal invariant \"counts\" references missing source entity Order evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"}}\n\nFAIL DD3 Delta Summary — Delta: +0 entities, -1 entities, +1 fields, -3 fields (4 warnings) (4 finding(s))\n  [warning/DD3_REMOVED_ENTITY] BEFORE entity Order is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field User.email is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.id is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.user is not present in AFTER\n\nFAIL DD4 Breaking Change Regression — Breaking change findings: 3 (3 errors) (3 finding(s))\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field User.email was removed without migration mapping evidence={\"beforeField\":\"User.email\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.id was removed without migration mapping evidence={\"beforeField\":\"Order.id\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.user was removed without migration mapping evidence={\"beforeField\":\"Order.user\"}\n\nNEXT  Resolve the failing checks first: DS2 Required-Field Completeness, DS3 Relationship Integrity, DA5 Migration Coverage, DD1 Data Behavior Preservation, DD2 Data Invariant Continuity, DD3 Delta Summary, DD4 Breaking Change Regression.\nNEXT  Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4).\nCOMPARISON  beforeModelHash=d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966 afterModelHash=28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83 beforeEntities=2 beforeFields=4 afterEntities=1 afterFields=2"
+    "body": "model-everything/datamodel/v1  verdict=fail  12 error finding(s) (first: DS3_FROM_ENTITY_MISSING)  ok=true  modelHash=28f27c82dd4a… errors=12 warnings=5 checksRun=21\nCHECKS  pass DS1 DS4 DA1 DA2 DA3 DA4 DA6 DA7 DA8 DA9 DA10 DA11 DA12 | fail DS2 DS3 DS5 DA5 DD1 DD2 DD3 DD4\n\nFAIL DS2 Required-Field Completeness — Required-field findings: 1 (1 warnings) (1 finding(s))\n  [warning/DS2_REQUIRED_FIELD_UNSOURCED] Required field User.fullName has no explicit migration mapping or copy target in a before/after migration\n\nFAIL DS3 Relationship Integrity — Relationship findings: 1 (1 errors) (1 finding(s))\n  [error/DS3_FROM_ENTITY_MISSING] Relationship references unknown fromEntity Order evidence={\"relationship\":{\"fromEntity\":\"Order\",\"fromField\":\"user\",\"toEntity\":\"User\",\"toField\":\"id\",\"onDelete\":\"cascade\"}}\n\nFAIL DS5 Invariant References — Unresolved invariant references: 1 (1 errors) (1 finding(s))\n  [error/DS5_INVARIANT_ENTITY_MISSING] Invariant \"counts\" names the source entity \"Order\", which the model does not declare, so the invariant was never read. evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"},\"entity\":\"Order\",\"role\":\"…\n\nFAIL DA5 Migration Coverage — Migration coverage findings: 3 (3 errors) (3 finding(s))\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field User.email is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"afterField\":\"User.email\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.id is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"afterField\":\"Order.id\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.user is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"afterField\":\"Order.user\"}\n\nFAIL DD1 Data Behavior Preservation — Data behavior findings: 3 (3 errors) (3 finding(s))\n  [error/DD1_FIELD_REMOVED] BEFORE field User.email is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"mapped\":\"User.email\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.id is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"mapped\":\"Order.id\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.user is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"mapped\":\"Order.user\"}\n\nFAIL DD2 Data Invariant Continuity — Data invariant continuity findings: 1 (1 errors) (1 finding(s))\n  [error/DD2_INVARIANT_ENTITY_MISSING] BEFORE count-equal invariant \"counts\" references missing source entity Order evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"}}\n\nFAIL DD3 Delta Summary — Delta: +0 entities, -1 entities, +1 fields, -3 fields (4 warnings) (4 finding(s))\n  [warning/DD3_REMOVED_ENTITY] BEFORE entity Order is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field User.email is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.id is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.user is not present in AFTER\n\nFAIL DD4 Breaking Change Regression — Breaking change findings: 3 (3 errors) (3 finding(s))\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field User.email was removed without migration mapping evidence={\"beforeField\":\"User.email\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.id was removed without migration mapping evidence={\"beforeField\":\"Order.id\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.user was removed without migration mapping evidence={\"beforeField\":\"Order.user\"}\n\nNEXT  Resolve the failing checks first: DS2 Required-Field Completeness, DS3 Relationship Integrity, DS5 Invariant References, DA5 Migration Coverage, DD1 Data Behavior Preservation, DD2 Data Invariant Continuity, DD3 Delta Summary, DD4 Breaking Change Regression.\nNEXT  Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4).\nCOMPARISON  beforeModelHash=d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966 afterModelHash=28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83 beforeEntities=2 beforeFields=4 afterEntities=1 afterFields=2"
   },
   "uml: a use case model": {
     "ok": true,
