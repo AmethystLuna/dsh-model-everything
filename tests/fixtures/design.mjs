@@ -13,18 +13,24 @@ export const declaredDesign = {
   schemaVersion: 1,
   artifact: 'orders service, layered',
   architecture: {
-    nodes: ['ui', 'service', 'repo', 'db', 'audit'],
-    edges: [['ui', 'service'], ['service', 'repo'], ['repo', 'db'], ['service', 'audit']],
+    // `pricelist` and `orderstore` are here because `OrderService` depends on them: a fixture whose
+    // "sound" design named two nodes the architecture never declared was carrying the very defect
+    // the design review now reports.
+    nodes: ['ui', 'service', 'repo', 'db', 'audit', 'pricelist', 'orderstore'],
+    edges: [
+      ['ui', 'service'], ['service', 'repo'], ['repo', 'db'],
+      ['service', 'audit'], ['service', 'pricelist'], ['service', 'orderstore'],
+    ],
   },
   declare: {
     layers: [
       { name: 'ui', members: ['ui'] },
       { name: 'service', members: ['service'] },
-      { name: 'data', members: ['repo', 'db', 'audit'] },
+      { name: 'data', members: ['repo', 'db', 'audit', 'pricelist', 'orderstore'] },
     ],
     boundaries: [
       { name: 'presentation', members: ['ui'] },
-      { name: 'domain', members: ['service', 'repo', 'db', 'audit'] },
+      { name: 'domain', members: ['service', 'repo', 'db', 'audit', 'pricelist', 'orderstore'] },
     ],
     allowedEdges: [{ id: 'ui-to-domain', source: 'presentation', allow: ['domain'] }],
     requiredEdges: [{ id: 'ui-calls-service', from: 'ui', to: 'service' }],
@@ -45,10 +51,12 @@ export const declaredDesign = {
       name: 'OrderService',
       stereotype: 'class',
       responsibilities: [
-        { name: 'pricing', uses: ['PriceList'] },
-        { name: 'persistence', uses: ['OrderStore'] },
+        { name: 'pricing', uses: ['pricelist'] },
+        { name: 'persistence', uses: ['orderstore'] },
       ],
-      dependsOn: ['PriceList', 'OrderStore'],
+      // Node names, not type names: `dependsOn` names a vertex of the architecture graph, and the
+      // two are separate identifier spaces.
+      dependsOn: ['pricelist', 'orderstore'],
     },
   ],
 }

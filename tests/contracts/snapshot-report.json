@@ -1649,16 +1649,16 @@
     "ok": true,
     "ran": true,
     "verdict": "pass_with_findings",
-    "verdictReason": "6 warning finding(s)",
+    "verdictReason": "8 warning finding(s)",
     "schema": "model-everything/design/v1",
-    "modelHash": "b53a2683c30e3d47ea72fda38eaaa55be19c1af5e05955e1dbcec0954e084387",
+    "modelHash": "4da2d99acbca316ce59fcac6260c20779ca0eaba7ced21a9d31e06a8d7840897",
     "summary": {
       "errors": 0,
-      "warnings": 6,
+      "warnings": 8,
       "info": 0,
-      "checksRun": 11,
-      "nodes": 5,
-      "edges": 4
+      "checksRun": 12,
+      "nodes": 7,
+      "edges": 6
     },
     "checks": [
       {
@@ -1701,6 +1701,16 @@
             "code": "DES4_LOAD_BEARING_ELEMENT",
             "severity": "warning",
             "message": "the edge service -> audit is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> orderstore is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> pricelist is a bridge: it is the only dependency joining its two sides."
           },
           {
             "code": "DES4_LOAD_BEARING_ELEMENT",
@@ -1748,26 +1758,31 @@
         "id": "DES11",
         "status": "pass",
         "findings": []
+      },
+      {
+        "id": "DES12",
+        "status": "pass",
+        "findings": []
       }
     ],
     "findings": [],
     "nextSteps": [
-      "Read the 6 signal(s) and decide which are intended: they are structural facts, not defects."
+      "Read the 8 signal(s) and decide which are intended: they are structural facts, not defects."
     ],
-    "body": "model-everything/design/v1  verdict=pass_with_findings  6 warning finding(s)  ok=true  modelHash=b53a2683c30e… errors=0 warnings=6 checksRun=11\nCHECKS  pass DES1 DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11 | fail DES4\n\nFAIL DES4 Load-Bearing Elements — 6 element(s) the graph depends on (6 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge repo -> db is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> audit is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> repo is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> service is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 6 signal(s) and decide which are intended: they are structural facts, not defects."
+    "body": "model-everything/design/v1  verdict=pass_with_findings  8 warning finding(s)  ok=true  modelHash=4da2d99acbca… errors=0 warnings=8 checksRun=12\nCHECKS  pass DES1 DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11 DES12 | fail DES4\n\nFAIL DES4 Load-Bearing Elements — 8 element(s) the graph depends on (8 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge repo -> db is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> audit is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> orderstore is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> pricelist is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> repo is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> service is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 8 signal(s) and decide which are intended: they are structural facts, not defects."
   },
   "design: a design that contradicts its declarations": {
     "ok": true,
     "ran": true,
     "verdict": "fail",
-    "verdictReason": "6 error finding(s) (first: DES1_CYCLE)",
+    "verdictReason": "8 error finding(s) (first: DES1_CYCLE)",
     "schema": "model-everything/design/v1",
     "modelHash": "66dad70532a4fe4dc4f418c16b8c666cba3807eca3cefb904fba7ccd4073f02e",
     "summary": {
-      "errors": 6,
+      "errors": 8,
       "warnings": 4,
       "info": 0,
-      "checksRun": 11,
+      "checksRun": 12,
       "nodes": 3,
       "edges": 3
     },
@@ -1892,14 +1907,32 @@
         "id": "DES11",
         "status": "pass",
         "findings": []
+      },
+      {
+        "id": "DES12",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES12_UNKNOWN_TYPE",
+            "severity": "error",
+            "message": "OrderService.dependsOn names a type the model does not declare: \"PriceList\".",
+            "detail": "A relation that resolves to nothing is not checked, so the report would say the design keeps a contract it never read."
+          },
+          {
+            "code": "DES12_UNKNOWN_TYPE",
+            "severity": "error",
+            "message": "OrderService.dependsOn names a type the model does not declare: \"AuditLog\".",
+            "detail": "A relation that resolves to nothing is not checked, so the report would say the design keeps a contract it never read."
+          }
+        ]
       }
     ],
     "findings": [],
     "nextSteps": [
-      "Fix the 6 violation(s) the design contradicts itself about, or change the declaration they contradict.",
+      "Fix the 8 violation(s) the design contradicts itself about, or change the declaration they contradict.",
       "Read the 4 signal(s) and decide which are intended: they are structural facts, not defects."
     ],
-    "body": "model-everything/design/v1  verdict=fail  6 error finding(s) (first: DES1_CYCLE)  ok=true  modelHash=66dad70532a4… errors=6 warnings=4 checksRun=11\nCHECKS  pass DES5 DES9 DES11 | fail DES1 DES2 DES3 DES4 DES6 DES7 DES8 DES10\n\nFAIL DES1 Acyclic Dependency — cycles: 1 (1 finding(s))\n  [error/DES1_CYCLE] the dependency graph is cyclic: the fewest edges that make it acyclic is 1, and the largest mutual-dependency group has 2 members. evidence={\"feedbackArcs\":[[\"service\",\"repo\"]],\"feedbackArcsExact\":true,\"largestCycle\":[\"repo\",\"service\"],\"ranks\":{\"repo\":1,\"service\":1,\"ui\":0}}\n\nFAIL DES2 Layer Order — 2 edge(s) against the declaration (2 finding(s))\n  [error/DES2_LAYER_ORDER] ui (layer ui) depends on repo (layer data), skipping service. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromLayer\":\"ui\",\"toLayer\":\"data\",\"skipped\":[\"service\"]}\n  [error/DES2_LAYER_ORDER] repo (layer data) depends upward on service (layer service). evidence={\"from\":\"repo\",\"to\":\"service\",\"fromLayer\":\"data\",\"toLayer\":\"service\"}\n\nFAIL DES3 Boundary Leak — 1 crossing(s) not allowed (1 finding(s))\n  [error/DES3_BOUNDARY_LEAK] ui (presentation) depends on repo (domain), and no declared rule allows presentation -> domain. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromBoundary\":\"presentation\",\"toBoundary\":\"domain\"}\n\nFAIL DES4 Load-Bearing Elements — 2 element(s) the graph depends on (2 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> repo is a bridge: it is the only dependency joining its two sides.\n\nFAIL DES6 Required Dependencies — 1 missing (1 finding(s))\n  [error/DES6_MISSING_REQUIRED_EDGE] ui-calls-service: the design requires ui -> service, and the architecture does not have it. evidence={\"id\":\"ui-calls-service\",\"from\":\"ui\",\"to\":\"service\"}\n\nFAIL DES7 Substitutability — 1 contract(s) against the declaration (1 finding(s))\n  [error/DES7_LSP_CONTRACT] FixedDeposit refuses withdraw, which its supertype Account declares it handles. A subtype may not strengthen a precondition. evidence={\"subtype\":\"FixedDeposit\",\"base\":\"Account\",\"event\":\"withdraw\",\"kind\":\"forbidden event\"}\n\nFAIL DES8 Interface Width — 1 interface(s) wider than their callers (1 finding(s))\n  [warning/DES8_ISP_UNUSED_OPERATION] Reader declares 1 operation(s) no client in this model calls: vacuum.\n\nFAIL DES10 Responsibility Boundaries — 1 mismatch(es) (1 finding(s))\n  [warning/DES10_RESPONSIBILITY_GAP] OrderService depends on AuditLog, which no declared responsibility owns.\n\nNEXT  Fix the 6 violation(s) the design contradicts itself about, or change the declaration they contradict.\nNEXT  Read the 4 signal(s) and decide which are intended: they are structural facts, not defects."
+    "body": "model-everything/design/v1  verdict=fail  8 error finding(s) (first: DES1_CYCLE)  ok=true  modelHash=66dad70532a4… errors=8 warnings=4 checksRun=12\nCHECKS  pass DES5 DES9 DES11 | fail DES1 DES2 DES3 DES4 DES6 DES7 DES8 DES10 DES12\n\nFAIL DES1 Acyclic Dependency — cycles: 1 (1 finding(s))\n  [error/DES1_CYCLE] the dependency graph is cyclic: the fewest edges that make it acyclic is 1, and the largest mutual-dependency group has 2 members. evidence={\"feedbackArcs\":[[\"service\",\"repo\"]],\"feedbackArcsExact\":true,\"largestCycle\":[\"repo\",\"service\"],\"ranks\":{\"repo\":1,\"service\":1,\"ui\":0}}\n\nFAIL DES2 Layer Order — 2 edge(s) against the declaration (2 finding(s))\n  [error/DES2_LAYER_ORDER] ui (layer ui) depends on repo (layer data), skipping service. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromLayer\":\"ui\",\"toLayer\":\"data\",\"skipped\":[\"service\"]}\n  [error/DES2_LAYER_ORDER] repo (layer data) depends upward on service (layer service). evidence={\"from\":\"repo\",\"to\":\"service\",\"fromLayer\":\"data\",\"toLayer\":\"service\"}\n\nFAIL DES3 Boundary Leak — 1 crossing(s) not allowed (1 finding(s))\n  [error/DES3_BOUNDARY_LEAK] ui (presentation) depends on repo (domain), and no declared rule allows presentation -> domain. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromBoundary\":\"presentation\",\"toBoundary\":\"domain\"}\n\nFAIL DES4 Load-Bearing Elements — 2 element(s) the graph depends on (2 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> repo is a bridge: it is the only dependency joining its two sides.\n\nFAIL DES6 Required Dependencies — 1 missing (1 finding(s))\n  [error/DES6_MISSING_REQUIRED_EDGE] ui-calls-service: the design requires ui -> service, and the architecture does not have it. evidence={\"id\":\"ui-calls-service\",\"from\":\"ui\",\"to\":\"service\"}\n\nFAIL DES7 Substitutability — 1 contract(s) against the declaration (1 finding(s))\n  [error/DES7_LSP_CONTRACT] FixedDeposit refuses withdraw, which its supertype Account declares it handles. A subtype may not strengthen a precondition. evidence={\"subtype\":\"FixedDeposit\",\"base\":\"Account\",\"event\":\"withdraw\",\"kind\":\"forbidden event\"}\n\nFAIL DES8 Interface Width — 1 interface(s) wider than their callers (1 finding(s))\n  [warning/DES8_ISP_UNUSED_OPERATION] Reader declares 1 operation(s) no client in this model calls: vacuum.\n\nFAIL DES10 Responsibility Boundaries — 1 mismatch(es) (1 finding(s))\n  [warning/DES10_RESPONSIBILITY_GAP] OrderService depends on AuditLog, which no declared responsibility owns.\n\nFAIL DES12 Type Relations — Unresolved relations: 2 (2 finding(s))\n  [error/DES12_UNKNOWN_TYPE] OrderService.dependsOn names a type the model does not declare: \"PriceList\". evidence={\"type\":\"OrderService\",\"field\":\"dependsOn\",\"name\":\"PriceList\"}\n  [error/DES12_UNKNOWN_TYPE] OrderService.dependsOn names a type the model does not declare: \"AuditLog\". evidence={\"type\":\"OrderService\",\"field\":\"dependsOn\",\"name\":\"AuditLog\"}\n\nNEXT  Fix the 8 violation(s) the design contradicts itself about, or change the declaration they contradict.\nNEXT  Read the 4 signal(s) and decide which are intended: they are structural facts, not defects."
   },
   "design: a design that declares nothing but a graph": {
     "ok": true,
@@ -1912,7 +1945,7 @@
       "errors": 0,
       "warnings": 1,
       "info": 0,
-      "checksRun": 11,
+      "checksRun": 12,
       "nodes": 2,
       "edges": 1
     },
@@ -1977,6 +2010,11 @@
         "id": "DES11",
         "status": "skip",
         "findings": []
+      },
+      {
+        "id": "DES12",
+        "status": "pass",
+        "findings": []
       }
     ],
     "findings": [],
@@ -1984,7 +2022,7 @@
       "Read the 1 signal(s) and decide which are intended: they are structural facts, not defects.",
       "Checks DES2, DES3, DES5, DES6, DES7, DES8, DES9, DES10, DES11 had nothing to hold the design to: declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here."
     ],
-    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=11\nCHECKS  pass DES1 | fail DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nFAIL DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects.\nNEXT  Checks DES2, DES3, DES5, DES6, DES7, DES8, DES9, DES10, DES11 had nothing to hold the design to: declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here."
+    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=12\nCHECKS  pass DES1 DES12 | fail DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nFAIL DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects.\nNEXT  Checks DES2, DES3, DES5, DES6, DES7, DES8, DES9, DES10, DES11 had nothing to hold the design to: declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here."
   },
   "design: a model the schema refuses": {
     "ok": false,

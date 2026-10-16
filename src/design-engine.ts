@@ -571,6 +571,148 @@ function skip(id: string, name: string, why: string): CheckResult {
 
 const typesByName = (model: DesignModelV1): Map<string, DesignType> => new Map((model.types ?? []).map((entry) => [entry.name, entry]))
 
+/**
+ * DES12: a name a type relation points at, resolved.
+ *
+ * `architecture.edges` had both endpoints resolved and `requiredEdges` had its edge checked, but
+ * every type relation was taken on trust: `extends: 'Ghost'`, a type extending itself, a cycle of
+ * extends, `implements: ['Ghost']`, an interface implementing itself, `dependsOn: ['Ghost']`,
+ * `uses: [{type: 'Ghost'}]` and a layer member that is not an architecture node all returned
+ * verdict=pass with no findings. A reader had no way to tell a design that satisfies its
+ * declarations from one whose declarations point at nothing.
+ *
+ * DES7 already skipped a base it could not find (`if (base === undefined) continue`) and then
+ * reported "no declared contract is strengthened or weakened" - the same shape of empty all-clear
+ * the robustness audit found in the other two engines.
+ */
+function DES12_typeRelations(model: DesignModelV1): CheckResult {
+  const findings: Finding[] = []
+  const types = model.types ?? []
+  const byName = typesByName(model)
+  const architectureNodes = new Set(model.architecture.nodes)
+
+  const missingType = (type: DesignType, field: string, name: string): void => {
+    findings.push({
+      code: 'DES12_UNKNOWN_TYPE',
+      severity: 'error',
+      message: type.name + '.' + field + ' names a type the model does not declare: ' + JSON.stringify(name) + '.',
+      detail: 'A relation that resolves to nothing is not checked, so the report would say the design keeps a contract it never read.',
+      evidence: { type: type.name, field, name },
+    })
+  }
+
+  for (const type of types) {
+    if (type.extends !== undefined) {
+      if (type.extends === type.name) {
+        findings.push({
+          code: 'DES12_TYPE_CYCLE',
+          severity: 'error',
+          message: type.name + ' extends itself, so it can never be the base of anything.',
+          evidence: { type: type.name, cycle: [type.name, type.name] },
+        })
+      } else if (!byName.has(type.extends)) {
+        missingType(type, 'extends', type.extends)
+      }
+    }
+    for (const implemented of type.implements ?? []) {
+      if (implemented === type.name) {
+        findings.push({
+          code: 'DES12_TYPE_CYCLE',
+          severity: 'error',
+          message: type.name + ' implements itself, which is not a relation.',
+          evidence: { type: type.name, cycle: [type.name, type.name] },
+        })
+      } else if (!byName.has(implemented)) {
+        missingType(type, 'implements', implemented)
+      }
+    }
+    for (const dependency of type.dependsOn ?? []) {
+      // A dependency may name anything in the architecture, not only a declared type: the
+      // architecture is the graph the shape features are computed from, and a node without a type
+      // is normal.
+      if (!byName.has(dependency) && !architectureNodes.has(dependency)) missingType(type, 'dependsOn', dependency)
+    }
+    for (const use of type.uses ?? []) {
+      if (!byName.has(use.type) && !architectureNodes.has(use.type)) missingType(type, 'uses', use.type)
+    }
+  }
+
+  // A cycle through `extends`, not only a self-loop: a chain that closes on itself has no
+  // most-general type, so the substitutability question has no answer rather than a yes.
+  const chain = (start: DesignType): string[] | undefined => {
+    const seen: string[] = []
+    let current: DesignType | undefined = start
+    while (current !== undefined && current.extends !== undefined) {
+      if (seen.includes(current.name)) return [...seen, current.name]
+      seen.push(current.name)
+      current = byName.get(current.extends)
+    }
+    return undefined
+  }
+  const reported = new Set<string>()
+  for (const type of types) {
+    const cycle = chain(type)
+    if (cycle === undefined) continue
+    const key = [...cycle].sort().join(',')
+    if (reported.has(key)) continue
+    reported.add(key)
+    findings.push({
+      code: 'DES12_TYPE_CYCLE',
+      severity: 'error',
+      message: 'the inheritance chain ' + cycle.join(' -> ') + ' closes on itself, so none of these types has a most-general base.',
+      detail: 'Substitutability is decided over this chain: a cycle means the question has no answer, not that the answer is yes.',
+      evidence: { cycle },
+    })
+  }
+
+  // Every declared layer and boundary member must be a node of the architecture, or the layer
+  // order and the boundary rules are computed over names that do not exist.
+  const declare = model.declare ?? {}
+  for (const [kind, groups] of [['layers', declare.layers ?? []], ['boundaries', declare.boundaries ?? []]] as const) {
+    for (const group of groups) {
+      for (const member of group.members) {
+        if (architectureNodes.has(member)) continue
+        findings.push({
+          code: 'DES12_UNKNOWN_NODE',
+          severity: 'error',
+          message: group.name + ' (declared under ' + kind + ') lists ' + JSON.stringify(member) + ', which the architecture does not declare.',
+          detail: 'A member that is not a node cannot break a layer order or a boundary rule, so listing it hides the member that should have been there.',
+          evidence: { group: group.name, kind, member },
+        })
+      }
+    }
+  }
+  // A rule whose source names no declared group judges nothing, and a required edge with an
+  // unknown endpoint could never have been satisfied.
+  const groupNames = new Set([
+    ...(declare.layers ?? []).map((group) => group.name),
+    ...(declare.boundaries ?? []).map((group) => group.name),
+  ])
+  for (const rule of declare.allowedEdges ?? []) {
+    if (rule.source === '*' || groupNames.has(rule.source)) continue
+    findings.push({
+      code: 'DES12_UNKNOWN_NODE',
+      severity: 'error',
+      message: 'allowedEdges rule ' + rule.id + ' has source ' + JSON.stringify(rule.source) + ', which names no declared layer or boundary.',
+      detail: 'A rule with no source judges no edge, so its allow and deny lists are never consulted.',
+      evidence: { rule: rule.id, source: rule.source },
+    })
+  }
+  for (const requirement of declare.requiredEdges ?? []) {
+    if (architectureNodes.has(requirement.from) && architectureNodes.has(requirement.to)) continue
+    const unknown = [requirement.from, requirement.to].filter((node) => !architectureNodes.has(node))
+    findings.push({
+      code: 'DES12_UNKNOWN_NODE',
+      severity: 'error',
+      message: 'requiredEdges entry ' + requirement.id + ' names ' + unknown.map((node) => JSON.stringify(node)).join(' and ') + ', which the architecture does not declare.',
+      detail: 'DES6 can only report that the edge is absent; an endpoint that is not a node means the requirement was never satisfiable.',
+      evidence: { requirement: requirement.id, from: requirement.from, to: requirement.to, unknown },
+    })
+  }
+
+  return check('DES12', 'Type Relations', findings, findings.length === 0 ? 'every type relation and declared member resolves' : 'Unresolved relations: ' + String(findings.length))
+}
+
 /** DES1: a cycle in a design, named with the canonical peeling that would break it. */
 function DES1_cycles(model: DesignModelV1, features: GraphFeatures): CheckResult {
   const findings: Finding[] = []
@@ -973,6 +1115,9 @@ export const DESIGN_CODE_LEVEL: Record<string, DesignPrincipleLevel> = {
   DES9_ISP_DISJOINT_CLIENTS: 'violation',
   DES10_RESPONSIBILITY_GAP: 'signal',
   DES11_CONCRETE_DEPENDENCY: 'signal',
+  DES12_UNKNOWN_TYPE: 'violation',
+  DES12_TYPE_CYCLE: 'violation',
+  DES12_UNKNOWN_NODE: 'violation',
 }
 
 export interface DesignReport {
@@ -1043,6 +1188,7 @@ export function runDesignReview(input: unknown): DesignReport {
     DES9_interfaceSplit(model),
     DES10_responsibilities(model),
     DES11_inversion(model),
+    DES12_typeRelations(model),
   ]
   const all = checks.flatMap((result) => result.findings)
   const violations = all.filter((finding) => DESIGN_CODE_LEVEL[finding.code] === 'violation')

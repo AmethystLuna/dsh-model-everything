@@ -37,7 +37,7 @@ function expectPresent(name, model, code) {
     const codes = codesOf(report)
     if (!codes.includes(code)) throw new Error(code + ' missing; the review reported ' + JSON.stringify(codes))
     if (DESIGN_CODE_LEVEL[code] === undefined) throw new Error(code + ' has no declared level')
-    if (report.summary.checksRun !== 11) throw new Error('expected 11 checks, ran ' + String(report.summary.checksRun))
+    if (report.summary.checksRun !== 12) throw new Error('expected 11 checks, ran ' + String(report.summary.checksRun))
     // The level decides the bucket: a signal must never be what fails the verdict.
     if (DESIGN_CODE_LEVEL[code] === 'signal' && report.violations.some((finding) => finding.code === code)) {
       throw new Error(code + ' is a signal and must not sit in violations')
@@ -337,6 +337,68 @@ expectAbsent('an interface depending on another abstraction', design({
   ],
 }), 'DES11_CONCRETE_DEPENDENCY')
 
+
+// ------------------------------------------------------------------ DES12 relations --
+
+expectPresent('a type extending a type that does not exist', design({
+  types: [{ name: 'A', stereotype: 'class', extends: 'Ghost' }],
+}), 'DES12_UNKNOWN_TYPE')
+expectPresent('a type implementing a type that does not exist', design({
+  types: [{ name: 'A', stereotype: 'class', implements: ['Ghost'] }],
+}), 'DES12_UNKNOWN_TYPE')
+expectPresent('a dependency on a name nothing declares', design({
+  types: [{ name: 'A', stereotype: 'class', dependsOn: ['Ghost'] }],
+}), 'DES12_UNKNOWN_TYPE')
+expectPresent('a use of a name nothing declares', design({
+  types: [{ name: 'A', stereotype: 'class', uses: [{ type: 'Ghost', operations: ['x'] }] }],
+}), 'DES12_UNKNOWN_TYPE')
+expectPresent('a type extending itself', design({
+  types: [{ name: 'A', stereotype: 'class', extends: 'A' }],
+}), 'DES12_TYPE_CYCLE')
+expectPresent('an inheritance chain that closes on itself', design({
+  types: [
+    { name: 'A', stereotype: 'class', extends: 'B' },
+    { name: 'B', stereotype: 'class', extends: 'C' },
+    { name: 'C', stereotype: 'class', extends: 'A' },
+  ],
+}), 'DES12_TYPE_CYCLE')
+expectPresent('an interface implementing itself', design({
+  types: [{ name: 'I', stereotype: 'interface', implements: ['I'] }],
+}), 'DES12_TYPE_CYCLE')
+expectPresent('a layer listing a node the architecture does not have', design({
+  architecture: { nodes: ['a'], edges: [] },
+  declare: { layers: [{ name: 'ui', members: ['a', 'ghost'] }] },
+}), 'DES12_UNKNOWN_NODE')
+expectPresent('an allowed-edge rule whose source is no declared group', design({
+  architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] },
+  declare: { boundaries: [{ name: 'x', members: ['a', 'b'] }], allowedEdges: [{ id: 'r', source: 'ghost', allow: ['x'] }] },
+}), 'DES12_UNKNOWN_NODE')
+expectPresent('a required edge with an endpoint that is not a node', design({
+  architecture: { nodes: ['a'], edges: [] },
+  declare: { requiredEdges: [{ id: 'r', from: 'a', to: 'ghost' }] },
+}), 'DES12_UNKNOWN_NODE')
+
+// The near misses: the same relations, resolving.
+expectAbsent('a type extending a declared type', design({
+  types: [
+    { name: 'A', stereotype: 'class' },
+    { name: 'B', stereotype: 'class', extends: 'A' },
+  ],
+}), 'DES12_UNKNOWN_TYPE')
+expectAbsent('a dependency on an architecture node with no type', design({
+  architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] },
+  types: [{ name: 'a', stereotype: 'class', dependsOn: ['b'] }],
+  declare: { boundaries: [{ name: 'x', members: ['a', 'b'] }] },
+}), 'DES12_UNKNOWN_TYPE')
+expectAbsent('a layer whose members are all nodes', design({
+  architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] },
+  declare: { layers: [{ name: 'ui', members: ['a'] }, { name: 'service', members: ['b'] }] },
+}), 'DES12_UNKNOWN_NODE')
+expectAbsent('a wildcard rule source', design({
+  architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] },
+  declare: { boundaries: [{ name: 'x', members: ['a', 'b'] }], allowedEdges: [{ id: 'r', source: '*', allow: ['x'] }] },
+}), 'DES12_UNKNOWN_NODE')
+
 // ------------------------------------------------------------------ the report --
 
 test('design: skipped checks are named, not silently passed', () => {
@@ -374,7 +436,7 @@ test('design: every code the engine declares has a case in this suite', () => {
   const covered = new Set([
     'DES1_CYCLE', 'DES2_LAYER_ORDER', 'DES3_BOUNDARY_LEAK', 'DES4_LOAD_BEARING_ELEMENT', 'DES5_UNDECLARED_NODE',
     'DES6_MISSING_REQUIRED_EDGE', 'DES7_LSP_CONTRACT', 'DES8_ISP_UNUSED_OPERATION', 'DES9_ISP_DISJOINT_CLIENTS',
-    'DES10_RESPONSIBILITY_GAP', 'DES11_CONCRETE_DEPENDENCY',
+    'DES10_RESPONSIBILITY_GAP', 'DES11_CONCRETE_DEPENDENCY', 'DES12_UNKNOWN_TYPE', 'DES12_TYPE_CYCLE', 'DES12_UNKNOWN_NODE',
   ])
   const missing = [...declared].filter((code) => !covered.has(code))
   if (missing.length > 0) throw new Error('codes with no case: ' + missing.join(', '))
