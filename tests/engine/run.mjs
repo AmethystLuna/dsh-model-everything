@@ -1980,6 +1980,387 @@ await runIncidentRegressionTests()
 
 await runCompositionExplainTests()
 
+// ---------------------------------------------------------------------------
+// Check-code coverage: one case per code, named after the code it owns
+// ---------------------------------------------------------------------------
+// A code no test ever drives is a branch nothing has ever run. Each entry below builds the
+// smallest model that reaches its code and asserts that code by name, so the condition
+// guarding it in `src/engine.ts` stays reachable through `runVerification`. Where one model
+// necessarily produces a second code (an overlapping guard is also a nondeterministic one;
+// a state the mapping does not carry over is missing for D1, D2 and D3 alike), that code is
+// asserted explicitly rather than left implied.
+async function runCheckCodeCoverageTests() {
+  const codesIn = (report, checkId) => {
+    const check = report.checks.find((entry) => entry.id === checkId)
+    return check === undefined ? [] : check.findings.map((finding) => finding.code)
+  }
+  const codeCases = [
+    {
+      // A1 walks every non-terminal state against the model's whole event alphabet: BUSY
+      // handles ping but not start, and start is fired elsewhere.
+      name: 'A1_UNHANDLED_EVENT',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'IDLE',
+        states: [{ id: 'IDLE' }, { id: 'BUSY' }],
+        transitions: [
+          { from: 'IDLE', event: 'start', to: 'BUSY' },
+          { from: 'IDLE', event: 'ping', to: 'IDLE' },
+          { from: 'BUSY', event: 'ping', to: 'BUSY' },
+        ],
+      }),
+      // S5 reports the same (state, event) table for readers of the structural checks.
+      codes: [['A1', 'A1_UNHANDLED_EVENT'], ['S5', 'S5_UNHANDLED_EVENT']],
+    },
+    {
+      // `unlock` is declared, so this is not A4_NO_RELEASE_EVENT, but A4 walks the state
+      // graph from the acquire target: B has no outgoing edge, so no release is reachable.
+      name: 'A4_NO_RELEASE_REACHABLE',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+        transitions: [
+          { from: 'A', event: 'lock', to: 'B' },
+          { from: 'A', event: 'unlock', to: 'C' },
+        ],
+        resourcePairs: [{ resource: 'mutex', acquireEvent: 'lock', releaseEvent: 'unlock' }],
+      }),
+      codes: [['A4', 'A4_NO_RELEASE_REACHABLE']],
+    },
+    {
+      // The boundary value 3 satisfies both guards of A|go, so A5 counts two matching
+      // branches at that point. Enumerating the same assignment is what S4 does, so the
+      // nondeterminism it reports there is asserted here as well.
+      name: 'A5_GUARD_OVERLAP',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+        variables: [{ name: 'n', kind: 'integer', init: 3, min: 0, max: 10 }],
+        transitions: [
+          { from: 'A', event: 'go', guard: { variable: 'n', op: '>=', value: 2 }, to: 'B' },
+          { from: 'A', event: 'go', guard: { variable: 'n', op: '<=', value: 5 }, to: 'C' },
+        ],
+        boundaryChecks: [{ variable: 'n', values: [3] }],
+      }),
+      codes: [['A5', 'A5_GUARD_OVERLAP'], ['S4', 'S4_NONDETERMINISTIC_GUARDS']],
+    },
+    {
+      // `ping` is declared idempotent, but its first application lands in a terminal state
+      // where it can no longer fire: A8 has no second application to compare against.
+      name: 'A8_NOT_REPLAYABLE',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [{ from: 'A', event: 'ping', to: 'B' }],
+        idempotentEvents: ['ping'],
+      }),
+      codes: [['A8', 'A8_NOT_REPLAYABLE']],
+    },
+    {
+      // Value iteration is capped at 20000 rounds. With a 1 : 999999 split the hit
+      // probability moves by about 1e-6 per round, so it is nowhere near converged when the
+      // cap is reached, while the declared bound (P < 0.5) already holds on the partial
+      // value: exactly the case A13 refuses to present as proven.
+      name: 'A13_NO_CONVERGENCE',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [
+          { from: 'A', event: 'ok', to: 'B', weight: 1 },
+          { from: 'A', event: 'retry', to: 'A', weight: 999999 },
+        ],
+        invariants: [{ id: 'p-under-half', description: 'P(hit B) is below one half', kind: 'probability', target: 'B', op: '<', p: 0.5 }],
+      }),
+      codes: [['A13', 'A13_NO_CONVERGENCE']],
+      assert(report) {
+        if (codesIn(report, 'A13').includes('A13_PROBABILITY_VIOLATION')) {
+          throw new Error('an unconverged probability must be reported as unconverged, not as a violation')
+        }
+      },
+    },
+    {
+      // BEFORE init INIT maps to OTHER, so the mapped init is not the AFTER init. OTHER is
+      // declared in AFTER with its own `go` transition and handles the whole alphabet, which
+      // keeps every other D1 finding out of this case.
+      name: 'D1_INIT_MISMATCH',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'START',
+        states: [{ id: 'START' }, { id: 'OTHER' }, { id: 'END', terminal: true }],
+        transitions: [
+          { from: 'START', event: 'go', to: 'END' },
+          { from: 'START', event: 'alt', to: 'OTHER' },
+          { from: 'OTHER', event: 'go', to: 'END' },
+          { from: 'OTHER', event: 'alt', to: 'OTHER' },
+        ],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'INIT',
+          states: [{ id: 'INIT' }, { id: 'END', terminal: true }],
+          transitions: [{ from: 'INIT', event: 'go', to: 'END' }],
+        },
+        stateMapping: { INIT: 'OTHER' },
+      }),
+      codes: [['D1', 'D1_INIT_MISMATCH']],
+    },
+    {
+      // GONE has no counterpart in AFTER. D3's delta is computed from the same mapped-id
+      // predicate D1 uses, so a removed state is reported by both checks.
+      name: 'D1_MAPPED_STATE_MISSING',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'INIT',
+        states: [{ id: 'INIT' }, { id: 'END', terminal: true }],
+        transitions: [{ from: 'INIT', event: 'go', to: 'END' }],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'INIT',
+          states: [{ id: 'INIT' }, { id: 'END', terminal: true }, { id: 'GONE' }],
+          transitions: [{ from: 'INIT', event: 'go', to: 'END' }],
+        },
+      }),
+      codes: [['D1', 'D1_MAPPED_STATE_MISSING'], ['D3', 'D3_REMOVED_STATE']],
+    },
+    {
+      // The BEFORE never-states invariant names B, which the mapping sends to a state AFTER
+      // does not declare. The same mapping drops the BEFORE state B, so D1 and D3 fire too.
+      name: 'D2_MAPPED_STATE_MISSING',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'DONE', terminal: true }],
+        transitions: [
+          { from: 'A', event: 'wait', to: 'A' },
+          { from: 'A', event: 'finish', to: 'DONE' },
+        ],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'A',
+          states: [{ id: 'A' }, { id: 'B', terminal: true }],
+          transitions: [{ from: 'A', event: 'wait', to: 'A' }],
+          invariants: [{ id: 'never-b', description: 'B must never be entered', kind: 'never-states', states: ['B'] }],
+        },
+        stateMapping: { B: 'GONE' },
+      }),
+      codes: [
+        ['D2', 'D2_MAPPED_STATE_MISSING'],
+        ['D1', 'D1_MAPPED_STATE_MISSING'],
+        ['D3', 'D3_REMOVED_STATE'],
+      ],
+    },
+    {
+      // A leads-to invariant is re-decided against AFTER through the same depth-first walk
+      // A9 uses. The counter makes every run state distinct, so the walk can never finish
+      // and spends its budget instead: undecided, which D2 must not report as proven.
+      name: 'D2_UNDECIDED',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A2',
+        states: [{ id: 'A2' }, { id: 'B', terminal: true }],
+        transitions: [
+          { from: 'A2', event: 'tick', to: 'A2', updates: [{ variable: 'x', op: 'inc', value: 1 }] },
+          { from: 'A2', event: 'finish', to: 'B' },
+        ],
+        variables: [{ name: 'x', kind: 'integer', init: 0 }],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'A',
+          states: [{ id: 'A' }, { id: 'B', terminal: true }],
+          transitions: [{ from: 'A', event: 'tick', to: 'A', updates: [{ variable: 'x', op: 'inc', value: 1 }] }],
+          variables: [{ name: 'x', kind: 'integer', init: 0 }],
+          invariants: [{ id: 'a-must-reach-b', description: 'A must reach B', kind: 'leads-to', from: 'A', to: ['B'] }],
+        },
+        stateMapping: { A: 'A2' },
+        maxStates: 10,
+      }),
+      codes: [['D2', 'D2_UNDECIDED']],
+    },
+    {
+      // The BEFORE var-in-range invariant constrains `depth`, which AFTER no longer
+      // declares: D2 has nothing left to re-decide the invariant against.
+      name: 'D2_VARIABLE_MISSING',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [{ from: 'A', event: 'go', to: 'B' }],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'A',
+          states: [{ id: 'A' }, { id: 'B', terminal: true }],
+          transitions: [{ from: 'A', event: 'go', to: 'B' }],
+          variables: [{ name: 'depth', kind: 'integer', init: 0, min: 0, max: 5 }],
+          invariants: [{ id: 'depth-range', description: 'depth stays within its range', kind: 'var-in-range', variable: 'depth', min: 0, max: 5 }],
+        },
+      }),
+      codes: [['D2', 'D2_VARIABLE_MISSING']],
+    },
+    {
+      // A BEFORE state the mapping does not carry into AFTER. D1 reads the same mapped-id
+      // predicate, so it reports the missing state as well.
+      name: 'D3_REMOVED_STATE',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'INIT',
+        states: [{ id: 'INIT' }, { id: 'END', terminal: true }],
+        transitions: [{ from: 'INIT', event: 'go', to: 'END' }],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'INIT',
+          states: [{ id: 'INIT' }, { id: 'END', terminal: true }, { id: 'GONE' }],
+          transitions: [{ from: 'INIT', event: 'go', to: 'END' }],
+        },
+      }),
+      codes: [['D3', 'D3_REMOVED_STATE'], ['D1', 'D1_MAPPED_STATE_MISSING']],
+    },
+    {
+      // AFTER adds a self-loop state with no exit and no terminal flag: a closed SCC BEFORE
+      // does not have, so the refactoring introduced a run that can never end.
+      name: 'D4_LIVENESS_REGRESSION',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'S' }],
+        transitions: [
+          { from: 'A', event: 'go', to: 'B' },
+          { from: 'A', event: 'spin', to: 'S' },
+          { from: 'S', event: 'spin', to: 'S' },
+        ],
+      }, {
+        beforeModel: {
+          schemaVersion: 1,
+          init: 'A',
+          states: [{ id: 'A' }, { id: 'B', terminal: true }],
+          transitions: [{ from: 'A', event: 'go', to: 'B' }],
+        },
+      }),
+      codes: [['D4', 'D4_LIVENESS_REGRESSION']],
+    },
+    {
+      // For n in [2,5] both guards of A|go hold at once. The `pick` transition puts 3 into
+      // the reachable value set, so the branches are live code and S6 does not report them
+      // as dead instead.
+      name: 'S4_NONDETERMINISTIC_GUARDS',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }, { id: 'C', terminal: true }],
+        variables: [{ name: 'n', kind: 'integer', init: 0, min: 0, max: 10 }],
+        transitions: [
+          { from: 'A', event: 'go', guard: { variable: 'n', op: '>=', value: 2 }, to: 'B' },
+          { from: 'A', event: 'go', guard: { variable: 'n', op: '<=', value: 5 }, to: 'C' },
+          { from: 'A', event: 'pick', to: 'A', updates: [{ variable: 'n', op: 'set', value: 3 }] },
+        ],
+      }),
+      codes: [['S4', 'S4_NONDETERMINISTIC_GUARDS']],
+    },
+    {
+      // S4/S6 enumerate the guard domain to decide determinism and completeness. Two integer
+      // variables over [0,200] and [0,100] are 20301 assignments, past the 10000 cap, so the
+      // analysis reports that it skipped the exhaustive check rather than guessing.
+      name: 'S6_UNBOUNDED_DOMAIN',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        variables: [
+          { name: 'x', kind: 'integer', init: 0, min: 0, max: 200 },
+          { name: 'y', kind: 'integer', init: 0, min: 0, max: 100 },
+        ],
+        transitions: [
+          { from: 'A', event: 'go', guard: { all: [{ variable: 'x', op: '>=', value: 0 }, { variable: 'y', op: '>=', value: 0 }] }, to: 'B' },
+        ],
+      }),
+      codes: [['S6', 'S6_UNBOUNDED_DOMAIN']],
+    },
+    {
+      // S7 cannot reach this code through the public API. Its own runInvariants() call leaves
+      // includePathProperties at false, so a leads-to, sequence, atomicity, budget or
+      // probability invariant is decided by the single-runtime predicate, which holds for
+      // every one of those kinds by construction. The only producer of `undecided: true` is
+      // the leads-to branch of pathPropertyViolation, which only A7 and D2 call. This case
+      // pins that: the same model makes A9 and A7 report the exhausted walk, while S7 stays
+      // silent instead of claiming to have decided a path property.
+      name: 'S7_UNDECIDED (unreachable: S7 decides no path property)',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [{ from: 'A', event: 'tick', to: 'A', updates: [{ variable: 'x', op: 'inc', value: 1 }] }],
+        variables: [{ name: 'x', kind: 'integer', init: 0 }],
+        invariants: [{ id: 'a-must-reach-b', description: 'A must reach B', kind: 'leads-to', from: 'A', to: ['B'] }],
+      }, { maxStates: 10 }),
+      codes: [['A9', 'A9_LEADS_TO_UNDECIDED'], ['A7', 'A7_UNDECIDED']],
+      assert(report) {
+        const s7 = codesIn(report, 'S7')
+        if (s7.includes('S7_UNDECIDED')) {
+          throw new Error('S7_UNDECIDED became reachable: S7 now decides a path property, so rewrite this case to assert it')
+        }
+        if (s7.length !== 0) throw new Error('S7 must not decide a path-property invariant at all, got ' + JSON.stringify(s7))
+      },
+    },
+    {
+      // `fuel` is declared monotonic 'dec', but `refuel` increases it.
+      name: 'S8_MONOTONIC_INCREASE',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [
+          { from: 'A', event: 'refuel', to: 'A', updates: [{ variable: 'fuel', op: 'inc' }] },
+          { from: 'A', event: 'done', to: 'B' },
+        ],
+        variables: [{ name: 'fuel', kind: 'integer', init: 5, monotonic: 'dec' }],
+      }),
+      codes: [['S8', 'S8_MONOTONIC_INCREASE']],
+    },
+    {
+      // A `set` on a monotonic variable has no direction to check, so S8 asks for a review
+      // instead of deciding it. The variable is monotonic 'inc' here, so this exercises the
+      // set branch rather than the inc/dec conflict.
+      name: 'S8_MONOTONIC_SET_REVIEW',
+      run: () => runVerification({
+        schemaVersion: 1,
+        init: 'A',
+        states: [{ id: 'A' }, { id: 'B', terminal: true }],
+        transitions: [
+          { from: 'A', event: 'reset', to: 'A', updates: [{ variable: 'level', op: 'set', value: 0 }] },
+          { from: 'A', event: 'done', to: 'B' },
+        ],
+        variables: [{ name: 'level', kind: 'integer', init: 1, monotonic: 'inc' }],
+      }),
+      codes: [['S8', 'S8_MONOTONIC_SET_REVIEW']],
+    },
+  ]
+
+  for (const testCase of codeCases) {
+    const report = testCase.run()
+    if (!report.ok) throw new Error(testCase.name + ': model did not validate: ' + JSON.stringify(report.checks[0]?.findings ?? []))
+    for (const [checkId, code] of testCase.codes) {
+      const codes = codesIn(report, checkId)
+      if (!codes.includes(code)) {
+        throw new Error(testCase.name + ': expected ' + checkId + '/' + code + ', got ' + JSON.stringify(codes))
+      }
+    }
+    if (testCase.assert !== undefined) testCase.assert(report)
+    assertNoUndefinedValues(report)
+    console.log('PASS', 'check-code', testCase.name)
+  }
+  console.log('PASS check-code-coverage (' + codeCases.length + ' cases)')
+}
+
+await runCheckCodeCoverageTests()
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)

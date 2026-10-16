@@ -7,6 +7,9 @@ import { renderUml, parseUml, parseFindings, reviewUml, diffModels, explainLabel
 // White-box surface: the timing family's own contract, which the entry points reach only
 // through a render or a review. Static, because the module has no dsh dependency.
 import { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES } from '../../lib/uml.js'
+// The profile family is the one whose notation only approximates it, so its parse
+// refuses as a matter of design and the module is reached directly.
+import { validateProfileModel, reviewProfileModel, profileModule, PROFILE_FINDING_CODES } from '../../lib/uml.js'
 
 let failures = 0
 function test(name, fn) {
@@ -1325,6 +1328,323 @@ test('timing white box: a parse names a state it cannot resolve, and names the m
     throw new Error('a duplicate lifeline must be reported: ' + JSON.stringify(twice.warnings))
   }
   if (twice.model.lifelines[0].kind !== 'concise') throw new Error('the first declaration wins: ' + JSON.stringify(twice.model.lifelines))
+})
+
+// -------------------------- the remaining family codes, one input shape each, by name --
+
+// The checks above drive the entry points the way a caller does. These are the codes those
+// checks never named, and each one needs an input shape of its own: a use case diagram with
+// no actor, a relation endpoint nothing declares, a structure node with no name, one guard
+// written twice for the same event. Every row pairs the code with that input, so the code is
+// pinned to a diagram rather than to a sentence about diagrams, and `check` states the
+// evidence the source attaches - which element, which cycle, which declaration was dropped.
+const actorlessUseCase = ['@startuml', '(Login)', '@enduml'].join('\n')
+const useCaselessActor = ['@startuml', ':Customer:', '@enduml'].join('\n')
+const unreachedUseCase = ['@startuml', ':Customer: --> (Login)', '(Admin)', '@enduml'].join('\n')
+const danglingUseCase = ['@startuml', ':Customer: --> (Login)', ':Customer: --> Missing', '@enduml'].join('\n')
+const useCaseIncludeCycle = [
+  '@startuml',
+  ':Customer: --> (Pay)',
+  '(Pay) .> (Ship) : <<include>>',
+  '(Ship) .> (Pay) : <<include>>',
+  '@enduml',
+].join('\n')
+const useCaseWithForeignDeclaration = ['@startuml', ':Customer: --> (Login)', 'class Order', '@enduml'].join('\n')
+const undocumentedComponents = ['@startuml', 'component SVC', 'component PAY', 'SVC --> PAY', '@enduml'].join('\n')
+const documentedComponents = ['@startuml', 'component [Order Service] as SVC', 'component [Payment Adapter] as PAY', 'SVC --> PAY', '@enduml'].join('\n')
+
+// Two arrows for one event carry the same guard text, so which branch fires is unresolved.
+// The third branch is the complement of that text, so the group is probably exhaustive and
+// the repeated guard is the only thing left for the review to name.
+const overlappingGuardModel = {
+  schemaVersion: 1,
+  init: 'IDLE',
+  states: [{ id: 'IDLE' }, { id: 'RUN', terminal: true }, { id: 'STOP', terminal: true }],
+  transitions: [
+    { from: 'IDLE', event: 'go', guard: { variable: 'retry', op: '<', value: 3 }, to: 'RUN' },
+    { from: 'IDLE', event: 'go', guard: { variable: 'retry', op: '<', value: 3 }, to: 'STOP' },
+    { from: 'IDLE', event: 'go', guard: { variable: 'retry', op: '>=', value: 3 }, to: 'STOP' },
+  ],
+  variables: [{ name: 'retry', kind: 'integer', init: 0, min: 0, max: 3 }],
+}
+
+const unnamedCodeCases = [
+  {
+    code: 'UML030_USE_CASE_NO_ACTORS',
+    severity: 'error',
+    input: { diagram: actorlessUseCase },
+    check: (found) => {
+      if (found[0].evidence.actors !== 0) throw new Error('the finding must count the actors: ' + JSON.stringify(found[0].evidence))
+    },
+  },
+  {
+    code: 'UML031_USE_CASE_NO_USE_CASES',
+    severity: 'error',
+    input: { diagram: useCaselessActor },
+    check: (found) => {
+      if (found[0].evidence.useCases !== 0) throw new Error('the finding must count the use cases: ' + JSON.stringify(found[0].evidence))
+    },
+  },
+  {
+    code: 'UML033_USE_CASE_WITHOUT_ACTOR',
+    severity: 'warning',
+    input: { diagram: unreachedUseCase },
+    check: (found, report) => {
+      // Login is reached through the association, Admin by nothing: only Admin is named.
+      const ids = found.map((finding) => finding.evidence.id)
+      if (JSON.stringify(ids) !== '["Admin"]') throw new Error('the unreachable use case must be named: ' + JSON.stringify(ids) + ' from ' + JSON.stringify(codes(report)))
+    },
+  },
+  {
+    code: 'UML034_DANGLING_RELATION_ENDPOINT',
+    severity: 'error',
+    input: { diagram: danglingUseCase },
+    check: (found, report) => {
+      if (JSON.stringify(found[0].evidence.ids) !== '["Missing"]' || found[0].detail !== 'Missing') {
+        throw new Error('the endpoint nothing declares must be named: ' + JSON.stringify(found[0].evidence) + ' / ' + String(found[0].detail) + ' from ' + JSON.stringify(codes(report)))
+      }
+    },
+  },
+  {
+    code: 'UML035_INCLUDE_EXTEND_CYCLE',
+    severity: 'error',
+    input: { diagram: useCaseIncludeCycle },
+    check: (found, report) => {
+      if (JSON.stringify(found[0].evidence.path) !== '["Pay","Ship","Pay"]' || found[0].detail !== 'Pay -> Ship -> Pay') {
+        throw new Error('the cycle must be carried as the path that closes it: ' + String(found[0].detail) + ' from ' + JSON.stringify(codes(report)))
+      }
+    },
+  },
+  {
+    code: 'UML040_STRUCTURE_NODE_UNDOCUMENTED',
+    severity: 'info',
+    input: { diagram: undocumentedComponents },
+    check: (found, report) => {
+      const ids = found.map((finding) => finding.evidence.id).sort()
+      if (JSON.stringify(ids) !== '["PAY","SVC"]') throw new Error('every node with no label is reported, and only those: ' + JSON.stringify(ids) + ' from ' + JSON.stringify(codes(report)))
+      // A label is the documentation: a node that carries one is silent.
+      const labelled = reviewUml({ diagram: documentedComponents })
+      if (findFinding(labelled, 'UML040_STRUCTURE_NODE_UNDOCUMENTED').length !== 0) {
+        throw new Error('a labelled node must not be reported: ' + JSON.stringify(codes(labelled)))
+      }
+    },
+  },
+  {
+    code: 'UML005_OVERLAPPING_GUARD',
+    severity: 'warning',
+    input: { model: overlappingGuardModel },
+    check: (found, report) => {
+      if (JSON.stringify(found[0].transitions) !== '[{"from":"IDLE","event":"go","to":"STOP"}]') {
+        throw new Error('the branch that repeats the guard must be named: ' + JSON.stringify(found[0].transitions) + ' from ' + JSON.stringify(codes(report)))
+      }
+    },
+  },
+  {
+    code: 'UML016_DIAGRAM_PARSE_NOTES',
+    severity: 'warning',
+    input: { diagram: useCaseWithForeignDeclaration },
+    check: (found, report) => {
+      if (!found[0].message.includes('class') || !String(found[0].detail).includes('class Order')) {
+        throw new Error('the declaration the family dropped must be named: ' + found[0].message + ' / ' + String(found[0].detail) + ' from ' + JSON.stringify(codes(report)))
+      }
+    },
+  },
+]
+
+for (const item of unnamedCodeCases) {
+  test('review: ' + item.code + ' is produced by its own input', () => {
+    const report = reviewUml(item.input)
+    const found = findFinding(report, item.code)
+    if (found.length === 0) throw new Error(item.code + ' missing; the review reported ' + JSON.stringify(codes(report)))
+    if (found[0].severity !== item.severity) {
+      throw new Error(item.code + ' came back as ' + found[0].severity + ', not ' + item.severity + '; the review reported ' + JSON.stringify(codes(report)))
+    }
+    if (item.check !== undefined) item.check(found, report)
+  })
+}
+
+// ------------------------------------------------------- the profile family --
+
+// A profile is the family whose notation only approximates it: PlantUML has metaclass and
+// stereotype elements but no profile element, and an extension and a stereotype
+// generalization are both a `--|>`. So the model is the record, the drawing is a view of
+// it, and the parse refuses by name. These cases hold that line.
+const profileModel = {
+  schemaVersion: 1,
+  profile: { id: 'EJBP', label: 'EJB Profile' },
+  stereotypes: [{ id: 'EJB', label: 'EJB' }, { id: 'Stateless', label: 'Stateless' }],
+  metaclasses: [{ id: 'Component', label: 'Component' }, { id: 'Class', label: 'Class' }],
+  extensions: [{ stereotype: 'EJB', metaclass: 'Component', multiplicity: '0..1', label: 'base' }],
+  applications: [{ profile: 'EJBP', applyTo: 'Shop' }],
+  generalizations: [{ general: 'EJB', specific: 'Stateless' }],
+}
+
+test('profile: the drawing carries what the picture cannot', () => {
+  const rendered = renderUml(profileModel, 'plantuml', 'profile')
+  for (const needle of [
+    "'dsh-model-everything:uml v1 notation=plantuml family=profile",
+    "'dsh-model-everything:profile EJBP",
+    'metaclass "Component" as Component',
+    'class "EJB" <<stereotype>> as EJB',
+    "'dsh-model-everything:profileExtension EJB -> Component 0..1 base",
+    "'dsh-model-everything:profileApply EJBP -> Shop",
+    'EJB --|> Component',
+    'Stateless --|> EJB',
+  ]) {
+    if (!rendered.primary.includes(needle)) throw new Error('missing ' + needle + '\n' + rendered.primary)
+  }
+  // The approximation is declared, not implied.
+  if (!rendered.warnings.some((warning) => warning.includes('UML_RENDER_APPROXIMATE_VIEW'))) {
+    throw new Error('the approximate view must be named: ' + JSON.stringify(rendered.warnings))
+  }
+  // An id PlantUML cannot use becomes an alias, and the alias is written down.
+  const aliased = renderUml({ ...profileModel, metaclasses: [{ id: 'Class A', label: 'Class A' }], extensions: [] }, 'plantuml', 'profile')
+  if (!aliased.primary.includes("'dsh-model-everything:alias E1 Class A")) {
+    throw new Error('an unusable id must be aliased:\n' + aliased.primary)
+  }
+  // Rendering is determinate and does not drift between calls.
+  if (renderUml(profileModel, 'plantuml', 'profile').primary !== rendered.primary) throw new Error('rendering is not deterministic')
+})
+
+test('profile: the parse refuses by name, and says why', () => {
+  const text = renderUml(profileModel, 'plantuml', 'profile').primary
+  let refusal
+  try { parseUml(text) } catch (error) { refusal = error }
+  if (!(refusal instanceof UmlError)) throw new Error('the profile parse must refuse: ' + String(refusal))
+  if (refusal.code !== 'UML_NOT_A_STATE_DIAGRAM') throw new Error('refusal code: ' + refusal.code)
+  if (!refusal.message.includes('--|>')) throw new Error('the refusal must say what the notation cannot separate: ' + refusal.message)
+  // The module's own parse refuses the same way, so no caller can route around it.
+  let direct
+  try { profileModule.parse(text, 'plantuml') } catch (error) { direct = error }
+  if (!(direct instanceof UmlError) || direct.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('module parse: ' + String(direct))
+})
+
+test('profile: a model is reviewed, a diagram is not pretended to be read', () => {
+  const report = reviewUml({ model: profileModel, diagramKind: 'profile' })
+  if (report.source !== 'model') throw new Error('source: ' + report.source)
+  if (report.verdict === 'fail') throw new Error('this profile must not fail: ' + report.verdictReason)
+  // `Class` is declared and no stereotype extends it, which is the one real finding here.
+  if (!codes(report).includes('UML052_PROFILE_EXTENSION_MISSING')) {
+    throw new Error('missing UML052 in ' + JSON.stringify(codes(report)))
+  }
+  if (report.primary === undefined || !report.primary.includes('<<stereotype>>')) throw new Error('the review must also render the drawing')
+
+  const byDiagram = reviewUml({ diagram: renderUml(profileModel, 'plantuml', 'profile').primary })
+  if (byDiagram.verdict === 'fail') throw new Error('an unreadable-but-drawn family must not fail the review: ' + byDiagram.verdictReason)
+  if (!codes(byDiagram).includes('UML018_FIDELITY_UNCHECKED')) throw new Error('the review must say the text was not read: ' + JSON.stringify(codes(byDiagram)))
+  const note = findFinding(byDiagram, 'UML018_FIDELITY_UNCHECKED')[0]
+  if (!note.message.includes('cannot be read back')) throw new Error('the note must say why: ' + note.message)
+})
+
+test('profile: mermaid has no profile diagram', () => {
+  let refusal
+  try { renderUml(profileModel, 'mermaid', 'profile') } catch (error) { refusal = error }
+  if (!(refusal instanceof UmlError) || refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('render: ' + String(refusal))
+  if (!refusal.message.includes('plantuml')) throw new Error('the refusal must name the notation that works: ' + refusal.message)
+})
+
+test('profile: every code the family declares is produced by its own case', () => {
+  const one = (model) => reviewProfileModel({ schemaVersion: 1, ...model }, {}).map((finding) => finding.code)
+  const cases = [
+    ['UML050_PROFILE_NO_STEREOTYPES', { profile: { id: 'P' }, stereotypes: [], metaclasses: [], extensions: [], applications: [], generalizations: [] }],
+    ['UML051_PROFILE_UNUSED_STEREOTYPE', {
+      profile: { id: 'P', label: 'P' },
+      stereotypes: [{ id: 'Used', label: 'Used' }, { id: 'Orphan', label: 'Orphan' }],
+      metaclasses: [{ id: 'M', label: 'M' }],
+      extensions: [{ stereotype: 'Used', metaclass: 'M' }],
+      applications: [{ profile: 'P', applyTo: 'X' }],
+      generalizations: [],
+    }],
+    ['UML052_PROFILE_EXTENSION_MISSING', {
+      // Every stereotype is used — one extends, one specialises — so UML051 does not
+      // apply, and the only thing wrong is that `Unused` is extended by nobody.
+      profile: { id: 'P', label: 'P' },
+      stereotypes: [{ id: 'Base', label: 'Base' }, { id: 'Special', label: 'Special' }],
+      metaclasses: [{ id: 'Component', label: 'Component' }, { id: 'Unused', label: 'Unused' }],
+      extensions: [{ stereotype: 'Base', metaclass: 'Component' }],
+      applications: [{ profile: 'P', applyTo: 'X' }],
+      generalizations: [{ general: 'Base', specific: 'Special' }],
+    }],
+    ['UML053_PROFILE_GENERALIZATION_CYCLE', {
+      profile: { id: 'P', label: 'P' },
+      stereotypes: [{ id: 'A', label: 'A' }, { id: 'B', label: 'B' }],
+      metaclasses: [{ id: 'M', label: 'M' }],
+      extensions: [{ stereotype: 'A', metaclass: 'M' }],
+      applications: [{ profile: 'P', applyTo: 'X' }],
+      generalizations: [{ general: 'A', specific: 'B' }, { general: 'B', specific: 'A' }],
+    }],
+    ['UML054_PROFILE_UNDECLARED_REFERENCE', {
+      profile: { id: 'P', label: 'P' },
+      stereotypes: [{ id: 'A', label: 'A' }],
+      metaclasses: [{ id: 'M', label: 'M' }],
+      extensions: [{ stereotype: 'A', metaclass: 'M' }],
+      applications: [{ profile: 'P', applyTo: 'X' }],
+      generalizations: [],
+      undeclared: ['Ghost'],
+    }],
+    ['UML055_PROFILE_APPLICATION_MISSING', {
+      profile: { id: 'P', label: 'P' },
+      stereotypes: [{ id: 'A', label: 'A' }],
+      metaclasses: [{ id: 'M', label: 'M' }],
+      extensions: [{ stereotype: 'A', metaclass: 'M' }],
+      applications: [],
+      generalizations: [],
+    }],
+    ['UML056_PROFILE_UNDOCUMENTED', {
+      // Documented everywhere it can be except the stereotype, which is what this code is
+      // about: `label` absent and no `labels` entry either.
+      profile: { id: 'P', label: 'P' },
+      stereotypes: [{ id: 'A' }],
+      metaclasses: [{ id: 'M', label: 'M' }],
+      extensions: [{ stereotype: 'A', metaclass: 'M' }],
+      applications: [{ profile: 'P', applyTo: 'X' }],
+      generalizations: [],
+    }],
+  ]
+  const covered = new Set(cases.map(([code]) => code))
+  const missing = PROFILE_FINDING_CODES.filter((code) => !covered.has(code))
+  if (missing.length > 0) throw new Error('codes with no case: ' + missing.join(', '))
+  for (const [code, model] of cases) {
+    const produced = one(model)
+    if (!produced.includes(code)) throw new Error(code + ' missing from ' + JSON.stringify(produced))
+    // Every case is about one defect. Two codes sit beside anything and are allowed to
+    // co-occur, because neither is a defect of the profile itself: UML049/UML056 say an
+    // id has no reader-facing name, and UML055 says a profile with nothing in it has no
+    // application either — which is true of the empty profile and of nothing else here.
+    const beside = new Set(['UML056_PROFILE_UNDOCUMENTED', 'UML055_PROFILE_APPLICATION_MISSING'])
+    const others = produced.filter((entry) => entry !== code && !beside.has(entry))
+    if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+  }
+  // UML056 is about the profile itself too, not only its stereotypes.
+  const bare = one({ profile: { id: 'P' }, stereotypes: [{ id: 'A', label: 'A' }], metaclasses: [{ id: 'M', label: 'M' }], extensions: [{ stereotype: 'A', metaclass: 'M' }], applications: [{ profile: 'P', applyTo: 'X' }], generalizations: [] })
+  if (!bare.includes('UML056_PROFILE_UNDOCUMENTED')) throw new Error('an undocumented profile must report UML056: ' + JSON.stringify(bare))
+})
+
+test('profile white box: the validator refuses by field', () => {
+  const base = { schemaVersion: 1, profile: { id: 'P' }, stereotypes: [], metaclasses: [], extensions: [], applications: [], generalizations: [] }
+  const refusals = [
+    ['must be an object with schemaVersion 1', 'x'],
+    ['must declare schemaVersion 1', { ...base, schemaVersion: 2 }],
+    ['needs a `profile` with a non-empty id', { ...base, profile: { id: '' } }],
+    ['every stereotype needs a non-empty string id', { ...base, stereotypes: [{ id: '' }] }],
+    ['duplicate stereotype id', { ...base, stereotypes: [{ id: 'A' }, { id: 'A' }] }],
+    ['declared as both a stereotype and a metaclass', { ...base, stereotypes: [{ id: 'A' }], metaclasses: [{ id: 'A' }] }],
+    ['every extension needs the metaclass it extends', { ...base, extensions: [{ stereotype: 'A' }] }],
+    ['extension multiplicity must be', { ...base, extensions: [{ stereotype: 'A', metaclass: 'M', multiplicity: 'many' }] }],
+    ['cannot generalize itself', { ...base, stereotypes: [{ id: 'A' }], generalizations: [{ general: 'A', specific: 'A' }] }],
+    ['every application needs a non-empty `applyTo`', { ...base, applications: [{ profile: 'P' }] }],
+  ]
+  for (const [needle, input] of refusals) {
+    let refusal
+    try { validateProfileModel(input) } catch (error) { refusal = error }
+    if (!(refusal instanceof UmlError) || refusal.code !== 'UML_INPUT') throw new Error(needle + ': not an UML_INPUT refusal: ' + String(refusal))
+    if (!refusal.message.includes(needle)) throw new Error('refusal for "' + needle + '" said: ' + refusal.message)
+  }
+  // Normalization keeps the declared shape only, and records what the model left dangling.
+  const normalized = validateProfileModel({ ...base, stereotypes: [{ id: 'A' }], extensions: [{ stereotype: 'A', metaclass: 'M' }] })
+  if (normalized.undeclared === undefined || !normalized.undeclared.includes('M')) {
+    throw new Error('an extension to an undeclared metaclass must be recorded: ' + JSON.stringify(normalized))
+  }
 })
 
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }
