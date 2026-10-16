@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-everything",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Modeling abstraction and automated review for designs and code, including a refactoring harness: UML diagrams, executable verification of machines and protocols with before/after regression, data-model and migration checks, concurrency claim routing, export to external checkers, dependency-graph review, and report diffing. Native plugin for DeepSeek Harness (dsh).",
   "type": "module",
   "main": "lib/index.js",
@@ -53,7 +53,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint:md": "markdownlint --dot --ignore \"**/node_modules/**\" .",
     "bump": "node scripts/bump-version.mjs",
-    "test:engine": "npm run build && node tests/engine/run.mjs && node tests/data-engine/run.mjs && node tests/concurrency/run.mjs && node tests/uml/run.mjs && node tests/apply-smoke.mjs && node tests/memory/run.mjs && node tests/skills/run.mjs && node tests/structure/run.mjs && node tests/baseline/run.mjs && node tests/granularity/run.mjs && node tests/exporters/run.mjs && node tests/report-view/run.mjs && node tests/contracts/run.mjs && node tests/negatives/run.mjs && node tests/external/run.mjs",
+    "test:engine": "npm run build && node tests/engine/run.mjs && node tests/data-engine/run.mjs && node tests/concurrency/run.mjs && node tests/uml/run.mjs && node tests/apply-smoke.mjs && node tests/memory/run.mjs && node tests/skills/run.mjs && node tests/skill-routing/run.mjs && node tests/structure/run.mjs && node tests/baseline/run.mjs && node tests/granularity/run.mjs && node tests/exporters/run.mjs && node tests/report-view/run.mjs && node tests/contracts/run.mjs && node tests/tool-boundary/run.mjs && node tests/negatives/run.mjs && node tests/external/run.mjs",
     "test:full": "npm run build && node tests/full-suite.mjs"
   },
   "peerDependencies": {

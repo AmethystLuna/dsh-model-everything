@@ -106,7 +106,12 @@ function cmdAudit(config) {
   const declaredPaths = new Set(declared(config).map((d) => d.path));
   const current = config.version;
   const excludes = config.audit?.exclude || [];
-  const skipDirs = new Set(['.git', 'node_modules']);
+  // A directory in `exclude` excludes the whole subtree, not just a file that happens to
+  // share its name. `.github` used to be in the list and did nothing: the memory tree
+  // records the *host* releases this plugin was measured against (`dsh 0.2.0-rc.2`), and a
+  // name-only match walked straight into it and reported the host's version as an
+  // undeclared plugin version.
+  const skipDirs = new Set(['.git', 'node_modules', ...excludes.map((entry) => path.normalize(entry))]);
   const exclNames = new Set(excludes.map((e) => path.basename(e)));
   const exclPaths = new Set(excludes.map((e) => path.normalize(e)));
 
