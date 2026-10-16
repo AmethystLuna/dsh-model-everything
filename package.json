@@ -19,22 +19,26 @@
     "src",
     "skills",
     "cordis.patch.yml",
-    "examples"
+    "examples",
+    "locale"
   ],
   "dsh": {
     "engines": {
-      "dsh": ">=0.2.0-rc.1"
+      "dsh": ">=0.1.7-alpha.2"
     },
-    "category": "skill",
+    "category": "tools/dev",
     "displayName": "设计与代码的建模/自动化审查",
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "compatibility": {
-      "dsh": "^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-alpha.2",
+      "dsh": "^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1",
       "dshReleases": {
+        "0.1.7-alpha.2": "compatible",
+        "0.1.7-rc.1": "compatible",
+        "0.1.7-rc.2": "compatible",
+        "0.2.0-rc.2": "compatible",
         "0.2.0-rc.1": "unknown",
-        "0.2.0-rc.2": "unknown",
         "0.2.1-alpha.1": "unknown",
         "0.2.1-alpha.2": "unknown"
       },
@@ -47,17 +51,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint:md": "markdownlint --dot --ignore \"**/node_modules/**\" .",
     "bump": "node scripts/bump-version.mjs",
     "test:engine": "npm run build && node tests/engine/run.mjs && node tests/data-engine/run.mjs && node tests/concurrency/run.mjs && node tests/uml/run.mjs && node tests/apply-smoke.mjs && node tests/memory/run.mjs && node tests/skills/run.mjs && node tests/structure/run.mjs && node tests/baseline/run.mjs && node tests/granularity/run.mjs && node tests/exporters/run.mjs && node tests/report-view/run.mjs && node tests/external/run.mjs",
     "test:full": "npm run build && node tests/full-suite.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-agent": "^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-alpha.2",
-    "@deepseek-ai/dsh-llm": "^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-alpha.2",
-    "@deepseek-ai/dsh-session": "^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-alpha.2",
-    "@deepseek-ai/dsh-skill-filesystem": "^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-alpha.2",
-    "@deepseek-ai/dsh-tools": "^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-alpha.2",
+    "@deepseek-ai/dsh-agent": "^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1",
+    "@deepseek-ai/dsh-llm": "^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session": "^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1",
+    "@deepseek-ai/dsh-skill-filesystem": "^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1",
+    "@deepseek-ai/dsh-tools": "^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "devDependencies": {
@@ -79,6 +84,7 @@
     "@deepseek-ai/dsh-user-approval": "^0.2.0-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4",
     "@types/node": "^26.6.4",
+    "markdownlint-cli": "0.42.0",
     "typescript": "^7.0.2"
   },
   "author": {
