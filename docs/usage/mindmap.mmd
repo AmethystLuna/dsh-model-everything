@@ -1,0 +1,56 @@
+mindmap
+root((how a plugin gets used))
+  the five surfaces dsh gives a plugin
+    the catalog row
+      every turn, for every session
+      truncated at 500 characters
+        the rest is never shown to the model
+    the skill body
+      only when the skill loads
+      the model chooses, from the row alone
+    the reference hint
+      dsh points the model at the references after loading
+      the model decides whether the summary was enough
+    the tool schema
+      every turn, and never truncated
+      the only surface with no ceiling
+    the result
+      reaches the model only after it already chose
+      the one place that can route mid-task
+  what each surface costs
+    per turn, paid whether or not it is used
+      catalog rows, 3256 characters
+      tool schemas, 9511 characters
+    on load, paid once
+      a skill body, 77794 characters across all of them
+    on follow-through
+      references, 151067 characters if every hint is taken
+  the asymmetry that decides everything
+    the truncated surface is the one the model routes on
+    the untruncated surface is the one it acts through
+      so a when clause belongs in the tool description
+        it is the only place with room for one
+    and neither surface is read after a tool has run
+      so the result has to carry the routing
+  what the numbers say is missing
+    0 of 12 tool descriptions open with a when clause
+      the model reads these every turn and acts through them
+    2 of 6 report families route to a sibling
+      a report that says nothing next leaves the model where it was
+    the catalog rows all fit, and none can grow
+  the routes that do not depend on the model noticing
+    a refusal names the sibling that would accept the input
+      the model is already holding the wrong tool when it finds out
+    nextSteps names the next tool, not the next idea
+      a step the model cannot act on is a step it skips
+    a finding code carries its domain in the prefix
+      so the model can tell which skill explains it
+    the report names the schema it follows
+      the reading skill exists for exactly that
+  where a usage claim is measurable
+    the catalog, by the routing corpus
+      measured at 93 of 93 on this plugin
+    the tool surface, by the same method
+      not measured yet: no corpus of tool-selection cases
+    the result surface, by whether it names a sibling
+      countable, and it is what the numbers above count

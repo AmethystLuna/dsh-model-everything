@@ -1,0 +1,70 @@
+{
+  "hostFacts": {
+    "catalogBudget": "500",
+    "truncation": "not found",
+    "resourceHint": "Load referenced resources only as needed.\"];\n\tswitch (base.kind) {\n\t\tcase \"directory\""
+  },
+  "surfaces": {
+    "catalog": 3256,
+    "bodies": 77794,
+    "references": 151067,
+    "referenceFiles": 10,
+    "toolChars": 9511,
+    "toolCount": 12
+  },
+  "toolsWithWhen": 0,
+  "routingFamilies": [
+    "structure",
+    "uml"
+  ],
+  "tools": [
+    {
+      "name": "model_compose_verify",
+      "chars": 656
+    },
+    {
+      "name": "model_concurrency_scan",
+      "chars": 847
+    },
+    {
+      "name": "model_datamodel_verify",
+      "chars": 708
+    },
+    {
+      "name": "model_design_review",
+      "chars": 968
+    },
+    {
+      "name": "model_export",
+      "chars": 689
+    },
+    {
+      "name": "report_diff",
+      "chars": 754
+    },
+    {
+      "name": "uml_structure_verify",
+      "chars": 959
+    },
+    {
+      "name": "uml_explain_labels",
+      "chars": 367
+    },
+    {
+      "name": "uml_parse",
+      "chars": 827
+    },
+    {
+      "name": "uml_render",
+      "chars": 826
+    },
+    {
+      "name": "uml_review",
+      "chars": 656
+    },
+    {
+      "name": "model_verify",
+      "chars": 1254
+    }
+  ]
+}
