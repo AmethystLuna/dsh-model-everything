@@ -1,6 +1,6 @@
 ---
 name: model-everything-structure
-description: "Use when reviewing architecture, module structure or a dependency diagram: parse a component, package, class or deployment diagram into a dependency graph and check isolated nodes, dangling endpoints, cycles, allowed-dependency violations, layer violations and missing required edges. Audits the diagram, not the code — reconcile it with a source-side scan. Doctrine: the model-everything skill."
+description: "Use when reviewing architecture, module structure or a dependency diagram: parse a component, package, class, object or deployment diagram into a dependency graph and check isolated nodes, dangling endpoints, cycles, allowed-dependency violations, layer violations and missing required edges, across one level or several. Audits the diagram, not the code — reconcile it with a source-side scan. Doctrine: the model-everything skill."
 ---
 
 # Model Everything — Structure and Dependency Review

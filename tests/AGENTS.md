@@ -84,6 +84,24 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
   believing a "not caught" result: swallowing a brace once produced a syntax error that read
   as a passing test.
 
+## Routing, where the user meets the plugin
+
+`tests/skill-routing/` holds the skill-selection corpus: what a user says, and which skill
+should answer. Its structural half runs in `npm run test:engine` and needs no model - it
+checks that every case names a shipped skill, that every skill is a trigger somewhere and a
+near miss somewhere else, and that the words a case relies on survive in the **visible**
+catalog budget (500 characters, the rest is truncated away at the moment the model decides).
+
+The scoring half is run by hand, because the plugin never calls a model:
+
+```bash
+node tests/skill-routing/run.mjs --print-prompt          # the question, as the model sees it
+node tests/skill-routing/run.mjs --decisions answer.json # score {"0": "<skill>", ...}
+```
+
+A misroute is a corpus or a description defect, not a model defect: fix whichever of the two
+the answer exposes, then re-run.
+
 ## House rules the suites follow
 
 - One directory per suite, `run.mjs`, zero dependencies, `console.log('PASS', name)` on
