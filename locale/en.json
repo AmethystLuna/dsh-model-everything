@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Modeling / Automated Review for Designs and Code",
+    "description": "Automated review instead of repeated trial and error: the tokens it saves go back into the design. What the doc says is cross-checked against the source; behaviour and flow are modelled and checked."
+  }
+}
