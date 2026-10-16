@@ -1,0 +1,147 @@
+{
+  "ciGates": [
+    "npm ci --legacy-peer-deps",
+    "npm run typecheck",
+    "npm run build",
+    "npm run test:engine",
+    "git diff --exit-code -- lib",
+    "npm run lint:md"
+  ],
+  "nodeVersions": [
+    "20, 22"
+  ],
+  "codeFiles": [
+    {
+      "file": "data-engine.ts",
+      "count": 73
+    },
+    {
+      "file": "engine.ts",
+      "count": 72
+    },
+    {
+      "file": "uml.ts",
+      "count": 32
+    },
+    {
+      "file": "design-engine.ts",
+      "count": 26
+    },
+    {
+      "file": "structure.ts",
+      "count": 11
+    },
+    {
+      "file": "uml-timing.ts",
+      "count": 10
+    },
+    {
+      "file": "uml-usecase.ts",
+      "count": 10
+    },
+    {
+      "file": "uml-composite.ts",
+      "count": 8
+    },
+    {
+      "file": "uml-profile.ts",
+      "count": 8
+    },
+    {
+      "file": "uml-communication.ts",
+      "count": 6
+    },
+    {
+      "file": "uml-interaction-overview.ts",
+      "count": 6
+    },
+    {
+      "file": "granularity.ts",
+      "count": 5
+    },
+    {
+      "file": "concurrency.ts",
+      "count": 1
+    },
+    {
+      "file": "uml-structure.ts",
+      "count": 1
+    }
+  ],
+  "provenance": [
+    {
+      "path": "model-everything/references/dsh-model-schema.md",
+      "hasProvenance": true,
+      "citesSource": true
+    },
+    {
+      "path": "model-everything/references/gap-routing-guide.md",
+      "hasProvenance": false,
+      "citesSource": false
+    },
+    {
+      "path": "model-everything/references/hash-spec.md",
+      "hasProvenance": false,
+      "citesSource": false
+    },
+    {
+      "path": "model-everything/references/logic-verification-guide.md",
+      "hasProvenance": true,
+      "citesSource": true
+    },
+    {
+      "path": "model-everything-concurrency/references/concurrency-risk-guide.md",
+      "hasProvenance": false,
+      "citesSource": false
+    },
+    {
+      "path": "model-everything-datamodel/references/data-model-guide.md",
+      "hasProvenance": true,
+      "citesSource": true
+    },
+    {
+      "path": "model-everything-datamodel/references/data-model-schema.md",
+      "hasProvenance": false,
+      "citesSource": false
+    },
+    {
+      "path": "model-everything-report-reading/references/reading-a-report.md",
+      "hasProvenance": false,
+      "citesSource": false
+    },
+    {
+      "path": "model-everything-structure/references/structure-review-guide.md",
+      "hasProvenance": true,
+      "citesSource": true
+    },
+    {
+      "path": "model-everything-uml/references/uml-modeling-guide.md",
+      "hasProvenance": false,
+      "citesSource": false
+    }
+  ],
+  "suites": [
+    "baseline",
+    "catalog",
+    "concurrency",
+    "contracts",
+    "contributing",
+    "data-engine",
+    "design-engine",
+    "engine",
+    "exporters",
+    "external",
+    "fixtures",
+    "granularity",
+    "memory",
+    "negatives",
+    "report-reading",
+    "report-view",
+    "routing-map",
+    "skill-routing",
+    "skills",
+    "structure",
+    "tool-boundary",
+    "uml"
+  ]
+}
