@@ -16,7 +16,7 @@ metadata:
 | `name` | 设计与代码的建模/自动化审查 |
 | `nameEn` | Modeling / Automated Review for Designs and Code |
 | `author` | Amethyst Luna |
-| `repo` | https://github.com/AmethystLuna/dsh-model-everything |
+| `repo` | <https://github.com/AmethystLuna/dsh-model-everything> |
 | `category` / `subcategory` | `tools/dev` / `review` |
 | `description` | 自动化审查替代反复试错——省下的 token，留给设计。文档与源码交叉验证；行为与流程建模核查。 |
 | `descriptionEn` | Automated review instead of repeated trial and error: the tokens it saves go back into the design. What the doc says is cross-checked against the source; behaviour and flow are modelled and checked. |

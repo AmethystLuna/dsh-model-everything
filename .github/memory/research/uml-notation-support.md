@@ -47,7 +47,7 @@ classDiagram
 
 - **PlantUML - class diagram: faithful.** Declarative elements include `class`, `abstract`, `interface`, `enum`, `annotation`, `metaclass`, `stereotype`, plus visibility, generics, notes, packages and stereotypes. Relations: Extension `<|--`, Implementation `<|..`, Composition `*--`, Aggregation `o--`, Dependency `-->`/`..>` (docs: <https://plantuml.com/en/class-diagram>, source: <http://alphadoc.plantuml.com/raw/markdown/en/class-diagram>).
 
-~~~
+~~~plantuml
 @startuml
 class Animal { +int age +isMammal() : bool }
 abstract class Duck
@@ -65,7 +65,7 @@ Animal "1" o-- "0..*" Duck : owns
 - **Mermaid - no native support.** No object-diagram page exists in the Mermaid docs sidebar/type list (<https://mermaid.js.org/intro/>); `classDiagram` has no documented instance/slot notation. Marked **none**.
 - **PlantUML - object diagram: faithful.** Documented `object` keyword with attribute/value bodies and class-diagram relation symbols for links (<https://plantuml.com/en/object-diagram>, source: <http://alphadoc.plantuml.com/raw/markdown/en/object-diagram>).
 
-~~~
+~~~plantuml
 @startuml
 object alice { name = "Alice" }
 object bob { name = "Bob" }
@@ -89,9 +89,10 @@ classDiagram
 ~~~
 
   (The `..>` here is a plain class relationship, not a UML PackageImport.)
+
 - **PlantUML - faithful.** `package "Name" { ... }` with nesting and `packageStyle` is documented on the class-diagram page; dependencies between packages use the class relation symbols. Import/merge are drawn as labelled dependencies rather than first-class elements - a small gap (**approximation of PackageImport/PackageMerge semantics**). <https://plantuml.com/en/class-diagram>
 
-~~~
+~~~plantuml
 @startuml
 package "Ordering" { class Order }
 package "Billing" { class Invoice }
@@ -116,7 +117,7 @@ C4Component
 
 - **PlantUML - faithful.** `component [Name]`, `component X as Y`, interfaces via `()` or the `interface` keyword, provided/required ("lollipop/socket") connections, grouping with `package/node/folder/frame/cloud/database`, and ports (`port`, `portin`, `portout`). <https://plantuml.com/en/component-diagram>, source <http://alphadoc.plantuml.com/raw/markdown/en/component-diagram> (section "## Port [port, portIn, portOut]").
 
-~~~
+~~~plantuml
 @startuml
 component [Web Server]
 () "REST API" as API
@@ -135,7 +136,7 @@ component [Database]
 - **Mermaid - no native support.** No composite-structure page in the type list; nothing documents parts, ports or connectors. **none.**
 - **PlantUML - approx.** PlantUML documents **no** composite-structure diagram page. Ports (`port`, `portin`, `portout`) are documented *inside components and nodes* (component/deployment pages), and nested components/nodes give "parts"; connectors are drawn as ordinary links. The PlantUML author's answer to "Composite Structure Diagrams?" (QA-547, <https://forum.plantuml.net/547/composite-structure-diagrams>) shows nested component/port syntax and states "All this is undocumented, but we are working on this...". No documented Connector/ConnectorEnd or collaboration-role notation => **approx**.
 
-~~~
+~~~plantuml
 @startuml
 component C {
   port p1
@@ -166,7 +167,7 @@ architecture-beta
 
 - **PlantUML - faithful.** Documented "Deployment Diagram" with `node`, `artifact`, `database`, `cloud`, `folder`, `frame`, `component`, links, and the same port keywords. <https://plantuml.com/en/deployment-diagram>, source <http://alphadoc.plantuml.com/raw/markdown/en/deployment-diagram>.
 
-~~~
+~~~plantuml
 @startuml
 node Server
 artifact app.jar
@@ -185,7 +186,7 @@ Server --> DB : JDBC
 - **Mermaid - no native support.** No profile page; class `<<annotation>>` markers are display labels only - no metaclass/extension/profile constructs. **none.**
 - **PlantUML - approx.** PlantUML's class diagram declares `metaclass` and `stereotype` elements and `class X <<stereotype>>`, with extension/generalization arrows (added in GH-1159; see "Declarative element" and "Relations between classes" in <http://alphadoc.plantuml.com/raw/markdown/en/class-diagram>). There is **no `profile` keyword and no Profile/ProfileApplication element** (the string "profile" does not occur in that page), so a profile diagram is only approximated.
 
-~~~
+~~~plantuml
 @startuml
 metaclass Component
 class "EJB" <<stereotype>>
@@ -212,7 +213,7 @@ Customer --> Checkout
 
 - **PlantUML - faithful.** Actors as `:Actor:` or `actor A`; use cases as `(UseCase)` or `usecase X as Y` (and business use cases `(X)/`, `usecase/`); system boundary as a `rectangle`; associations `--`/`-->`; `.> : include` and `.> : extends`; generalization `<|--`. <https://plantuml.com/en/use-case-diagram>, source <http://alphadoc.plantuml.com/raw/markdown/en/use-case-diagram>.
 
-~~~
+~~~plantuml
 @startuml
 actor Customer
 rectangle Shop {
@@ -241,7 +242,7 @@ flowchart TD
 
 - **PlantUML - faithful.** `start`/`stop`/`end`, `:action;`, `if/else`, `repeat`/`while`, `fork`/`fork again`/`end fork`/`end merge`, `partition`, `group`, swimlanes (`|Lane|`), `split`, notes, `detach`, `kill`. <https://plantuml.com/en/activity-diagram-beta>, source <http://alphadoc.plantuml.com/raw/markdown/en/activity-diagram-beta>.
 
-~~~
+~~~plantuml
 @startuml
 start
 :Fetch data;
@@ -272,7 +273,7 @@ stateDiagram-v2
 
 - **PlantUML - faithful.** `state`, `[*]`, transitions `A --> B : event`, composite/nested states, concurrent regions with `--`, `<<choice>>`, `<<fork>>`, `<<join>>`, `<<entryPoint>>`, `<<exitPoint>>`, `<<history>>`/`<<history*>>`, `<<end>>`, `<<sdlreceive>>`, notes. <https://plantuml.com/en/state-diagram>, source <http://alphadoc.plantuml.com/raw/markdown/en/state-diagram>.
 
-~~~
+~~~plantuml
 @startuml
 [*] --> Idle
 Idle --> Running : start
@@ -303,7 +304,7 @@ sequenceDiagram
 
 - **PlantUML - faithful.** `participant`/`actor`, message arrows, `activate`/`deactivate`/`destroy`, combined fragments `alt/else`, `opt`, `loop`, `par`, `break`, `critical`, `group`, and `ref over ... : ...` / `ref over X ... end ref` for InteractionUse, plus delays, dividers and autonumbering. <https://plantuml.com/en/sequence-diagram>, source <http://alphadoc.plantuml.com/raw/markdown/en/sequence-diagram>.
 
-~~~
+~~~plantuml
 @startuml
 participant Client
 participant Server
@@ -323,7 +324,7 @@ deactivate Server
 - **Mermaid - no native support.** No communication-diagram page exists in Mermaid's type list; nothing documents lifelines-plus-link-and-sequence-number notation. **none.**
 - **PlantUML - approx (manual, undocumented as a type).** <https://plantuml.com/en/communication-diagram> returns **404**, and the PlantUML navigation lists no Communication page. The closest documented constructs are the object diagram (objects + links) and the sequence diagram; sequence numbers have to be written as message labels. This is a hand-built approximation, not a PlantUML diagram type. **approx.**
 
-~~~
+~~~plantuml
 @startuml
 object ":Customer:" as C
 object ":Order:" as O
@@ -341,7 +342,7 @@ O --> O : 2: validate
 - **Mermaid - no native support.** Nothing in the Mermaid type list covers frames-with-interaction-references or combined fragments on a control-flow frame. **none.**
 - **PlantUML - approx (manual, no dedicated type).** PlantUML documents no interaction-overview page (navigation lists Sequence, Use Case, Class, Activity, Component, State, Object, Deployment, Timing only). The activity diagram provides the control-flow frame (`group`, `partition`, `fork`, `if`), and the sequence diagram provides `ref over`; combining them (activity nodes labelled as references to sequence diagrams) is a manual approximation, not a UML `ref` on an IO frame. **approx.**
 
-~~~
+~~~plantuml
 @startuml
 start
 group sd Login
@@ -364,7 +365,7 @@ endif
 - **Mermaid - no native support.** No timing-diagram page in Mermaid's type list (the only time-oriented diagram, Gantt, is not UML). **none.**
 - **PlantUML - faithful.** Documented lifeline signal kinds `robust`, `concise`, `binary`, `clock` (with `period`/`pulse`/`offset`), `analog`, `rectangle`; state changes with `@0` time points and the `is` verb; messages (`WU -> WB : URL`); anchor points and constraints (`@200 <-> @+150 : {150 ms}`); relative time, scale, hidden state, date/time axis, highlight, notes. <https://plantuml.com/en/timing-diagram>, source <http://alphadoc.plantuml.com/raw/markdown/en/timing-diagram>.
 
-~~~
+~~~plantuml
 @startuml
 robust "Browser" as WB
 concise "User" as WU
