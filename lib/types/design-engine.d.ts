@@ -142,7 +142,12 @@ export interface GraphFeatures {
     /** The largest strongly connected component, and its members when it has more than one. */
     largestCycle: string[];
     /** One canonical peeling: remove these and the graph is acyclic. */
-    feedbackArcs: Array<[string, string]>;
+    /** The edges whose removal makes the graph acyclic, and whether that count is a proven minimum. */
+    feedbackArcs: {
+        edges: Array<[string, string]>;
+        exact: boolean;
+        note: string;
+    };
     /** Removing one of these disconnects the graph. */
     articulationPoints: string[];
     /** Removing one of these disconnects the graph. */

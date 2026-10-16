@@ -53,7 +53,7 @@ It does not report that the hierarchy is badly designed.
 
 | Code | Level | What it means |
 |---|---|---|
-| `DES1_CYCLE` | violation | A dependency cycle. Reported with the edges a canonical peel cannot remove, and with the largest mutually reachable group. |
+| `DES1_CYCLE` | violation | A dependency cycle. Reported with the fewest edges whose removal makes the graph acyclic - an exact minimum for small cyclic parts, and an upper bound past that, with `facts.feedbackArcsExact` saying which - plus the largest mutually reachable group. |
 | `DES2_LAYER_ORDER` | violation | An edge that skips a declared layer, an upward edge, or a node two layers both claim. |
 | `DES3_BOUNDARY_LEAK` | violation | An edge across a declared boundary that no `allowedEdges` rule permits. Deny beats allow. |
 | `DES4_LOAD_BEARING_ELEMENT` | signal | An articulation point (removing it disconnects the graph) or a bridge (the only edge joining its two sides). |
@@ -104,9 +104,10 @@ dependencies is a *consistent* declaration, not a *good* one, and the report say
   from the strings.
 - **`DES4` is about the graph, not the design.** A gateway layer is supposed to be a node
   everything routes through; the point of the finding is that the design did not say so.
-- **The unpeelable edges are not a repair.** A minimum feedback arc set is NP-hard
-  (Garey & Johnson, 1979), so the report names the edges a peel cannot remove. For a cycle of
-  `n` nodes that is all `n` edges, while breaking it costs `n - 1`.
+- **The edge count is a minimum only where it says so.** A minimum feedback arc set is NP-hard
+  (Garey & Johnson, 1979). `DES1` decides it exactly by subset search while the cyclic part is
+  small, and past that limit reports the edges a canonical peel cannot remove - an upper bound.
+  `facts.feedbackArcsExact` is the flag, and the wording of the finding follows it.
 - **Complexity numbers are counts, not judgements.** `facts.cyclomatic` is McCabe's `E - V + 2P`
   over the dependency graph; a high number is a fact about the graph.
 - **This is not topology.** Ranks, articulation points, bridges and mutual reachability are
