@@ -79,7 +79,7 @@ Within a finding, the severity decides whether it changed the verdict:
 
 - **error** — this is what makes the verdict `fail`;
 - **warning** — reported, does not fail the delta;
-- **info** — context, for example that a single element makes two checks inseparable;
+- **info** — context, for example that one element makes an inseparable group of findings;
 - **undecided** — the search stopped before deciding. Not a pass. `summary.truncated` says the same
   thing for the report as a whole.
 

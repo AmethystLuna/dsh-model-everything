@@ -92,6 +92,28 @@ test('the guide names only fields the reports carry', () => {
   if (unknown.length > 0) throw new Error('the guide names fields no report carries: ' + unknown.join(', '))
 })
 
+test('the published copies are in step with their sources', () => {
+  // The package publishes `skills`, not `docs/`, so the guide has to live inside the skill to ship.
+  // The generator writes the source; this asserts the copy the model actually reads matches it.
+  execFileSync(process.execPath, [guideDir + '/sync-check.mjs'], { encoding: 'utf8', timeout: 60_000 })
+})
+
+test('the skill row fits the catalog budget with its triggers visible', () => {
+  const skill = readFileSync(root + 'skills/model-everything-report-reading/SKILL.md', 'utf8')
+  const match = /^description:\s*"([\s\S]*?)"\s*$/m.exec(skill)
+  if (match === null) throw new Error('the skill has no description')
+  const description = match[1]
+  // 500 is the catalog budget and the last three characters are the ellipsis, so a trigger has to be
+  // inside the first 497 or it is never shown to the model that has to route on it.
+  if (description.length > 500) throw new Error('the row is ' + String(description.length) + ' characters; the budget is 500')
+  const visible = description.slice(0, 497)
+  for (const trigger of ['reading a report', 'verdict', 'not prove', 'reading order']) {
+    if (!visible.toLowerCase().includes(trigger)) throw new Error('a trigger falls past the truncation: ' + trigger)
+  }
+  if (!/^Use when/.test(description)) throw new Error('the row must open with a trigger')
+  if (!description.includes('model-everything')) throw new Error('the row must name the sibling skill that produces a model')
+})
+
 if (failures > 0) {
   console.log('report-reading tests failed:', failures)
   process.exit(1)
