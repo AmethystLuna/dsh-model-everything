@@ -51,6 +51,13 @@ mindmap
       model_everything_structure["near miss x2 -> me-structure"]
       model_everything_uml["near miss x1 -> me-uml"]
       model_everything_concurrency["near miss x1 -> me-concurrency"]
+    me-report-reading["me-report-reading - 6 corpus trigger(s)"]
+      len["row: 420 of 500 chars"]
+      model_everything["near miss x1 -> me"]
+      model_everything_concurrency["near miss x1 -> me-concurrency"]
+      model_everything_datamodel["near miss x1 -> me-datamodel"]
+      model_everything_structure["near miss x1 -> me-structure"]
+      model_everything_uml["near miss x1 -> me-uml"]
     me-structure["me-structure - 7 corpus trigger(s)"]
       len["row: 476 of 500 chars"]
       uml_structure_verify["tool: uml_structure_verify"]
@@ -59,6 +66,7 @@ mindmap
       model_everything["near miss x2 -> me"]
       model_everything_datamodel["near miss x1 -> me-datamodel"]
       model_everything_design["near miss x1 -> me-design"]
+      model_everything_report_reading["near miss x1 -> me-report-reading"]
     me-uml["me-uml - 9 corpus trigger(s)"]
       len["row: 428 of 500 chars"]
       uml_render["tool: uml_render"]
@@ -78,7 +86,8 @@ mindmap
 | `model-everything-concurrency` | 341/500 | "this design claims the queue is thread-safe and lock-free"<br>"is this counter monotonic under concurrent writers?"<br>"the doc says the ISR-safe path touches no shared memory" | me x1, me-datamodel x1, me-uml x1, me-structure x1 |
 | `model-everything-datamodel` | 450/500 | "review this migration: the orders table gains a required column"<br>"does the migration preserve every required field?"<br>"our schema says ids are unique and no row may be orphaned - check the model" | me-uml x2, me-concurrency x2, me x2, me-structure x2 |
 | `model-everything-design` | 478/500 | "does this design keep its layering, or does something reach across a boundary"<br>"tag each module with its responsibilities and check the split"<br>"this interface forces callers to depend on methods they never call" | me-structure x2, me-uml x1, me-concurrency x1 |
-| `model-everything-structure` | 476/500 | "here is our component diagram, check for dependency cycles"<br>"the deployment diagram has a service calling the database directly, which our layers forbid"<br>"audit the module structure: which packages depend on which?" | me-uml x2, me-concurrency x2, me x2, me-datamodel x1, me-design x1 |
+| `model-everything-report-reading` | 420/500 | "the verify tool gave me a report - what does this verdict mean?"<br>"why did the review come out pass_with_findings instead of pass?"<br>"which findings should I act on in this report?" | me x1, me-concurrency x1, me-datamodel x1, me-structure x1, me-uml x1 |
+| `model-everything-structure` | 476/500 | "here is our component diagram, check for dependency cycles"<br>"the deployment diagram has a service calling the database directly, which our layers forbid"<br>"audit the module structure: which packages depend on which?" | me-uml x2, me-concurrency x2, me x2, me-datamodel x1, me-design x1, me-report-reading x1 |
 | `model-everything-uml` | 428/500 | "draw this retry flow as a state diagram"<br>"turn this model into PlantUML"<br>"someone drew this activity diagram - does it match the code?" | me-structure x3, me x2, me-datamodel x2 |
 
 ## The overlap that has to be resolved in words
