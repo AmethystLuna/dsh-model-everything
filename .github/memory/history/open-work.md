@@ -26,8 +26,8 @@ metadata:
 | 待办 | 说明 | 状态 |
 |---|---|---|
 | **报告解读工具／方法论／技能** | 报告已经能产出，但「怎么读这份报告、先看什么、什么可以忽略」原先散在 skill 正文与 `references/` 里。现有：`skills/model-everything-report-reading/`（技能 + `references/reading-a-report.md` 与同名 `.mmd`）、`docs/report-reading/`（图生成器、测量事实 `facts.json`、技能路由图、同步检查）、`tests/report-reading/`。**没有加工具**——这是个有依据的决定：报告不缺字段（`reportView` 已能选 digest/full，`report_diff` 已能比较两份），加工具只会复述它要传达的指引。图见[技能路由图](../../../docs/report-reading/skill-routing.mmd)。 | **完成**（2026-10-17） |
-| **社区贡献指南优化** | 分两种情形分别写：① **有学术指导的功能优化／补充意见**——需引用来源、说明改进的是哪个判据、以及如何验证；② **运行中遇到问题的 ticket**——需最小可复现的模型或图、实际判定、期望判定，以及报告里的 `verdict`／`verdictReason`／相关 `code`。 | **未开工**，先起思维导图（两种情形结构不同） |
-| **文档随新增内容继续更新** | 每一处新能力／新码／新行为都要落到对应文档，并保持中英成对。**当前已知缺口**：README 中英对（`README.md` / `README.en-US.md`）尚未提到报告解读技能与新的 `MATRIX_*`、`MODEL_UNRESOLVED_EVENT`、`S6_UNBOUNDED_VARIABLE` 等码；`skills/` 里的参考资料目前只有英文。 | **未开工** |
+| **社区贡献指南优化** | 仓库原先**根本没有贡献指南**（只有 `CODE_OF_CONDUCT.md`、CI 与 dependabot），所以是「从零写」而不是「优化」。现有 `CONTRIBUTING.md`（按两种情形分结构）、`.github/ISSUE_TEMPLATE/`（两种情形各一份模板 + `config.yml`）、`docs/contributing/`（由仓库测量的图与 `facts.json`）、`tests/contributing/`（七条：图不漂移、链接可达、计数与实际一致、门禁与 CI 一致、**引用的文献必须在仓库里有据**、两份模板各问对的东西、联系链接指向声明的仓库）。图见[贡献图](../../../docs/contributing/mindmap.mmd)。 | **完成**（2026-10-17） |
+| **文档随新增内容继续更新** | 每一处新能力／新码／新行为都要落到对应文档，并保持中英成对。**当前已知缺口**：README 中英对（`README.md` / `README.en-US.md`）尚未提到报告解读技能、贡献指南，以及本次新增的 `MATRIX_*`、`MODEL_UNRESOLVED_EVENT`、`S6_UNBOUNDED_VARIABLE` 等码；`skills/` 与 `docs/` 的参考资料目前只有英文。 | **未开工**，先起思维导图 |
 
 - **待办：非机器族 UML 校验器的引用解析审计**：use-case、class、timing、profile、composite、communication、interaction-overview 的 `validate*Model`/`review*Model` 只经 `parseUml`/`renderUml` 探过，审查者预计 D1-D3 那一族在那里还有更多。
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
