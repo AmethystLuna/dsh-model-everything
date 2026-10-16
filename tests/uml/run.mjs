@@ -1816,5 +1816,35 @@ test('composite: mermaid has no composite structure diagram', () => {
   if (!(refusal instanceof UmlError) || refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('render: ' + String(refusal))
 })
 
+test('entry: an entity-relationship diagram is refused, not read as a class diagram', () => {
+  // The cardinality is the tell. Read as a component diagram, `USER ||--o{ ORDER` becomes
+  // two components called `USER ||` and `o{ ORDER`, and the review passes a graph the
+  // diagram never drew.
+  const er = ['@startuml', 'entity USER {', '  *id : int', '}', 'entity ORDER {', '  *id : int', '}', 'USER ||--o{ ORDER', '@enduml'].join('\n')
+  const refusal = refusalOf(() => parseUml(er))
+  if (refusal.code !== 'UML_NOT_A_STATE_DIAGRAM') throw new Error('refusal code: ' + refusal.code)
+  if (!refusal.message.includes('entity-relationship')) throw new Error('the refusal must name what it is: ' + refusal.message)
+  if (!refusal.message.includes('dsh-model-everything-datamodel')) throw new Error('the refusal must route to what does cover it: ' + refusal.message)
+  // Through the review entry point the same refusal arrives as a failing report rather
+  // than a throw: an unreadable diagram is a result the caller can act on, not a crash.
+  const byReview = reviewUml({ diagram: er })
+  if (byReview.verdict !== 'fail') throw new Error('the review must fail on an unreadable diagram: ' + byReview.verdict)
+  const unreadable = findFinding(byReview, 'UML001_DIAGRAM_UNREADABLE')[0]
+  if (unreadable === undefined) throw new Error('codes: ' + JSON.stringify(codes(byReview)))
+  if (!unreadable.message.includes('entity-relationship')) throw new Error('the report must carry the reason: ' + unreadable.message)
+  if (!findFinding(byReview, 'UML018_FIDELITY_UNCHECKED').every((finding) => finding.severity === 'info')) throw new Error('a non-machine family reports fidelity as info')
+})
+
+test('entry: the ER refusal does not swallow the class diagram that shares its keyword', () => {
+  // `entity` is a class-diagram keyword too, and its members and `--` separator are spelled
+  // the same way as ER ones. Only the crow's-foot cardinality decides, so this must parse.
+  const asClass = ['@startuml', 'entity Foo {', '  +id : int', '  --', '  +name()', '}', 'entity Bar', 'Foo --> Bar', '@enduml'].join('\n')
+  const parsed = parseUml(asClass)
+  if (parsed.family !== 'class' && parsed.family !== 'component') throw new Error('family: ' + parsed.family)
+  const ids = (parsed.model.nodes ?? []).map((node) => node.id)
+  if (!ids.includes('Foo') || !ids.includes('Bar')) throw new Error('nodes: ' + JSON.stringify(ids))
+  if ((parsed.model.edges ?? []).length !== 1) throw new Error('edges: ' + JSON.stringify(parsed.model.edges))
+})
+
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }
 console.log('all uml tests passed')

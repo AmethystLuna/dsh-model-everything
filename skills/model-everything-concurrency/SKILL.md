@@ -1,6 +1,6 @@
 ---
 name: model-everything-concurrency
-description: "Use when a design or plan claims concurrency safety (thread-safe, lock-free, no data race, ISR-safe) or names shared state, mutexes, atomics or interrupts. Mines the claims and routes each to dedicated verification (TSan, Helgrind, CBMC, TLA+); it does not prove concurrency safety. Doctrine: the model-everything skill."
+description: "Use when a design or plan claims concurrency safety (thread-safe, lock-free, no data race, ISR-safe), or names concurrent writers, shared state, mutexes, atomics or interrupts. Mines the claims and routes each to dedicated verification (TSan, Helgrind, CBMC, TLA+); it does not prove concurrency safety. Doctrine: the model-everything skill."
 ---
 
 # Model Everything — Concurrency Claims
