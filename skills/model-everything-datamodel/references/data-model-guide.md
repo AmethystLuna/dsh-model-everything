@@ -48,7 +48,29 @@ Order    | userId     | uuid    | yes      | no     | no       | FK -> User.id
 - [ ] Added/removed entities, fields, relationships are listed.
 - [ ] No new breaking changes: removed required field, optional→required, nullable→non-null, type narrowing, added unique constraint.
 
-## 5. Output
+## 5. Where each class of check comes from
+
+The distinction matters for how much weight a finding carries. A **published method** has a
+definition and a body of work behind it, so its result means what that work says it means. A
+**house convention** is this plugin's own rule: the concern is standard, the decision procedure
+is ours, and nothing outside this repository defines it.
+
+| Checks | Method | Provenance |
+|---|---|---|
+| DS1, DS2 | Key and name uniqueness: a relation's attributes are named, and a candidate key identifies a tuple | Published. Codd, *A Relational Model of Data for Large Shared Data Banks*, CACM 13(6), 1970 |
+| DS3, DA1, DA2 | Domain and null constraints: a required attribute admits no null, and a declared domain excludes values outside it | Published. Codd (1970); Date, *An Introduction to Database Systems* - the constraint taxonomy (`NOT NULL`, `CHECK`, domain) is standard SQL practice |
+| DS4, DA4 | SQL's three-valued logic: a column that is part of a unique or primary key cannot be null, because two nulls are not equal and the uniqueness claim becomes undecidable | Published. The SQL standard's treatment of null in `UNIQUE` and `PRIMARY KEY`; the practical rule is standard schema-review doctrine |
+| DA3, DA5 | Referential integrity and type compatibility of a foreign key with the attribute it references | Published. Codd, *Extending the Database Relational Model to Capture More Meaning*, ACM TODS 1979 (the referential-integrity rule); every SQL implementation states it |
+| DA6, DA7, DA10-DA13 | Migration completeness and idempotence: every removed or renamed field has a mapping, and applying a copy twice changes nothing | **Convention**, in the shape this plugin states it. The concerns are standard schema-migration practice (Fowler's evolutionary database design; the expand/contract pattern); the specific requirement - a mapping per removed field, an invariant per `idempotent-copy` - is defined here |
+| DD1-DD4 | Behaviour preservation across a schema change, decided by re-running the structural and invariant checks on AFTER | **Convention.** There is no canonical formulation for "this migration preserves the invariants". The nearest published ideas are regression test selection and metamorphic testing, but the DD semantics are this repository's |
+| `boundaryChecks`, `migrationMappings`, `backupPairs` | Fields the model declares so the checks above have something to hold it to | **Convention.** The schema is this plugin's; nothing else reads it |
+
+Two consequences worth stating plainly. A model that declares no `migrationMappings` has no
+migration completeness to check - that is a `skip`, not a pass. And "the migration preserves
+every invariant" is a claim about the models, not about the database: this plugin compares
+BEFORE and AFTER as declared, and cannot see data that neither model mentions.
+
+## 6. Output
 
 Append a summary to the plan file:
 
