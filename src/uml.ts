@@ -1981,6 +1981,19 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
   }
 
   const supplied = request.model
+  // The canonical shape of what was supplied, when the family says it has one. Fidelity is a
+  // comparison between a model and what a diagram drawn from that model reads back as - and
+  // that is the normalized shape, not the raw input, because a parser necessarily fills in
+  // what the notation always draws.
+  let canonical: unknown = supplied
+  if (supplied !== undefined && request.module.normalize !== undefined) {
+    try {
+      const normalized = request.module.normalize(supplied)
+      if (normalized !== undefined) canonical = normalized
+    } catch {
+      // Not a model of this family: the render below reports that, in its own words.
+    }
+  }
   let renderedForSupplied: UmlFamilyRender | undefined
   if (supplied !== undefined) {
     try {
@@ -2015,13 +2028,13 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
       })
     } else {
       const reparsed = request.module.parse(rendered.primary, request.notation)
-      const diffs = diffJsonModels(supplied, reparsed.model)
+      const diffs = diffJsonModels(canonical, reparsed.model)
       roundTrip = {
         notation: request.notation,
         diagram: request.family,
         ok: diffs.length === 0,
         hashSpec: DEFAULT_HASH_SPEC,
-        modelHash: valueHash(supplied),
+        modelHash: valueHash(canonical),
         parsedHash: valueHash(reparsed.model),
         diffs,
         warnings: [...rendered.warnings, ...reparsed.warnings],
@@ -2035,7 +2048,7 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
         })
       }
       if (parsed !== undefined) {
-        const againstDiagram = diffJsonModels(supplied, parsed.model)
+        const againstDiagram = diffJsonModels(canonical, parsed.model)
         if (againstDiagram.length > 0) {
           findings.push({
             code: 'UML017_ROUND_TRIP_MISMATCH',
