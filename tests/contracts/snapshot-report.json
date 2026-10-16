@@ -1,0 +1,1631 @@
+{
+  "verify: a machine with a narrative": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "no error findings; 31 warning finding(s)",
+    "schema": "model-everything/verify/v1",
+    "modelHash": "f93412c1445d8c03acd24829fa41d6eaf988eff5e5a5e606d77250f58834bb6a",
+    "summary": {
+      "states": 5,
+      "transitions": 6,
+      "errors": 0,
+      "warnings": 31,
+      "checksRun": 22,
+      "truncated": false
+    },
+    "checks": [
+      {
+        "id": "S1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S5",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event ack"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event cooldown"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event stop"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event timeout"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "STARTING silently ignores event cooldown"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "STARTING silently ignores event power_ready"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "STARTING silently ignores event stop"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event ack"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event cooldown"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event power_ready"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event timeout"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event ack"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event power_ready"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event stop"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event timeout"
+          }
+        ]
+      },
+      {
+        "id": "S6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A1",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event ack in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event cooldown in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event stop in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event timeout in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event cooldown in state STARTING has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event power_ready in state STARTING has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event stop in state STARTING has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event ack in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event cooldown in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event power_ready in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event timeout in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event ack in state ERROR has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event power_ready in state ERROR has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event stop in state ERROR has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event timeout in state ERROR has no defined transition (silent ignore)."
+          }
+        ]
+      },
+      {
+        "id": "A2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "A3_ORDER_DEPENDENT",
+            "severity": "warning",
+            "message": "Same event set produces 7 different outcomes depending on order."
+          }
+        ]
+      },
+      {
+        "id": "A4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A11",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A12",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A13",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A14",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Resolve the failing checks first: S5 Event Completeness, A1 Unexpected Event Injection, A3 Order Permutation.",
+      "Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either.",
+      "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+    ],
+    "body": "model-everything/verify/v1  verdict=pass_with_findings  no error findings; 31 warning finding(s)  ok=true  modelHash=f93412c1445d… states=5 transitions=6 errors=0 warnings=31 checksRun=22\nCHECKS  pass S1 S2 S3 S4 S6 S7 S8 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 | fail S5 A1 A3\n\nFAIL S5 Event Completeness — 15 unhandled (state, event) pairs (15 warnings) (15 finding(s))\n  INIT (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, stop, timeout\n  STARTING (3) [warning/S5_UNHANDLED_EVENT]: cooldown, power_ready, stop\n  ACTIVE (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, power_ready, timeout\n  ERROR (4) [warning/S5_UNHANDLED_EVENT]: ack, power_ready, stop, timeout\n\nFAIL A1 Unexpected Event Injection — 15 unhandled combinations (15 warnings) (15 finding(s))\n  (15 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 7 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 7 different outcomes depending on order.\n\nCOVERAGE  The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).\nNEXT  Resolve the failing checks first: S5 Event Completeness, A1 Unexpected Event Injection, A3 Order Permutation.\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+  },
+  "verify: a machine with one defect of each kind": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "3 error finding(s) (first: S2_NO_TRANSITIONS)",
+    "schema": "model-everything/verify/v1",
+    "modelHash": "01f6bd510ae4ea6024f560e25551a871cb5299a3467424bd92e04e7bbfb9a29e",
+    "summary": {
+      "states": 4,
+      "transitions": 5,
+      "errors": 3,
+      "warnings": 10,
+      "checksRun": 22,
+      "truncated": false
+    },
+    "checks": [
+      {
+        "id": "S1",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S1_UNREACHABLE_STATE",
+            "severity": "warning",
+            "message": "State ORPHAN is not reachable from init."
+          }
+        ]
+      },
+      {
+        "id": "S2",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S2_NO_TRANSITIONS",
+            "severity": "error",
+            "message": "Non-terminal state ORPHAN has no outgoing transitions."
+          }
+        ]
+      },
+      {
+        "id": "S3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S3_CLOSED_SCC",
+            "severity": "error",
+            "message": "Closed SCC has no exit and contains no terminal state: LOOP"
+          }
+        ]
+      },
+      {
+        "id": "S4",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S4_AMBIGUOUS_DEFAULT",
+            "severity": "error",
+            "message": "B + go has multiple unconditional transitions: B, LOOP"
+          }
+        ]
+      },
+      {
+        "id": "S5",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "A silently ignores event spin"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ORPHAN silently ignores event go"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ORPHAN silently ignores event spin"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "LOOP silently ignores event go"
+          }
+        ]
+      },
+      {
+        "id": "S6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A1",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event spin in state A has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event go in state ORPHAN has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event spin in state ORPHAN has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event go in state LOOP has no defined transition (silent ignore)."
+          }
+        ]
+      },
+      {
+        "id": "A2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "A3_ORDER_DEPENDENT",
+            "severity": "warning",
+            "message": "Same event set produces 2 different outcomes depending on order."
+          }
+        ]
+      },
+      {
+        "id": "A4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A11",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A12",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A13",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A14",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Resolve the failing checks first: S1 Reachability, S2 Deadlock, S3 Liveness, S4 Determinism, S5 Event Completeness, A1 Unexpected Event Injection, A3 Order Permutation.",
+      "Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S1_UNREACHABLE_STATE, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either.",
+      "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+    ],
+    "body": "model-everything/verify/v1  verdict=fail  3 error finding(s) (first: S2_NO_TRANSITIONS)  ok=true  modelHash=01f6bd510ae4… states=4 transitions=5 errors=3 warnings=10 checksRun=22\nCHECKS  pass S6 S7 S8 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 | fail S1 S2 S3 S4 S5 A1 A3\n\nFAIL S1 Reachability — Unreachable states: ORPHAN (1 warnings) (1 finding(s))\n  [warning/S1_UNREACHABLE_STATE] State ORPHAN is not reachable from init.\n\nFAIL S2 Deadlock — Deadlocks: Non-terminal state ORPHAN has no outgoing transitions. (1 errors) (1 finding(s))\n  [error/S2_NO_TRANSITIONS] Non-terminal state ORPHAN has no outgoing transitions.\n\nFAIL S3 Liveness — Closed SCCs: 1 (1 errors) (1 finding(s))\n  [error/S3_CLOSED_SCC] Closed SCC has no exit and contains no terminal state: LOOP evidence={\"states\":[\"LOOP\"],\"transitions\":1}\n\nFAIL S4 Determinism — Nondeterminism findings: 1 (1 errors) (1 finding(s))\n  [error/S4_AMBIGUOUS_DEFAULT] B + go has multiple unconditional transitions: B, LOOP\n\nFAIL S5 Event Completeness — 4 unhandled (state, event) pairs (4 warnings) (4 finding(s))\n  A (1) [warning/S5_UNHANDLED_EVENT]: spin\n  ORPHAN (2) [warning/S5_UNHANDLED_EVENT]: go, spin\n  LOOP (1) [warning/S5_UNHANDLED_EVENT]: go\n\nFAIL A1 Unexpected Event Injection — 4 unhandled combinations (4 warnings) (4 finding(s))\n  (4 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 2 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 2 different outcomes depending on order.\n\nNEXT  Resolve the failing checks first: S1 Reachability, S2 Deadlock, S3 Liveness, S4 Determinism, S5 Event Completeness, A1 Unexpected Event Injection, A3 Order Permutation.\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S1_UNREACHABLE_STATE, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+  },
+  "verify: the same machine after a refactor, with regression": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "no error findings; 31 warning finding(s)",
+    "schema": "model-everything/verify/v1",
+    "modelHash": "5e188ab2ea9c8f954d5b31d7342e16eae830af0f43f7251cf35a6bd95ce0e26e",
+    "summary": {
+      "states": 5,
+      "transitions": 6,
+      "errors": 0,
+      "warnings": 31,
+      "checksRun": 26,
+      "truncated": false
+    },
+    "checks": [
+      {
+        "id": "S1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S5",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event ack"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event cooldown"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event stop"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "INIT silently ignores event timeout"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "STARTING silently ignores event cooldown"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "STARTING silently ignores event power_ready"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "STARTING silently ignores event stop"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event ack"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event cooldown"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event power_ready"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ACTIVE silently ignores event timeout"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event ack"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event power_ready"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event stop"
+          },
+          {
+            "code": "S5_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "ERROR silently ignores event timeout"
+          }
+        ]
+      },
+      {
+        "id": "S6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "S8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A1",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event ack in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event cooldown in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event stop in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event timeout in state INIT has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event cooldown in state STARTING has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event power_ready in state STARTING has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event stop in state STARTING has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event ack in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event cooldown in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event power_ready in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event timeout in state ACTIVE has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event ack in state ERROR has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event power_ready in state ERROR has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event stop in state ERROR has no defined transition (silent ignore)."
+          },
+          {
+            "code": "A1_UNHANDLED_EVENT",
+            "severity": "warning",
+            "message": "Event timeout in state ERROR has no defined transition (silent ignore)."
+          }
+        ]
+      },
+      {
+        "id": "A2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "A3_ORDER_DEPENDENT",
+            "severity": "warning",
+            "message": "Same event set produces 7 different outcomes depending on order."
+          }
+        ]
+      },
+      {
+        "id": "A4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A11",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A12",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A13",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "A14",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "D1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "D2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "D3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "D4",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Resolve the failing checks first: S5 Event Completeness, A1 Unexpected Event Injection, A3 Order Permutation.",
+      "Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either.",
+      "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+    ],
+    "body": "model-everything/verify/v1  verdict=pass_with_findings  no error findings; 31 warning finding(s)  ok=true  modelHash=5e188ab2ea9c… states=5 transitions=6 errors=0 warnings=31 checksRun=26\nCHECKS  pass S1 S2 S3 S4 S6 S7 S8 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 D1 D2 D3 D4 | fail S5 A1 A3\n\nFAIL S5 Event Completeness — 15 unhandled (state, event) pairs (15 warnings) (15 finding(s))\n  INIT (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, stop, timeout\n  STARTING (3) [warning/S5_UNHANDLED_EVENT]: cooldown, power_ready, stop\n  ACTIVE (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, power_ready, timeout\n  ERROR (4) [warning/S5_UNHANDLED_EVENT]: ack, power_ready, stop, timeout\n\nFAIL A1 Unexpected Event Injection — 15 unhandled combinations (15 warnings) (15 finding(s))\n  (15 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 7 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 7 different outcomes depending on order.\n\nCOVERAGE  The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).\nNEXT  Resolve the failing checks first: S5 Event Completeness, A1 Unexpected Event Injection, A3 Order Permutation.\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4).\nCOMPARISON  beforeModelHash=f93412c1445d8c03acd24829fa41d6eaf988eff5e5a5e606d77250f58834bb6a afterModelHash=5e188ab2ea9c8f954d5b31d7342e16eae830af0f43f7251cf35a6bd95ce0e26e beforeStates=5 beforeTransitions=6 afterStates=5 afterTransitions=6"
+  },
+  "verify: a model the schema refuses": {
+    "ok": false,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "4 error finding(s) (first: MODEL_INVALID)",
+    "schema": "model-everything/verify/v1",
+    "modelHash": "",
+    "summary": {
+      "states": 0,
+      "transitions": 0,
+      "errors": 4,
+      "warnings": 0,
+      "checksRun": 0
+    },
+    "checks": [
+      {
+        "id": "MODEL",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "MODEL_INVALID",
+            "severity": "error",
+            "message": "schemaVersion: must be 1"
+          },
+          {
+            "code": "MODEL_INVALID",
+            "severity": "error",
+            "message": "init: must be a non-empty string"
+          },
+          {
+            "code": "MODEL_INVALID",
+            "severity": "error",
+            "message": "states: must be a non-empty array"
+          },
+          {
+            "code": "MODEL_INVALID",
+            "severity": "error",
+            "message": "transitions: must be an array"
+          }
+        ]
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Resolve the failing checks first: MODEL Model Validation.",
+      "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+    ],
+    "body": "model-everything/verify/v1  verdict=fail  4 error finding(s) (first: MODEL_INVALID)  ok=false  modelHash=… states=0 transitions=0 errors=4 warnings=0 checksRun=0\nCHECKS  fail MODEL\n\nFAIL MODEL Model Validation — Model schema validation failed: 4 errors (4 finding(s))\n  [error/MODEL_INVALID] schemaVersion: must be 1\n  [error/MODEL_INVALID] init: must be a non-empty string\n  [error/MODEL_INVALID] states: must be a non-empty array\n  [error/MODEL_INVALID] transitions: must be an array\n\nNEXT  Resolve the failing checks first: MODEL Model Validation.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress (D1-D4)."
+  },
+  "datamodel: a valid model": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/datamodel/v1",
+    "modelHash": "d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966",
+    "summary": {
+      "entities": 2,
+      "fields": 4,
+      "errors": 0,
+      "warnings": 0,
+      "checksRun": 16
+    },
+    "checks": [
+      {
+        "id": "DS1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA11",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA12",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
+    ],
+    "body": "model-everything/datamodel/v1  verdict=pass  no error or warning findings  ok=true  modelHash=d9d5ccf936db… errors=0 warnings=0 checksRun=16\nCHECKS  pass DS1 DS2 DS3 DS4 DA1 DA2 DA3 DA4 DA5 DA6 DA7 DA8 DA9 DA10 DA11 DA12\n\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
+  },
+  "datamodel: a migration with no mapping": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "11 error finding(s) (first: DS3_FROM_ENTITY_MISSING)",
+    "schema": "model-everything/datamodel/v1",
+    "modelHash": "28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83",
+    "summary": {
+      "entities": 1,
+      "fields": 2,
+      "errors": 11,
+      "warnings": 5,
+      "checksRun": 20
+    },
+    "checks": [
+      {
+        "id": "DS1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS2",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DS2_REQUIRED_FIELD_UNSOURCED",
+            "severity": "warning",
+            "message": "Required field User.fullName has no explicit migration mapping or copy target in a before/after migration"
+          }
+        ]
+      },
+      {
+        "id": "DS3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DS3_FROM_ENTITY_MISSING",
+            "severity": "error",
+            "message": "Relationship references unknown fromEntity Order"
+          }
+        ]
+      },
+      {
+        "id": "DS4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA5",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DA5_FIELD_NOT_MIGRATED",
+            "severity": "error",
+            "message": "BEFORE field User.email is not present in AFTER and has no migration mapping"
+          },
+          {
+            "code": "DA5_FIELD_NOT_MIGRATED",
+            "severity": "error",
+            "message": "BEFORE field Order.id is not present in AFTER and has no migration mapping"
+          },
+          {
+            "code": "DA5_FIELD_NOT_MIGRATED",
+            "severity": "error",
+            "message": "BEFORE field Order.user is not present in AFTER and has no migration mapping"
+          }
+        ]
+      },
+      {
+        "id": "DA6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA11",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA12",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DD1",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DD1_FIELD_REMOVED",
+            "severity": "error",
+            "message": "BEFORE field User.email is missing in AFTER and has no migration mapping"
+          },
+          {
+            "code": "DD1_FIELD_REMOVED",
+            "severity": "error",
+            "message": "BEFORE field Order.id is missing in AFTER and has no migration mapping"
+          },
+          {
+            "code": "DD1_FIELD_REMOVED",
+            "severity": "error",
+            "message": "BEFORE field Order.user is missing in AFTER and has no migration mapping"
+          }
+        ]
+      },
+      {
+        "id": "DD2",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DD2_INVARIANT_ENTITY_MISSING",
+            "severity": "error",
+            "message": "BEFORE count-equal invariant \"counts\" references missing source entity Order"
+          }
+        ]
+      },
+      {
+        "id": "DD3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DD3_REMOVED_ENTITY",
+            "severity": "warning",
+            "message": "BEFORE entity Order is not present in AFTER"
+          },
+          {
+            "code": "DD3_REMOVED_FIELD",
+            "severity": "warning",
+            "message": "BEFORE field User.email is not present in AFTER"
+          },
+          {
+            "code": "DD3_REMOVED_FIELD",
+            "severity": "warning",
+            "message": "BEFORE field Order.id is not present in AFTER"
+          },
+          {
+            "code": "DD3_REMOVED_FIELD",
+            "severity": "warning",
+            "message": "BEFORE field Order.user is not present in AFTER"
+          }
+        ]
+      },
+      {
+        "id": "DD4",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DD4_REQUIRED_FIELD_REMOVED",
+            "severity": "error",
+            "message": "Required field User.email was removed without migration mapping"
+          },
+          {
+            "code": "DD4_REQUIRED_FIELD_REMOVED",
+            "severity": "error",
+            "message": "Required field Order.id was removed without migration mapping"
+          },
+          {
+            "code": "DD4_REQUIRED_FIELD_REMOVED",
+            "severity": "error",
+            "message": "Required field Order.user was removed without migration mapping"
+          }
+        ]
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Resolve the failing checks first: DS2 Required-Field Completeness, DS3 Relationship Integrity, DA5 Migration Coverage, DD1 Data Behavior Preservation, DD2 Data Invariant Continuity, DD3 Delta Summary, DD4 Breaking Change Regression.",
+      "Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.",
+      "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4)."
+    ],
+    "body": "model-everything/datamodel/v1  verdict=fail  11 error finding(s) (first: DS3_FROM_ENTITY_MISSING)  ok=true  modelHash=28f27c82dd4a… errors=11 warnings=5 checksRun=20\nCHECKS  pass DS1 DS4 DA1 DA2 DA3 DA4 DA6 DA7 DA8 DA9 DA10 DA11 DA12 | fail DS2 DS3 DA5 DD1 DD2 DD3 DD4\n\nFAIL DS2 Required-Field Completeness — Required-field findings: 1 (1 warnings) (1 finding(s))\n  [warning/DS2_REQUIRED_FIELD_UNSOURCED] Required field User.fullName has no explicit migration mapping or copy target in a before/after migration\n\nFAIL DS3 Relationship Integrity — Relationship findings: 1 (1 errors) (1 finding(s))\n  [error/DS3_FROM_ENTITY_MISSING] Relationship references unknown fromEntity Order evidence={\"relationship\":{\"fromEntity\":\"Order\",\"fromField\":\"user\",\"toEntity\":\"User\",\"toField\":\"id\",\"onDelete\":\"cascade\"}}\n\nFAIL DA5 Migration Coverage — Migration coverage findings: 3 (3 errors) (3 finding(s))\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field User.email is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"afterField\":\"User.email\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.id is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"afterField\":\"Order.id\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.user is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"afterField\":\"Order.user\"}\n\nFAIL DD1 Data Behavior Preservation — Data behavior findings: 3 (3 errors) (3 finding(s))\n  [error/DD1_FIELD_REMOVED] BEFORE field User.email is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"mapped\":\"User.email\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.id is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"mapped\":\"Order.id\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.user is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"mapped\":\"Order.user\"}\n\nFAIL DD2 Data Invariant Continuity — Data invariant continuity findings: 1 (1 errors) (1 finding(s))\n  [error/DD2_INVARIANT_ENTITY_MISSING] BEFORE count-equal invariant \"counts\" references missing source entity Order evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"}}\n\nFAIL DD3 Delta Summary — Delta: +0 entities, -1 entities, +1 fields, -3 fields (4 warnings) (4 finding(s))\n  [warning/DD3_REMOVED_ENTITY] BEFORE entity Order is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field User.email is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.id is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.user is not present in AFTER\n\nFAIL DD4 Breaking Change Regression — Breaking change findings: 3 (3 errors) (3 finding(s))\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field User.email was removed without migration mapping evidence={\"beforeField\":\"User.email\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.id was removed without migration mapping evidence={\"beforeField\":\"Order.id\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.user was removed without migration mapping evidence={\"beforeField\":\"Order.user\"}\n\nNEXT  Resolve the failing checks first: DS2 Required-Field Completeness, DS3 Relationship Integrity, DA5 Migration Coverage, DD1 Data Behavior Preservation, DD2 Data Invariant Continuity, DD3 Delta Summary, DD4 Breaking Change Regression.\nNEXT  Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4).\nCOMPARISON  beforeModelHash=d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966 afterModelHash=28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83 beforeEntities=2 beforeFields=4 afterEntities=1 afterFields=2"
+  },
+  "uml: a use case model": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/uml/review/v1",
+    "modelHash": "662413fe8821d6d812c81363c401bc4e4defc8b46a4e9e1a8d62b119d55c225a",
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 1,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
+    "findings": [
+      {
+        "code": "UML039_USE_CASE_UNDOCUMENTED",
+        "severity": "info",
+        "message": "use case Audit carries no name a reader can map back to the system: give it a display label or a narrative entry."
+      }
+    ],
+    "family": "use-case",
+    "source": "model",
+    "roundTrip": {
+      "ok": true,
+      "diffs": []
+    },
+    "nextSteps": [
+      "A use case diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass  no error or warning findings  ok=true  modelHash=662413fe8821… states=0 transitions=0 errors=0 warnings=0\nFINDINGS  1 total (0 error, 1 warning): UML039_USE_CASE_UNDOCUMENTED x1\n\n  [info/UML039_USE_CASE_UNDOCUMENTED] use case Audit carries no name a reader can map back to the system: give it a display label or a narrative entry.\n\nNEXT  A use case diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "uml: a hand-written use case diagram": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "no error findings; 1 warning finding(s)",
+    "schema": "model-everything/uml/review/v1",
+    "summary": {
+      "errors": 0,
+      "warnings": 1,
+      "info": 3,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
+    "findings": [
+      {
+        "code": "UML018_FIDELITY_UNCHECKED",
+        "severity": "info",
+        "message": "only a diagram was supplied, so the review reads the diagram as the model: nothing here proves it matches the system it describes.",
+        "detail": "Compare every element against the code or the requirements (each one needs a citation), or pass the family model alongside the diagram to check the two against each other."
+      },
+      {
+        "code": "UML039_USE_CASE_UNDOCUMENTED",
+        "severity": "info",
+        "message": "use case Login carries no name a reader can map back to the system: give it a display label or a narrative entry."
+      },
+      {
+        "code": "UML033_USE_CASE_WITHOUT_ACTOR",
+        "severity": "warning",
+        "message": "use case Audit is connected to no actor, directly or through an include or extend: nothing says who triggers it."
+      },
+      {
+        "code": "UML039_USE_CASE_UNDOCUMENTED",
+        "severity": "info",
+        "message": "use case Audit carries no name a reader can map back to the system: give it a display label or a narrative entry."
+      }
+    ],
+    "family": "use-case",
+    "source": "diagram",
+    "nextSteps": [
+      "A use case diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  states=0 transitions=0 errors=0 warnings=1\nFINDINGS  4 total (0 error, 4 warning): UML018_FIDELITY_UNCHECKED x1 | UML039_USE_CASE_UNDOCUMENTED x2 | UML033_USE_CASE_WITHOUT_ACTOR x1\n\n  [info/UML018_FIDELITY_UNCHECKED] only a diagram was supplied, so the review reads the diagram as the model: nothing here proves it matches the system it describes.\n  [info/UML039_USE_CASE_UNDOCUMENTED] use case Login carries no name a reader can map back to the system: give it a display label or a narrative entry.\n  [warning/UML033_USE_CASE_WITHOUT_ACTOR] use case Audit is connected to no actor, directly or through an include or extend: nothing says who triggers it.\n  [info/UML039_USE_CASE_UNDOCUMENTED] use case Audit carries no name a reader can map back to the system: give it a display label or a narrative entry.\n\nNEXT  A use case diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "uml: a timing model": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/uml/review/v1",
+    "modelHash": "2cb98f02af991525870a7c2f11c75054fa5d580373bb49c9ddb70b77b8b10b86",
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 1,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
+    "findings": [
+      {
+        "code": "UML049_TIMING_UNDOCUMENTED",
+        "severity": "info",
+        "message": "state Idle carries no name a reader can map back to the system: give it a display label or a narrative entry."
+      }
+    ],
+    "family": "timing",
+    "source": "model",
+    "roundTrip": {
+      "ok": true,
+      "diffs": []
+    },
+    "nextSteps": [
+      "A timing diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass  no error or warning findings  ok=true  modelHash=2cb98f02af99… states=0 transitions=0 errors=0 warnings=0\nFINDINGS  1 total (0 error, 1 warning): UML049_TIMING_UNDOCUMENTED x1\n\n  [info/UML049_TIMING_UNDOCUMENTED] state Idle carries no name a reader can map back to the system: give it a display label or a narrative entry.\n\nNEXT  A timing diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "uml: the timing diagram it renders": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/uml/review/v1",
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 2,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
+    "findings": [
+      {
+        "code": "UML018_FIDELITY_UNCHECKED",
+        "severity": "info",
+        "message": "only a diagram was supplied, so the review reads the diagram as the model: nothing here proves it matches the system it describes.",
+        "detail": "Compare every element against the code or the requirements (each one needs a citation), or pass the family model alongside the diagram to check the two against each other."
+      },
+      {
+        "code": "UML049_TIMING_UNDOCUMENTED",
+        "severity": "info",
+        "message": "state Idle carries no name a reader can map back to the system: give it a display label or a narrative entry."
+      }
+    ],
+    "family": "timing",
+    "source": "diagram",
+    "nextSteps": [
+      "A timing diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass  no error or warning findings  ok=true  states=0 transitions=0 errors=0 warnings=0\nFINDINGS  2 total (0 error, 2 warning): UML018_FIDELITY_UNCHECKED x1 | UML049_TIMING_UNDOCUMENTED x1\n\n  [info/UML018_FIDELITY_UNCHECKED] only a diagram was supplied, so the review reads the diagram as the model: nothing here proves it matches the system it describes.\n  [info/UML049_TIMING_UNDOCUMENTED] state Idle carries no name a reader can map back to the system: give it a display label or a narrative entry.\n\nNEXT  A timing diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "uml: a profile model": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "no error findings; 1 warning finding(s)",
+    "schema": "model-everything/uml/review/v1",
+    "summary": {
+      "errors": 0,
+      "warnings": 1,
+      "info": 1,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
+    "findings": [
+      {
+        "code": "UML018_FIDELITY_UNCHECKED",
+        "severity": "info",
+        "message": "the diagram was drawn from the model, but a profile diagram cannot be read back out of plantuml, so nothing here proves the drawing still says what the model says.",
+        "detail": "Keep the drawing and the model in one commit, and re-render with uml_render whenever the model changes."
+      },
+      {
+        "code": "UML052_PROFILE_EXTENSION_MISSING",
+        "severity": "warning",
+        "message": "metaclass Class is declared but no stereotype extends it, so the profile does not change it."
+      }
+    ],
+    "family": "profile",
+    "source": "model",
+    "nextSteps": [
+      "When the question is where the dependencies point, run uml_structure_verify on the same text: it audits the graph against a dependency matrix.",
+      "A profile diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  states=0 transitions=0 errors=0 warnings=1\nFINDINGS  2 total (0 error, 2 warning): UML018_FIDELITY_UNCHECKED x1 | UML052_PROFILE_EXTENSION_MISSING x1\n\n  [info/UML018_FIDELITY_UNCHECKED] the diagram was drawn from the model, but a profile diagram cannot be read back out of plantuml, so nothing here proves the drawing still says what the model says.\n  [warning/UML052_PROFILE_EXTENSION_MISSING] metaclass Class is declared but no stereotype extends it, so the profile does not change it.\n\nNEXT  When the question is where the dependencies point, run uml_structure_verify on the same text: it audits the graph against a dependency matrix.\nNEXT  A profile diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "uml: a state diagram read back": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/uml/review/v1",
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 5,
+      "states": 5,
+      "events": 5,
+      "transitions": 6,
+      "terminalStates": 1,
+      "reachableStates": 5,
+      "documentedStates": 0
+    },
+    "findings": [
+      {
+        "code": "UML018_FIDELITY_UNCHECKED",
+        "severity": "info",
+        "message": "only a diagram was supplied, so the review reads the diagram as the model: nothing here proves the diagram matches the code it claims to describe.",
+        "detail": "Compare the parsed model against the code (each state/event/guard needs a source citation), or pass the machine alongside the diagram to check the two against each other."
+      },
+      {
+        "code": "UML006_INEXHAUSTIVE_BRANCH",
+        "severity": "info",
+        "message": "1 (state, event) group(s) have guards that look complementary on retry, so they are probably exhaustive — but no default branch exists and only model_verify S6 can settle it."
+      },
+      {
+        "code": "UML011_UNBOUNDED_VARIABLE",
+        "severity": "info",
+        "message": "1 integer variable(s) declare no min/max, so no range invariant can be checked and A5 boundary probing has no declared domain.",
+        "detail": "retry"
+      },
+      {
+        "code": "UML013_NO_NARRATIVE",
+        "severity": "info",
+        "message": "the model carries no narrative block: no state, event or scenario has a natural-language meaning, so a reader must re-derive every symbol from the source.",
+        "detail": "Add narrative.states / narrative.events / narrative.scenarios — a partial narrative is valid and its coverage is reported; write the states first and fill the rest in later."
+      },
+      {
+        "code": "UML014_UNDOCUMENTED_STATE",
+        "severity": "info",
+        "message": "5 of 5 states carry no meaning in the diagram (they render as their bare id).",
+        "detail": "Give each state a `state \"meaning\" as ID` label or `ID : meaning` description so the diagram can be read against the code."
+      }
+    ],
+    "nextSteps": [
+      "Run model_verify on this model for the behavioural checks (S1-S8 structural, A1-A14 adversarial); the review above covers modelling, not behaviour.",
+      "Add narrative.states/events/scenarios so the diagram is readable against the code.",
+      "Declare min/max (or boundaryChecks) before relying on A5 boundary probes."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass  no error or warning findings  ok=true  states=5 transitions=6 errors=0 warnings=0\nFINDINGS  5 total (0 error, 5 warning): UML018_FIDELITY_UNCHECKED x1 | UML006_INEXHAUSTIVE_BRANCH x1 | UML011_UNBOUNDED_VARIABLE x1 | UML013_NO_NARRATIVE x1 | UML014_UNDOCUMENTED_STATE x1\n\n  [info/UML018_FIDELITY_UNCHECKED] only a diagram was supplied, so the review reads the diagram as the model: nothing here proves the diagram matches the code it claims to describe.\n  [info/UML006_INEXHAUSTIVE_BRANCH] 1 (state, event) group(s) have guards that look complementary on retry, so they are probably exhaustive — but no default branch exists and only model_verify S6 can settle it.\n  [info/UML011_UNBOUNDED_VARIABLE] 1 integer variable(s) declare no min/max, so no range invariant can be checked and A5 boundary probing has no declared domain.\n  [info/UML013_NO_NARRATIVE] the model carries no narrative block: no state, event or scenario has a natural-language meaning, so a reader must re-derive every symbol from the source.\n  [info/UML014_UNDOCUMENTED_STATE] 5 of 5 states carry no meaning in the diagram (they render as their bare id).\n\nNEXT  Run model_verify on this model for the behavioural checks (S1-S8 structural, A1-A14 adversarial); the review above covers modelling, not behaviour.\nNEXT  Add narrative.states/events/scenarios so the diagram is readable against the code.\nNEXT  Declare min/max (or boundaryChecks) before relying on A5 boundary probes."
+  },
+  "structure: a component diagram with a cycle and an isolated node": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first: UML022_CYCLE)",
+    "schema": "model-everything/structure/v1",
+    "summary": {
+      "nodes": 3,
+      "edges": 2,
+      "containers": 0,
+      "isolated": 1,
+      "dangling": 0,
+      "cycles": 1,
+      "disallowedEdges": 0,
+      "layerViolations": 0,
+      "missingExpectedEdges": 0,
+      "errors": 1,
+      "warnings": 1,
+      "rules": 0
+    },
+    "findings": [
+      {
+        "code": "UML020_ISOLATED_NODE",
+        "severity": "warning",
+        "message": "1 node(s) have no edge at all: C. Either they are dead entries or the diagram is missing their dependencies."
+      },
+      {
+        "code": "UML022_CYCLE",
+        "severity": "error",
+        "message": "the dependency graph has a directed cycle: A → B → A. A cycle means no build order and no layering can hold."
+      }
+    ],
+    "nextSteps": [
+      "Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.",
+      "Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.",
+      "Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.",
+      "State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+    ],
+    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first: UML022_CYCLE)  ok=true  errors=1 warnings=1\nFINDINGS  2 total (1 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: C. Either they are dead entries or the diagram is missing their dependencies.\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: A → B → A. A cycle means no build order and no layering can hold. evidence={\"cycle\":[\"A\",\"B\",\"A\"]}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+  },
+  "structure: a matrix that forbids the edge the diagram draws": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first: UML023_DISALLOWED_EDGE)",
+    "schema": "model-everything/structure/v1",
+    "summary": {
+      "nodes": 2,
+      "edges": 1,
+      "containers": 0,
+      "isolated": 0,
+      "dangling": 0,
+      "cycles": 0,
+      "disallowedEdges": 1,
+      "layerViolations": 0,
+      "missingExpectedEdges": 0,
+      "errors": 1,
+      "warnings": 0,
+      "rules": 1
+    },
+    "findings": [
+      {
+        "code": "UML023_DISALLOWED_EDGE",
+        "severity": "error",
+        "message": "edge UI → DB violates rule no-direct (deny DB)."
+      }
+    ],
+    "nextSteps": [
+      "Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.",
+      "Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.",
+      "State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+    ],
+    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first: UML023_DISALLOWED_EDGE)  ok=true  errors=1 warnings=0\nFINDINGS  1 total (1 error, 0 warning): UML023_DISALLOWED_EDGE x1\n\n  [error/UML023_DISALLOWED_EDGE] edge UI → DB violates rule no-direct (deny DB). evidence={\"edge\":{\"from\":\"UI\",\"to\":\"DB\",\"line\":4},\"matchedRules\":[\"no-direct\"],\"basis\":\"deny\",\"rule\":\"no-direct\"}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+  },
+  "granularity: a child that does not refine its parent": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first: UML021_DANGLING_REFERENCE)",
+    "schema": "model-everything/granularity/v1",
+    "summary": {
+      "diagrams": 2,
+      "roots": 1,
+      "pairs": 1,
+      "nodes": 5,
+      "edges": 3,
+      "inventedEdges": 0,
+      "missingEdges": 0,
+      "expandedEdges": 0,
+      "errors": 1,
+      "warnings": 0
+    },
+    "findings": [
+      {
+        "code": "UML021_DANGLING_REFERENCE",
+        "severity": "error",
+        "message": "1 arrow endpoint(s) are used without ever being declared: UI. In a component diagram this is how a dependency on a component that does not exist stays invisible."
+      }
+    ],
+    "nextSteps": [
+      "Fix the refinement violations first: a level that invents or drops a parent-level dependency makes the hierarchy unusable as a rule source.",
+      "Reconcile the levels with the source-side scan: the diagram pair is consistent or not, and neither says anything about the code until it is scanned."
+    ],
+    "body": "model-everything/granularity/v1  verdict=fail  1 error finding(s) (first: UML021_DANGLING_REFERENCE)  ok=true  errors=1 warnings=0\nFINDINGS  1 total (1 error, 0 warning): UML021_DANGLING_REFERENCE x1\n\n  [error/UML021_DANGLING_REFERENCE] 1 arrow endpoint(s) are used without ever being declared: UI. In a component diagram this is how a dependency on a component that does not exist stays invisible. (core) evidence={\"nodes\":[{\"id\":\"UI\",\"line\":5}]}\n\nNEXT  Fix the refinement violations first: a level that invents or drops a parent-level dependency makes the hierarchy unusable as a rule source.\nNEXT  Reconcile the levels with the source-side scan: the diagram pair is consistent or not, and neither says anything about the code until it is scanned."
+  },
+  "concurrency: a document full of absolute claims": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "3 error finding(s) (first: CONCURRENCY_ABSOLUTE_CLAIM)",
+    "schema": "model-everything/concurrency/v1",
+    "summary": {
+      "lines": 1,
+      "keywords": 6,
+      "absoluteClaims": 3,
+      "warnings": 3,
+      "errors": 3
+    },
+    "findings": [
+      {
+        "code": "CONCURRENCY_ABSOLUTE_CLAIM",
+        "severity": "error",
+        "message": "Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+      },
+      {
+        "code": "CONCURRENCY_ABSOLUTE_CLAIM",
+        "severity": "error",
+        "message": "Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+      },
+      {
+        "code": "CONCURRENCY_KEYWORD",
+        "severity": "warning",
+        "message": "Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk."
+      },
+      {
+        "code": "CONCURRENCY_KEYWORD",
+        "severity": "warning",
+        "message": "Concurrency-related term \"shared memory\" detected; review whether the plan addresses this risk."
+      },
+      {
+        "code": "CONCURRENCY_ABSOLUTE_CLAIM",
+        "severity": "error",
+        "message": "Concurrency safety claim \"ISR-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+      },
+      {
+        "code": "CONCURRENCY_KEYWORD",
+        "severity": "warning",
+        "message": "Concurrency-related term \"ISR\" detected; review whether the plan addresses this risk."
+      }
+    ],
+    "nextSteps": [
+      "Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.",
+      "Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.",
+      "This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
+    ],
+    "body": "model-everything/concurrency/v1  verdict=fail  3 error finding(s) (first: CONCURRENCY_ABSOLUTE_CLAIM)  ok=true  errors=3 warnings=3\nFINDINGS  6 total (3 error, 3 warning): CONCURRENCY_ABSOLUTE_CLAIM x3 | CONCURRENCY_KEYWORD x3\n\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"shared memory\" detected; review whether the plan addresses this risk.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"ISR-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"ISR\" detected; review whether the plan addresses this risk.\n\nNEXT  Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.\nNEXT  Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.\nNEXT  This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
+  },
+  "export: a verified machine to spin": {
+    "findings": [],
+    "format": "spin",
+    "payloadLength": 399,
+    "body": "model-everything/report  ok=undefined\n\n// Generated by this plugin (Promela v1; booleans as 0/1 integers).\nint pc = 0;\nint retry = 0;\nactive proctype ModelEverything() {\n  do\n    :: (pc == 0) -> pc = 1;\n    :: (pc == 1) -> pc = 2;\n    :: (pc == 2) -> pc = 4;\n    :: (pc == 1 && retry < 3) -> retry = retry + 1; pc = 3;\n    :: (pc == 1 && retry >= 3) -> pc = 4;\n    :: (pc == 3) -> pc = 1;\n    :: (pc == 4) -> goto done;\n  od\ndone: skip\n}"
+  },
+  "export: a model the schema refuses": {
+    "ok": false,
+    "ran": false,
+    "verdict": "fail",
+    "verdictReason": "threw: model invalid: schemaVersion: must be 1; init: must be a non-empty string; states: must be a non-empty array; transitions: must be an array",
+    "schema": "none",
+    "summary": {},
+    "findings": [],
+    "nextSteps": [],
+    "body": "none  verdict=fail  threw: model invalid: schemaVersion: must be 1; init: must be a non-empty string; states: must be a non-empty array; transitions: must be an array  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\n\n{\"ok\":false,\"ran\":false,\"verdict\":\"fail\",\"verdictReason\":\"threw: model invalid: schemaVersion: must be 1; init: must be a non-empty string; states: must be a non-empty array; transitions: must be an array\",\"schema\":\"none\",\"summary\":{},\"findings\":[],\"nextSteps\":[]}"
+  },
+  "report diff: a machine against its own refactor": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no new findings, nothing resolved",
+    "schema": "model-everything/baseline/v1",
+    "summary": {
+      "baseline": 31,
+      "current": 31,
+      "added": 0,
+      "removed": 0,
+      "changed": 0,
+      "addedErrors": 0,
+      "addedWarnings": 0
+    },
+    "findings": [],
+    "nextSteps": [
+      "No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
+    ],
+    "delta": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "body": "model-everything/baseline/v1  verdict=pass  no new findings, nothing resolved  ok=true\n\n{\"ok\":true,\"ran\":true,\"verdict\":\"pass\",\"verdictReason\":\"no new findings, nothing resolved\",\"schema\":\"model-everything/baseline/v1\",\"currentVerdict\":\"pass_with_findings\",\"added\":[],\"removed\":[],\"changed\":[],\"summary\":{\"baseline\":31,\"current\":31,\"added\":0,\"removed\":0,\"changed\":0,\"addedErrors\":0,\"addedWarnings\":0},\"nextSteps\":[\"No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it.\"]}\n\nNEXT  No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
+  }
+}

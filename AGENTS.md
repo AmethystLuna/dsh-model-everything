@@ -37,7 +37,7 @@ host guide: this plugin has exactly one host.
 | `src/data-engine.ts`, `src/concurrency.ts`, `src/exporters.ts`, `src/baseline.ts`, `src/report-view.ts` | The other domains and the report plumbing |
 | `src/*-tool.ts`, `src/index.ts` | The dsh tool wrappers and the plugin entry that registers skills and tools |
 | `skills/` | The shipped skills, one directory each, discovered by the standard filesystem provider |
-| `tests/` | One directory per suite, plus `tests/memory` for the memory gate |
+| `tests/` | One directory per suite, plus `tests/memory` for the memory gate. [tests/AGENTS.md](tests/AGENTS.md) carries the test methodology: read it before adding or changing a suite |
 | `.github/memory/` | Project memory: research findings, architecture decisions, handover |
 | `lib/` | Build output; committed, and must stay in step with `src/` |
 
