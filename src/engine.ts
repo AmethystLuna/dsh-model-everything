@@ -263,6 +263,8 @@ export interface VerificationReport {
     warnings: number
     checksRun: number
     truncated?: boolean
+    /** Bounds that were replaced or clamped because they could not bound the search. */
+    boundNotes?: string[]
   }
   checks: CheckResult[]
   comparison?: ComparisonSummary
@@ -329,6 +331,42 @@ type NormalizedOptions = Required<Pick<VerificationOptions, 'maxStates' | 'maxPe
 
 const DEFAULT_MAX_STATES = 10_000
 const DEFAULT_MAX_PERMUTATION_EVENTS = 5
+/**
+ * Ceilings the caller cannot raise.
+ *
+ * These are not budget opinions, they are the difference between a bounded answer and an aborted
+ * process. `maxStates` bounds every walk in the engine with `steps > options.maxStates`, so a `NaN`
+ * makes that comparison false forever and the walk allocates until the heap dies - the robustness
+ * audit measured 4 GB and a fatal V8 error at about 70 s, from an option the tool schema accepts.
+ * `Infinity` never stops at all.
+ *
+ * The state ceiling is ten times the default, so a caller who genuinely needs more can ask.
+ * Permutations are factorial, which makes that ceiling hard: 9! is 362 880 orderings, three orders
+ * of magnitude past the default's 120, and A2's sampling path exists for the cases beyond it.
+ */
+const MAX_STATES_CEILING = 100_000
+const MAX_PERMUTATION_EVENTS_CEILING = 9
+
+/**
+ * A caller-supplied bound, or the default when the value could not bound anything.
+ *
+ * The engine never throws for a bad option, so this neither refuses nor throws: it replaces or
+ * clamps the value and records that it did, and the report carries the note. A non-finite or
+ * non-integer bound is not a claim to disagree with - it is a bound that does not bound, and
+ * `steps > NaN` is false forever.
+ */
+function boundedOption(value: number | undefined, fallback: number, ceiling: number, name: string, notes: string[]): number {
+  if (value === undefined) return fallback
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < 1) {
+    notes.push(name + ' was ' + String(value) + ', which cannot bound a search; the default of ' + String(fallback) + ' was used instead.')
+    return fallback
+  }
+  if (value > ceiling) {
+    notes.push(name + ' was ' + String(value) + '; it was clamped to ' + String(ceiling) + '. A larger bound does not buy a larger answer here: the search would run until the process ran out of memory.')
+    return ceiling
+  }
+  return value
+}
 /**
  * Budget for the leads-to walk, as a multiple of `maxStates`. That walk is depth-first
  * over run states, so `maxStates` does not bound it the way it bounds the breadth-first
@@ -1039,12 +1077,18 @@ function validateGuard(input: unknown, path: string, errors: string[], bad: (pat
   }
   if (guard.all !== undefined) {
     if (!Array.isArray(guard.all)) bad(path + '.all', 'must be an array')
-    else guard.all.forEach((child, index) => validateGuard(child, path + '.all[' + index + ']', errors, bad))
+    else if (guard.all.length === 0) {
+      // Vacuously true, so the transition would be unconditional while reading as guarded.
+      bad(path + '.all', 'must not be empty: an empty conjunction is always true, which would make this transition unconditional while it reads as guarded')
+    } else guard.all.forEach((child, index) => validateGuard(child, path + '.all[' + index + ']', errors, bad))
     return
   }
   if (guard.any !== undefined) {
     if (!Array.isArray(guard.any)) bad(path + '.any', 'must be an array')
-    else guard.any.forEach((child, index) => validateGuard(child, path + '.any[' + index + ']', errors, bad))
+    else if (guard.any.length === 0) {
+      // Vacuously false: a branch dead on arrival, spelled as if it were live.
+      bad(path + '.any', 'must not be empty: an empty disjunction is always false, so this transition can never fire')
+    } else guard.any.forEach((child, index) => validateGuard(child, path + '.any[' + index + ']', errors, bad))
     return
   }
   if (guard.not !== undefined) {
@@ -1054,41 +1098,69 @@ function validateGuard(input: unknown, path: string, errors: string[], bad: (pat
   bad(path, 'must be a leaf ({ variable, op, value }), { all }, { any }, or { not }')
 }
 
-function walkGuardReferences(guard: GuardNode | undefined, variableNames: Set<string>, errors: string[], bad: (path: string, message: string) => void): void {
+/**
+ * Every variable a guard names.
+ *
+ * Total over arbitrary JSON: the validator reports a malformed guard, and this must not be the
+ * place that throws instead. A node it does not recognise contributes no references, which is the
+ * safe direction - the guard is already an error, so nothing is decided from it either way.
+ */
+function isGuardObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function walkGuardReferences(guard: unknown, variableNames: Set<string>, errors: string[], bad: (path: string, message: string) => void): void {
   if (guard === undefined) return
-  if ('variable' in guard) {
+  if (!isGuardObject(guard)) return
+  if (guard.variable !== undefined) {
+    if (typeof guard.variable !== 'string') return
     if (!variableNames.has(guard.variable)) bad('guard', 'references unknown variable ' + guard.variable)
     return
   }
-  if ('all' in guard) {
-    for (const child of guard.all) walkGuardReferences(child, variableNames, errors, bad)
+  for (const key of ['all', 'any'] as const) {
+    const children = guard[key]
+    if (children === undefined) continue
+    // An empty array is the degenerate answer - true for `all`, false for `any` - and
+    // `validateGuard` refuses it. Here it simply carries no references.
+    if (!Array.isArray(children)) return
+    for (const child of children) walkGuardReferences(child, variableNames, errors, bad)
     return
   }
-  if ('any' in guard) {
-    for (const child of guard.any) walkGuardReferences(child, variableNames, errors, bad)
-    return
-  }
-  if ('not' in guard) walkGuardReferences(guard.not, variableNames, errors, bad)
+  if (guard.not !== undefined) walkGuardReferences(guard.not, variableNames, errors, bad)
 }
-
-// ---------------------------------------------------------------------------
-// execution
-// ---------------------------------------------------------------------------
 
 function isLeafGuard(guard: GuardNode): guard is LeafGuard {
   return 'variable' in guard
 }
 
+/**
+ * Every variable a guard names, total over arbitrary JSON for the same reason as
+ * walkGuardReferences.
+ */
 export function guardVariables(guard: GuardNode | undefined): string[] {
   if (guard === undefined) return []
+  if (!isGuardObject(guard)) return []
   if (isLeafGuard(guard)) return [guard.variable]
-  if ('all' in guard) return guard.all.flatMap((child) => guardVariables(child))
-  if ('any' in guard) return guard.any.flatMap((child) => guardVariables(child))
-  if ('not' in guard) return guardVariables(guard.not)
+  for (const key of ['all', 'any'] as const) {
+    const children = guard[key]
+    if (children === undefined) continue
+    if (!Array.isArray(children)) return []
+    return children.flatMap((child) => guardVariables(child as GuardNode))
+  }
+  if (guard.not !== undefined) return guardVariables(guard.not as GuardNode)
   return []
 }
 
+/**
+ * Whether a guard holds, TOTAL over arbitrary JSON.
+ *
+ * A node that is not one of the four shapes is a guard that is never true, so a malformed guard
+ * cannot fire a transition. Safely false is the right answer rather than a throw: the validator has
+ * already refused the model, and a review that crashes tells the caller less than a review that
+ * names the field that is wrong.
+ */
 function evalGuard(guard: GuardNode, vars: Record<string, VarValue>): boolean {
+  if (!isGuardObject(guard)) return false
   if (isLeafGuard(guard)) {
     const actual = vars[guard.variable]
     switch (guard.op) {
@@ -1099,12 +1171,23 @@ function evalGuard(guard: GuardNode, vars: Record<string, VarValue>): boolean {
       case '>': return (actual as number) > (guard.value as number)
       case '>=': return (actual as number) >= (guard.value as number)
     }
+    return false
   }
-  if ('all' in guard) return guard.all.every((child) => evalGuard(child, vars))
-  if ('any' in guard) return guard.any.some((child) => evalGuard(child, vars))
-  if ('not' in guard) return !evalGuard(guard.not, vars)
+  for (const key of ['all', 'any'] as const) {
+    const children = guard[key]
+    if (children === undefined) continue
+    // An empty conjunction is true and an empty disjunction is false, which is also what
+    // every/some do. The validator refuses both; this keeps the evaluator total for a model that
+    // arrived anyway.
+    if (!Array.isArray(children)) return false
+    return key === 'all'
+      ? children.every((child) => evalGuard(child as GuardNode, vars))
+      : children.some((child) => evalGuard(child as GuardNode, vars))
+  }
+  if (guard.not !== undefined) return !evalGuard(guard.not as GuardNode, vars)
   return false
 }
+
 
 function initialState(model: LogicModelV1): RuntimeState {
   const vars: Record<string, VarValue> = {}
@@ -1525,13 +1608,160 @@ function S4_determinism(model: LogicModelV1): CheckResult {
   return checkResult('S4', 'Determinism', analysis.determinism, analysis.determinism.length === 0 ? 'Deterministic' : 'Nondeterminism findings: ' + analysis.determinism.length)
 }
 
+/**
+ * A variable whose reachable domain is provably infinite, decided from the model rather than from
+ * a search that ran out of room.
+ *
+ * The engine already bounds every exploration with `steps > options.maxStates`, and reports a
+ * search that hit the bound as undecided rather than as a pass. That is the right report, but it
+ * is the wrong way to find out: the audit got a 4 GB heap and a fatal error from a `NaN` bound,
+ * and a caller who passes no bound at all still pays for ten thousand states before being told the
+ * answer was never decidable.
+ *
+ * Whether the space is infinite is a property of the model, and it can be read off the transition
+ * graph:
+ *
+ *   - a variable is MONOTONE over a cycle when every update to it on that cycle moves the same way
+ *     (`inc`, or `inc` + `set` to a larger constant). An unrelated update to another variable does
+ *     not break it;
+ *   - if such a cycle is reachable from the initial state, and the variable has no declared bound
+ *     in that direction, then repeating the cycle yields a distinct runtime state every time. The
+ *     reachable set is infinite, so NO bound decides the question - not a larger one, not a
+ *     smaller one;
+ *   - bounded in the direction of travel means the walk stops at the bound, which the ordinary
+ *     exploration already handles.
+ *
+ * One direction is enough to make the space infinite, and any monotone direction counts, so this
+ * reports the variable rather than trying to be exhaustive about which check suffers.
+ *
+ * The same reasoning answers the modelling question the audit's D-series kept circling: a model
+ * whose state space is infinite cannot be refuted by enumeration, so "this model cannot be decided
+ * by search" is itself a review result rather than an internal detail. It is reported as an error
+ * for that reason - it is not the reviewer's problem, it is a gap in the model.
+ */
+function unboundedDomainFindings(model: LogicModelV1): Finding[] {
+  const variables = new Map<string, VariableSpec>()
+  for (const variable of model.variables ?? []) variables.set(variable.name, variable)
+
+  // The state graph: which states each transition connects, taken from the transitions alone. No
+  // runtime state is constructed, which is the point - this runs before any exploration.
+  const successors = new Map<string, Array<{ to: string; step: PathStep }>>()
+  for (const state of model.states) successors.set(state.id, [])
+  for (const transition of model.transitions) {
+    if (transition.to === undefined) continue
+    const out = successors.get(transition.from)
+    if (out === undefined) continue
+    for (const to of String(transition.to).split('|')) {
+      if (successors.has(to)) out.push({ to, step: { from: transition.from, event: transition.event, to } })
+    }
+  }
+
+  const findings: Finding[] = []
+  const reported = new Set<string>()
+  // Only states reachable from the initial one matter: a monotone cycle on an island no event
+  // reaches does not make the reachable set infinite, and reporting it would be a defect invented
+  // by the analysis rather than found in the model.
+  const start = initialState(model)
+  const reachable = new Set<string>([start.state])
+  const frontier = [start.state]
+  while (frontier.length > 0) {
+    const id = frontier.pop() as string
+    for (const edge of successors.get(id) ?? []) {
+      if (reachable.has(edge.to)) continue
+      reachable.add(edge.to)
+      frontier.push(edge.to)
+    }
+  }
+  for (const state of model.states) {
+    if (!reachable.has(state.id)) continue
+    // Depth-first over the state graph with an explicit stack, so a deep model cannot overflow it.
+    const onPath = new Map<string, number>()
+    const path: Array<{ to: string; step: PathStep }> = []
+    const visited = new Set<string>()
+    const stack: Array<{ id: string; index: number }> = [{ id: state.id, index: 0 }]
+    onPath.set(state.id, 0)
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1]
+      const edges = (successors.get(frame.id) ?? []).filter((edge) => reachable.has(edge.to))
+      if (frame.index >= edges.length) {
+        onPath.delete(frame.id)
+        visited.add(frame.id)
+        stack.pop()
+        path.pop()
+        continue
+      }
+      const edge = edges[frame.index++]
+      const seenAt = onPath.get(edge.to)
+      if (seenAt !== undefined) {
+        // A cycle: the edges from `seenAt` on the current path, plus this closing edge.
+        const cycleSteps = [...path.slice(seenAt).map((entry) => entry.step), edge.step]
+        for (const variable of variables.values()) {
+          if (variable.kind !== 'integer') continue
+          if (reported.has(variable.name)) continue
+          const analysis = monotoneOverCycle(model, cycleSteps, variable)
+          if (analysis === undefined) continue
+          reported.add(variable.name)
+          findings.push({
+            code: 'S6_UNBOUNDED_VARIABLE',
+            severity: 'error',
+            message: 'the reachable state space is infinite: ' + variable.name + ' is only ever ' + analysis.word + ' around the cycle ' + cycleSteps.map((step) => step.from + ' -> ' + step.to).join(' -> ') + ', and the declaration gives it no ' + analysis.bound + '.',
+            detail: 'Repeating this cycle produces a distinct runtime state every time, so no search bound decides any question about this model: a larger bound walks further without deciding, and a smaller one reports truncation sooner. Declare the ' + analysis.bound + ' to make the model decidable, or remove the cycle. Checks that walk the state space report themselves truncated until then.',
+            evidence: { variable: variable.name, direction: analysis.direction, events: cycleSteps.map((step) => step.event) },
+          })
+        }
+        continue
+      }
+      if (visited.has(edge.to)) continue
+      onPath.set(edge.to, path.length + 1)
+      path.push(edge)
+      stack.push({ id: edge.to, index: 0 })
+    }
+  }
+  return findings
+}
+
+/**
+ * Whether one variable moves one way along the whole cycle, and which declared bound is missing.
+ *
+ * `inc` + `set` to a larger constant counts as monotone: the variable still only ever climbs. A
+ * `dec` or a `set` to a smaller constant on the same cycle means it does not, and `undefined` says
+ * so.
+ */
+function monotoneOverCycle(model: LogicModelV1, steps: PathStep[], variable: VariableSpec): { direction: 'inc' | 'dec'; bound: 'min' | 'max'; word: string } | undefined {
+  let direction: 'inc' | 'dec' | undefined
+  for (const step of steps) {
+    for (const transition of model.transitions) {
+      if (transition.from !== step.from || transition.event !== step.event || transition.to !== step.to) continue
+      for (const update of transition.updates ?? []) {
+        if (update.variable !== variable.name) continue
+        if (update.op === 'set') {
+          // A `set` fixes the value, so it cannot contribute to an unbounded climb on its own. It
+          // neither proves monotonicity nor breaks it.
+          continue
+        }
+        if (direction === undefined) direction = update.op
+        else if (direction !== update.op) return undefined
+      }
+    }
+  }
+  if (direction === undefined) return undefined
+  if (direction === 'inc') return variable.max === undefined ? { direction, bound: 'max', word: 'incremented' } : undefined
+  return variable.min === undefined ? { direction, bound: 'min', word: 'decremented' } : undefined
+}
+
 function S6_guardCompleteness(model: LogicModelV1): CheckResult {
   const analysis = analyzeGuards(model)
+  // The domain findings come first: an infinite state space is why the guard enumeration could not
+  // finish, so a reader meets the cause before the symptom.
+  const findings = [...unboundedDomainFindings(model), ...analysis.completeness]
   const dead = analysis.completeness.filter((finding) => finding.code === 'S6_DEAD_GUARD').length
-  const detail = analysis.completeness.length === 0
-    ? 'All guard branches defined'
-    : dead === analysis.completeness.length ? 'Dead guard branches: ' + dead : 'Guard findings: ' + analysis.completeness.length
-  return checkResult('S6', 'Guard Completeness', analysis.completeness, detail)
+  const unbounded = findings.filter((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE').length
+  const detail = unbounded > 0
+    ? 'The reachable state space is infinite: ' + String(unbounded) + ' variable(s) climb without a declared bound'
+    : findings.length === 0
+      ? 'All guard branches defined'
+      : dead === analysis.completeness.length ? 'Dead guard branches: ' + String(dead) : 'Guard findings: ' + String(findings.length)
+  return checkResult('S6', 'Guard Completeness', findings, detail)
 }
 
 function S5_eventCompleteness(model: LogicModelV1): CheckResult {
@@ -3291,9 +3521,13 @@ function computeCoverageNotes(model: LogicModelV1): string[] {
 // ---------------------------------------------------------------------------
 
 export function runVerification(input: unknown, options: VerificationOptions = {}): VerificationReport {
+  // A bound that was replaced or clamped is recorded here and reported through the summary, so a
+  // caller who asked for 10^12 learns the answer came from a smaller search instead of reading a
+  // truncated report as a complete one.
+  const boundNotes: string[] = []
   const normalized: NormalizedOptions = {
-    maxStates: options.maxStates ?? DEFAULT_MAX_STATES,
-    maxPermutationEvents: options.maxPermutationEvents ?? DEFAULT_MAX_PERMUTATION_EVENTS,
+    maxStates: boundedOption(options.maxStates, DEFAULT_MAX_STATES, MAX_STATES_CEILING, 'maxStates', boundNotes),
+    maxPermutationEvents: boundedOption(options.maxPermutationEvents, DEFAULT_MAX_PERMUTATION_EVENTS, MAX_PERMUTATION_EVENTS_CEILING, 'maxPermutationEvents', boundNotes),
   }
   const hashSpec = options.hashSpec ?? DEFAULT_HASH_SPEC
   const metadataKeys = metadataKeysOf(input)
@@ -3432,6 +3666,7 @@ export function runVerification(input: unknown, options: VerificationOptions = {
       warnings,
       checksRun: checks.length,
       truncated: exploration.truncated || hasUndecidedFinding(checks),
+      ...(boundNotes.length === 0 ? {} : { boundNotes }),
     },
     checks,
     nextSteps: verificationNextSteps(checks, narrativeCoverage),
