@@ -40,6 +40,16 @@ dsh --profile scratch --dump-config                    # expect this plugin's ro
 - [ ] one real call returns a report (for example `model_verify model=examples/control-dispatcher.json`)
 - [ ] the scratch profile and the scratch `DSH_HOME` are removed afterwards
 
+A round that covers all of this end to end, for any `file:` install, is the `compat-round.ps1`
+harness in the `model-everything-mount` task directory under the scratch root (adapted from
+the logicprobe round): install, `--dump-config`, the packaged `skills/` and `locale/`, a
+headless boot with a deliberately invalid API key, **a real report from the installed
+copy**, and an uninstall. Two facts about a `file:` install make that fifth step fiddly, and
+both are properties of pnpm rather than of this plugin: the linked copy has no `node_modules`
+of its own, and its `peerDependencies` are resolved by the host's loader tree, which a plain
+`import` does not consult. The harness therefore runs the probe from the dsh tree and lends
+the copy the `@deepseek-ai` scope through a junction, removed again on the way out.
+
 ## 2. Compatibility
 
 **The runtime version is the gate; the declaration is not.** `dsh.engines.dsh`,
