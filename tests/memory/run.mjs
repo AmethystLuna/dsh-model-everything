@@ -84,8 +84,12 @@ check('every link in the memory resolves inside the repository', () => {
 
 check('every file carries frontmatter with a name and a description', () => {
   const bad = []
+  // Line endings are a checkout setting, not a property of the memory: with
+  // `core.autocrlf=true` a fresh Windows checkout writes CRLF and a gate that insisted
+  // on LF would fail on a tree nobody had edited.
+  const normalized = (text) => text.replace(/\r\n/g, '\n')
   for (const file of files) {
-    const text = readFileSync(file, 'utf8')
+    const text = normalized(readFileSync(file, 'utf8'))
     if (!text.startsWith('---\n')) { bad.push(relative(file) + ' (no frontmatter)'); continue }
     const end = text.indexOf('\n---', 3)
     const front = end < 0 ? '' : text.slice(0, end)

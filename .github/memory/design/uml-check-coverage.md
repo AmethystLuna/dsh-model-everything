@@ -42,6 +42,23 @@ metadata:
 
 判定原则由清单末尾给出：只有 `[WFR]` 报 error，`[TOOL]` 报 warning 并点名定义它的工具，`[STYLE]` 只在项目约定采用时才报，且不得称为「违反 UML」。
 
+## 2b. 定时族（2026-10 新增，模块 `src/uml-timing.ts`）
+
+PlantUML 可 render 可 parse，Mermaid 无此图（能力矩阵 `none`）。检查码 `UML042`–`UML049` 全部来自「图与模型能不能彼此承载」，不是规范第 14 节的 `[WFR]` 清单：
+
+| 码 | 等级 | 为什么是这个等级 |
+|---|---|---|
+| `UML042_TIMING_NO_LIFELINES` | error | 空图没有可审内容，与 `UML026` 同级 |
+| `UML043_TIMING_EMPTY_LIFELINE` | warning | 画了但不说话的参与者是完备性缺口，不是规范违规 |
+| `UML044_TIMING_TIME_ORDER` | error | 模型即行序，按时间写；倒序意味着某个状态在它开始之前就结束了（负时间**合法**，是读者关心那一刻之前的 run-up，所以不判符号） |
+| `UML045_TIMING_SIMULTANEOUS_STATES` | error | 一条 lifeline 同一时刻只能处于一个状态；渲染器只保留最后一条，模型不能说出图承载不了的事 |
+| `UML046_TIMING_UNDECLARED_REFERENCE` | error | 端点未声明，PlantUML 会安静地画一条空时间轴——错字因此不可见 |
+| `UML047_TIMING_CONSTRAINT_RANGE` | error | 时长约束自己前后倒置 |
+| `UML048_TIMING_STATE_UNUSED` | warning | 完备性缺口，同 `UML043` |
+| `UML049_TIMING_UNDOCUMENTED` | info | 文档缺口，与 `UML014`、`UML039`、`UML040` 同级 |
+
+整块没实现的是清单第 14 节的 `[WFR]`（受约束元素基数、Duration/TimeExpression 与观测的对应、`InteractionConstraint` 的 minint/maxint、负的 `when`）：那些读的是时间与持续时间的约束对象，本模块只承载 `<->` 区间。**「定时图没报错」不等于这些约束成立。**
+
 ## 3. 编号冲突：`UML030` / `UML031` 被两处占用
 
 - `src/uml-usecase.ts`：`UML030_USE_CASE_NO_ACTORS`、`UML031_USE_CASE_NO_USE_CASES`

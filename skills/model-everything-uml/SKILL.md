@@ -27,8 +27,8 @@ code flow → model (citation per element) → uml_render → diagram source
           → model_verify           → behaviour (S1-S8 structural, A1-A14 adversarial)
 ```
 
-- **render** — model to diagram. Mermaid covers `state`, `activity` and `sequence`. PlantUML covers `state` and `sequence`. Any construct the notation cannot carry becomes a warning, never a silent drop. PlantUML activity is refused instead of approximated.
-- **parse** — diagram to model. It reads Mermaid and PlantUML state or activity text, so a hand-drawn diagram can be verified like any other model. Two inputs are refused because they cannot become a machine: a sequence diagram (a trace cannot reconstruct a machine) and a different Mermaid family (`classDiagram`, `erDiagram`, `gantt`, `mindmap`, …) — both come back as `errorCode: "UML_NOT_A_STATE_DIAGRAM"` with the discarded construct named.
+- **render** — model to diagram. Mermaid covers `state`, `activity` and `sequence`. PlantUML covers `state`, `sequence` and `timing`. Any construct the notation cannot carry becomes a warning, never a silent drop. PlantUML activity is refused instead of approximated.
+- **parse** — diagram to model. It reads Mermaid and PlantUML state or activity text, so a hand-drawn diagram can be verified like any other model; a PlantUML timing diagram is read as its own model (lifelines, states over time, messages, duration constraints). Two inputs are refused because they cannot become a machine: a sequence diagram (a trace cannot reconstruct a machine) and a different Mermaid family (`classDiagram`, `erDiagram`, `gantt`, `mindmap`, …) — both come back as `errorCode: "UML_NOT_A_STATE_DIAGRAM"` with the discarded construct named.
 - **review** — it answers one of three questions. Give it a model: is the machine well-modelled? Give it a diagram: what does the diagram say? Give it both: does the diagram match the model?
 - **explain-labels** — the parser's own account of labels and comments: the accepted spellings, the form the renderer writes, and which lines it ignores. No diagram needed. It answers "why does my hand-drawn diagram report drift or ignored lines?" without reading the source.
 
