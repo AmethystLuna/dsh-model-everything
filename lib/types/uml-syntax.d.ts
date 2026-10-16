@@ -146,6 +146,14 @@ export type UmlCapability = {
     errorCode: string;
     message: string;
 };
+export interface UmlCapabilityOptions {
+    /**
+     * Whether this call needs a parse. A review of a *model* in a family the notation can
+     * only approximate does not, and refusing it for a reason that belongs to the diagram
+     * would be refusing the part that works.
+     */
+    requireParse?: boolean;
+}
 /**
  * Whether this (notation, family, action) cell exists.
  *
@@ -154,7 +162,7 @@ export type UmlCapability = {
  * registry (see `uml.ts`). Keeping the two apart is what lets the engine document
  * all fourteen diagram types while the implementation lands family by family.
  */
-export declare function umlCapability(notation: UmlNotation, family: UmlFamilyId, action: UmlIntentAction): UmlCapability;
+export declare function umlCapability(notation: UmlNotation, family: UmlFamilyId, action: UmlIntentAction, options?: UmlCapabilityOptions): UmlCapability;
 /** `umlCapability`, as a throw. */
 export declare function assertUmlCapability(notation: UmlNotation, family: UmlFamilyId, action: UmlIntentAction): UmlCapability;
 export interface UmlFamilyParse<Model> {

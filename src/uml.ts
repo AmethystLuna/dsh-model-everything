@@ -42,6 +42,7 @@ import {
 import { useCaseModule, validateUseCaseModel, type UseCaseModelV1 } from './uml-usecase.js'
 import { structureFamilyModule, type StructureModelV1 } from './uml-structure.js'
 import { timingModule, validateTimingModel, type TimingModelV1 } from './uml-timing.js'
+import { profileModule, validateProfileModel, type ProfileModelV1 } from './uml-profile.js'
 
 export { UmlError, UML_NOTATIONS } from './uml-syntax.js'
 export type { UmlNotation, UmlFamilyId } from './uml-syntax.js'
@@ -52,6 +53,8 @@ export type { UmlNotation, UmlFamilyId } from './uml-syntax.js'
 // reviewUml and the tools built on them.
 export { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES, parseTiming, renderTiming } from './uml-timing.js'
 export type { TimingModelV1, TimingSegment, TimingLifeline, TimingFindingCode } from './uml-timing.js'
+export { validateProfileModel, reviewProfileModel, PROFILE_FINDING_CODES, renderProfile, profileModule } from './uml-profile.js'
+export type { ProfileModelV1, ProfileExtension, ProfileApplication, ProfileFindingCode } from './uml-profile.js'
 
 /**
  * The diagram families this front end knows, in the engine's order. The name is kept
@@ -91,7 +94,7 @@ export interface UmlRenderResult {
 }
 
 /** What a family's parse produces: a LogicModelV1 for the machine families, the family model otherwise. */
-export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1
+export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1
 
 export interface UmlParseResult {
   notation: UmlNotation
@@ -466,8 +469,8 @@ const ACTION_INTENTS: Record<UmlIntentAction, readonly UmlIntent[]> = {
  * build implements. A family the table calls faithful but no module serves yet is
  * refused here, by name, instead of being handed to the wrong parser.
  */
-function umlFamilyCapability(notation: UmlNotation, family: UmlDiagram, action: 'render' | 'parse' | 'review'): { ok: true; warning?: string } {
-  const capability = umlCapability(notation, family, action)
+function umlFamilyCapability(notation: UmlNotation, family: UmlDiagram, action: 'render' | 'parse' | 'review', options: { requireParse?: boolean } = {}): { ok: true; warning?: string } {
+  const capability = umlCapability(notation, family, action, options)
   if (!capability.ok) throw new UmlError(capability.message, capability.errorCode)
   return capability
 }
@@ -476,6 +479,7 @@ function umlFamilyCapability(notation: UmlNotation, family: UmlDiagram, action: 
 const FAMILY_MODULES = {
   'use-case': useCaseModule,
   timing: timingModule,
+  profile: profileModule,
   class: structureFamilyModule('class'),
   object: structureFamilyModule('object'),
   package: structureFamilyModule('package'),
@@ -1683,14 +1687,22 @@ export function reviewUml(options: UmlReviewOptions): UmlReviewReport {
     if (detected !== undefined) {
       const module = familyModule(detected.family)
       if (module !== undefined) {
-        return reviewFamilyUml({ family: detected.family, module, notation: detected.notation, diagram: options.diagram as string, model: options.model, roundTrip: options.roundTrip !== false, metadataKeys: metadataKeysOf(options.model), intent: options.intent })
+        return reviewFamilyUml({
+          family: detected.family, module, notation: detected.notation, diagram: options.diagram as string,
+          model: options.model, roundTrip: options.roundTrip !== false, metadataKeys: metadataKeysOf(options.model),
+          intent: options.intent, canParse: umlFamilySpec(detected.family).parseable,
+        })
       }
     }
   } else if (options.diagramKind !== undefined) {
     const module = familyModule(options.diagramKind)
     if (module !== undefined) {
       const notation = options.notation === undefined || options.notation === 'auto' ? 'plantuml' : options.notation
-      return reviewFamilyUml({ family: options.diagramKind, module, notation, model: options.model, roundTrip: options.roundTrip !== false, metadataKeys: metadataKeysOf(options.model), intent: options.intent })
+      return reviewFamilyUml({
+        family: options.diagramKind, module, notation, model: options.model,
+        roundTrip: options.roundTrip !== false, metadataKeys: metadataKeysOf(options.model), intent: options.intent,
+        canParse: umlFamilySpec(options.diagramKind).parseable,
+      })
     }
   }
 
@@ -1882,6 +1894,12 @@ interface FamilyReviewRequest {
   roundTrip: boolean
   metadataKeys: string[]
   intent?: UmlIntent
+  /**
+   * False when the family table refuses a parse for this family. The module's `parse`
+   * exists because the contract requires it, and it throws; a review handed diagram text
+   * must therefore never call it. The capability table is the single decision.
+   */
+  canParse: boolean
 }
 
 /** Element counts for a family model, so the report says how big the diagram is. */
@@ -1907,7 +1925,10 @@ function summarizeFamilyModel(model: unknown): { actors?: number; useCases?: num
  */
 function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
   checkUmlIntent(request.intent, 'review', { notation: request.notation, diagram: request.family })
-  const capability = umlFamilyCapability(request.notation, request.family, 'review')
+  // A review of a model does not need a parse, so it is not refused for the notation
+  // being unable to read the family back; `uml_review` on a model of an approximate
+  // family is a review of the part that exists.
+  const capability = umlFamilyCapability(request.notation, request.family, 'review', { requireParse: false })
   const spec = umlFamilySpec(request.family)
   const findings: UmlFinding[] = []
   const warnings: string[] = []
@@ -1917,7 +1938,7 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
   let primary: string | undefined
   let roundTrip: UmlRoundTripReport | null = null
 
-  if (request.diagram !== undefined) {
+  if (request.diagram !== undefined && request.canParse) {
     parsed = request.module.parse(request.diagram, request.notation)
     labels = parsed.labels
     warnings.push(...parsed.warnings)
@@ -1930,6 +1951,16 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
         detail: parsed.discardedConstructs.slice(0, 12).map((entry) => 'line ' + String(entry.line) + ': ' + entry.text).join(' | '),
       })
     }
+  } else if (request.diagram !== undefined) {
+    // The notation draws this family and cannot read it back. Saying so is the review's
+    // job: parsing anyway would be the fabrication the capability table exists to stop,
+    // and throwing would leave the caller without the report the tool promised.
+    findings.push({
+      code: 'UML018_FIDELITY_UNCHECKED',
+      severity: 'info',
+      message: 'a ' + spec.name + ' is drawn by ' + request.notation + ' and cannot be read back out of it, so this text was not read and nothing here is checked against it.',
+      detail: umlFamilySpec(request.family).parseRefusal ?? 'Keep the drawing and the model in one commit, and re-render with uml_render whenever the model changes.',
+    })
   }
 
   const supplied = request.model
@@ -1951,38 +1982,49 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
     const rendered = renderedForSupplied
     primary = rendered.primary
     warnings.push(...rendered.warnings)
-    const reparsed = request.module.parse(rendered.primary, request.notation)
-    const diffs = diffJsonModels(supplied, reparsed.model)
-    roundTrip = {
-      notation: request.notation,
-      diagram: request.family,
-      ok: diffs.length === 0,
-      hashSpec: DEFAULT_HASH_SPEC,
-      modelHash: valueHash(supplied),
-      parsedHash: valueHash(reparsed.model),
-      diffs,
-      warnings: [...rendered.warnings, ...reparsed.warnings],
-    }
-    if (diffs.length > 0) {
+    if (!request.canParse) {
+      // The diagram was drawn from the model, and the notation cannot read it back, so
+      // there is no fidelity check to report - only that there is none.
       findings.push({
-        code: 'UML017_ROUND_TRIP_MISMATCH',
-        severity: 'error',
-        message: 'the rendered diagram does not read back as the model: ' + String(diffs.length) + ' structural difference(s).',
-        detail: diffs.slice(0, 12).join(' | '),
+        code: 'UML018_FIDELITY_UNCHECKED',
+        severity: 'info',
+        message: 'the diagram was drawn from the model, but a ' + spec.name + ' cannot be read back out of ' + request.notation + ', so nothing here proves the drawing still says what the model says.',
+        detail: 'Keep the drawing and the model in one commit, and re-render with uml_render whenever the model changes.',
       })
-    }
-    if (parsed !== undefined) {
-      const againstDiagram = diffJsonModels(supplied, parsed.model)
-      if (againstDiagram.length > 0) {
+    } else {
+      const reparsed = request.module.parse(rendered.primary, request.notation)
+      const diffs = diffJsonModels(supplied, reparsed.model)
+      roundTrip = {
+        notation: request.notation,
+        diagram: request.family,
+        ok: diffs.length === 0,
+        hashSpec: DEFAULT_HASH_SPEC,
+        modelHash: valueHash(supplied),
+        parsedHash: valueHash(reparsed.model),
+        diffs,
+        warnings: [...rendered.warnings, ...reparsed.warnings],
+      }
+      if (diffs.length > 0) {
         findings.push({
           code: 'UML017_ROUND_TRIP_MISMATCH',
           severity: 'error',
-          message: 'the diagram does not carry the model it is presented with: ' + String(againstDiagram.length) + ' structural difference(s).',
-          detail: againstDiagram.slice(0, 12).join(' | '),
+          message: 'the rendered diagram does not read back as the model: ' + String(diffs.length) + ' structural difference(s).',
+          detail: diffs.slice(0, 12).join(' | '),
         })
       }
+      if (parsed !== undefined) {
+        const againstDiagram = diffJsonModels(supplied, parsed.model)
+        if (againstDiagram.length > 0) {
+          findings.push({
+            code: 'UML017_ROUND_TRIP_MISMATCH',
+            severity: 'error',
+            message: 'the diagram does not carry the model it is presented with: ' + String(againstDiagram.length) + ' structural difference(s).',
+            detail: againstDiagram.slice(0, 12).join(' | '),
+          })
+        }
+      }
+      if (labels === undefined) labels = reparsed.labels
     }
-    if (labels === undefined) labels = reparsed.labels
   } else if (parsed !== undefined && supplied === undefined) {
     findings.push({
       code: 'UML018_FIDELITY_UNCHECKED',

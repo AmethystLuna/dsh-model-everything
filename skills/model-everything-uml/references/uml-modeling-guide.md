@@ -317,6 +317,48 @@ declaration. Each is a real construct of the notation and none of them is a stat
 message, so they are reported by name. A clock's `pulse` and `offset` are reported the
 same way: the model carries the period.
 
+### Profile diagrams
+
+A profile extends the metamodel: a package of stereotypes, the metaclasses they extend,
+and the applications that put the profile to use. PlantUML draws one **approximately**,
+and this family is the case where the honest answer is a one-way view:
+
+- it has `metaclass` and `stereotype` elements and draws `class X <<stereotype>>`;
+- it has **no** profile element and no ProfileApplication, so the profile package itself
+  is never drawn;
+- an **extension** and a **stereotype generalization** are both a `--|>` arrow.
+
+That last one is why `uml_parse` refuses this family by name: reading the text back would
+have to decide which fact each arrow carries, and the notation does not say. So the model
+is the record and the drawing is a view of it:
+
+| Action | What happens |
+|---|---|
+| `uml_render` with `kind: "profile"` | Draws the approximation, with an `UML_RENDER_APPROXIMATE_VIEW` warning that says what it cannot carry. Every fact the drawing cannot show (which arrow is an extension, its multiplicity and role, the applications) is written as a `dsh-model-everything:profileExtension` / `:profileApply` / `:profile` directive, so the text is a faithful record even though the picture is not. |
+| `uml_parse` | Refused with `UML_VIEW_UNREPRESENTABLE` and the reason. Use the model. |
+| `uml_review` with `model` and `diagramKind: "profile"` | Reviews the model. This works, and is the intended path. |
+| `uml_review` with `diagram` | Returns one `UML018_FIDELITY_UNCHECKED` info finding saying the text was not read — not a pass, and not an error either. |
+
+The model is `ProfileModelV1`: `profile`, `stereotypes`, `metaclasses`, `extensions`
+(with the extension end's `multiplicity` and role `label`), `applications`, and
+`generalizations` (kept apart from extensions, because they are different facts).
+
+| Code | Severity | What it means |
+|---|---|---|
+| `UML050_PROFILE_NO_STEREOTYPES` | error | The profile declares no stereotype, so it extends the metamodel with nothing. |
+| `UML051_PROFILE_UNUSED_STEREOTYPE` | warning | A stereotype extends no metaclass and specialises no stereotype: nothing in the profile uses it. |
+| `UML052_PROFILE_EXTENSION_MISSING` | warning | A metaclass is declared that no stereotype extends, so the profile does not change it. |
+| `UML053_PROFILE_GENERALIZATION_CYCLE` | error | The stereotype hierarchy is cyclic, so which stereotype is the general one has no answer. The `detail` names the path. |
+| `UML054_PROFILE_UNDECLARED_REFERENCE` | error | An extension, generalization or application names an element no declaration introduced. |
+| `UML055_PROFILE_APPLICATION_MISSING` | info | The profile is applied to no package: nothing says where it is meant to be used. |
+| `UML056_PROFILE_UNDOCUMENTED` | info | The profile or a stereotype carries no name a reader can map back to the specification it extends. |
+
+The checks read the model alone. Whether a profile is *right* for the metamodel it
+extends is a question about the specification being profiled, and that is not answered
+here. The specification's own constraints on profiles — an extension end's aggregation,
+`isRequired`, the ProfileApplication correspondence — need the drawing to carry the
+extension endpoints and the application, which this notation does not.
+
 ### What the round trip proves
 
 It proves the diagram is a faithful rendering of the model:

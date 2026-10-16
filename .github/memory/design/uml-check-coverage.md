@@ -19,7 +19,8 @@ metadata:
 | 用例 | `UML030`–`UML039` | `src/uml-usecase.ts` | `[WFR]`：用例之间的关联、非二元关联、include/extend 端点类型、扩展点归属、重名；`[TOOL]`/风格项大多未实现 |
 | 类 / 对象 / 包 / 组件 / 部署 | `UML020`–`UML026`、`UML040` | 审查由 `src/uml-structure.ts` 转到 `src/structure.ts`，与 `uml_structure_verify` 同一份实现 | 清单第 1–6 节几乎全部 `[WFR]`：泛化环与 isLeaf、成员可区分、悬空关联端、多重性、导入自身、Port 与 Connector 的角色、Node 内部结构等 |
 | 定时 | `UML042`–`UML049` | `src/uml-timing.ts`（PlantUML 可 render 可 parse；Mermaid 无此图） | 清单第 14 节的 `[WFR]`：DurationConstraint/TimeConstraint 的受约束元素基数、Duration/TimeExpression 与观测的对应、`InteractionConstraint` 的 minint/maxint 规则、负的 `when`。这些读的是时间/持续时间约束，本模块目前只承载 `<->` 区间 |
-| 复合结构 / Profile / 通信 / 交互概览 | 无模块 | 图族表在 `src/uml-syntax.ts`，注册表在 `src/uml.ts` 按名拒绝 | 族的全部检查 |
+| Profile | `UML050`–`UML056` | `src/uml-profile.ts`（PlantUML 只 render，`parseable: false`） | 清单第 7 节按 `[WFR]` 列的约束（Extension 的 `isRequired`、`ExtensionEnd` 的聚合与多重性、ProfileApplication 与被应用包的对应、stereotype 与 metaclass 的重名冲突等）——这些要读出图里的扩展端点与 ProfileApplication，而记号没有这两样 |
+| 复合结构 / 通信 / 交互概览 | 无模块 | 图族表在 `src/uml-syntax.ts`，注册表在 `src/uml.ts` 按名拒绝 | 族的全部检查 |
 
 **这张表怎么用**：结构族与复合结构族没有按元素类型区分缺陷的能力——它们的审查是依赖图审查，加一条节点未命名（`UML040`）。因此「`uml_review` 没报错」对类图、包图、组件图、部署图**不等于**没有违反规范约束，只等于依赖图层面没有发现。要说一张结构图干净，得再说明没有检查的那一半。
 

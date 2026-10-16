@@ -213,9 +213,10 @@ export const UML_FAMILIES: readonly UmlFamilySpec[] = [
     mermaid: { fidelity: 'none', note: 'mermaid architecture-beta draws a service topology, not UML deployment nodes and artifacts, and this build does not emit it under the deployment name. Render it with notation "plantuml".' },
   },
   {
-    id: 'profile', name: 'profile diagram', nameZh: 'Profile 图', group: 'structure', machine: false, parseable: true,
-    plantuml: { fidelity: 'approximate', declarations: ['stereotype'], note: 'plantuml draws a profile as a class diagram carrying stereotype and metaclass markers; the extension and the profile application are not spelled. The view is rendered as an approximation and never parsed back.' },
-    mermaid: { fidelity: 'none', note: 'mermaid has no profile diagram. Render it with notation "plantuml".' },
+    id: 'profile', name: 'profile diagram', nameZh: 'Profile 图', group: 'structure', machine: false, parseable: false,
+    parseRefusal: 'plantuml draws a profile with the class diagram\'s elements and has no profile element, and an extension and a stereotype generalization are both a --|> arrow: a parse would have to guess which fact the arrow carries. Keep the profile as its own model and review that.',
+    plantuml: { fidelity: 'approximate', declarations: ['stereotype'], note: 'plantuml has metaclass and stereotype elements and draws `class X <<stereotype>>`, but no profile element and no ProfileApplication: the profile package itself is not drawn, and an extension is drawn as the same --|> arrow as a generalization. This build draws that approximation and never reads it back.' },
+    mermaid: { fidelity: 'none', note: 'mermaid has no profile diagram: classDiagram draws classifiers and carries <<annotation>> markers as labels, with no metaclass, stereotype or extension element. Render it with notation "plantuml".' },
   },
   {
     id: 'communication', name: 'communication diagram', nameZh: '通信图', group: 'interaction', machine: false, parseable: false,
@@ -418,6 +419,15 @@ export type UmlCapability =
   | { ok: true; warning?: string }
   | { ok: false; errorCode: string; message: string }
 
+export interface UmlCapabilityOptions {
+  /**
+   * Whether this call needs a parse. A review of a *model* in a family the notation can
+   * only approximate does not, and refusing it for a reason that belongs to the diagram
+   * would be refusing the part that works.
+   */
+  requireParse?: boolean
+}
+
 /**
  * Whether this (notation, family, action) cell exists.
  *
@@ -426,7 +436,7 @@ export type UmlCapability =
  * registry (see `uml.ts`). Keeping the two apart is what lets the engine document
  * all fourteen diagram types while the implementation lands family by family.
  */
-export function umlCapability(notation: UmlNotation, family: UmlFamilyId, action: UmlIntentAction): UmlCapability {
+export function umlCapability(notation: UmlNotation, family: UmlFamilyId, action: UmlIntentAction, options: UmlCapabilityOptions = {}): UmlCapability {
   if (!isUmlNotation(notation)) {
     return { ok: false, errorCode: 'UML_INPUT', message: 'unknown notation "' + String(notation) + '"; expected ' + UML_NOTATIONS.join(' | ') }
   }
@@ -447,6 +457,7 @@ export function umlCapability(notation: UmlNotation, family: UmlFamilyId, action
     return { ok: true }
   }
 
+  if (options.requireParse === false) return { ok: true }
   if (!spec.parseable) {
     return { ok: false, errorCode: spec.parseRefusalCode ?? 'UML_NOT_A_STATE_DIAGRAM', message: spec.parseRefusal ?? ('a ' + spec.name + ' cannot be read back into a model') }
   }
