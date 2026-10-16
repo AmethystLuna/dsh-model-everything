@@ -55,7 +55,7 @@ It reviews the diagram and the model you give it. Whether they match the code is
 Build the machine as an executable model and let an engine run it, instead of reading the code and concluding that it cannot get stuck:
 
 1. **Build the model**: `uml_parse` reads a hand-drawn `stateDiagram-v2` or PlantUML state diagram; a `LogicModelV1` can also be written directly against the schema.
-2. **Run the checks**: `model_verify` runs S1-S8 and A1-A14 - unreachable states, absorbing cycles, events silently ignored, an allocation with no recovery path, a budget overrun, a deadline that cannot be met.
+2. **Run the checks**: `model_verify` looks for unreachable states, absorbing cycles, events silently ignored, an allocation with no recovery path, a budget overrun, and a deadline that cannot be met. It reports each as a code whose prefix says which family it belongs to.
 3. **State the always/never claims**: put them in `invariants`. The engine searches every reachable state for a counterexample and returns the shortest one it finds.
 4. **Reconcile with the source**: every error finding goes back to the code.
 

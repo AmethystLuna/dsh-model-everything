@@ -6,7 +6,7 @@
 // objects. It was written after measuring 8 of 12 tools naming a sibling - the four it found were then
 // fixed, and this keeps them fixed.
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 let failures = 0
@@ -103,6 +103,59 @@ test('no early text names a code range', async () => {
   if (offenders.length > 0) {
     throw new Error('these assert a count and mean nothing before the skill is loaded: ' + offenders.join(', ') + '. Say what the checks do instead.')
   }
+})
+
+test('the README pair leads with content, not with a number', () => {
+  // A range is defensible as a label whose content is explained, and indefensible as the thing the
+  // sentence is about: "runs S1-S8 and A1-A14 - unreachable states, absorbing cycles" hands the reader six
+  // digits and puts the meaning in an aside. This checks the order, not the presence.
+  const offenders = []
+  for (const name of ['README.md', 'README.en-US.md']) {
+    const text = readFileSync(repo + name, 'utf8')
+    for (const line of text.split('\n')) {
+      const range = /\b[A-Z]{1,4}\d{1,3}\s*[-–—]\s*[A-Z]{1,4}\d{1,3}\b/.exec(line)
+      if (range === null) continue
+      // The defect is a range followed by an em-dash list: the range is asserted and the content follows.
+      const after = line.slice(range.index + range[0].length)
+      if (/^\s*[-–—]/.test(after)) offenders.push(name + ': ' + line.trim().slice(0, 90))
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error('a range is carrying the sentence while its content is the aside:\n    ' + offenders.join('\n    '))
+  }
+})
+
+test('every declared display string states what the plugin does', () => {
+  // The surfaces that carry the plugin's own prose, gathered rather than listed: a registry shows
+  // `description`, a plugin manager shows `dsh.displayName`, and the GUI shows the locale bundle. All
+  // three are read before anyone has seen a report, so a code or a roster count in any of them is the
+  // same defect as one in a skill row.
+  const declared = []
+  const pkg = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
+  if (typeof pkg.description === 'string') declared.push({ where: 'package.json description', text: pkg.description })
+  if (typeof pkg.displayName === 'string') declared.push({ where: 'package.json displayName', text: pkg.displayName })
+  if (pkg.dsh !== undefined && typeof pkg.dsh.displayName === 'string') declared.push({ where: 'package.json dsh.displayName', text: pkg.dsh.displayName })
+  for (const name of readdirSync(repo + 'locale')) {
+    const bundle = JSON.parse(readFileSync(repo + 'locale/' + name, 'utf8'))
+    for (const key of ['title', 'description']) {
+      if (typeof bundle.meta?.[key] === 'string') declared.push({ where: 'locale/' + name + ' meta.' + key, text: bundle.meta[key] })
+    }
+  }
+  if (declared.length === 0) throw new Error('no declared display string was found; this check would pass vacuously')
+
+  const RANGE = /\b[A-Z]{1,4}\d{1,3}\s*[-–—]\s*[A-Z]{1,4}\d{1,3}\b/
+  const CODE = /\b[A-Z]{1,4}\d{1,3}\b/
+  const ROSTER = /\b(?:\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:checks?|codes?|tools?|skills?|families|suites?)\b/i
+  const problems = []
+  for (const { where, text } of declared) {
+    if (RANGE.test(text)) problems.push(where + ' names a code range')
+    else if (CODE.test(text)) problems.push(where + ' names a check code')
+    if (ROSTER.test(text)) problems.push(where + ' counts a roster')
+  }
+  if (problems.length > 0) {
+    throw new Error('a reader meets these before any report exists, so a code means nothing here:\n    ' + problems.join('\n    '))
+  }
+  console.log('      (' + String(declared.length) + ' declared display string(s) checked: ' + declared.map((entry) => entry.where).join(', ') + ')')
 })
 
 test('the toolset map matches the measurement', () => {
