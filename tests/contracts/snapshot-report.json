@@ -1627,5 +1627,380 @@
       "changed": []
     },
     "body": "model-everything/baseline/v1  verdict=pass  no new findings, nothing resolved  ok=true\n\n{\"ok\":true,\"ran\":true,\"verdict\":\"pass\",\"verdictReason\":\"no new findings, nothing resolved\",\"schema\":\"model-everything/baseline/v1\",\"currentVerdict\":\"pass_with_findings\",\"added\":[],\"removed\":[],\"changed\":[],\"summary\":{\"baseline\":31,\"current\":31,\"added\":0,\"removed\":0,\"changed\":0,\"addedErrors\":0,\"addedWarnings\":0},\"nextSteps\":[\"No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it.\"]}\n\nNEXT  No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
+  },
+  "design: a layered design that keeps every declaration": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "6 warning finding(s)",
+    "schema": "model-everything/design/v1",
+    "modelHash": "b53a2683c30e3d47ea72fda38eaaa55be19c1af5e05955e1dbcec0954e084387",
+    "summary": {
+      "errors": 0,
+      "warnings": 6,
+      "info": 0,
+      "checksRun": 11,
+      "nodes": 5,
+      "edges": 4
+    },
+    "checks": [
+      {
+        "id": "DES1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES4",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.",
+            "detail": "This is a fact about the graph, not a verdict about the design. A gateway layer is supposed to be such a node; the point is that it was not stated."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.",
+            "detail": "This is a fact about the graph, not a verdict about the design. A gateway layer is supposed to be such a node; the point is that it was not stated."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge repo -> db is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> audit is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> repo is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge ui -> service is a bridge: it is the only dependency joining its two sides."
+          }
+        ]
+      },
+      {
+        "id": "DES5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES11",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Read the 6 signal(s) and decide which are intended: they are structural facts, not defects."
+    ],
+    "body": "model-everything/design/v1  verdict=pass_with_findings  6 warning finding(s)  ok=true  modelHash=b53a2683c30e… errors=0 warnings=6 checksRun=11\nCHECKS  pass DES1 DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11 | fail DES4\n\nFAIL DES4 Load-Bearing Elements — 6 element(s) the graph depends on (6 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge repo -> db is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> audit is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> repo is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> service is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 6 signal(s) and decide which are intended: they are structural facts, not defects."
+  },
+  "design: a design that contradicts its declarations": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "6 error finding(s) (first: DES1_CYCLE)",
+    "schema": "model-everything/design/v1",
+    "modelHash": "66dad70532a4fe4dc4f418c16b8c666cba3807eca3cefb904fba7ccd4073f02e",
+    "summary": {
+      "errors": 6,
+      "warnings": 4,
+      "info": 0,
+      "checksRun": 11,
+      "nodes": 3,
+      "edges": 3
+    },
+    "checks": [
+      {
+        "id": "DES1",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES1_CYCLE",
+            "severity": "error",
+            "message": "the dependency graph is cyclic: 2 edge(s) survive peeling every node that has nothing depending on it, and the largest mutual-dependency group has 2 members.",
+            "detail": "These edges survive a canonical peel, which means every node they touch has something depending on it: repo -> service, service -> repo. They are not a minimum set to delete - a minimum feedback arc set is NP-hard (Garey & Johnson, 1979) - and for a cycle of n nodes the peel leaves all n edges while breaking it costs n - 1. Mutually reachable: repo, service."
+          }
+        ]
+      },
+      {
+        "id": "DES2",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES2_LAYER_ORDER",
+            "severity": "error",
+            "message": "ui (layer ui) depends on repo (layer data), skipping service.",
+            "detail": "A declared layering says which bands may depend on which; an edge that jumps a band is not a style question, it is a dependency the declaration does not admit."
+          },
+          {
+            "code": "DES2_LAYER_ORDER",
+            "severity": "error",
+            "message": "repo (layer data) depends upward on service (layer service).",
+            "detail": "The layers are declared in order, so a later band depending on an earlier one inverts the declaration."
+          }
+        ]
+      },
+      {
+        "id": "DES3",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES3_BOUNDARY_LEAK",
+            "severity": "error",
+            "message": "ui (presentation) depends on repo (domain), and no declared rule allows presentation -> domain.",
+            "detail": "Boundaries partition responsibility; an edge across one that the declaration does not admit means the two are not as separate as the model says."
+          }
+        ]
+      },
+      {
+        "id": "DES4",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.",
+            "detail": "This is a fact about the graph, not a verdict about the design. A gateway layer is supposed to be such a node; the point is that it was not stated."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge ui -> repo is a bridge: it is the only dependency joining its two sides."
+          }
+        ]
+      },
+      {
+        "id": "DES5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES6",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES6_MISSING_REQUIRED_EDGE",
+            "severity": "error",
+            "message": "ui-calls-service: the design requires ui -> service, and the architecture does not have it."
+          }
+        ]
+      },
+      {
+        "id": "DES7",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES7_LSP_CONTRACT",
+            "severity": "error",
+            "message": "FixedDeposit refuses withdraw, which its supertype Account declares it handles. A subtype may not strengthen a precondition.",
+            "detail": "Liskov & Wing (1994): a subtype must accept everything its supertype accepts. Refusing an event the supertype handles means the subtype cannot stand in for it."
+          }
+        ]
+      },
+      {
+        "id": "DES8",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES8_ISP_UNUSED_OPERATION",
+            "severity": "warning",
+            "message": "Reader declares 1 operation(s) no client in this model calls: vacuum.",
+            "detail": "A client that must know about operations it never calls is coupled to them: that is the fat-interface signal (Martin, 2002; the interface-anomaly literature measures unused methods as the defect). This is a signal, not a verdict - a published interface may keep operations for callers outside this model."
+          }
+        ]
+      },
+      {
+        "id": "DES9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES10",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES10_RESPONSIBILITY_GAP",
+            "severity": "warning",
+            "message": "OrderService depends on AuditLog, which no declared responsibility owns.",
+            "detail": "The responsibilities and the dependency list disagree. Either the dependency belongs to a responsibility that was not declared, or the tag list is incomplete - the model cannot say which, so this is reported as the disagreement it is."
+          }
+        ]
+      },
+      {
+        "id": "DES11",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Fix the 6 violation(s) the design contradicts itself about, or change the declaration they contradict.",
+      "Read the 4 signal(s) and decide which are intended: they are structural facts, not defects."
+    ],
+    "body": "model-everything/design/v1  verdict=fail  6 error finding(s) (first: DES1_CYCLE)  ok=true  modelHash=66dad70532a4… errors=6 warnings=4 checksRun=11\nCHECKS  pass DES5 DES9 DES11 | fail DES1 DES2 DES3 DES4 DES6 DES7 DES8 DES10\n\nFAIL DES1 Acyclic Dependency — cycles: 2 (1 finding(s))\n  [error/DES1_CYCLE] the dependency graph is cyclic: 2 edge(s) survive peeling every node that has nothing depending on it, and the largest mutual-dependency group has 2 members. evidence={\"feedbackArcs\":[[\"repo\",\"service\"],[\"service\",\"repo\"]],\"largestCycle\":[\"repo\",\"service\"],\"ranks\":{\"repo\":1,\"service\":1,\"ui\":0}}\n\nFAIL DES2 Layer Order — 2 edge(s) against the declaration (2 finding(s))\n  [error/DES2_LAYER_ORDER] ui (layer ui) depends on repo (layer data), skipping service. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromLayer\":\"ui\",\"toLayer\":\"data\",\"skipped\":[\"service\"]}\n  [error/DES2_LAYER_ORDER] repo (layer data) depends upward on service (layer service). evidence={\"from\":\"repo\",\"to\":\"service\",\"fromLayer\":\"data\",\"toLayer\":\"service\"}\n\nFAIL DES3 Boundary Leak — 1 crossing(s) not allowed (1 finding(s))\n  [error/DES3_BOUNDARY_LEAK] ui (presentation) depends on repo (domain), and no declared rule allows presentation -> domain. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromBoundary\":\"presentation\",\"toBoundary\":\"domain\"}\n\nFAIL DES4 Load-Bearing Elements — 2 element(s) the graph depends on (2 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> repo is a bridge: it is the only dependency joining its two sides.\n\nFAIL DES6 Required Dependencies — 1 missing (1 finding(s))\n  [error/DES6_MISSING_REQUIRED_EDGE] ui-calls-service: the design requires ui -> service, and the architecture does not have it. evidence={\"id\":\"ui-calls-service\",\"from\":\"ui\",\"to\":\"service\"}\n\nFAIL DES7 Substitutability — 1 contract(s) against the declaration (1 finding(s))\n  [error/DES7_LSP_CONTRACT] FixedDeposit refuses withdraw, which its supertype Account declares it handles. A subtype may not strengthen a precondition. evidence={\"subtype\":\"FixedDeposit\",\"base\":\"Account\",\"event\":\"withdraw\",\"kind\":\"forbidden event\"}\n\nFAIL DES8 Interface Width — 1 interface(s) wider than their callers (1 finding(s))\n  [warning/DES8_ISP_UNUSED_OPERATION] Reader declares 1 operation(s) no client in this model calls: vacuum.\n\nFAIL DES10 Responsibility Boundaries — 1 mismatch(es) (1 finding(s))\n  [warning/DES10_RESPONSIBILITY_GAP] OrderService depends on AuditLog, which no declared responsibility owns.\n\nNEXT  Fix the 6 violation(s) the design contradicts itself about, or change the declaration they contradict.\nNEXT  Read the 4 signal(s) and decide which are intended: they are structural facts, not defects."
+  },
+  "design: a design that declares nothing but a graph": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "1 warning finding(s)",
+    "schema": "model-everything/design/v1",
+    "modelHash": "b85bb45059c0c13fb114dd662a1d67fe95b95c17643833841b34032f4c7b7a4b",
+    "summary": {
+      "errors": 0,
+      "warnings": 1,
+      "info": 0,
+      "checksRun": 11,
+      "nodes": 2,
+      "edges": 1
+    },
+    "checks": [
+      {
+        "id": "DES1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES2",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES3",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES4",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge a -> b is a bridge: it is the only dependency joining its two sides."
+          }
+        ]
+      },
+      {
+        "id": "DES5",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES6",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES7",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES8",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES9",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES10",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DES11",
+        "status": "skip",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Read the 1 signal(s) and decide which are intended: they are structural facts, not defects.",
+      "Checks DES2, DES3, DES5, DES6, DES7, DES8, DES9, DES10, DES11 had nothing to hold the design to: declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here."
+    ],
+    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=11\nCHECKS  pass DES1 | fail DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nFAIL DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects.\nNEXT  Checks DES2, DES3, DES5, DES6, DES7, DES8, DES9, DES10, DES11 had nothing to hold the design to: declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here."
+  },
+  "design: a model the schema refuses": {
+    "ok": false,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first: DESIGN_INVALID)",
+    "schema": "model-everything/design/v1",
+    "modelHash": "",
+    "summary": {
+      "errors": 1,
+      "warnings": 0,
+      "info": 0,
+      "checksRun": 0,
+      "nodes": 0,
+      "edges": 0
+    },
+    "checks": [
+      {
+        "id": "DESIGN",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DESIGN_INVALID",
+            "severity": "error",
+            "message": "architecture.wibble: unknown field (the schema is closed; a typo would silently change the design under review)"
+          }
+        ]
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
+    ],
+    "body": "model-everything/design/v1  verdict=fail  1 error finding(s) (first: DESIGN_INVALID)  ok=false  modelHash=… errors=1 warnings=0 checksRun=0\nCHECKS  fail DESIGN\n\nFAIL DESIGN Design Model Validation — the model was rejected before any check ran (1 finding(s))\n  [error/DESIGN_INVALID] architecture.wibble: unknown field (the schema is closed; a typo would silently change the design under review)\n\nNEXT  Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
   }
 }

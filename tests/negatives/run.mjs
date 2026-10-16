@@ -13,6 +13,7 @@ import { runDataVerification } from '../../lib/data-engine.js'
 import { reviewUml } from '../../lib/uml.js'
 import { reviewStructure } from '../../lib/structure.js'
 import { runConcurrencyScan } from '../../lib/concurrency.js'
+import { runDesignReview } from '../../lib/design-engine.js'
 
 let failures = 0
 function test(name, fn) {
@@ -435,6 +436,95 @@ expectAbsent('a dependency graph whose endpoints are declared', 'UML021_DANGLING
 
 expectAbsent('a document that claims nothing absolutely', 'CONCURRENCY_ABSOLUTE_CLAIM',
   runConcurrencyScan('The cache is guarded by a mutex; the queue is drained on shutdown.'))
+
+// ------------------------------------------------------------------ design engine --
+// Eleven codes, each with the declaration put right. The near miss matters more here than in
+// most domains: a signal like "this edge is a bridge" is true of many healthy designs, so a
+// check that fires on the near miss as well is not deciding anything.
+const designCase = (overrides = {}) => runDesignReview({
+  schemaVersion: 1,
+  architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] },
+  ...overrides,
+})
+const layersOf = (names) => names.map(([name, members]) => ({ name, members }))
+
+expectAbsent('a graph with the cycle cut', 'DES1_CYCLE',
+  designCase({ architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c']] } }))
+
+expectAbsent('an edge one step down the declared layers', 'DES2_LAYER_ORDER',
+  designCase({
+    architecture: { nodes: ['u', 's', 'd'], edges: [['u', 's'], ['s', 'd']] },
+    declare: { layers: layersOf([['ui', ['u']], ['service', ['s']], ['data', ['d']]]) },
+  }))
+
+expectAbsent('a crossing the declared rule allows', 'DES3_BOUNDARY_LEAK',
+  designCase({
+    architecture: { nodes: ['bill', 'idp'], edges: [['bill', 'idp']] },
+    declare: {
+      boundaries: layersOf([['billing', ['bill']], ['identity', ['idp']]]),
+      allowedEdges: [{ id: 'r1', source: 'billing', allow: ['identity'] }],
+    },
+  }))
+
+// The near miss for a load-bearing element is a ring: every node has two ways round, so
+// nothing is an articulation point and no edge is a bridge.
+expectAbsent('a ring, where no element is load-bearing', 'DES4_LOAD_BEARING_ELEMENT',
+  designCase({ architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] } }))
+
+expectAbsent('every node placed in a declared layer', 'DES5_UNDECLARED_NODE',
+  designCase({
+    architecture: { nodes: ['u', 's'], edges: [['u', 's']] },
+    declare: { layers: layersOf([['ui', ['u']], ['service', ['s']]]) },
+  }))
+
+expectAbsent('the required dependency present', 'DES6_MISSING_REQUIRED_EDGE',
+  designCase({ declare: { requiredEdges: [{ id: 'must', from: 'a', to: 'b' }] } }))
+
+// A subtype may refuse an event its supertype never had: that narrows nothing the base
+// promised, so it is a legitimate narrowing rather than a strengthened precondition.
+expectAbsent('a subtype refusing an event the supertype never had', 'DES7_LSP_CONTRACT',
+  designCase({
+    types: [
+      { name: 'Account', stereotype: 'class', operations: [{ name: 'withdraw', parameters: ['Money'] }], transitions: [{ event: 'withdraw' }] },
+      { name: 'Savings', stereotype: 'class', extends: 'Account', forbids: [{ event: 'closeEarly' }] },
+    ],
+  }))
+
+expectAbsent('every interface operation called by a client', 'DES8_ISP_UNUSED_OPERATION',
+  designCase({
+    types: [
+      { name: 'Reader', stereotype: 'interface', operations: [{ name: 'find' }] },
+      { name: 'Job', stereotype: 'class', uses: [{ type: 'Reader', operations: ['find'] }] },
+    ],
+  }))
+
+// The near miss for a split interface: one client needs both operations, which joins the
+// two groups and means one interface is the right width after all.
+expectAbsent('clients whose operation sets overlap', 'DES9_ISP_DISJOINT_CLIENTS',
+  designCase({
+    types: [
+      { name: 'Store', stereotype: 'interface', operations: [{ name: 'read' }, { name: 'write' }] },
+      { name: 'Reader', stereotype: 'class', uses: [{ type: 'Store', operations: ['read'] }] },
+      { name: 'Both', stereotype: 'class', uses: [{ type: 'Store', operations: ['read', 'write'] }] },
+    ],
+  }))
+
+expectAbsent('every dependency owned by exactly one responsibility', 'DES10_RESPONSIBILITY_GAP',
+  designCase({
+    types: [{
+      name: 'OrderService', stereotype: 'class',
+      responsibilities: [{ name: 'pricing', uses: ['PriceList'] }, { name: 'persistence', uses: ['OrderStore'] }],
+      dependsOn: ['PriceList', 'OrderStore'],
+    }],
+  }))
+
+expectAbsent('an abstraction depending on another abstraction', 'DES11_CONCRETE_DEPENDENCY',
+  designCase({
+    types: [
+      { name: 'Notifier', stereotype: 'interface', operations: [{ name: 'send' }], dependsOn: ['Transport'] },
+      { name: 'Transport', stereotype: 'interface', operations: [{ name: 'deliver' }] },
+    ],
+  }))
 
 if (failures > 0) {
   console.log('negative tests failed:', failures)

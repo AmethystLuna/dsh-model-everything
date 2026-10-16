@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url'
 import { runVerification } from '../../lib/engine.js'
 import { runDataVerification } from '../../lib/data-engine.js'
 import { renderUml, reviewUml, parseUml } from '../../lib/uml.js'
+import { runDesignReview } from '../../lib/design-engine.js'
+import { declaredDesign, defectiveDesign, bareDesign, refusedDesign } from '../fixtures/design.mjs'
 import { renderReportText } from '../../lib/report-view.js'
 import { reviewStructure } from '../../lib/structure.js'
 import { reviewGranularity } from '../../lib/granularity.js'
@@ -206,6 +208,10 @@ const cases = {
     runVerification(narratedMachine, {}),
     runVerification(stateMachine, { beforeModel: narratedMachine, stateMapping: { INIT: 'INIT', STARTING: 'STARTING', ACTIVE: 'ACTIVE', ERROR: 'ERROR', FATAL: 'FATAL' } }),
   ),
+  'design: a layered design that keeps every declaration': () => runDesignReview(declaredDesign),
+  'design: a design that contradicts its declarations': () => runDesignReview(defectiveDesign),
+  'design: a design that declares nothing but a graph': () => runDesignReview(bareDesign),
+  'design: a model the schema refuses': () => runDesignReview(refusedDesign),
 }
 
 const current = {}

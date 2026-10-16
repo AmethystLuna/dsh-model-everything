@@ -422,6 +422,7 @@ export const REPORT_SCHEMAS = {
   umlExplainLabels: 'model-everything/uml/explain-labels/v1',
   structure: 'model-everything/structure/v1',
   granularity: 'model-everything/granularity/v1',
+  design: 'model-everything/design/v1',
   baseline: 'model-everything/baseline/v1',
 } as const
 
