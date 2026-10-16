@@ -237,6 +237,8 @@ export interface VerificationReport {
         warnings: number;
         checksRun: number;
         truncated?: boolean;
+        /** Bounds that were replaced or clamped because they could not bound the search. */
+        boundNotes?: string[];
     };
     checks: CheckResult[];
     comparison?: ComparisonSummary;
@@ -385,6 +387,10 @@ export declare function unresolvedEventNames(root: Record<string, unknown>): Arr
     value: string;
     check: string;
 }>;
+/**
+ * Every variable a guard names, total over arbitrary JSON for the same reason as
+ * walkGuardReferences.
+ */
 export declare function guardVariables(guard: GuardNode | undefined): string[];
 export declare function runVerification(input: unknown, options?: VerificationOptions): VerificationReport;
 export interface CompositionStep {

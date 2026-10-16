@@ -1230,6 +1230,169 @@ async function runUnresolvedNameTests() {
 
 await runUnresolvedNameTests()
 
+/**
+ * An option that cannot bound a search, and a state space that provably has no bound.
+ *
+ * The audit got a 4 GB heap and a fatal V8 error out of `maxStates: NaN`, because every walk in the
+ * engine bounds itself with `steps > options.maxStates` and that comparison is false forever. Two
+ * things are pinned here:
+ *   - a bound that cannot bound is replaced, and the report says so rather than running unbounded;
+ *   - the state space is analysed BEFORE the walk, so a model whose reachable set is infinite is
+ *     reported as a modelling defect instead of being discovered by exhausting a budget. That is
+ *     the difference between "we ran out of room" and "no room would have been enough".
+ */
+async function runBoundedSearchTests() {
+  const unbounded = {
+    schemaVersion: 1, init: 'RUN',
+    states: [{ id: 'RUN' }],
+    transitions: [{ from: 'RUN', event: 'up', to: 'RUN', updates: [{ variable: 'n', op: 'inc' }] }],
+    variables: [{ name: 'n', kind: 'integer', init: 0 }],
+  }
+
+  // The bound that started this: it used to abort the process. The test would die rather than fail,
+  // which is why the assertion is on the answer as well as on the timing.
+  const started = Date.now()
+  const nanReport = runVerification(unbounded, { maxStates: NaN })
+  const elapsed = Date.now() - started
+  if (elapsed > 20_000) throw new Error('a bound that cannot bound must not make the search unbounded; took ' + String(elapsed) + 'ms')
+  if (nanReport.summary.boundNotes === undefined) throw new Error('the replaced bound must be reported')
+  if (!nanReport.summary.boundNotes.some((note) => note.includes('maxStates'))) {
+    throw new Error('the note must name the option: ' + JSON.stringify(nanReport.summary.boundNotes))
+  }
+
+  // Every shape that cannot bound. The tool schema takes `json`, so a caller can send all of these.
+  for (const value of [NaN, Infinity, -Infinity, 0, -1, 1.5]) {
+    const report = runVerification(unbounded, { maxStates: value })
+    if (report.summary.boundNotes === undefined) throw new Error(String(value) + ' must be replaced and reported')
+  }
+  // The nearest miss: a usable bound is taken as given and nothing is said about it.
+  const honest = runVerification(unbounded, { maxStates: 50 })
+  if (honest.summary.boundNotes !== undefined) throw new Error('a usable bound must not be reported as replaced')
+  // A bound above the ceiling is clamped and the clamp is reported: a truncated report must not read
+  // as a complete one.
+  const huge = runVerification(unbounded, { maxStates: 1_000_000_000 })
+  if (huge.summary.boundNotes === undefined || !huge.summary.boundNotes.some((note) => note.includes('clamped'))) {
+    throw new Error('a bound past the ceiling must be clamped and said so: ' + JSON.stringify(huge.summary.boundNotes))
+  }
+
+  // The state space, decided from the model rather than from a search that ran out.
+  const s6 = nanReport.checks.find((check) => check.id === 'S6')
+  if (s6 === undefined || !s6.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE')) {
+    throw new Error('an infinite reachable set must be a finding, not only a truncation')
+  }
+  if (nanReport.summary.truncated !== true) throw new Error('and the report must say the searches stopped early')
+
+  // Decision table for the analysis: each clause of "monotone over a reachable cycle, unbounded in
+  // the direction of travel" turned false in turn.
+  const cases = [
+    ['bounded in the direction of travel', { ...unbounded, variables: [{ name: 'n', kind: 'integer', init: 0, max: 5 }] }],
+    ['the update is not on a cycle', {
+      schemaVersion: 1, init: 'A',
+      states: [{ id: 'A' }, { id: 'B', terminal: true }],
+      transitions: [{ from: 'A', event: 'up', to: 'B', updates: [{ variable: 'n', op: 'inc' }] }],
+      variables: [{ name: 'n', kind: 'integer', init: 0 }],
+    }],
+    ['the cycle moves both ways', {
+      schemaVersion: 1, init: 'A',
+      states: [{ id: 'A' }, { id: 'B' }],
+      transitions: [
+        { from: 'A', event: 'up', to: 'B', updates: [{ variable: 'n', op: 'inc' }] },
+        { from: 'B', event: 'down', to: 'A', updates: [{ variable: 'n', op: 'dec' }] },
+      ],
+      variables: [{ name: 'n', kind: 'integer', init: 0 }],
+    }],
+    ['the cycle is not reachable from the initial state', {
+      schemaVersion: 1, init: 'START',
+      states: [{ id: 'START' }, { id: 'ISLAND' }],
+      transitions: [{ from: 'ISLAND', event: 'up', to: 'ISLAND', updates: [{ variable: 'n', op: 'inc' }] }],
+      variables: [{ name: 'n', kind: 'integer', init: 0 }],
+    }],
+  ]
+  for (const [why, model] of cases) {
+    const report = runVerification(model, {})
+    const hit = report.checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))
+    if (hit) throw new Error('S6_UNBOUNDED_VARIABLE fired although ' + why)
+  }
+
+  console.log('PASS bounded-search')
+}
+
+await runBoundedSearchTests()
+
+/**
+ * A malformed guard is an error report, never a crash.
+ *
+ * `validateGuard` reported these all along, but the validator collects errors instead of stopping
+ * and returns the caller's own JSON, so the second pass walked a tree that does not exist and threw
+ * `guard.all is not iterable`. A guard is a tree with four shapes, so the walkers are total over
+ * arbitrary JSON, and the two shapes that are valid JSON but not valid logic are refused.
+ */
+async function runGuardShapeTests() {
+  const withGuard = (guard) => ({
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B', guard }, { from: 'A', event: 'other', to: 'A' }],
+    variables: [{ name: 'n', kind: 'integer', init: 0 }],
+  })
+
+  const malformed = [
+    ['all is not an array', { all: 5 }],
+    ['all holds a non-node', { all: [42] }],
+    ['any is not an array', { any: 'x' }],
+    ['any holds a non-node', { any: [null] }],
+    ['not holds a non-node', { not: 7 }],
+    ['a leaf with no op', { variable: 'n' }],
+    ['a leaf with an unknown op', { variable: 'n', op: 'between', value: 1 }],
+    ['a leaf whose variable is not a string', { variable: 5, op: '==', value: 1 }],
+    ['the guard is a number', 42],
+    ['the guard is a string', 'n > 1'],
+    ['the guard is an array', []],
+    ['the guard is null', null],
+    ['an empty conjunction', { all: [] }],
+    ['an empty disjunction', { any: [] }],
+    ['a nested malformed node', { all: [{ any: [{ variable: 'n', op: '==' }] }] }],
+  ]
+  for (const [why, guard] of malformed) {
+    let report
+    try {
+      report = runVerification(withGuard(guard), {})
+    } catch (error) {
+      // A throw here is the defect: the caller gets no code to route on.
+      throw new Error(why + ': the engine threw instead of reporting - ' + String(error?.message))
+    }
+    if (report.verdict !== 'fail') throw new Error(why + ': a malformed guard must fail the report, got ' + report.verdict)
+    const codes = report.checks.flatMap((check) => check.findings.map((finding) => finding.code))
+    if (!codes.includes('MODEL_INVALID')) throw new Error(why + ': expected a coded refusal, got ' + JSON.stringify(codes))
+  }
+
+  // The nearest miss: every legal shape is accepted, nesting included.
+  const legal = [
+    ['a leaf', { variable: 'n', op: '>', value: 1 }],
+    ['a conjunction', { all: [{ variable: 'n', op: '>', value: 1 }, { variable: 'n', op: '<', value: 9 }] }],
+    ['a disjunction', { any: [{ variable: 'n', op: '==', value: 1 }] }],
+    ['a negation', { not: { variable: 'n', op: '==', value: 1 } }],
+    ['a nested combination', { all: [{ any: [{ variable: 'n', op: '==', value: 1 }] }, { not: { variable: 'n', op: '>', value: 9 } }] }],
+  ]
+  for (const [why, guard] of legal) {
+    const report = runVerification(withGuard(guard), {})
+    const codes = report.checks.flatMap((check) => check.findings.map((finding) => finding.code))
+    if (codes.includes('MODEL_INVALID')) throw new Error(why + ' is a legal guard and must be accepted: ' + JSON.stringify(codes))
+  }
+
+  // An empty conjunction is vacuously true, which would make the transition unconditional while it
+  // reads as guarded; an empty disjunction can never fire. Each says which it is.
+  const emptyAll = runVerification(withGuard({ all: [] }), {})
+  const emptyAllNote = emptyAll.checks[0].findings.map((finding) => finding.message).join(' | ')
+  if (!emptyAllNote.includes('always true')) throw new Error('the empty conjunction must say why it is refused: ' + emptyAllNote)
+  const emptyAny = runVerification(withGuard({ any: [] }), {})
+  const emptyAnyNote = emptyAny.checks[0].findings.map((finding) => finding.message).join(' | ')
+  if (!emptyAnyNote.includes('never fire')) throw new Error('the empty disjunction must say why it is refused: ' + emptyAnyNote)
+
+  console.log('PASS guard-shapes')
+}
+
+await runGuardShapeTests()
+
 async function runDeadlineTests() {
   // advisory: maxTicks declared but no tickEvents -> cannot verify
   const noTicks = {
