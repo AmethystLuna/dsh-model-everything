@@ -44,7 +44,13 @@ metadata:
 - `npm run test:engine`：整套回归全绿，含记忆门禁与外部检查器往返（检查器不在 PATH 上时自动跳过）。
 - 工具入口检查覆盖四个 UML 工具各自的参数与拒绝码，包括「`uml_explain_labels` 不提供 `intent`」。
 - 图族能力有测试对着拒绝消息与模型逐字比对；结构族的往返一致性由能力矩阵与测试共同钉住。
-- **未验证**：`dsh.compatibility.dshReleases` 的每一条都标 `unknown`（未实测）；插件尚未装进任何 profile；npm 发布与 GitHub 建仓未做。
+- **未验证**：插件尚未装进任何**长期使用的** profile；npm 发布与 GitHub 建仓未做。
+
+## 迁移之后补测的（2026-10 下半月）
+
+- **兼容性是实测的**：在隔离 `DSH_HOME` 里用 `dsh 0.2.0-rc.2` 装 `file:` 副本，`--dump-config` 里看到本插件的行（`enabled: true`），技能与 `locale/` 都在包内。0.1.7 那一段另用 API 面探针（装该版本的 `dsh-tools`/`dsh-llm`/`dsh-skill-filesystem`，把 `lib/` 放进去跑 `apply`）测过 `0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`：工具全注册、工具能跑出报告、inspect 与技能 provider 都建得起来。
+- **准入只看 `peerDependencies`**：`dsh.engines.dsh`、`dsh.category`、`dsh.displayName`、`dsh.compatibility` 都没有读者；区间不放宽就会被插件管理器拒装。细节见[插件开发规范](../design/plugin-dev-spec.md)。
+- **卡片标题来自 `locale/*.json` 的 `meta.title`**，原先 `package.json` 里那个 `./locale/*.json` export 没有对应文件，卡片因此拿不到名字；现在 `locale/en.json` 与 `locale/zh.json` 都在，并已进 `files`。
 
 ## 源仓库那一侧（已做）
 

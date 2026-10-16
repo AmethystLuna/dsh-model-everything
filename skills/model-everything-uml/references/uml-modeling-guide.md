@@ -253,6 +253,33 @@ skill and the `uml_structure_verify` tool, which parse the same component,
 package, class and deployment text into a real node/edge graph instead of discarding
 it. Use that for architecture questions; this guide is about the state-machine half.
 
+### Use case diagrams
+
+A use case diagram is read as its own model (actors, use cases, associations, include,
+extend, generalization), never as a machine. Its findings are these, and the severity
+follows the source of the rule: an error is a UML 2.5 well-formedness constraint, while
+a warning or an info is a completeness or style rule named by the tool that defines it.
+
+| Code | Severity | What it means |
+|---|---|---|
+| `UML030_USE_CASE_NO_ACTORS` | error | No actor is declared, so the diagram does not say who uses the system. |
+| `UML031_USE_CASE_NO_USE_CASES` | error | No use case is declared, so the diagram does not say what the system offers. |
+| `UML034_DANGLING_RELATION_ENDPOINT` | error | A relation names an element the diagram never declares. The line points at nothing a reader can look up. |
+| `UML035_INCLUDE_EXTEND_CYCLE` | error | Include and extend are cyclically dependent, so the use cases can never be performed in a finite order. The detail names the path. |
+| `UML036_ACTOR_TO_ACTOR_ASSOCIATION` | error | An association joins two actors. Actors do not use each other: a shared role is a generalization, and shared behaviour belongs in a use case. |
+| `UML037_ACTOR_INCLUDE_EXTEND` | error | An actor includes or extends a use case. Only use cases include or extend each other; an actor reaches a use case by an association. |
+| `UML038_SELF_RELATION` | warning | An element relates to itself, which says nothing. |
+| `UML032_ISOLATED_ACTOR` | info | An actor takes part in nothing. The tool rule that defines this check reports it at info, and an unused actor alone is not a modelling error: a diagram may be drawn before its use cases are. |
+| `UML033_USE_CASE_WITHOUT_ACTOR` | warning | No actor reaches this use case, directly or through an include or extend, so nothing says who triggers it. |
+| `UML039_USE_CASE_UNDOCUMENTED` | info | A use case carries neither a display label nor a narrative entry, so a reader cannot map the id back to the system. |
+
+That table is the use case half of the review. It is not the review of the class,
+object, package, component or deployment families: those reviews are the dependency
+checks above, plus `UML040_STRUCTURE_NODE_UNDOCUMENTED` (info) when a node carries no
+label. The per-family well-formedness constraints those diagrams have in the
+specification are not implemented as findings — see the coverage table in the project
+memory before claiming a structure diagram is clean.
+
 ### What the round trip proves
 
 It proves the diagram is a faithful rendering of the model:

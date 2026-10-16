@@ -8,16 +8,18 @@ metadata:
 # UML 2.5.1 reviewer checklist — mechanically checkable defects
 
 ## Sources
-- [SPEC] OMG UML 2.5.1 (formal/2017-12-05) - https://www.omg.org/spec/UML/2.5.1/PDF - every "Sx.y.z" below is a Constraints subsection of the spec.
-- [EA] Sparx Enterprise Architect 17.1, Model Validation rules reference - https://sparxsystems.com/resources/user-guides/17.1/model-domains/model-validation.pdf (rule ids MVRxxnnnn).
-- [MD] MagicDraw 2024x, "UML completeness constraints rules" index - https://docs.nomagic.com/spaces/MD2024xR2/pages/189143254/UML+completeness+constraints+rules ; individual rule pages cited by URL.
-- [ML] mermaid-lint semantic rule table - https://github.com/jasonworden/mermaid-lint (packages/markdownlint/README.md) and https://jasonworden.com/blog/introducing-mermaid-lint/
-- [SK] statekit Go linter (state machines) - https://pkg.go.dev/github.com/felixgeelhaar/statekit@v1.0.0/lint
-- [AMB] Ambler, The Elements of UML 2.0 Style, cited + enumerated in Univ. Freiburg lecture 09 slides - http://swt.informatik.uni-freiburg.de/teaching/WS2012-13/sdmauml/Resources/Slides/lecture-20121126-1-annot-fix.pdf
-- [VPC] Visual Paradigm, "Avoiding Beginner Mistakes in Class Diagram Design" - https://skills.visual-paradigm.com/docs/uml-basics-diagrams-for-beginners/mastering-class-diagrams-beginner/uml-class-diagram-mistakes-avoid/
-- [ADP] Acyclic Dependencies Principle (design principle, NOT UML) - https://en.wikipedia.org/wiki/Acyclic_dependencies_principle
+
+- [SPEC] OMG UML 2.5.1 (formal/2017-12-05) - <https://www.omg.org/spec/UML/2.5.1/PDF> - every "Sx.y.z" below is a Constraints subsection of the spec.
+- [EA] Sparx Enterprise Architect 17.1, Model Validation rules reference - <https://sparxsystems.com/resources/user-guides/17.1/model-domains/model-validation.pdf> (rule ids MVRxxnnnn).
+- [MD] MagicDraw 2024x, "UML completeness constraints rules" index - <https://docs.nomagic.com/spaces/MD2024xR2/pages/189143254/UML+completeness+constraints+rules> ; individual rule pages cited by URL.
+- [ML] mermaid-lint semantic rule table - <https://github.com/jasonworden/mermaid-lint> (packages/markdownlint/README.md) and <https://jasonworden.com/blog/introducing-mermaid-lint/>
+- [SK] statekit Go linter (state machines) - <https://pkg.go.dev/github.com/felixgeelhaar/statekit@v1.0.0/lint>
+- [AMB] Ambler, The Elements of UML 2.0 Style, cited + enumerated in Univ. Freiburg lecture 09 slides - <http://swt.informatik.uni-freiburg.de/teaching/WS2012-13/sdmauml/Resources/Slides/lecture-20121126-1-annot-fix.pdf>
+- [VPC] Visual Paradigm, "Avoiding Beginner Mistakes in Class Diagram Design" - <https://skills.visual-paradigm.com/docs/uml-basics-diagrams-for-beginners/mastering-class-diagrams-beginner/uml-class-diagram-mistakes-avoid/>
+- [ADP] Acyclic Dependencies Principle (design principle, NOT UML) - <https://en.wikipedia.org/wiki/Acyclic_dependencies_principle>
 
 ## Legend
+
 - [WFR] = normative UML 2.5.1 well-formedness constraint (checked by the spec's own OCL).
 - [TOOL] = a named rule shipped in a validator/linter (not necessarily a UML rule).
 - [STYLE]/heuristic = book/lecture/architecture guideline.
@@ -28,7 +30,9 @@ IMPORTANT: several commonly requested checks are NOT UML well-formedness rules. 
 ---
 
 ## 1. Class diagram
+
 Model: Class/Interface/DataType/Enumeration/AssociationClass nodes; Generalization, Association(+memberEnd Property), Dependency, InterfaceRealization, Nesting edges.
+
 - Generalization cycle, incl. self-generalization - hierarchy must be directed and acyclic; a Classifier may not be both transitively general and transitively specific of itself. Detect: digraph over Generalization.general->generalization.specific; DFS cycle detection; a self-loop is self-generalization. [WFR] Classifier::no_cycles_in_generalization S9.9.4.8; [TOOL] EA MVR050005 "cannot generalize self".
 - Specializing a final (isLeaf) classifier - parents must be non-final. Detect: Generalization.general.isFinalSpecialization == true. [WFR] Classifier::non_final_parents S9.9.4.8; [TOOL] EA MVR050003.
 - Child with isRoot=true used as a specific - Detect: Generalization.specific.isRoot. [TOOL] EA MVR050004 (no matching spec constraint found).
@@ -56,7 +60,9 @@ Model: Class/Interface/DataType/Enumeration/AssociationClass nodes; Generalizati
 - Nameless class/attribute/operation - [TOOL] MD Nameless Class (189143283), Nameless Attribute (189143281), Nameless Operation (189143285). UML only forces names on Actor/UseCase/ExtensionPoint.
 
 ## 2. Object diagram
+
 Model: InstanceSpecification nodes; Slot(definingFeature,value); links (association instances); classifier refs.
+
 - InstanceSpecification with no classifier - cannot tell what it instantiates. Detect: classifier empty. [TOOL] MD "No Classifier for Instance" (189143293).
 - Slot whose definingFeature is not a StructuralFeature of one of the instance's classifiers (incl. inherited/memberEnd) - [WFR] InstanceSpecification::defining_feature S9.9.9.6. Detect: for each Slot, definingFeature must be a StructuralFeature of the instance's classifier closure.
 - Two slots with the same definingFeature - [WFR] InstanceSpecification::structural_feature ("no more than one slot ... may have the same definingFeature") S9.9.9.6; [TOOL] MD "Multiple Slot Values" (189143274).
@@ -66,7 +72,9 @@ Model: InstanceSpecification nodes; Slot(definingFeature,value); links (associat
 - Instance used in a deployment role must represent a Node (DeploymentTarget) or an Artifact (DeployedArtifact) - [WFR] InstanceSpecification::deployment_target, deployment_artifact S9.9.9.6.
 
 ## 3. Package
+
 Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization edges; nesting.
+
 - PackageImport to itself - [WFR] Namespace::cannot_import_self S7.8.10.7.
 - ElementImport of an element the Namespace already owns - [WFR] Namespace::cannot_import_ownedMembers S7.8.10.7.
 - Import visibility not public/private - [WFR] ElementImport::visibility_public_or_private S7.8.7.7; PackageImport::public_or_private S7.8.11.6.
@@ -76,6 +84,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Isolated package / empty package - heuristic, UNCONFIRMED as a WFR (ML no-orphan-nodes is the notation analogue).
 
 ## 4. Component
+
 - Component nesting Classifiers, or a Component nested in a Class having packaged elements - [WFR] Component::no_nested_classifiers, no_packaged_elements S11.8.6.7.
 - Port not owned by an EncapsulatedClassifier; Port.aggregation not composite; defaultValue on an Interface-typed Port - [WFR] Port::encapsulated_owner, port_aggregation, default_value S11.8.14.7.
 - ConnectorEnd whose role is not an owned/inherited role (or a Port of such a role) of the classifier owning the Connector; whose partWithPort is a Port; partWithPort set although the end is a Port of the containing classifier; whose type does not conform to the typing Association - [WFR] Connector::roles, types S11.8.10.7; ConnectorEnd::role_and_part_with_port, self_part_with_port, part_with_port_empty S11.8.11.6.
@@ -84,6 +93,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Isolation and dependency cycles - as Package (ADP; in-tool UML020/UML022).
 
 ## 5. Composite structure
+
 - Connector whose roles are not owned/inherited by the owning EncapsulatedClassifier - [WFR] Connector::roles S11.8.10.7.
 - ConnectorEnd whose role is not a Port defined/inherited by the type of partWithPort - [WFR] ConnectorEnd::role_and_part_with_port S11.8.11.6.
 - Port outside an EncapsulatedClassifier - [WFR] Port::encapsulated_owner S11.8.14.7.
@@ -92,6 +102,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Unconnected port / delegation connector to nowhere - not a WFR; UNCONFIRMED (style).
 
 ## 6. Deployment
+
 - Node internal structure containing parts that are not Nodes - [WFR] Node::internal_structure S19.5.10.6.
 - CommunicationPath whose ends are not typed by DeploymentTargets - [WFR] CommunicationPath::association_ends S19.5.2.4.
 - DeploymentSpecification whose DeploymentTarget is not an ExecutionEnvironment, or whose deployed elements are not Components - [WFR] DeploymentSpecification::deployment_target, deployed_elements S19.5.5.6.
@@ -101,6 +112,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Isolated node / cycle of communication paths - heuristic (ML no-orphan analogue).
 
 ## 7. Profile
+
 - Extension that is not binary, or whose non-owned end is not typed by a Class - [WFR] Extension::is_binary, non_owned_end S12.4.1.7.
 - ExtensionEnd multiplicity not 0..1 or 1; aggregation not composite - [WFR] ExtensionEnd::multiplicity, aggregation S12.4.2.7.
 - Stereotype generalizing/specializing something that is not a Stereotype - [WFR] Stereotype::generalize S12.4.9.6.
@@ -113,6 +125,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 ## Part 2 — behaviour and interaction diagrams
 
 ## 8. Use case
+
 - Actor associated with anything other than a UseCase/Component/Class, or a non-binary association - [WFR] Actor::associations S18.2.1.4. This is the "association pointing at another actor" defect (Actor-Actor association).
 - UseCase-to-UseCase association within the same subject - [WFR] UseCase::no_association_to_use_case S18.2.5.6.
 - Non-binary association involving a UseCase - [WFR] UseCase::binary_associations S18.2.5.6.
@@ -121,16 +134,17 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Include/Extend whose endpoint is not a UseCase (e.g. an Actor) - typing violation, not OCL: Include.addition : UseCase [1..1], Include.includingCase : UseCase [1..1], Extend.extendedCase : UseCase [1..1], Extend.extension : UseCase [1..1] - S18.2.4.4/S18.2.4.5. Detect: resolve endpoint meta-type.
 - Extend whose extensionLocation is an ExtensionPoint not owned by the extended UseCase - [WFR] Extend::extension_points S18.2.2.5.
 - Nameless Actor / UseCase / ExtensionPoint - [WFR] must_have_name S18.2.1.4 / S18.2.5.6 / S18.2.3.5.
-- Actor not associated with any use case - [TOOL] MD "Actor and Usecase" (ActorUsecase, severity info, constrained element Actor) - https://docs.nomagic.com/spaces/MD2024xR2/pages/189143255/Actor+and+Usecase
+- Actor not associated with any use case - [TOOL] MD "Actor and Usecase" (ActorUsecase, severity info, constrained element Actor) - <https://docs.nomagic.com/spaces/MD2024xR2/pages/189143255/Actor+and+Usecase>
 - Use case reachable from no actor - the mirror check is not in the tool rule set, and is not a WFR => UNCONFIRMED (style; notation analogue ML mermaid-no-orphan-nodes).
 - Actor/UseCase generalization cycle or cross-kind generalization - Actor and UseCase are Classifiers: [WFR] Classifier::no_cycles_in_generalization, specialize_type S9.9.4.8.
 - Duplicate actor/use-case names in one namespace - [WFR] Namespace::members_distinguishable S7.8.10.7.
 
 ## 9. Activity
+
 - Node with no incoming ActivityEdge that is not an InitialNode (or a parameter node whose parameter is in/inout) - completeness rule. [TOOL] MD "No Activity Incoming Edge" (189143287). Not a WFR per se.
 - Non-final node with no outgoing ActivityEdge - dead end. [TOOL] MD "No Activity Outgoing Edge" (189143289); compare [SK] dead-end (state machines).
-- Decision with fewer than two outgoing edges - [TOOL] MD "Flows on decision" (DecisionOut): "checks if a Decision Node has more than one Outgoing Edge" - https://docs.nomagic.com/spaces/MD2024xR2/pages/189143259/Flows+on+decision . The WFR is weaker: DecisionNode::incoming_outgoing_edges requires "at least one outgoing" (S15.7.12.5). So >=2 is a completeness rule, not a WFR.
-- Outgoing flow from a Decision with no guard - [TOOL] MD "Guard on decision" (DecisionGuar, constrained element ActivityEdge, severity warning): "checks if a Flow from a Decision Node has a Guard specified" - https://docs.nomagic.com/spaces/MD2024xR2/pages/189143261/Guard+on+decision . Not a WFR.
+- Decision with fewer than two outgoing edges - [TOOL] MD "Flows on decision" (DecisionOut): "checks if a Decision Node has more than one Outgoing Edge" - <https://docs.nomagic.com/spaces/MD2024xR2/pages/189143259/Flows+on+decision> . The WFR is weaker: DecisionNode::incoming_outgoing_edges requires "at least one outgoing" (S15.7.12.5). So >=2 is a completeness rule, not a WFR.
+- Outgoing flow from a Decision with no guard - [TOOL] MD "Guard on decision" (DecisionGuar, constrained element ActivityEdge, severity warning): "checks if a Flow from a Decision Node has a Guard specified" - <https://docs.nomagic.com/spaces/MD2024xR2/pages/189143261/Guard+on+decision> . Not a WFR.
 - Decision with more than two incoming edges; mixed ObjectFlow/ControlFlow on a Decision; decisionInputFlow that is not an incoming edge - [WFR] DecisionNode::incoming_outgoing_edges, edges, decision_input_flow_incoming S15.7.12.5.
 - InitialNode with an incoming edge, or a non-ControlFlow outgoing edge - [WFR] InitialNode::no_incoming_edges, control_edges S15.7.18.4.
 - FinalNode with an outgoing edge - [WFR] FinalNode::no_outgoing_edges S15.7.15.5.
@@ -148,6 +162,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - No final node / unreachable node - no WFR. Unreachable is confirmed as a linter rule for state machines ([SK] unreachable); for activities treat as an analysis check (path from InitialNode) => UNCONFIRMED as a UML defect.
 
 ## 10. State machine
+
 - Region with zero or more than one initial Vertex - [WFR] Region::initial_vertex S14.5.8.6.
 - Initial vertex with more than one outgoing Transition, or a Trigger/Guard on its outgoing Transition - [WFR] Pseudostate::initial_vertex, outgoing_from_initial S14.5.6.7.
 - FinalState with outgoing Transitions, Regions, entry/exit/do behavior, or a submachine reference - [WFR] FinalState S14.5.2.5.
@@ -171,6 +186,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - StateMachine with an Interface context, or a method StateMachine that has connection points - [WFR] StateMachine::connection_points, classifier_context, method, context_classifier S14.5.10.7.
 
 ## 11. Sequence
+
 - Message arguments do not match the Signature (Signal attributes; Operation in/inout for synchCall/asynchCall; out/inout/return for reply) - [WFR] Message::signature_is_signal, signature_is_operation_request, signature_is_operation_reply S17.12.18.7.
 - Message with messageSort synchCall/asynchCall whose signature is not an Operation, or reply without an Operation signature - [WFR] Message::signature_refer_to S17.12.18.7.
 - Message whose send and receive events are on the same Lifeline but the receive is not ordered after the send - [WFR] Message::sending_receiving_message_event S17.12.18.7.
@@ -193,6 +209,7 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Interaction nested inside another Interaction - [WFR] Interaction::not_contained S17.12.11.5.
 
 ## 12. Communication
+
 - Message between two Lifelines whose represented Parts have no Connector/link - [WFR] Message::occurrence_specifications ("the connector must go between the Parts represented by the Lifelines of the two MessageEnds", no OCL) S17.12.18.7. This is the communication-diagram analogue of a message with no link.
 - CommunicationPath whose ends are not typed by DeploymentTargets - [WFR] S19.5.2.4.
 - Message signature/argument rules - same as Sequence ([WFR] S17.12.18.7).
@@ -201,7 +218,9 @@ Model: Package nodes; PackageImport/ElementImport, Dependency, Generalization ed
 - Call message with no operation on the receiver - [TOOL] MD "No Operation for Call Message" (189143297).
 
 ## 13. Interaction overview
+
 An IOD is an Activity whose nodes are InteractionUse (ref) or inline Interaction, joined by ControlFlow/initial/final nodes.
+
 - InteractionUse referencing an Interaction that does not resolve - type/unresolved reference (InteractionUse::ref : Interaction [1..1], S17.12.16.6); unresolved id is a parse error ([ML] mermaid-syntax).
 - Gates mismatch between the InteractionUse and the referred Interaction - [WFR] InteractionUse::gates_match S17.12.16.6; Gate matching rules S17.12.9.5.
 - InteractionUse not covering every Lifeline common with the referred Interaction - [WFR] InteractionUse::all_lifelines S17.12.16.6.
@@ -210,6 +229,7 @@ An IOD is an Activity whose nodes are InteractionUse (ref) or inline Interaction
 - Control-flow defects (node with no incoming/outgoing edge, dangling InitialNode/FinalNode, DecisionNode cardinality) - the Activity WFRs and completeness rules of section 9 apply unchanged: [WFR] S15.7.18.4, S15.7.15.5, S15.7.12.5; [TOOL] MD "No Activity Incoming Edge"/"No Activity Outgoing Edge" (189143287/189143289).
 
 ## 14. Timing
+
 - DurationConstraint with neither one nor two constrainedElements; firstEvent multiplicity mismatched to constrainedElement multiplicity - [WFR] DurationConstraint::lements (one or two constrainedElements), first_event_multiplicity S8.6.2.6.
 - TimeConstraint with more or fewer than one constrainedElement - [WFR] TimeConstraint S8.6.18.6.
 - Duration without an expr and without exactly one DurationObservation; TimeExpression without an expr and without exactly one TimeObservation - [WFR] Duration::no_expr_requires_observation S8.6.1.5; TimeExpression::no_expr_requires_observation S8.6.19.5.
@@ -217,9 +237,10 @@ An IOD is an Activity whose nodes are InteractionUse (ref) or inline Interaction
 - InteractionConstraint minint/maxint used outside a loop operand; minint < 0; maxint <= 0; maxint < minint; dynamic variables not owned by the covered Lifeline - [WFR] InteractionConstraint S17.12.12.5.
 - TimeEvent with a negative when value - [WFR] TimeEvent::when_non_negative S13.4.10.6.
 - Lifeline/Message/StateInvariant rules from the Interaction family apply (S17.12.17.5, S17.12.18.7).
-- Overlapping or non-disjoint state invariants on one lifeline; missing explicit time axis/scale - [STYLE] Visual Paradigm timing best practices - https://skills.visual-paradigm.com/best-practices-uml-timing-diagrams-real-time-systems/ ; no WFR => UNCONFIRMED for the mechanical part.
+- Overlapping or non-disjoint state invariants on one lifeline; missing explicit time axis/scale - [STYLE] Visual Paradigm timing best practices - <https://skills.visual-paradigm.com/best-practices-uml-timing-diagrams-real-time-systems/> ; no WFR => UNCONFIRMED for the mechanical part.
 
 ## Cross-diagram (applies to every diagram type)
+
 - Unparseable text / unknown element keyword - [TOOL] [ML] mermaid-syntax.
 - Same id declared twice with conflicting labels - [TOOL] [ML] mermaid-duplicate-ids.
 - Duplicate edge, self-loop edge, empty label - [TOOL] [ML] mermaid-no-duplicate-edges, no-self-loop, no-empty-labels.
@@ -230,4 +251,5 @@ An IOD is an Activity whose nodes are InteractionUse (ref) or inline Interaction
 - OCL constraint syntax violations - [TOOL] EA MVR040001/070001/0A0001.
 
 ## Practical ranking for an automated reviewer
+
 Emit as hard errors only the [WFR] items (they are checkable from the parsed model with OCL-equivalent rules and are backed by the spec). Emit [TOOL] completeness rules as warnings with the tool that defines them named. Emit [STYLE] items only when a project convention opts in, and never as "UML violations".
