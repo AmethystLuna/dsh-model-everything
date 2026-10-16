@@ -1,0 +1,85 @@
+{
+  "universal": [
+    "ok",
+    "ran",
+    "verdict",
+    "verdictReason",
+    "schema",
+    "summary",
+    "nextSteps"
+  ],
+  "verdicts": [
+    "pass",
+    "pass_with_findings",
+    "fail"
+  ],
+  "carrier": {
+    "verify": "checks[].findings",
+    "compose": "checks[].findings",
+    "datamodel": "checks[].findings",
+    "design": "checks[].findings",
+    "structure": "findings",
+    "uml": "findings",
+    "concurrency": "findings",
+    "baseline": "none"
+  },
+  "extras": {
+    "verify": [
+      "checks"
+    ],
+    "compose": [
+      "checks"
+    ],
+    "datamodel": [
+      "checks"
+    ],
+    "design": [
+      "checks",
+      "facts",
+      "signals",
+      "violations"
+    ],
+    "structure": [
+      "findings",
+      "graph",
+      "notation",
+      "warnings"
+    ],
+    "uml": [
+      "findings",
+      "primary",
+      "roundTrip",
+      "source",
+      "warnings"
+    ],
+    "concurrency": [
+      "findings"
+    ],
+    "baseline": [
+      "added",
+      "changed",
+      "currentVerdict",
+      "removed"
+    ]
+  },
+  "okByFamily": {
+    "verify": true,
+    "compose": true,
+    "datamodel": true,
+    "design": true,
+    "structure": true,
+    "uml": true,
+    "concurrency": true,
+    "baseline": true
+  },
+  "tools": {
+    "verify": "model_verify",
+    "compose": "model_compose_verify",
+    "datamodel": "model_datamodel_verify",
+    "design": "model_design_review",
+    "structure": "uml_structure_verify",
+    "uml": "uml review",
+    "concurrency": "model_concurrency_scan",
+    "baseline": "report_diff"
+  }
+}
