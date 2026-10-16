@@ -2071,7 +2071,13 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
 
   // A model of another family is reported above and never handed to the family review:
   // its checks read fields this model does not have.
-  const reviewable = supplied !== undefined && renderedForSupplied === undefined ? parsed?.model : (supplied ?? parsed?.model)
+  //
+  // What is handed over is the CANONICAL model, not the raw `supplied` one. They differ whenever a
+  // family validates into a richer shape than the caller wrote - the composite validator records
+  // the connector endpoints no declaration introduced, and `UML059` reads exactly that field. A
+  // review given the raw model reports nothing for a dangling endpoint: a pass for a model whose
+  // defect is only visible in the shape the family itself produces.
+  const reviewable = supplied !== undefined && renderedForSupplied === undefined ? parsed?.model : (canonical ?? parsed?.model)
   if (reviewable !== undefined) findings.push(...(request.module.review?.(reviewable, labels ?? {}, request.notation) ?? []))
   const model = supplied ?? parsed?.model
 

@@ -496,5 +496,25 @@ export const compositeModule: UmlFamilyModule<CompositeModelV1> = {
   id: 'composite-structure',
   render: (input: unknown, notation: UmlNotation, _options: UmlFamilyRenderOptions): UmlFamilyRender => renderComposite(input, notation),
   parse: (text: string, notation: UmlNotation): UmlFamilyParse<CompositeModelV1> => parseComposite(text, notation),
+  // The self's `kind` is always drawn - the renderer writes it into the `compositeSelf` directive
+  // and into the declaration - so the parser always reads one back. A model that left it out is
+  // normalized to the same shape before the fidelity comparison, or the review reports its own
+  // default as drift: "self.kind invented by the diagram" on a diagram that says exactly what the
+  // model meant.
+  //
+  // `undeclared` is carried through deliberately. It is what `UML059` reads, and it is a fact about
+  // the supplied model rather than about the diagram, so normalizing it away would silence the one
+  // finding that says a connector ends at a name the classifier never declares - the silent pass
+  // this file's own comments promise not to produce.
+  normalize: (input: unknown): CompositeModelV1 | undefined => {
+    try {
+      const normalized = validateCompositeModel(input)
+      const undeclared = (input as { undeclared?: unknown }).undeclared
+      if (!Array.isArray(undeclared)) return normalized
+      return { ...normalized, undeclared: undeclared.filter((entry): entry is string => typeof entry === 'string') }
+    } catch {
+      return undefined
+    }
+  },
   review: (model: CompositeModelV1, labels: Record<string, string>): UmlFamilyFinding[] => reviewCompositeModel(model, labels),
 }
