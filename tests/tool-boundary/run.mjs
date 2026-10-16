@@ -32,6 +32,7 @@ import { modelComposeTool } from '../../lib/compose-tool.js'
 import { modelExportTool } from '../../lib/export-tool.js'
 import { umlRenderTool, umlParseTool, umlReviewTool, umlExplainLabelsTool } from '../../lib/uml-tool.js'
 import { umlStructureTool } from '../../lib/structure-tool.js'
+import { designTool } from '../../lib/design-tool.js'
 import { reportDiffTool } from '../../lib/report-diff-tool.js'
 
 // ---------------------------------------------------------------------------
@@ -121,6 +122,7 @@ const TOOL_DEFINITIONS = [
   umlReviewTool,
   umlExplainLabelsTool,
   umlStructureTool,
+  designTool,
   reportDiffTool,
 ]
 
@@ -216,6 +218,15 @@ const SCAN_TEXT_ABSOLUTE = 'the cache is lock-free and the counter is atomic.'
 const SCAN_TEXT_KEYWORD = 'the worker protects the counter with a mutex.'
 const SCAN_TEXT_PLAIN = 'the loop adds one to a local counter.'
 
+/** A design with one broken declaration, so the tool has something to report through the host. */
+const DESIGN_MODEL = {
+  schemaVersion: 1,
+  architecture: { nodes: ['ui', 'repo'], edges: [['ui', 'repo']] },
+  declare: {
+    layers: [{ name: 'ui', members: ['ui'] }, { name: 'service', members: [] }, { name: 'data', members: ['repo'] }],
+  },
+}
+
 /** A baseline/current pair one added error finding apart, computed by the engine under test. */
 const REPORT_BASELINE = { verdict: 'pass', checks: [{ id: 'S1', status: 'pass', findings: [] }] }
 const REPORT_CURRENT = {
@@ -239,6 +250,7 @@ const REQUIRED_PARAMS = {
   uml_review: { required: [], valid: () => ({ model: MACHINE }) },
   uml_explain_labels: { required: [], valid: () => ({}) },
   uml_structure_verify: { required: [], valid: () => ({ diagram: STRUCTURE_DIAGRAM }) },
+  model_design_review: { required: ['model'], valid: () => ({ model: DESIGN_MODEL }) },
   report_diff: { required: ['baseline', 'current'], valid: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }) },
 }
 
@@ -254,6 +266,7 @@ const TYPE_ERRORS = {
   uml_review: { args: { model: MACHINE, roundTrip: 'no' }, param: 'roundTrip', violation: '"roundTrip" must be a boolean' },
   uml_explain_labels: { args: { notation: 'graphviz' }, param: 'notation', violation: 'must be one of ["auto","mermaid","plantuml"]' },
   uml_structure_verify: { args: { diagram: 42 }, param: 'diagram', violation: '"diagram" must be a string' },
+  model_design_review: { args: { model: DESIGN_MODEL, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
   report_diff: { args: { baseline: REPORT_BASELINE, current: REPORT_CURRENT, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
 }
 
@@ -269,6 +282,7 @@ const VIEW_CASES = {
   uml_review: () => ({ model: MACHINE, diagram: STATE_DIAGRAM }),
   uml_explain_labels: () => ({}),
   uml_structure_verify: () => ({ diagram: STRUCTURE_DIAGRAM }),
+  model_design_review: () => ({ model: DESIGN_MODEL }),
   report_diff: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }),
 }
 

@@ -37,6 +37,7 @@ import { modelComposeTool } from './compose-tool.js'
 import { modelExportTool } from './export-tool.js'
 import { umlRenderTool, umlParseTool, umlReviewTool, umlExplainLabelsTool } from './uml-tool.js'
 import { umlStructureTool } from './structure-tool.js'
+import { designTool } from './design-tool.js'
 import { reportDiffTool } from './report-diff-tool.js'
 import { ENGINE_SCHEMA_VERSION } from './engine.js'
 
@@ -275,6 +276,7 @@ export function apply(ctx: Context, config: Config): void {
       ctx.effect(() => tools.register(umlReviewTool), 'dsh-model-everything: uml review tool')
       ctx.effect(() => tools.register(umlExplainLabelsTool), 'dsh-model-everything: uml explain-labels tool')
       ctx.effect(() => tools.register(umlStructureTool), 'dsh-model-everything: structure tool')
+      ctx.effect(() => tools.register(designTool), 'dsh-model-everything: design review tool')
       ctx.effect(() => tools.register(reportDiffTool), 'dsh-model-everything: report diff tool')
       toolRegistered = true
       dataToolRegistered = true

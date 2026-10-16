@@ -5,134 +5,395 @@
     {
       "skill": "model-everything",
       "triggers": [
-        { "utterance": "the README says the API accepts a batch of 100, check that", "expected": "model-everything" },
-        { "utterance": "verify the claims in this design doc against the code", "expected": "model-everything" },
-        { "utterance": "this spec says a job can never be both queued and running - is that enforced?", "expected": "model-everything" },
-        { "utterance": "the plan promises the retry is idempotent; is it?", "expected": "model-everything" }
+        {
+          "utterance": "the README says the API accepts a batch of 100, check that",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "verify the claims in this design doc against the code",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "this spec says a job can never be both queued and running - is that enforced?",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "the plan promises the retry is idempotent; is it?",
+          "expected": "model-everything"
+        }
       ],
       "nearMisses": [
-        { "utterance": "this design claims the queue is thread-safe and lock-free", "expected": "model-everything-concurrency" },
-        { "utterance": "review this migration: the orders table gains a required column", "expected": "model-everything-datamodel" },
-        { "utterance": "here is our component diagram, check for dependency cycles", "expected": "model-everything-structure" },
-        { "utterance": "draw this retry flow as a state diagram", "expected": "model-everything-uml" }
+        {
+          "utterance": "this design claims the queue is thread-safe and lock-free",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "review this migration: the orders table gains a required column",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "here is our component diagram, check for dependency cycles",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "draw this retry flow as a state diagram",
+          "expected": "model-everything-uml"
+        }
       ]
     },
     {
       "skill": "model-everything-uml",
       "triggers": [
-        { "utterance": "draw this retry flow as a state diagram", "expected": "model-everything-uml" },
-        { "utterance": "turn this model into PlantUML", "expected": "model-everything-uml" },
-        { "utterance": "someone drew this activity diagram - does it match the code?", "expected": "model-everything-uml" },
-        { "utterance": "render the order lifecycle as a timing diagram", "expected": "model-everything-uml" },
-        { "utterance": "check the round trip on this hand-written mermaid diagram", "expected": "model-everything-uml" },
-        { "utterance": "draw the EJB profile: stereotypes and the metaclasses they extend", "expected": "model-everything-uml" }
+        {
+          "utterance": "draw this retry flow as a state diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "turn this model into PlantUML",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "someone drew this activity diagram - does it match the code?",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "render the order lifecycle as a timing diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "check the round trip on this hand-written mermaid diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "draw the EJB profile: stereotypes and the metaclasses they extend",
+          "expected": "model-everything-uml"
+        }
       ],
       "nearMisses": [
-        { "utterance": "here is our component diagram, check for dependency cycles", "expected": "model-everything-structure" },
-        { "utterance": "the deployment diagram has a service calling the database directly, which our layers forbid", "expected": "model-everything-structure" },
-        { "utterance": "this state machine must never reach FAILED twice in a row", "expected": "model-everything" },
-        { "utterance": "our schema diagram shows USER ||--o{ ORDER - do the entities line up?", "expected": "model-everything-datamodel" }
+        {
+          "utterance": "here is our component diagram, check for dependency cycles",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "the deployment diagram has a service calling the database directly, which our layers forbid",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "this state machine must never reach FAILED twice in a row",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "our schema diagram shows USER ||--o{ ORDER - do the entities line up?",
+          "expected": "model-everything-datamodel"
+        }
       ]
     },
     {
       "skill": "model-everything-structure",
       "triggers": [
-        { "utterance": "here is our component diagram, check for dependency cycles", "expected": "model-everything-structure" },
-        { "utterance": "the deployment diagram has a service calling the database directly, which our layers forbid", "expected": "model-everything-structure" },
-        { "utterance": "audit the module structure: which packages depend on which?", "expected": "model-everything-structure" },
-        { "utterance": "our class diagram has a node nothing connects to", "expected": "model-everything-structure" },
-        { "utterance": "check the architecture diagram against our allowed dependencies", "expected": "model-everything-structure" }
+        {
+          "utterance": "here is our component diagram, check for dependency cycles",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "the deployment diagram has a service calling the database directly, which our layers forbid",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "audit the module structure: which packages depend on which?",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "our class diagram has a node nothing connects to",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "check the architecture diagram against our allowed dependencies",
+          "expected": "model-everything-structure"
+        }
       ],
       "nearMisses": [
-        { "utterance": "draw this retry flow as a state diagram", "expected": "model-everything-uml" },
-        { "utterance": "this design claims the cache is thread-safe", "expected": "model-everything-concurrency" },
-        { "utterance": "does the migration preserve every required field?", "expected": "model-everything-datamodel" },
-        { "utterance": "verify that the README's claim about the default timeout is true", "expected": "model-everything" }
+        {
+          "utterance": "draw this retry flow as a state diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "this design claims the cache is thread-safe",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "does the migration preserve every required field?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "verify that the README's claim about the default timeout is true",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "does the layering in our design doc actually hold?",
+          "expected": "model-everything-design"
+        }
       ]
     },
     {
       "skill": "model-everything-datamodel",
       "triggers": [
-        { "utterance": "review this migration: the orders table gains a required column", "expected": "model-everything-datamodel" },
-        { "utterance": "does the migration preserve every required field?", "expected": "model-everything-datamodel" },
-        { "utterance": "our schema says ids are unique and no row may be orphaned - check the model", "expected": "model-everything-datamodel" },
-        { "utterance": "compare the data model before and after the rollback", "expected": "model-everything-datamodel" },
-        { "utterance": "the copy job must be idempotent; does the mapping say so?", "expected": "model-everything-datamodel" }
+        {
+          "utterance": "review this migration: the orders table gains a required column",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "does the migration preserve every required field?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "our schema says ids are unique and no row may be orphaned - check the model",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "compare the data model before and after the rollback",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "the copy job must be idempotent; does the mapping say so?",
+          "expected": "model-everything-datamodel"
+        }
       ],
       "nearMisses": [
-        { "utterance": "draw this retry flow as a state diagram", "expected": "model-everything-uml" },
-        { "utterance": "is this counter monotonic under concurrent writers?", "expected": "model-everything-concurrency" },
-        { "utterance": "the design doc claims the API path is /v2/orders - is it?", "expected": "model-everything" },
-        { "utterance": "check the package diagram for an upward dependency", "expected": "model-everything-structure" }
+        {
+          "utterance": "draw this retry flow as a state diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "is this counter monotonic under concurrent writers?",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "the design doc claims the API path is /v2/orders - is it?",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "check the package diagram for an upward dependency",
+          "expected": "model-everything-structure"
+        }
       ]
     },
     {
       "skill": "model-everything-concurrency",
       "triggers": [
-        { "utterance": "this design claims the queue is thread-safe and lock-free", "expected": "model-everything-concurrency" },
-        { "utterance": "is this counter monotonic under concurrent writers?", "expected": "model-everything-concurrency" },
-        { "utterance": "the doc says the ISR-safe path touches no shared memory", "expected": "model-everything-concurrency" },
-        { "utterance": "we guard the cache with a mutex - is that enough?", "expected": "model-everything-concurrency" },
-        { "utterance": "there is no data race in the ring buffer, per the design note", "expected": "model-everything-concurrency" }
+        {
+          "utterance": "this design claims the queue is thread-safe and lock-free",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "is this counter monotonic under concurrent writers?",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "the doc says the ISR-safe path touches no shared memory",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "we guard the cache with a mutex - is that enough?",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "there is no data race in the ring buffer, per the design note",
+          "expected": "model-everything-concurrency"
+        }
       ],
       "nearMisses": [
-        { "utterance": "verify the retry loop always terminates", "expected": "model-everything" },
-        { "utterance": "does this migration keep the unique constraint?", "expected": "model-everything-datamodel" },
-        { "utterance": "draw the interrupt handling as a state diagram", "expected": "model-everything-uml" },
-        { "utterance": "check the deployment diagram for a forbidden edge", "expected": "model-everything-structure" }
+        {
+          "utterance": "verify the retry loop always terminates",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "does this migration keep the unique constraint?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "draw the interrupt handling as a state diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "check the deployment diagram for a forbidden edge",
+          "expected": "model-everything-structure"
+        }
       ]
     },
     {
       "skill": "model-everything",
       "triggers": [
-        { "utterance": "the doc says the scheduler retries three times before giving up", "expected": "model-everything" },
-        { "utterance": "our README claims the CLI is backwards compatible with v1 flags", "expected": "model-everything" },
-        { "utterance": "the ticket says the timeout is 30 seconds; confirm that", "expected": "model-everything" }
+        {
+          "utterance": "the doc says the scheduler retries three times before giving up",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "our README claims the CLI is backwards compatible with v1 flags",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "the ticket says the timeout is 30 seconds; confirm that",
+          "expected": "model-everything"
+        }
       ],
       "nearMisses": [
-        { "utterance": "the design claims the counter never decreases, even with two writers", "expected": "model-everything-concurrency" },
-        { "utterance": "audit the diagram of our services for a layer violation", "expected": "model-everything-structure" },
-        { "utterance": "the spec says every order row must have a customer - is that guaranteed?", "expected": "model-everything-datamodel" },
-        { "utterance": "render the checkout flow as a sequence diagram", "expected": "model-everything-uml" }
+        {
+          "utterance": "the design claims the counter never decreases, even with two writers",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "audit the diagram of our services for a layer violation",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "the spec says every order row must have a customer - is that guaranteed?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "render the checkout flow as a sequence diagram",
+          "expected": "model-everything-uml"
+        }
       ]
     },
     {
       "skill": "model-everything-uml",
       "triggers": [
-        { "utterance": "render the checkout flow as a sequence diagram", "expected": "model-everything-uml" },
-        { "utterance": "the diagram in the RFC no longer matches the state machine in the code", "expected": "model-everything-uml" },
-        { "utterance": "draw the parts and ports inside the order component", "expected": "model-everything-uml" }
+        {
+          "utterance": "render the checkout flow as a sequence diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "the diagram in the RFC no longer matches the state machine in the code",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "draw the parts and ports inside the order component",
+          "expected": "model-everything-uml"
+        }
       ],
       "nearMisses": [
-        { "utterance": "audit the diagram of our services for a layer violation", "expected": "model-everything-structure" },
-        { "utterance": "the doc says the scheduler retries three times before giving up", "expected": "model-everything" },
-        { "utterance": "does the ER diagram's cardinality match the schema we actually have?", "expected": "model-everything-datamodel" }
+        {
+          "utterance": "audit the diagram of our services for a layer violation",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "the doc says the scheduler retries three times before giving up",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "does the ER diagram's cardinality match the schema we actually have?",
+          "expected": "model-everything-datamodel"
+        }
       ]
     },
     {
       "skill": "model-everything-structure",
       "triggers": [
-        { "utterance": "audit the diagram of our services for a layer violation", "expected": "model-everything-structure" },
-        { "utterance": "which modules does the payments package reach into?", "expected": "model-everything-structure" }
+        {
+          "utterance": "audit the diagram of our services for a layer violation",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "which modules does the payments package reach into?",
+          "expected": "model-everything-structure"
+        }
       ],
       "nearMisses": [
-        { "utterance": "draw the parts and ports inside the order component", "expected": "model-everything-uml" },
-        { "utterance": "our README claims the CLI is backwards compatible with v1 flags", "expected": "model-everything" },
-        { "utterance": "there is no data race in the ring buffer, per the design note", "expected": "model-everything-concurrency" }
+        {
+          "utterance": "draw the parts and ports inside the order component",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "our README claims the CLI is backwards compatible with v1 flags",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "there is no data race in the ring buffer, per the design note",
+          "expected": "model-everything-concurrency"
+        }
       ]
     },
     {
       "skill": "model-everything-datamodel",
       "triggers": [
-        { "utterance": "the spec says every order row must have a customer - is that guaranteed?", "expected": "model-everything-datamodel" },
-        { "utterance": "we renamed a column; does the rollback still restore the old shape?", "expected": "model-everything-datamodel" },
-        { "utterance": "does the ER diagram's cardinality match the schema we actually have?", "expected": "model-everything-datamodel" }
+        {
+          "utterance": "the spec says every order row must have a customer - is that guaranteed?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "we renamed a column; does the rollback still restore the old shape?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "does the ER diagram's cardinality match the schema we actually have?",
+          "expected": "model-everything-datamodel"
+        }
       ],
       "nearMisses": [
-        { "utterance": "the ticket says the timeout is 30 seconds; confirm that", "expected": "model-everything" },
-        { "utterance": "we guard the cache with a mutex - is that enough?", "expected": "model-everything-concurrency" },
-        { "utterance": "the diagram in the RFC no longer matches the state machine in the code", "expected": "model-everything-uml" },
-        { "utterance": "which modules does the payments package reach into?", "expected": "model-everything-structure" }
+        {
+          "utterance": "the ticket says the timeout is 30 seconds; confirm that",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "we guard the cache with a mutex - is that enough?",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "the diagram in the RFC no longer matches the state machine in the code",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "which modules does the payments package reach into?",
+          "expected": "model-everything-structure"
+        }
+      ]
+    },
+    {
+      "skill": "model-everything-design",
+      "triggers": [
+        {
+          "utterance": "does this design keep its layering, or does something reach across a boundary",
+          "expected": "model-everything-design"
+        },
+        {
+          "utterance": "tag each module with its responsibilities and check the split",
+          "expected": "model-everything-design"
+        },
+        {
+          "utterance": "this interface forces callers to depend on methods they never call",
+          "expected": "model-everything-design"
+        },
+        {
+          "utterance": "can this subtype stand in for its base, or does it refuse something the base allows",
+          "expected": "model-everything-design"
+        },
+        {
+          "utterance": "our abstractions depend on concrete classes - check the dependency inversion",
+          "expected": "model-everything-design"
+        },
+        {
+          "utterance": "what shape is the dependency graph - cycles, ranks, fan-in",
+          "expected": "model-everything-design"
+        }
+      ],
+      "nearMisses": [
+        {
+          "utterance": "here is our component diagram, check for dependency cycles",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "the deployment diagram has a service calling the database directly, which our layers forbid",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "draw the class hierarchy as a diagram",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "this design claims the queue is thread-safe and lock-free",
+          "expected": "model-everything-concurrency"
+        }
       ]
     }
   ]

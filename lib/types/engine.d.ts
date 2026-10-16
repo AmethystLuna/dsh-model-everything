@@ -309,6 +309,7 @@ export declare const REPORT_SCHEMAS: {
     readonly umlExplainLabels: 'model-everything/uml/explain-labels/v1';
     readonly structure: 'model-everything/structure/v1';
     readonly granularity: 'model-everything/granularity/v1';
+    readonly design: 'model-everything/design/v1';
     readonly baseline: 'model-everything/baseline/v1';
 };
 export type ReportSchema = typeof REPORT_SCHEMAS[keyof typeof REPORT_SCHEMAS];
