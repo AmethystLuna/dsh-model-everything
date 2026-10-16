@@ -55,6 +55,11 @@ would change is agreed and reproducible.
 - **The far side of the tradeoff, if there is one.** A method that buys precision with runtime, or
   completeness with memory, needs that said in the proposal rather than discovered in review.
 
+The order to do all of this in, by what you are adding, is
+[docs/feature-checklist.md](docs/feature-checklist.md) - generated from this repository, so it names the
+files to touch and the suites that keep each one honest. The beliefs behind it, and what each one cost,
+are in [docs/principles.md](docs/principles.md).
+
 ## A problem you hit while running it
 
 ### What to send
