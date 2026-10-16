@@ -132,6 +132,10 @@
         {
           "utterance": "does the layering in our design doc actually hold?",
           "expected": "model-everything-design"
+        },
+        {
+          "utterance": "the structure report came back pass - does that mean the layering is right?",
+          "expected": "model-everything-report-reading"
         }
       ]
     },
@@ -393,6 +397,57 @@
         {
           "utterance": "this design claims the queue is thread-safe and lock-free",
           "expected": "model-everything-concurrency"
+        }
+      ]
+    },
+    {
+      "skill": "model-everything-report-reading",
+      "triggers": [
+        {
+          "utterance": "the verify tool gave me a report - what does this verdict mean?",
+          "expected": "model-everything-report-reading"
+        },
+        {
+          "utterance": "why did the review come out pass_with_findings instead of pass?",
+          "expected": "model-everything-report-reading"
+        },
+        {
+          "utterance": "which findings should I act on in this report?",
+          "expected": "model-everything-report-reading"
+        },
+        {
+          "utterance": "the report says truncated - what did it not decide?",
+          "expected": "model-everything-report-reading"
+        },
+        {
+          "utterance": "what does this design review not prove about the code?",
+          "expected": "model-everything-report-reading"
+        },
+        {
+          "utterance": "the report has checks marked skip, is that a pass?",
+          "expected": "model-everything-report-reading"
+        }
+      ],
+      "nearMisses": [
+        {
+          "utterance": "verify that the retry is idempotent",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "is this queue thread-safe under two writers?",
+          "expected": "model-everything-concurrency"
+        },
+        {
+          "utterance": "does this migration keep the unique constraint?",
+          "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "review this component diagram for dependency cycles",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "draw the checkout flow as a state diagram",
+          "expected": "model-everything-uml"
         }
       ]
     }

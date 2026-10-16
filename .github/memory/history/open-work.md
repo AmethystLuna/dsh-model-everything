@@ -29,10 +29,11 @@ metadata:
 | **社区贡献指南优化** | 分两种情形分别写：<br>① **有学术指导的功能优化／补充意见** —— 需要引用来源、说明它改进的是哪个判据、以及如何验证；<br>② **运行中遇到问题的 ticket** —— 需要最小可复现的模型或图、实际判定、期望判定，以及报告里的 `verdict`／`verdictReason`／相关 `code`。 | 先起思维导图（两种情形各自的结构不同） |
 | **文档随新增内容继续更新** | 每一处新能力／新码／新行为都要落到对应文档，并保持中英成对。 | 并入上面两项一起做 |
 
-**写作纪律（用户明确要求）**：**所有文档类内容的更新，都必须先有思维导图作为行文结构的指导**，再动笔。已用此法做过一次（`docs/routing-map.md` 的目录契约来自 `docs/tools/generate-routing-map.mjs` 生成的图），并在写作规则的「禁止脆弱计数」上得过一次教训：`tests/structure` 的 guide 夹具原先写死一串码，加一个节点就断——现改为断言**顺序**并把重复码**对着图计数**。
 - **待办：非机器族 UML 校验器的引用解析审计**：use-case、class、timing、profile、composite、communication、interaction-overview 的 `validate*Model`/`review*Model` 只经 `parseUml`/`renderUml` 探过，审查者预计 D1-D3 那一族在那里还有更多。
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
+
+**写作纪律（用户明确要求）**：**所有文档类内容的更新，都必须先有思维导图作为行文结构的指导**，再动笔。已用此法做过两次（`docs/routing-map.md` 的目录契约、`docs/report-reading/` 的解读指南，图都由脚本从真实语料生成，不是手画），并在写作规则的「禁止脆弱计数」上得过一次教训：`tests/structure` 的 guide 夹具原先写死一串码，加一个节点就断——现改为断言**顺序**并把重复码**对着图计数**。
 
 ## 2. 图族模块：十四个族全部有实现路径
 
