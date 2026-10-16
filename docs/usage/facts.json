@@ -6,14 +6,18 @@
   },
   "surfaces": {
     "catalog": 3293,
-    "bodies": 77831,
-    "references": 151067,
+    "bodies": 78730,
+    "references": 152242,
     "referenceFiles": 10,
     "toolChars": 10328,
     "toolCount": 12
   },
   "toolsWithWhen": 0,
   "routingFamilies": [
+    "verify",
+    "compose",
+    "datamodel",
+    "design",
     "structure",
     "uml"
   ],

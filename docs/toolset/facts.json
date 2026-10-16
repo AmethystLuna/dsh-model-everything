@@ -24,7 +24,7 @@
     {
       "skill": "model-everything-report-reading",
       "chars": 420,
-      "body": 5748
+      "body": 6647
     },
     {
       "skill": "model-everything-structure",
@@ -100,7 +100,7 @@
     "toolsWithNonGoal": 12,
     "toolCount": 12,
     "toolsWithoutSibling": [],
-    "familiesRoutingOnward": 2,
+    "familiesRoutingOnward": 6,
     "familyCount": 6
   }
 }

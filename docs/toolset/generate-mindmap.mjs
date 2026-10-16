@@ -61,11 +61,22 @@ const { reviewStructure } = await import('file:///F:/workspace/dsh-plugins/dsh-m
 const { reviewUml } = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/uml.js')
 
 const machine = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
+const other = { schemaVersion: 1, init: 'X', states: [{ id: 'X' }, { id: 'Y', terminal: true }], transitions: [{ from: 'X', event: 'ping', to: 'Y' }] }
+// Inputs that SUCCEED. A probe built on an invalid model measures the refusal path, which returns early
+// with one step about the input - that is how the composition was once reported as routing nowhere.
 const reports = {
   verify: runVerification(machine),
-  compose: runCompositionVerification([machine]),
+  compose: runCompositionVerification([machine, other]),
   datamodel: runDataVerification({ schemaVersion: 1, entities: [{ name: 'U', fields: [{ name: 'id', type: 'uuid' }] }] }),
-  design: runDesignReview({ schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } }),
+  design: runDesignReview({
+    schemaVersion: 1,
+    architecture: { nodes: ['api', 'store'], edges: [['api', 'store']] },
+    declare: { layers: [{ name: 'top', members: ['api'] }, { name: 'bottom', members: ['store'] }] },
+    types: [
+      { name: 'api', stereotype: 'component', responsibilities: [{ name: 'serve', uses: ['store'] }] },
+      { name: 'store', stereotype: 'component' },
+    ],
+  }),
   structure: reviewStructure({ diagram: 'component a\ncomponent b\na --> b\n' }),
   uml: reviewUml({ model: machine, diagramKind: 'state' }),
 }

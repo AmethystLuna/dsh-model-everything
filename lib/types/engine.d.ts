@@ -209,7 +209,7 @@ export interface VerificationReport {
     ran: boolean;
     /** The review outcome. `ok: true` with `verdict: "fail"` is a failing review, not a passing one. */
     verdict: Verdict;
-    /** Why the verdict came out that way, e.g. `2 error finding(s) (first: S2_NO_TRANSITIONS)`. */
+    /** Why the verdict came out that way, e.g. `2 error finding(s) (first error: S2_NO_TRANSITIONS)`. */
     verdictReason: string;
     /** The versioned report contract this result follows. */
     schema: ReportSchema;

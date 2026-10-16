@@ -1142,7 +1142,8 @@ export interface DesignReport {
 }
 
 function verdictOf(errors: number, warnings: number, first?: string): { verdict: Verdict; verdictReason: string } {
-  if (errors > 0) return { verdict: 'fail', verdictReason: String(errors) + ' error finding(s)' + (first === undefined ? '' : ' (first: ' + first + ')') }
+  // `first error:` rather than `first:` - what follows is a code, and the reader should be able to tell.
+  if (errors > 0) return { verdict: 'fail', verdictReason: String(errors) + ' error finding(s)' + (first === undefined ? '' : ' (first error: ' + first + ')') }
   if (warnings > 0) return { verdict: 'pass_with_findings', verdictReason: String(warnings) + ' warning finding(s)' }
   return { verdict: 'pass', verdictReason: 'no error or warning findings' }
 }
@@ -1206,13 +1207,17 @@ export function runDesignReview(input: unknown): DesignReport {
     withBehaviour: (model.types ?? []).filter((entry) => entry.transitions !== undefined || entry.forbids !== undefined).length,
     withResponsibilities: (model.types ?? []).filter((entry) => (entry.responsibilities ?? []).length > 0).length,
   }
-  const skipped = checks.filter((result) => result.status === 'skip').map((result) => result.id)
+  // Name first, code in parentheses, and the code is kept because the `includes` tests below need it -
+  // a bare list of six codes tells a reader nothing about what went unchecked.
+  const skipped = checks.filter((result) => result.status === 'skip')
+  const skippedCodes = skipped.map((result) => result.id)
+  const skippedLabels = skipped.map((result) => result.name + ' (' + result.id + ')')
   const modelHash = valueHash(model)
   const nextSteps: string[] = []
   if (violations.length > 0) nextSteps.push('Fix the ' + String(violations.length) + ' violation(s) the design contradicts itself about, or change the declaration they contradict.')
-  if (signals.length > 0) nextSteps.push('Read the ' + String(signals.length) + ' signal(s) and decide which are intended: they are structural facts, not defects.')
-  if (skipped.length > 0) nextSteps.push('Checks ' + skipped.join(', ') + ' had nothing to hold the design to: declare ' + (skipped.includes('DES2') ? 'layers, ' : '') + (skipped.includes('DES7') ? 'transitions/forbids, ' : '') + (skipped.includes('DES8') || skipped.includes('DES9') ? 'interfaces with callers, ' : '') + 'or accept that those principles are unverified here.')
-  if (nextSteps.length === 0) nextSteps.push('Nothing to fix. The design keeps every contract it declares; the shape facts in `facts` are for a reader.')
+  if (signals.length > 0) nextSteps.push('Read the ' + String(signals.length) + ' signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.')
+  if (skipped.length > 0) nextSteps.push('These had nothing to hold the design to: ' + skippedLabels.join('; ') + '. Declare ' + (skippedCodes.includes('DES2') ? 'layers, ' : '') + (skippedCodes.includes('DES7') ? 'transitions/forbids, ' : '') + (skippedCodes.includes('DES8') || skippedCodes.includes('DES9') ? 'interfaces with callers, ' : '') + 'or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact.')
+  if (nextSteps.length === 0) nextSteps.push('Nothing to fix. The design keeps every contract it declares; the shape facts in `facts` are for a reader. To audit the drawing this design came from against a dependency matrix, use `uml_structure_verify`; for a state machine or protocol among these types, use `model_verify`; to accept a later revision, compare the two reports with `report_diff`.')
   void facts
 
   return {
@@ -1240,7 +1245,7 @@ export function runDesignReview(input: unknown): DesignReport {
       bridges: features.bridges,
       mutualPairs: features.mutualPairs,
       declared,
-      checksSkipped: skipped,
+      checksSkipped: skippedCodes,
     },
     summary: { errors, warnings, info, checksRun: checks.length, nodes: features.nodes, edges: features.edges },
     hashes: { modelHash },

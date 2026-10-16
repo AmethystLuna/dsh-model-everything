@@ -266,7 +266,9 @@ test('report contract: schema, hashes and next steps are present and determinist
   if (JSON.stringify(again.nextSteps) !== JSON.stringify(report.nextSteps)) throw new Error('nextSteps must be deterministic')
   const rejected = runDataVerification({ schemaVersion: 2, entities: [] })
   if (rejected.ok !== false || rejected.schema !== 'model-everything/datamodel/v1') throw new Error('a rejected model keeps the contract')
-  if (!rejected.nextSteps.some((step) => step.includes('DATA_MODEL Data Model Validation'))) {
+  // Name first, code in parentheses: the same order the verification engine uses, so a reader who does not
+  // know the codes can still act on the sentence.
+  if (!rejected.nextSteps.some((step) => step.includes('Data Model Validation (DATA_MODEL)'))) {
     throw new Error('a rejected model must name the validation check: ' + JSON.stringify(rejected.nextSteps))
   }
   assertNoUndefinedValues(report)

@@ -1884,7 +1884,10 @@ async function runReportContractTests() {
   const deadlocked = runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] })
   if (deadlocked.ok !== true || deadlocked.ran !== true) throw new Error('the engine ran; ok/ran must both be true')
   expectFail('deadlock', deadlocked)
-  if (deadlocked.verdictReason !== '1 error finding(s) (first: S2_NO_TRANSITIONS)') {
+  // The field names what the code IS. `first:` left a reader to guess whether it meant the first finding
+  // or the first code, and a code with no label is exactly the kind of thing a model repeats to a user
+  // verbatim, where it means nothing.
+  if (deadlocked.verdictReason !== '1 error finding(s) (first error: S2_NO_TRANSITIONS)') {
     throw new Error('unexpected verdictReason: ' + deadlocked.verdictReason)
   }
   if (deadlocked.summary.errors !== 1) throw new Error('the summary must still count the error')
@@ -1893,7 +1896,7 @@ async function runReportContractTests() {
   const invalid = runVerification({ schemaVersion: 2, init: 'A', states: [{ id: 'A' }], transitions: [] })
   if (invalid.ok !== false || invalid.ran !== true) throw new Error('a rejected model still ran the validation')
   expectFail('invalid model', invalid)
-  if (!invalid.verdictReason.startsWith('1 error finding(s) (first: MODEL_INVALID)')) {
+  if (!invalid.verdictReason.startsWith('1 error finding(s) (first error: MODEL_INVALID)')) {
     throw new Error('unexpected verdictReason: ' + invalid.verdictReason)
   }
 
@@ -1972,12 +1975,14 @@ async function runReportContractTests() {
     throw new Error('verify hashes: ' + JSON.stringify(deadlocked.hashes))
   }
   if (!Array.isArray(deadlocked.nextSteps) || deadlocked.nextSteps.length === 0) throw new Error('verify nextSteps must not be empty')
-  if (!deadlocked.nextSteps.some((step) => step.includes('S2 Deadlock'))) {
+  // The name leads and the code follows, so the sentence is actionable for a reader who does not know the
+  // codes yet, and the code is still there for one who does.
+  if (!deadlocked.nextSteps.some((step) => step.includes('Deadlock (S2)'))) {
     throw new Error('the failing check must be named in nextSteps: ' + JSON.stringify(deadlocked.nextSteps))
   }
   const repeat = runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] })
   if (JSON.stringify(repeat.nextSteps) !== JSON.stringify(deadlocked.nextSteps)) throw new Error('nextSteps must be deterministic')
-  if (!invalid.nextSteps.some((step) => step.includes('MODEL Model Validation'))) {
+  if (!invalid.nextSteps.some((step) => step.includes('Model Validation (MODEL)'))) {
     throw new Error('a rejected model must name the validation check')
   }
 

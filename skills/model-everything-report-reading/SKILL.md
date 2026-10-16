@@ -82,9 +82,22 @@ Within a finding, the severity decides whether it changed the verdict:
 The code prefix names the check that owns the finding (`S1`, `A4`, `DS5`, `DA2`, `DES12`, `UML023`),
 so a code tells you where to look before you read its message.
 
+### A code is for you, not for the person you are answering
+
+The codes exist so you can route the finding to the right reference and re-check it. A user who never
+read the report has no idea what `A4_NO_RELEASE_EVENT` means, and a reply that recites codes makes the
+work look opaque while telling them nothing they can act on.
+
+**Say what the finding says, in words.** The finding's own `message` is already a sentence written for a
+reader who does not know the codes - use it. Name the code afterwards only if it helps the user find the
+same line in the report, and then give it a meaning: not "S7 failed" but "the invariant is violated - the
+model reaches C after two events (`S7_INVARIANT_VIOLATION`)".
+
+The same goes for a check id: `Event Completeness` is the name, `S5` is the label. Lead with the name.
+
 A model whose reachable state space is infinite is reported as `S6_UNBOUNDED_VARIABLE`, an error. It
 is a property of the model, not a defect of the search: no search bound would have decided the
-question.
+question. When you relay this one, relay the reason: *any* search bound would leave it undecided.
 
 ## What a Report Does Not Tell You
 
