@@ -1,0 +1,72 @@
+mindmap
+root((contributing to this plugin))
+  decide which of the two you have
+    a claim about a method
+      you have a source and it says the check should work differently
+      you found a defect in how a judgement is computed
+    a claim about behaviour
+      a tool answered something you believe is wrong
+      a tool refused, crashed, or took the process down
+    if it is both, file the behaviour first
+      a method proposal is easier to judge once the behaviour is agreed
+  an improvement with a source
+    what you must cite
+      the published method, with its year and venue
+      the house convention it would replace
+        provenance tables separate the two
+          4 of 10 reference files carry one today
+        most of the shipped checks are house conventions
+    what you must say about the judgement
+      which check changes, by its code
+        codes are declared across 14 source files
+        the 73 in data-engine are the largest group
+      whether it changes a verdict or adds a signal
+        only violation level decides a verdict
+      what it does NOT decide, in words
+    what it must come with
+      the nearest case that must still pass
+        a check that fires on everything proves nothing
+      a mutation that makes the new case go red
+        a case that cannot fail is not a case
+      the far side of the tradeoff, if there is one
+        a method that buys precision with runtime needs saying
+  a problem you hit while running it
+    what to send
+      the exact call, with its arguments
+        the tool name and the full arguments object
+      what you got
+        the verdict and the verdict reason
+        the finding codes, verbatim
+        the schema, since the reading order differs by family
+      what you expected instead, and why
+        the rule or the source that says so
+    the shapes worth reporting first
+      a verdict that reads as a pass over nothing
+        a check that never ran is not a check that passed
+      a refusal where a report was expected
+      a raw error with no code to route on
+      the process dying or the search not stopping
+    what makes it reproducible
+      the smallest model or diagram that shows it
+        strip it until removing anything makes the effect go away
+      the version, and the schema you got
+      whether it is stable or intermittent
+        a report is deterministic by contract, so say which
+  what both have to pass
+    the gates, in the order CI runs them
+      Node 20, 22
+      typecheck
+      build
+      the regression chain
+      the committed build must match the source
+        the build output is committed, so it moves with the change
+    the house rules a suite follows
+      one code per case, no other error beside it
+      assert which check carries the finding
+      every code gets a near miss that must not fire
+      an unreachable code is pinned, not skipped
+      no brittle counts, in text or in a test name
+    the documents that must move with the change
+      the reference file for the domain
+      the memory entry, when a decision was made
+      the bilingual pair together
