@@ -23,11 +23,11 @@ metadata:
 
 ## 待办（2026-10-16 用户指定，尚未开工）
 
-| 待办 | 说明 | 第一步 |
+| 待办 | 说明 | 状态 |
 |---|---|---|
-| **报告解读工具／方法论／技能** | 报告已经能产出，但「怎么读这份报告、先看什么、什么可以忽略」目前散在 skill 正文与 `references/` 里。要做成一个成体系的能力：一份方法论 + 相应技能，必要时配一个工具（例如只取报告里需要行动的部分）。 | **先起思维导图定结构，再下笔** |
-| **社区贡献指南优化** | 分两种情形分别写：<br>① **有学术指导的功能优化／补充意见** —— 需要引用来源、说明它改进的是哪个判据、以及如何验证；<br>② **运行中遇到问题的 ticket** —— 需要最小可复现的模型或图、实际判定、期望判定，以及报告里的 `verdict`／`verdictReason`／相关 `code`。 | 先起思维导图（两种情形各自的结构不同） |
-| **文档随新增内容继续更新** | 每一处新能力／新码／新行为都要落到对应文档，并保持中英成对。 | 并入上面两项一起做 |
+| **报告解读工具／方法论／技能** | 报告已经能产出，但「怎么读这份报告、先看什么、什么可以忽略」原先散在 skill 正文与 `references/` 里。现有：`skills/model-everything-report-reading/`（技能 + `references/reading-a-report.md` 与同名 `.mmd`）、`docs/report-reading/`（图生成器、测量事实 `facts.json`、技能路由图、同步检查）、`tests/report-reading/`。**没有加工具**——这是个有依据的决定：报告不缺字段（`reportView` 已能选 digest/full，`report_diff` 已能比较两份），加工具只会复述它要传达的指引。图见[技能路由图](../../../docs/report-reading/skill-routing.mmd)。 | **完成**（2026-10-17） |
+| **社区贡献指南优化** | 分两种情形分别写：① **有学术指导的功能优化／补充意见**——需引用来源、说明改进的是哪个判据、以及如何验证；② **运行中遇到问题的 ticket**——需最小可复现的模型或图、实际判定、期望判定，以及报告里的 `verdict`／`verdictReason`／相关 `code`。 | **未开工**，先起思维导图（两种情形结构不同） |
+| **文档随新增内容继续更新** | 每一处新能力／新码／新行为都要落到对应文档，并保持中英成对。**当前已知缺口**：README 中英对（`README.md` / `README.en-US.md`）尚未提到报告解读技能与新的 `MATRIX_*`、`MODEL_UNRESOLVED_EVENT`、`S6_UNBOUNDED_VARIABLE` 等码；`skills/` 里的参考资料目前只有英文。 | **未开工** |
 
 - **待办：非机器族 UML 校验器的引用解析审计**：use-case、class、timing、profile、composite、communication、interaction-overview 的 `validate*Model`/`review*Model` 只经 `parseUml`/`renderUml` 探过，审查者预计 D1-D3 那一族在那里还有更多。
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
