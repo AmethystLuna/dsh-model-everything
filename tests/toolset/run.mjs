@@ -158,6 +158,51 @@ test('every declared display string states what the plugin does', () => {
   console.log('      (' + String(declared.length) + ' declared display string(s) checked: ' + declared.map((entry) => entry.where).join(', ') + ')')
 })
 
+test('nextSteps leads with a check name, not a bare code', async () => {
+  // A model repeats nextSteps to a user more readily than any other field, so the sentence has to be
+  // actionable for someone who has never seen a report. `Deadlock (S2)` works; `S2` alone does not.
+  const { runVerification, runCompositionVerification } = await import('file:///' + repo.replace(/\/$/, '') + '/lib/engine.js')
+  const { runDataVerification } = await import('file:///' + repo.replace(/\/$/, '') + '/lib/data-engine.js')
+  const { runDesignReview } = await import('file:///' + repo.replace(/\/$/, '') + '/lib/design-engine.js')
+
+  const machine = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
+  const other = { schemaVersion: 1, init: 'X', states: [{ id: 'X' }, { id: 'Y', terminal: true }], transitions: [{ from: 'X', event: 'ping', to: 'Y' }] }
+  const reports = {
+    model_verify: runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] }),
+    model_compose_verify: runCompositionVerification([machine, other]),
+    model_datamodel_verify: runDataVerification({ schemaVersion: 1, entities: [{ name: 'U', fields: [{ name: 'id', type: 'uuid' }] }] }),
+    model_design_review: runDesignReview({ schemaVersion: 1, architecture: { nodes: ['a'], edges: [] } }),
+  }
+
+  const offenders = []
+  for (const [family, report] of Object.entries(reports)) {
+    for (const step of report.nextSteps ?? []) {
+      // A step that opens with a code and nothing else is the defect. A code inside parentheses after a
+      // name is the format this repository chose.
+      if (/^\s*[A-Z]{1,4}\d{1,3}([_A-Z0-9]*)?[\s,:]/.test(step)) offenders.push(family + ': ' + step.slice(0, 80))
+    }
+  }
+  if (offenders.length > 0) throw new Error('a step opens with a code, which means nothing before the codes are known:\n    ' + offenders.join('\n    '))
+
+  // And the successful path of each family has to route onward: the result is the only channel that can
+  // redirect a model mid-task, because it is the only one read after the model already chose something.
+  const NAMES = ['model_verify', 'model_compose_verify', 'model_datamodel_verify', 'model_design_review', 'uml_structure_verify', 'uml_render', 'uml_parse', 'uml_review', 'report_diff', 'model_concurrency_scan']
+  const silent = Object.entries(reports).filter(([, report]) => !(report.nextSteps ?? []).some((step) => NAMES.some((name) => step.includes(name)))).map(([family]) => family)
+  if (silent.length > 0) throw new Error('these families route nowhere: ' + silent.join(', ') + '. Name the tool that answers the adjacent question.')
+})
+
+test('the skipped-check list stays a list of codes', async () => {
+  // It became an array of whole check objects in an edit that was meant to change only a sentence, and
+  // `facts.checksSkipped` is published: a caller doing `includes('DES2')` broke silently.
+  const { runDesignReview } = await import('file:///' + repo.replace(/\/$/, '') + '/lib/design-engine.js')
+  const report = runDesignReview({ schemaVersion: 1, architecture: { nodes: ['a'], edges: [] } })
+  const skipped = report.facts.checksSkipped
+  if (!Array.isArray(skipped)) throw new Error('checksSkipped must be an array')
+  const notStrings = skipped.filter((entry) => typeof entry !== 'string')
+  if (notStrings.length > 0) throw new Error('checksSkipped must hold codes, not objects: ' + JSON.stringify(notStrings[0]).slice(0, 80))
+  if (skipped.length === 0) throw new Error('this design skips checks, so the list must not be empty; the check would pass vacuously')
+})
+
 test('the toolset map matches the measurement', () => {
   // The generator in check mode compares instead of writing, so this does not race on the file.
   const output = execFileSync(process.execPath, [repo + 'docs/toolset/generate-mindmap.mjs', '--check'], { encoding: 'utf8', timeout: 300_000 })

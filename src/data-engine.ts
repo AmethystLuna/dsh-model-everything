@@ -1132,10 +1132,12 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
  */
 function dataNextSteps(checks: CheckResult[]): string[] {
   const steps: string[] = []
-  const failed = checks.filter((check) => check.status === 'fail').map((check) => check.id + ' ' + check.name)
+  // Name first, code in parentheses: the sentence has to be actionable for a reader who has not seen a
+  // report yet, and the code stays available for one who has.
+  const failed = checks.filter((check) => check.status === 'fail').map((check) => check.name + ' (' + check.id + ')')
   const warningCodes = [...new Set(checks.flatMap((check) => check.findings).filter((finding) => finding.severity === 'warning').map((finding) => finding.code))].sort()
   if (failed.length > 0) steps.push('Resolve the failing checks first: ' + failed.join(', ') + '.')
   if (warningCodes.length > 0) steps.push('Review the warning findings (' + warningCodes.join(', ') + '): a nullable field or a missing index is a decision, not silence.')
-  steps.push('Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress (DD1-DD4).')
+  steps.push('Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side.')
   return steps
 }

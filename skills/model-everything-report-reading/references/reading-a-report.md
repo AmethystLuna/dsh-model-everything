@@ -85,6 +85,23 @@ Within a finding, the severity decides whether it changed the verdict:
 The finding codes are prefixed by the check that owns them (`S1`, `A4`, `DS5`, `DA2`, `DES12`,
 `UML023`), so a code tells you where to look even before you read its message.
 
+### A code is for you, not for the person you are answering
+
+The codes exist so you can route a finding to the reference that explains it, and so a run is comparable
+with the last one. A user who never read the report has no idea what `A4_NO_RELEASE_EVENT` means, and a
+reply that recites codes makes the work look opaque while telling them nothing they can act on.
+
+**Say what the finding says, in words.** Each finding's own `message` is already a sentence written for a
+reader who does not know the codes. Use it. Name the code afterwards only when it helps the user find the
+same line in the report, and give it a meaning at the same time: not "S7 failed", but "the invariant is
+violated - the model reaches C after two events (`S7_INVARIANT_VIOLATION`)".
+
+The same rule covers a check id: `Event Completeness` is the name, `S5` is the label. Lead with the name.
+
+One code is worth relaying with its reason rather than its name. A model whose reachable state space is
+infinite is reported as `S6_UNBOUNDED_VARIABLE`, an error, and the point to pass on is that **no** search
+bound would have decided it: the question is undecidable for that model, not merely unanswered.
+
 One family of findings deserves its own note: a model whose reachable state space is infinite is
 reported as `S6_UNBOUNDED_VARIABLE`, an error. It is not a defect of the search — it is a property
 of the model, and it means no search bound would have decided the question.

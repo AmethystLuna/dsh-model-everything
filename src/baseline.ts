@@ -97,7 +97,7 @@ function diffOf(added: number, removed: number, addedErrors: number, firstCode?:
   if (addedErrors > 0) {
     return {
       verdict: 'fail',
-      verdictReason: String(added) + ' new finding(s) (' + String(addedErrors) + ' error)' + (firstCode === undefined ? '' : ' (first: ' + firstCode + ')'),
+      verdictReason: String(added) + ' new finding(s) (' + String(addedErrors) + ' error)' + (firstCode === undefined ? '' : ' (first error: ' + firstCode + ')'),
     }
   }
   if (added > 0) {

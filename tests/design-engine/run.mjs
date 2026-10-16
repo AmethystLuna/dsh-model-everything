@@ -410,7 +410,9 @@ test('design: skipped checks are named, not silently passed', () => {
   if (report.checks.some((check) => check.status === 'skip' && !check.detail.includes('skipped'))) {
     throw new Error('a skipped check must say so in its detail')
   }
-  if (!report.nextSteps.some((step) => step.includes('declare'))) throw new Error('the report must say what to declare: ' + JSON.stringify(report.nextSteps))
+  // The step names each skipped check with its name and code, and says what to declare to remove the skip.
+  // Case-insensitive because that clause now starts a sentence after the list.
+  if (!report.nextSteps.some((step) => /declare/i.test(step))) throw new Error('the report must say what to declare: ' + JSON.stringify(report.nextSteps))
 })
 
 test('design: the shape facts are stable and complete', () => {
