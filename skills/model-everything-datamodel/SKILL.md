@@ -1,6 +1,6 @@
 ---
 name: model-everything-datamodel
-description: "Use when reviewing design docs, specs, plans or migrations claiming entities, fields, constraints, relationships, data invariants, or before/after data-model equivalence: schema changes, migration logic, or data guarantees ('all records must have X', 'no orphan rows', 'ids unique') want executable data-model verification (migration coverage, copy consistency, rollback symmetry, DD1-DD4 regression). State machines and protocols: this plugin; diagrams: model-everything-uml."
+description: "Use when reviewing a schema, a migration or a data guarantee: entities, fields, constraints, uniqueness, referential integrity, data invariants, 'no orphan rows', and before/after equivalence. It runs the data model as a model: key and domain checks, migration coverage, copy consistency, rollback symmetry, and the DD1-DD4 regression. State machines: model-everything; module dependencies: model-everything-structure; diagrams: model-everything-uml."
 ---
 
 # Model Everything — Data

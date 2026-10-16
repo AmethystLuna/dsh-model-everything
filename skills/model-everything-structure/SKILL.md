@@ -1,6 +1,6 @@
 ---
 name: model-everything-structure
-description: "Use when reviewing architecture, module structure or a dependency diagram: parse a component, package, class, object or deployment diagram into a dependency graph and check isolated nodes, dangling endpoints, cycles, allowed-dependency violations, layer violations and missing required edges, across one level or several. Audits the diagram, not the code — reconcile it with a source-side scan. Doctrine: the model-everything skill."
+description: "Use when auditing architecture or module structure from a drawing. It reads component, package, class, object or deployment diagrams as a dependency graph and checks isolated nodes, dangling endpoints, cycles, allowed-dependency violations, layer violations and missing required edges, across one level or several. Audits the drawing, not the code — reconcile it with a source-side scan. SRP/LSP/ISP questions are model-everything-design. Doctrine: the model-everything skill."
 ---
 
 # Model Everything — Structure and Dependency Review
