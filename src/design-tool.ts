@@ -35,7 +35,7 @@ export const designTool = defineTool({
   output: {
     schema: {
       type: 'json',
-      description: 'Design review report: checks DES1-DES11 with their status, `violations` (they decide the verdict), `signals`, `facts` (graph features), summary and next steps.',
+      description: 'Design review report: every check with its status, `violations` (they decide the verdict), `signals`, `facts` (graph features), summary and next steps.',
     },
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]

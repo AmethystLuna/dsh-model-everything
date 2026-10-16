@@ -1,10 +1,10 @@
 {
-  "catalogChars": 3270,
+  "catalogChars": 3307,
   "catalogRows": [
     {
       "skill": "model-everything",
-      "chars": 493,
-      "body": 36454
+      "chars": 497,
+      "body": 36458
     },
     {
       "skill": "model-everything-concurrency",
@@ -13,8 +13,8 @@
     },
     {
       "skill": "model-everything-datamodel",
-      "chars": 450,
-      "body": 6160
+      "chars": 483,
+      "body": 6193
     },
     {
       "skill": "model-everything-design",
@@ -37,7 +37,7 @@
       "body": 8009
     }
   ],
-  "toolChars": 10145,
+  "toolChars": 10328,
   "tools": [
     {
       "name": "model_compose_verify",
@@ -49,7 +49,7 @@
     },
     {
       "name": "model_datamodel_verify",
-      "chars": 708
+      "chars": 719
     },
     {
       "name": "model_design_review",
@@ -85,12 +85,12 @@
     },
     {
       "name": "model_verify",
-      "chars": 1254
+      "chars": 1426
     }
   ],
   "perTurn": {
-    "chars": 13415,
-    "tokens": 3354
+    "chars": 13635,
+    "tokens": 3409
   },
   "routing": {
     "rowsWithSibling": 7,
