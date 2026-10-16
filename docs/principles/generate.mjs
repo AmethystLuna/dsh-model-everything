@@ -32,6 +32,22 @@ const PRINCIPLES = [
     enforced: 'tests/engine',
   },
   {
+    id: 'prevent-by-mathematics',
+    title: 'What mathematics can prevent, do not wait to discover by hitting it',
+    source: '.github/memory/design/robustness-audit.md',
+    quote: '能用数学挡住的异常，就不要靠撞上才发现；而「异常处理」本身也是建模的审查结果。',
+    because: 'Three layers, in the order they apply: a closed shape (malformed input becomes a coded report), algebraic degeneracy (valid JSON with invalid logic is refused with its reason), and decidability (whether the model can be decided at all is computed, not discovered by running out of budget). Handling an anomaly is itself a review result about the model, which is why `S6_UNBOUNDED_VARIABLE` is an accusation against the model and not a note about the search.',
+    enforced: 'tests/engine, tests/tool-boundary, tests/baseline',
+  },
+  {
+    id: 'false-positive-worse',
+    title: 'A mathematical criterion\'s false positive costs more than its false negative',
+    source: '.github/memory/design/robustness-audit.md',
+    quote: '数学判据的假阳性比假阴性更伤，因为它指控一个正确的模型。',
+    because: 'The first decidability criterion reported monotone cycles on unreachable islands - defects the analysis invented rather than found. So the criterion is narrowed on purpose: only `inc`/`dec` monotonicity, `set` neither proves nor breaks, only cycles reachable from the initial state.',
+    enforced: 'tests/engine',
+  },
+  {
     id: 'decidability',
     title: 'An answer comes from the model, not from a budget that ran out',
     source: '.github/memory/design/robustness-audit.md',
@@ -212,16 +228,19 @@ lines.push('')
 lines.push('Read it when a change feels like a judgement call. Most of these cost this repository a real defect')
 lines.push('first, and the cost is recorded with the rule.')
 lines.push('')
-lines.push('## The twenty')
+lines.push('## Every one of them')
 lines.push('')
 lines.push('| Principle | Stated in | Kept honest by |')
 lines.push('|---|---|---|')
 for (const principle of PRINCIPLES) {
-  const link = '[' + principle.source + '](' + (principle.source.startsWith('.') ? '../' : '../') + principle.source + ')'
+  const link = '[' + principle.source + '](../' + principle.source + ')'
   lines.push('| **' + principle.title + '** | ' + link + ' | ' + (principle.enforced ?? '-') + ' |')
 }
 lines.push('')
 lines.push('## Each one, and why it is here')
+lines.push('')
+lines.push('The count is not written down on purpose: a sentence saying how many principles exist goes stale the')
+lines.push('day one is added, which is the rule against brittle counts applied to this file.')
 lines.push('')
 for (const principle of PRINCIPLES) {
   lines.push('### ' + principle.title)

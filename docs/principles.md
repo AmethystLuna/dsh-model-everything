@@ -8,12 +8,14 @@ matching the file it came from.
 Read it when a change feels like a judgement call. Most of these cost this repository a real defect
 first, and the cost is recorded with the rule.
 
-## The twenty
+## Every one of them
 
 | Principle | Stated in | Kept honest by |
 |---|---|---|
 | **A malformed input becomes a coded report, never a raw throw** | [AGENTS.md](../AGENTS.md) | tests/tool-boundary |
 | **Valid JSON with invalid logic is refused with its reason** | [skills/model-everything/references/dsh-model-schema.md](../skills/model-everything/references/dsh-model-schema.md) | tests/engine |
+| **What mathematics can prevent, do not wait to discover by hitting it** | [.github/memory/design/robustness-audit.md](../.github/memory/design/robustness-audit.md) | tests/engine, tests/tool-boundary, tests/baseline |
+| **A mathematical criterion's false positive costs more than its false negative** | [.github/memory/design/robustness-audit.md](../.github/memory/design/robustness-audit.md) | tests/engine |
 | **An answer comes from the model, not from a budget that ran out** | [.github/memory/design/robustness-audit.md](../.github/memory/design/robustness-audit.md) | tests/engine (`S6_UNBOUNDED_VARIABLE`) |
 | **A report never says whether a design conforms to a principle** | [AGENTS.md](../AGENTS.md) | tests/design-engine, tests/structure |
 | **A skip is not a pass, and a truncated search is not a pass** | [README.en-US.md](../README.en-US.md) | tests/report-view, tests/engine |
@@ -35,6 +37,9 @@ first, and the cost is recorded with the rule.
 
 ## Each one, and why it is here
 
+The count is not written down on purpose: a sentence saying how many principles exist goes stale the
+day one is added, which is the rule against brittle counts applied to this file.
+
 ### A malformed input becomes a coded report, never a raw throw
 
 > Reports are contracts.
@@ -52,6 +57,26 @@ Kept honest by `tests/tool-boundary`.
 > — [`skills/model-everything/references/dsh-model-schema.md`](../skills/model-everything/references/dsh-model-schema.md)
 
 `{ all: [] }` is vacuously true, so accepting it reports a positive all-clear over nothing. A misspelled state id can never be reached, so the invariant can never fail.
+
+Kept honest by `tests/engine`.
+
+### What mathematics can prevent, do not wait to discover by hitting it
+
+> 能用数学挡住的异常，就不要靠撞上才发现；而「异常处理」本身也是建模的审查结果。
+>
+> — [`.github/memory/design/robustness-audit.md`](../.github/memory/design/robustness-audit.md)
+
+Three layers, in the order they apply: a closed shape (malformed input becomes a coded report), algebraic degeneracy (valid JSON with invalid logic is refused with its reason), and decidability (whether the model can be decided at all is computed, not discovered by running out of budget). Handling an anomaly is itself a review result about the model, which is why `S6_UNBOUNDED_VARIABLE` is an accusation against the model and not a note about the search.
+
+Kept honest by `tests/engine, tests/tool-boundary, tests/baseline`.
+
+### A mathematical criterion's false positive costs more than its false negative
+
+> 数学判据的假阳性比假阴性更伤，因为它指控一个正确的模型。
+>
+> — [`.github/memory/design/robustness-audit.md`](../.github/memory/design/robustness-audit.md)
+
+The first decidability criterion reported monotone cycles on unreachable islands - defects the analysis invented rather than found. So the criterion is narrowed on purpose: only `inc`/`dec` monotonicity, `set` neither proves nor breaks, only cycles reachable from the initial state.
 
 Kept honest by `tests/engine`.
 
