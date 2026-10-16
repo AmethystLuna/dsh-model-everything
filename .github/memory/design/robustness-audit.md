@@ -53,10 +53,16 @@ metadata:
 
 ## 修复计划（按严重度）
 
-1. **D1–D3 一起修**：三个引擎都补**引用解析**，并统一一条纪律——**声明里的名称解析不到就拒绝（或报 error），绝不 `continue`**。这条正是「空洞的检查比拒绝更糟」的落地。
-2. **D5**：选项先归一（`Number.isFinite` + 上界），再进搜索；`maxStates: NaN/Infinity` 拒绝，`maxPermutationEvents` 设上界。
-3. **D4**：`validateGuard` 失败后**不要**再让第二次走查读同一畸形节点（提前返回或跳过）。
-4. **D6–D10**：各自补拒绝/警告；其中 D6 的「未分层节点豁免」要么拒绝，要么报明确 warning，不能让 `summary.layerViolations: 0` 读成「分层成立」。
-5. **D11–D12**：深度上限（走查前先限制嵌套深度）+ 参数形态守卫，抛文档化的错。
-6. 每条修复**必须先有一条能红的用例**（否则修了还会再犯），并在 `tests/negatives` 补最邻近反例。
-7. 顺带把**非机器族 UML 校验器**的引用解析补齐审计（审查者的预测点）。
+1. ~~**D1–D3 一起修**~~ **已完成（2026-10-16）**：三个引擎都补上了引用解析，纪律统一为——**声明里的名称解析不到就要报出来，绝不 `continue` 成空的全部通过**。落实到具体形态：
+   - **D1 状态机**：`resourcePairs`/`concurrentPairs`/`idempotentEvents`/`tickEvents` 的悬空名称由 `withUnresolved` 报 `MODEL_UNRESOLVED_EVENT`（**warning**），并且**当检查已用自己的码说明时就沉默**（`A4_NO_RELEASE_EVENT` 的证据里带事件，避免一条缺陷两条发现）。定为 warning 是**测量结果**：教材书信号量用例故意写 `failEvent: 'timeout'` 并期望无 error。检查状态随之从 `pass` 变 `fail`（`detail` 仍是旧的全部通过措辞，属措辞瑕疵而非假判定）。
+   - **D2 数据族**：schema 在 model/entity/field/invariant/boundary-check 五层封闭；七种从不解析的不变式（field-required、no-orphan、unique、referential-integrity、range、count-equal、field-equal）由新检查 **DS5** 解析。已解析的种类保留自己的码（`DA9`/`DA10`/`DA11`/`DS3`/`DS4`/`DD2`）。
+   - **D3 设计族**：新检查 **DES12** 解析类型关系——`extends`/`implements`/`dependsOn`/`uses`、继承环、层成员、规则 source、必需边端点。`dependsOn`/`uses` 接受已声明类型**或**架构节点（两个标识空间）。
+   - 顺带修好三处**夹具自身的缺陷**：数据夹具与工具边界夹具各带一个从未被读取的字段级 `primaryKey`；「守规矩的设计」夹具的 `OrderService.dependsOn` 指向两个图里不存在的节点。
+   - **修 D2 时踩的坑**：第一版把 `DS3`/`DS4`/`DA9` 已经做的解析又做了一遍（大量用例变红才发现），并且误以为**选项**（`copyPairs`/`migrationMappings`/`backupPairs`）能靠**模型层**封闭兜住——它们不是模型字段，`tests/tool-boundary` 里那三条 pinned 用例因此仍成立。
+2. ~~**D5**~~ **未做**：选项先归一（`Number.isFinite` + 上界）再进搜索；`maxStates: NaN/Infinity` 拒绝，`maxPermutationEvents` 设上界。
+3. **D4 未做**：`validateGuard` 失败后不要再让第二次走查读同一畸形节点。
+4. **D6–D10 未做**：各自补拒绝/警告；D6 的「未分层节点豁免」要么拒绝，要么报明确 warning。
+5. **D11–D12 未做**：嵌套深度上限 + 参数形态守卫，抛文档化的错。
+6. 每条修复**必须先有一条能红的用例**（D1/D2/D3 都已补：`runUnresolvedNameTests`、`runClosureTests`、DES12 的十四条例）。
+7. ~~**非机器族 UML 校验器审计**~~ **已完成（2026-10-16）**：七个族里**六个已经处理悬空引用**（use-case 与 timing 直接 `UML_INPUT` 拒绝；communication、interaction-overview、profile 由 review 报出）。**`composite-structure` 是唯一有这个缺陷的**，而修它的过程又挖出第二层：`reviewFamilyUml` 把**原始**模型交给族审查，而不是该族校验器产出的**规范形态**——于是 `UML059` 读不到 `undeclared`，悬空端点静默 `pass`。现已传入规范形态。第三层：复合族**没有 normalize**，导致「模型省略 `self.kind`」被报成 `self.kind invented by the diagram`（把自己补的默认值当成漂移）。三处都已修并各有回归用例。
+   - 这轮的方法教训：我第一版探针**直接调 `reviewCompositeModel` 传原始模型**，得出「0 发现」的结论——那是**我的探针跳过了校验步骤**，不是引擎沉默。审计工具自己出错时最像「引擎有问题」。
