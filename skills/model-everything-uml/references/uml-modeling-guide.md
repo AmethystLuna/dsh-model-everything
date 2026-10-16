@@ -426,6 +426,36 @@ about the design; the diagram draws a label. The model keeps the number as the s
 diagram wrote, and the review does not check the drawing order against it - the numbers are
 the order, and the order they were drawn in is not a claim.
 
+### Interaction overview diagrams
+
+An interaction overview is a control-flow graph whose nodes are interactions: a start, a
+decision, references to interactions, a stop. It is drawn here as a **Mermaid flowchart**
+whose nodes name interactions and whose edges carry the branch conditions. Mermaid is the
+only notation it is drawn in. PlantUML's activity syntax is the one place a `ref` step
+exists, and this build refuses it, because a structured flowchart language cannot carry a
+graph with merges or cycles.
+
+| Action | What happens |
+|---|---|
+| `uml_render` with `kind: "interaction-overview"` | A `flowchart TD` with a start node, a reference drawn as `[/"Name"/]`, an inline interaction as `["Name"]`, a decision as a rhombus, and each branch condition as an edge label. |
+| `uml_parse` | Refused. A flowchart node carries a *name* rather than the interaction it stands for, so reading one back would have to guess whether a node is a reference to another diagram, an inline interaction, or a plain step. |
+| `uml_review` | Reviews the model, and renders it in Mermaid - the family's own notation - so the drawing comes back with the report. Fidelity is reported as unchecked, because the text cannot be read back. |
+
+The model is `InteractionOverviewModelV1`: `nodes` (each with a `kind` of `initial`,
+`final`, `decision`, `merge`, `interaction` or `reference`, and an `interaction` name for
+the last two) and `edges` (each with an optional `condition`). Exactly one initial node is
+required, and that is a validator refusal rather than a finding: every later check would be
+reading a graph with no entry.
+
+| Code | Severity | What it means |
+|---|---|---|
+| `UML069_OVERVIEW_NO_INITIAL` | error | No initial node. Refused by the validator before the review runs, so the review never reports it. |
+| `UML070_OVERVIEW_NODE_UNREACHABLE` | error | A node is on no path from the initial node, so the overview does not run it. |
+| `UML071_OVERVIEW_DECISION_ONE_BRANCH` | warning | A decision has one outgoing edge, so it does not decide anything. |
+| `UML072_OVERVIEW_REFERENCE_UNDECLARED` | error | An edge names a node the overview never declares. |
+| `UML073_OVERVIEW_NODE_WITHOUT_INTERACTION` | error | An interaction or reference node names no interaction. |
+| `UML074_OVERVIEW_UNDOCUMENTED` | info | A node carries no name a reader can map back to the design. |
+
 ### What the round trip proves
 
 It proves the diagram is a faithful rendering of the model:

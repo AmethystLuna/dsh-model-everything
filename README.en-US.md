@@ -188,7 +188,7 @@ Override it by row id in the profile's `cordis.patch.yml`:
 - **Skills are not visible**: check that the DSH version supports `ctx.skills` and Agent Skills discovery, and restart the profile after installing.
 - **Tools are missing**: check `enabled` (it may be `false`) and that the plugin really installed (`--dump-config` lists its row).
 - **The plugin manager refuses the install**: make sure `@deepseek-ai/*` packages are `peerDependencies`, not `dependencies`.
-- **A diagram family was refused**: that is the design. When the notation cannot express it, or this build has no module for it, the tool refuses by name with the reason instead of returning a wrong model.
+- **A diagram family was refused**: that is the design. Every one of the fourteen UML 2.5 diagram families has an implementation here, so a refusal is always about the notation: it cannot express that view, or it draws it without being able to read it back. The tool refuses by name with the reason instead of returning a wrong model.
 
 ## Development
 

@@ -215,6 +215,15 @@ export interface UmlFamilyFinding {
  */
 export interface UmlFamilyModule<Model> {
     id: UmlFamilyId;
+    /**
+     * The notation this family is drawn in, when only one can draw it.
+     *
+     * Absent means "either, as the caller asks", which is true for most families. A family
+     * whose table gives one notation `none` has exactly one answer, and saying it here is
+     * what lets a review of a *model* render the family instead of reporting that the model
+     * cannot be drawn at all.
+     */
+    notation?: UmlNotation;
     render(input: unknown, notation: UmlNotation, options: UmlFamilyRenderOptions): UmlFamilyRender;
     parse(text: string, notation: UmlNotation): UmlFamilyParse<Model>;
     /** Family findings for the review: what the diagram itself gets wrong. */

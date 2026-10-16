@@ -45,6 +45,7 @@ import { timingModule, validateTimingModel, type TimingModelV1 } from './uml-tim
 import { profileModule, validateProfileModel, type ProfileModelV1 } from './uml-profile.js'
 import { compositeModule, validateCompositeModel, type CompositeModelV1 } from './uml-composite.js'
 import { communicationModule, validateCommunicationModel, type CommunicationModelV1 } from './uml-communication.js'
+import { interactionOverviewModule, validateInteractionOverviewModel, type InteractionOverviewModelV1 } from './uml-interaction-overview.js'
 
 export { UmlError, UML_NOTATIONS } from './uml-syntax.js'
 export type { UmlNotation, UmlFamilyId } from './uml-syntax.js'
@@ -61,6 +62,8 @@ export { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES, 
 export type { CompositeModelV1, CompositePart, CompositePort, CompositeConnector, CompositeFindingCode } from './uml-composite.js'
 export { validateCommunicationModel, reviewCommunicationModel, COMMUNICATION_FINDING_CODES, renderCommunication, parseCommunication, communicationModule, communicationSequenceOrder } from './uml-communication.js'
 export type { CommunicationModelV1, CommunicationLifeline, CommunicationMessage, CommunicationFindingCode } from './uml-communication.js'
+export { validateInteractionOverviewModel, reviewInteractionOverviewModel, INTERACTION_OVERVIEW_FINDING_CODES, renderInteractionOverview, parseInteractionOverview, interactionOverviewModule } from './uml-interaction-overview.js'
+export type { InteractionOverviewModelV1, InteractionOverviewNode, InteractionOverviewEdge, InteractionOverviewFindingCode } from './uml-interaction-overview.js'
 
 /**
  * The diagram families this front end knows, in the engine's order. The name is kept
@@ -100,7 +103,7 @@ export interface UmlRenderResult {
 }
 
 /** What a family's parse produces: a LogicModelV1 for the machine families, the family model otherwise. */
-export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1 | CompositeModelV1 | CommunicationModelV1
+export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1 | CompositeModelV1 | CommunicationModelV1 | InteractionOverviewModelV1
 
 export interface UmlParseResult {
   notation: UmlNotation
@@ -488,6 +491,7 @@ const FAMILY_MODULES = {
   profile: profileModule,
   'composite-structure': compositeModule,
   communication: communicationModule,
+  'interaction-overview': interactionOverviewModule,
   class: structureFamilyModule('class'),
   object: structureFamilyModule('object'),
   package: structureFamilyModule('package'),
@@ -1698,7 +1702,7 @@ export function reviewUml(options: UmlReviewOptions): UmlReviewReport {
         return reviewFamilyUml({
           family: detected.family, module, notation: detected.notation, diagram: options.diagram as string,
           model: options.model, roundTrip: options.roundTrip !== false, metadataKeys: metadataKeysOf(options.model),
-          intent: options.intent, canParse: umlFamilySpec(detected.family).parseable,
+          intent: options.intent, canParse: umlFamilySpec(detected.family).parseable, parsedNotation: detected.notation,
         })
       }
     }
@@ -1908,6 +1912,11 @@ interface FamilyReviewRequest {
    * must therefore never call it. The capability table is the single decision.
    */
   canParse: boolean
+  /**
+   * The notation the diagram text resolved to, when there was text. A review of a model
+   * alone has none, and renders in the family's own notation.
+   */
+  parsedNotation?: UmlNotation
 }
 
 /** Element counts for a family model, so the report says how big the diagram is. */
@@ -1975,7 +1984,12 @@ function reviewFamilyUml(request: FamilyReviewRequest): UmlReviewReport {
   let renderedForSupplied: UmlFamilyRender | undefined
   if (supplied !== undefined) {
     try {
-      renderedForSupplied = request.module.render(supplied, request.notation, { maxSteps: 60 })
+      // A review that has no parsed diagram has no notation from the text to trust, so it
+      // renders in the one notation the capability table says can draw this family. Asking
+      // for the caller's default instead would refuse a family whose view exists - and
+      // report it as a model that belongs to another family.
+      const renderNotation = request.parsedNotation ?? request.module.notation ?? request.notation
+      renderedForSupplied = request.module.render(supplied, renderNotation, { maxSteps: 60 })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       findings.push({
