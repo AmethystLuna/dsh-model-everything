@@ -49,6 +49,7 @@ metadata:
 ## 迁移之后补测的（2026-10 下半月）
 
 - **兼容性是实测的**：在隔离 `DSH_HOME` 里用 `dsh 0.2.0-rc.2` 装 `file:` 副本，`--dump-config` 里看到本插件的行（`enabled: true`），技能与 `locale/` 都在包内。0.1.7 那一段另用 API 面探针（装该版本的 `dsh-tools`/`dsh-llm`/`dsh-skill-filesystem`，把 `lib/` 放进去跑 `apply`）测过 `0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`：工具全注册、工具能跑出报告、inspect 与技能 provider 都建得起来。
+- **兼容性轮次有了可复用的测试台（2026-10-16）**：`0.2.1-alpha.1` 用一套六步轮次实测——装 → `--dump-config` 看到行 → 技能与 `locale/` 在包内 → headless 带假 key 启动（止步 AUTH 即说明整棵插件树加载通过）→ **从装好的副本跑出真实报告** → 卸载后行消失。脚本是 scratch 区里 `model-everything-mount` 任务目录下的 `compat-round.ps1`（改编自 logicprobe 那份：插件参数化，并多了「真实报告」这一步）。这一步有两个只属于 `file:` 安装的坑：pnpm 装进来的副本**没有自己的 `node_modules`**，且它的 `peerDependencies` 由**宿主的 loader 树**解析，普通 `import` 查不到——所以探针要从 dsh 树里跑，并用一个临时 junction 把 `@deepseek-ai/*` 借给副本，跑完就摘掉。`dshReleases` 因此把 `0.2.1-alpha.1` 从 `unknown` 记为 `compatible`。
 - **准入只看 `peerDependencies`**：`dsh.engines.dsh`、`dsh.category`、`dsh.displayName`、`dsh.compatibility` 都没有读者；区间不放宽就会被插件管理器拒装。细节见[插件开发规范](../design/plugin-dev-spec.md)。
 - **卡片标题来自 `locale/*.json` 的 `meta.title`**，原先 `package.json` 里那个 `./locale/*.json` export 没有对应文件，卡片因此拿不到名字；现在 `locale/en.json` 与 `locale/zh.json` 都在，并已进 `files`。
 
