@@ -238,9 +238,9 @@ export const UML_FAMILIES: readonly UmlFamilySpec[] = [
   },
   {
     id: 'interaction-overview', name: 'interaction overview diagram', nameZh: '交互概览图', group: 'interaction', machine: false, parseable: false,
-    parseRefusal: 'an interaction overview diagram is an activity graph whose nodes are interactions; neither notation spells the inline interaction references, so a parse would produce a flow whose nodes are not the interactions the diagram names.',
-    mermaid: { fidelity: 'none', note: 'mermaid has no interaction overview diagram. Keep the overview as a flowchart and the interactions as sequence diagrams.' },
-    plantuml: { fidelity: 'none', note: 'plantuml has no interaction overview diagram: ref and group fragments inside a sequence diagram are not an activity graph. Keep the overview as an activity diagram and the interactions as sequence diagrams.' },
+    parseRefusal: 'an interaction overview is drawn here as a mermaid flowchart whose nodes name interactions, and a flowchart node carries a name rather than the interaction it stands for: reading one back would have to guess whether a node is a reference to another diagram, an inline interaction, or a plain step. Keep the overview as its own model and review that.',
+    mermaid: { fidelity: 'approximate', declarations: ['flowchart'], note: 'mermaid has no interaction overview diagram, but this build draws one as a flowchart whose nodes name interactions and whose edges carry the branch conditions - the flow, the references and the conditions are all carried. The combined fragments of an inline interaction are not drawn: the drawing has one node for it.' },
+    plantuml: { fidelity: 'none', note: 'plantuml has no interaction overview page, and the one place a `ref` step exists - its activity syntax - is refused by this build, because a structured flowchart language cannot carry a graph with merges or cycles. Render it with notation "mermaid".' },
   },
   {
     id: 'timing', name: 'timing diagram', nameZh: '定时图', group: 'interaction', machine: false, parseable: true,
@@ -593,6 +593,15 @@ export interface UmlFamilyFinding {
  */
 export interface UmlFamilyModule<Model> {
   id: UmlFamilyId
+  /**
+   * The notation this family is drawn in, when only one can draw it.
+   *
+   * Absent means "either, as the caller asks", which is true for most families. A family
+   * whose table gives one notation `none` has exactly one answer, and saying it here is
+   * what lets a review of a *model* render the family instead of reporting that the model
+   * cannot be drawn at all.
+   */
+  notation?: UmlNotation
   render(input: unknown, notation: UmlNotation, options: UmlFamilyRenderOptions): UmlFamilyRender
   parse(text: string, notation: UmlNotation): UmlFamilyParse<Model>
   /** Family findings for the review: what the diagram itself gets wrong. */

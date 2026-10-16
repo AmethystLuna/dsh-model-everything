@@ -188,7 +188,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 - **技能不可见**：确认 DSH 版本支持 `ctx.skills` 与 Agent Skills 发现，并在安装后重启 profile。
 - **工具不在**：先查 `enabled`（可能是 `false`），再看插件管理器是否真的装上了（`--dump-config` 里有没有本插件的行）。
 - **插件管理器拒绝安装**：确认 `@deepseek-ai/*` 在 `peerDependencies` 里，而不是 `dependencies`。
-- **某个图族被拒绝**：这是设计行为。记号表达不了，或本构建还没有该族模块时，它按名拒绝并说明理由，不会交出错的模型。
+- **某个图族被拒绝**：这是设计行为。UML 2.5 的十四个图族在本构建里都有实现，所以拒绝永远是关于记号的：记号画不出这个视图，或画得出但读不回来。它按名拒绝并说明理由，不会交出错的模型。
 
 ## 开发
 

@@ -12,6 +12,7 @@ import { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES } from '..
 import { validateProfileModel, reviewProfileModel, profileModule, PROFILE_FINDING_CODES } from '../../lib/uml.js'
 import { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES } from '../../lib/uml.js'
 import { validateCommunicationModel, reviewCommunicationModel, COMMUNICATION_FINDING_CODES } from '../../lib/uml.js'
+import { validateInteractionOverviewModel, reviewInteractionOverviewModel, INTERACTION_OVERVIEW_FINDING_CODES } from '../../lib/uml.js'
 
 let failures = 0
 function test(name, fn) {
@@ -1962,6 +1963,136 @@ test('communication: every code the family declares is produced by its own case'
     const beside = new Set(['UML068_COMMUNICATION_UNDOCUMENTED', 'UML064_COMMUNICATION_LIFELINE_UNLINKED', 'UML065_COMMUNICATION_MESSAGE_WITHOUT_LINK'])
     const others = codes.filter((entry) => entry !== code && !beside.has(entry))
     if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+  }
+})
+
+// ------------------------------------------- the interaction overview family --
+
+// The overview is drawn as a Mermaid flowchart whose nodes name interactions. Mermaid is
+// the only notation it is drawn in: PlantUML's activity syntax - the one place a `ref` step
+// exists - is refused by this build, so the family's module says which notation it uses and
+// a review of a model renders in that one.
+const overviewModel = {
+  schemaVersion: 1,
+  nodes: [
+    { id: 'n0', kind: 'initial' },
+    { id: 'n1', kind: 'reference', interaction: 'Login sequence' },
+    { id: 'n2', kind: 'decision', label: 'ok?' },
+    { id: 'n3', kind: 'reference', interaction: 'Dashboard' },
+    { id: 'n4', kind: 'final' },
+    { id: 'n5', kind: 'merge' },
+    { id: 'n6', kind: 'interaction', interaction: 'Logout' },
+    { id: 'n7', kind: 'final' },
+  ],
+  edges: [
+    { from: 'n0', to: 'n1' }, { from: 'n1', to: 'n2' },
+    { from: 'n2', to: 'n3', condition: 'yes' }, { from: 'n2', to: 'n4', condition: 'no' },
+    { from: 'n3', to: 'n5' }, { from: 'n5', to: 'n6' }, { from: 'n6', to: 'n7' },
+  ],
+}
+
+test('overview: the flow, the references and the conditions are all drawn', () => {
+  const rendered = renderUml(overviewModel, 'mermaid', 'interaction-overview')
+  for (const needle of [
+    'flowchart TD',
+    '%%dsh-model-everything:uml v1 notation=mermaid family=interaction-overview',
+    'n0(["start"])',
+    'n1[/"Login sequence"/]',
+    'n2{"ok?"}',
+    'n6["Logout"]',
+    'n2 -->|"yes"| n3',
+    'n2 -->|"no"| n4',
+  ]) {
+    if (!rendered.primary.includes(needle)) throw new Error('missing ' + needle + '\n' + rendered.primary)
+  }
+  if (!rendered.warnings.some((warning) => warning.includes('UML_RENDER_APPROXIMATE_VIEW'))) {
+    throw new Error('the approximate view must be named: ' + JSON.stringify(rendered.warnings))
+  }
+  if (renderUml(overviewModel, 'mermaid', 'interaction-overview').primary !== rendered.primary) throw new Error('rendering is not deterministic')
+})
+
+test('overview: the parse refuses by name, and the review renders anyway', () => {
+  const text = renderUml(overviewModel, 'mermaid', 'interaction-overview').primary
+  const refusal = refusalOf(() => parseUml(text))
+  if (refusal.code !== 'UML_NOT_A_STATE_DIAGRAM') throw new Error('refusal code: ' + refusal.code)
+  if (!refusal.message.includes('flowchart node carries a name')) throw new Error('the refusal must say why: ' + refusal.message)
+  // A review of the model still draws it - in the family's own notation, not the caller's
+  // default - and says that fidelity was not checked rather than pretending it was.
+  const report = reviewUml({ model: overviewModel, diagramKind: 'interaction-overview' })
+  if (report.verdict === 'fail') throw new Error('this overview must not fail: ' + report.verdictReason)
+  if (report.primary === undefined || !report.primary.startsWith('flowchart TD')) {
+    throw new Error('the review must render the family in mermaid: ' + String(report.primary).slice(0, 80))
+  }
+  if (!codes(report).includes('UML018_FIDELITY_UNCHECKED')) throw new Error('the review must say fidelity is unchecked: ' + JSON.stringify(codes(report)))
+  if (report.roundTrip !== null) throw new Error('an unreadable family must not report a round trip: ' + JSON.stringify(report.roundTrip))
+})
+
+test('overview: plantuml cannot draw it, and says which notation can', () => {
+  const refusal = refusalOf(() => renderUml(overviewModel, 'plantuml', 'interaction-overview'))
+  if (refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('refusal code: ' + refusal.code)
+  if (!refusal.message.includes('mermaid')) throw new Error('the refusal must name the notation that works: ' + refusal.message)
+})
+
+test('overview: the validator refuses by field', () => {
+  const base = { schemaVersion: 1, nodes: [{ id: 'n0', kind: 'initial' }], edges: [] }
+  const refusals = [
+    ['must be an object with schemaVersion 1', 'x'],
+    ['must declare schemaVersion 1', { ...base, schemaVersion: 2 }],
+    ['every node needs a non-empty string id', { ...base, nodes: [{ id: '' }] }],
+    ['is declared more than once', { ...base, nodes: [{ id: 'n0', kind: 'initial' }, { id: 'n0', kind: 'final' }] }],
+    ['node kind must be one of', { ...base, nodes: [{ id: 'n0', kind: 'wibble' }] }],
+    ['needs a non-empty `interaction` name', { ...base, nodes: [{ id: 'n0', kind: 'initial' }, { id: 'n1', kind: 'reference' }] }],
+    ['needs exactly one initial node', { ...base, nodes: [{ id: 'n0', kind: 'final' }] }],
+    ['every edge needs a non-empty `to` end', { ...base, edges: [{ from: 'n0', to: '' }] }],
+  ]
+  for (const [needle, input] of refusals) {
+    let refusal
+    try { validateInteractionOverviewModel(input) } catch (error) { refusal = error }
+    if (!(refusal instanceof UmlError) || refusal.code !== 'UML_INPUT') throw new Error(needle + ': not an UML_INPUT refusal: ' + String(refusal))
+    if (!refusal.message.includes(needle)) throw new Error('refusal for "' + needle + '" said: ' + refusal.message)
+  }
+})
+
+test('overview: every code the family declares is produced by its own case', () => {
+  const base = [{ id: 'n0', kind: 'initial' }, { id: 'n1', kind: 'final' }]
+  const cases = [
+    ['UML070_OVERVIEW_NODE_UNREACHABLE', {
+      nodes: [...base, { id: 'orphan', kind: 'reference', interaction: 'X' }], edges: [{ from: 'n0', to: 'n1' }],
+    }],
+    ['UML071_OVERVIEW_DECISION_ONE_BRANCH', {
+      nodes: [{ id: 'n0', kind: 'initial' }, { id: 'n1', kind: 'decision', label: 'ok?' }, { id: 'n2', kind: 'final' }],
+      edges: [{ from: 'n0', to: 'n1' }, { from: 'n1', to: 'n2' }],
+    }],
+    ['UML072_OVERVIEW_REFERENCE_UNDECLARED', {
+      nodes: base, edges: [{ from: 'n0', to: 'n1' }, { from: 'n1', to: 'ghost' }], undeclared: ['ghost'],
+    }],
+    ['UML073_OVERVIEW_NODE_WITHOUT_INTERACTION', {
+      // The validator refuses this shape, so the case reaches the review the way the parser
+      // can: a model whose node lost its interaction after validation.
+      nodes: [{ id: 'n0', kind: 'initial' }, { id: 'n1', kind: 'reference', interaction: '   ' }, { id: 'n2', kind: 'final' }],
+      edges: [{ from: 'n0', to: 'n1' }, { from: 'n1', to: 'n2' }],
+    }],
+    ['UML074_OVERVIEW_UNDOCUMENTED', {
+      nodes: [{ id: 'n0', kind: 'initial' }, { id: 'n1', kind: 'merge' }, { id: 'n2', kind: 'final' }],
+      edges: [{ from: 'n0', to: 'n1' }, { from: 'n1', to: 'n2' }],
+    }],
+  ]
+  const declared = new Set(INTERACTION_OVERVIEW_FINDING_CODES)
+  for (const [code] of cases) declared.delete(code)
+  if (declared.size > 1) throw new Error('codes with no case: ' + [...declared].join(', '))
+  for (const [code, model] of cases) {
+    const produced = reviewInteractionOverviewModel({ schemaVersion: 1, ...model }, {})
+    const producedCodes = produced.map((finding) => finding.code)
+    if (!producedCodes.includes(code)) throw new Error(code + ' missing from ' + JSON.stringify(producedCodes))
+    const others = producedCodes.filter((entry) => entry !== code && entry !== 'UML074_OVERVIEW_UNDOCUMENTED')
+    if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+  }
+  // UML069 is the validator's own refusal: no initial node never reaches the review, so the
+  // case pins the shadowing instead of pretending to drive it.
+  let refusal
+  try { validateInteractionOverviewModel({ schemaVersion: 1, nodes: [{ id: 'n0', kind: 'final' }], edges: [] }) } catch (error) { refusal = error }
+  if (refusal === undefined || !refusal.message.includes('exactly one initial node')) {
+    throw new Error('UML069 must stay unreachable from the review: ' + String(refusal))
   }
 })
 

@@ -22,7 +22,9 @@ metadata:
 | Profile | `UML050`–`UML056` | `src/uml-profile.ts`（PlantUML 只 render，`parseable: false`） | 清单第 7 节按 `[WFR]` 列的约束（Extension 的 `isRequired`、`ExtensionEnd` 的聚合与多重性、ProfileApplication 与被应用包的对应、stereotype 与 metaclass 的重名冲突等）——这些要读出图里的扩展端点与 ProfileApplication，而记号没有这两样 |
 | 复合结构 | `UML057`–`UML062` | `src/uml-composite.ts`（PlantUML 可 render 可 parse：近似视图但实测往返无损） | 清单第 5 节按 `[WFR]` 列的约束（part 的类型与多重性、port 的 required/provided 接口、connector 两端的角色名与类型兼容、collaboration 与 role binding）——记号一个都表达不出，模型里也不假装有 |
 | 通信 | `UML063`–`UML068` | `src/uml-communication.ts`（PlantUML 可 render 可 parse：近似视图，往返无损） | 清单第 12 节按 `[WFR]` 列的约束（消息必须是 link 的实例、link 的两端类型兼容、并行消息的次序、`GeneralOrdering`）——这些要读出 link 的元模型与消息的 `MessageEnd`，而记号只画一条带编号的箭头 |
-| 交互概览 | 无模块 | 图族表在 `src/uml-syntax.ts`，注册表在 `src/uml.ts` 按名拒绝 | 族的全部检查 |
+| 交互概览 | `UML069`–`UML074` | `src/uml-interaction-overview.ts`（Mermaid 只 render，`parseable: false`） | 清单第 13 节按 `[WFR]` 列的约束（内联交互的 combined fragment 与 operand、InteractionUse 的实参绑定、概览节点与所引用交互的对应）——画成流程图后一个节点只带名字，这些读不出来 |
+
+**十四个族全部有实现路径**：三个机器族走 `src/uml.ts` 的机器路径，其余十一个各有 `UmlFamilyModule`。剩下的拒绝都是记号能力的拒绝（`profile` 与 `interaction-overview` 不读、`sequence` 不读），没有「本构建没有模块」这一档了。
 
 **这张表怎么用**：结构族与复合结构族没有按元素类型区分缺陷的能力——它们的审查是依赖图审查，加一条节点未命名（`UML040`）。因此「`uml_review` 没报错」对类图、包图、组件图、部署图**不等于**没有违反规范约束，只等于依赖图层面没有发现。要说一张结构图干净，得再说明没有检查的那一半。复合结构是例外：它有专门的模块与检查码（端口是否接上、连接器端点是否存在、part/port 是否重名），但它检查的是**这张图内部自洽**，不是「分解得对不对」——后者要读设计。
 

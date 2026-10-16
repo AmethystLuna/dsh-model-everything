@@ -19,16 +19,29 @@ metadata:
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
 
-## 2. 未实现的图族模块
+## 2. 图族模块：十四个族全部有实现路径
 
-`interaction-overview` 目前**按名拒绝并给出理由**，没有模块。要真正 render / parse / review，按[架构](../design/architecture.md)加模块：在图族表补一条，再写一个 `UmlFamilyModule`。
+**没有「本构建没有模块」的族了。** 三个机器族（state / activity / sequence）走 `src/uml.ts` 的机器路径，其余十一个族各有一个 `UmlFamilyModule`，注册在 `FAMILY_MODULES`。剩下的拒绝都是**记号能力**的拒绝，不是实现缺失：
 
-- **`profile` 已落地（2026-10，`src/uml-profile.ts`）**：记号只有近似视图，所以这一族按记号如实做成**只能画、不能读回**——`UML_FAMILIES` 里 `parseable: false` 并写明理由（PlantUML 没有 profile 元素，且「扩展」与「泛化」是同一个 `--|>` 箭头，读回必须猜），模型（`ProfileModelV1`）仍然完整，`uml_review` 只给模型时照常审（`UML050`–`UML056`），给图时返回一份说明性的 info 报告而不是抛错。这是「画得出来就画，读不回来就说不读」的样板。
-- **`composite-structure` 已落地（2026-10，`src/uml-composite.ts`）**：同样只有近似视图（PlantUML 没有这一族的页面），但**实测往返无损**（嵌套、端口方向、连接器两端都在文本里），所以它走近似视图却能读回。为此图族表新增 `parseThroughApproximation`：**能不能读回是实测事实，不是从 fidelity 标签推出来的**——判定曾用「是否 faithful」去推断，把这个能用的视图关掉了。识别器同时补了 `plantumlCompositeSyntax`（`port`/`portin`/`portout` 是这一族独有记号，否则文本会被读成组件图——一个能解析但是另一个模型的结果）。
-- **`communication` 已落地（2026-10，`src/uml-communication.ts`）**：它的拒绝理由**曾经是错的**。原话是「两种记号都无法拼出消息编号与链接角色」，但记号调研里那条实测写法就带着编号：`C --> O : 1: create`（编号在箭头标签里）。**过度断言「做不到」和过度承诺「做得到」一样是缺陷**——它把一个本可实现的族锁死了。现在按 object 图 + 编号箭头实现，往返无损（编号、链接、参与者都在文本里）；记号说不出的只有「`1.1` 隐含的嵌套调用树」，模型就原样保留编号字符串、不对树做任何断言。识别器补了 `plantumlCommunicationSyntax`（带 `N:` 前缀的箭头标签是这一族独有信号）。
-- `interaction-overview` 两种记号都是 `none`，本构建没有可做的实现路径——继续按名拒绝才是正确答案。
+| 族 | 能力 | 拒绝什么、为什么 |
+|---|---|---|
+| `profile` | PlantUML 只画不读 | 记号没有 profile 元素，且「扩展」与「泛化」是同一根 `--\|>`（`parseable: false`） |
+| `interaction-overview` | Mermaid 只画不读 | 画成流程图后节点只带名字，读回无法区分「引用别的图」与「内联交互」 |
+| `sequence` | 不读 | 迹不能反推机器（`parseable: false`） |
+| 其余 | 可画可读 | — |
 
-动手前先读[记号调研](../research/uml-notation-support.md)，确认这种记号的表达能力支持你要做的事；表里 `faithful` 但本构建尚无模块的族，注册表会按名拒绝，不会交给错的解析器。注意记忆里那张总表把活动图标成「PlantUML faithful」，而**本构建**的图族表对 PlantUML 活动标的是 `none`（结构化流程语法无法承载带汇合或环的图）——以图族表为准。
+**两族的拒绝理由曾经是错的，都改掉了。** 这是收尾这轮最有价值的发现：
+
+- `communication`（`src/uml-communication.ts`）：原话是「两种记号都无法拼出消息编号与链接角色」。**错的**——[记号调研](../research/uml-notation-support.md)里那条实测写法就带着编号：`C --> O : 1: create`（编号写在箭头标签里）。过度断言「做不到」把一个本可实现的族锁死了。现已实现，往返无损。
+- `interaction-overview`（`src/uml-interaction-overview.ts`）：原话是「两种记号都表达不出内联交互引用」。**也是错的**——PlantUML 的活动语法里有 `ref`，调研里 `start` / `:ref Login sequence;` / `if (ok?) then (yes)` 那条就是它。现已实现（画成 Mermaid 流程图，因为本构建拒绝 PlantUML 活动），读回按实际能力如实拒绝。
+
+**教训**：过度断言「做不到」与过度承诺「做得到」是同一类缺陷，而前者更难被发现——它不会让任何测试变红，只会让能力表少一格。核证据要读调研与实测记号，不要相信自己上一轮的措辞。
+
+`composite-structure` 与 `communication` 都走**近似视图却能读回**，为此图族表有 `parseThroughApproximation`：**能不能读回是实测事实，不是从 fidelity 标签推出来的**——判定曾用「是否 faithful」去推断，把这两个能用的视图关掉了。发现它的是白盒用例（`parseUml` 直接抛 `UML_VIEW_UNREPRESENTABLE`）。
+
+三个族还各补了一条识别器线索，否则手写文本会被读成另一个族（能解析、但是另一个模型）：`plantumlCompositeSyntax`（端口声明）、`plantumlCommunicationSyntax`（带 `N:` 的箭头标签）、`plantumlErSyntax`（鸦脚基数 → **拒绝**，ER 不是 UML 族）。
+
+动手前先读[记号调研](../research/uml-notation-support.md)，确认这种记号的表达能力支持你要做的事。注意记忆里那张总表把活动图标成「PlantUML faithful」，而**本构建**的图族表对 PlantUML 活动标的是 `none`（结构化流程语法无法承载带汇合或环的图）——以图族表为准。
 
 ### 每加一个图族，这几件事一起做（`timing` 那轮定下的清单）
 
