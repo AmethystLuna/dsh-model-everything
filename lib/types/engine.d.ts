@@ -366,6 +366,25 @@ export declare function validateModel(input: unknown): {
     ok: false;
     errors: string[];
 };
+/**
+ * Event names in the adversarial declarations that no transition and no entry/exit action
+ * declares.
+ *
+ * The robustness audit called this the dominant defect class: a misspelled name made a check
+ * skip and then report its all-clear - "All pairs balanced", "No race conditions detected", "All
+ * deadlines respected" - for a model it never ran on. A reader cannot tell an empty check from a
+ * passing one, which is what a verifier must never do.
+ *
+ * A name that resolves to nothing is reported by the check that would have used it, not refused
+ * by validation, because for some fields the absence IS the defect: a
+ * `resourcePairs[].releaseEvent` naming a step nobody built is what `A4_NO_RELEASE_EVENT` says,
+ * and refusing it would replace a finding that names the missing step with a generic one.
+ */
+export declare function unresolvedEventNames(root: Record<string, unknown>): Array<{
+    path: string;
+    value: string;
+    check: string;
+}>;
 export declare function guardVariables(guard: GuardNode | undefined): string[];
 export declare function runVerification(input: unknown, options?: VerificationOptions): VerificationReport;
 export interface CompositionStep {

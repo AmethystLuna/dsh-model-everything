@@ -1149,6 +1149,87 @@ async function runTextbookCanonTests() {
 
 await runTextbookCanonTests()
 
+/**
+ * A declared event name that resolves to nothing used to switch its check off, and the check
+ * then reported a positive all-clear - "All pairs balanced", "No race conditions detected" - for
+ * a model it never ran on. The robustness audit called this the dominant defect class, and it is
+ * the one shape of defect a verifier must never produce: a reader cannot tell an empty check
+ * from a passing one.
+ *
+ * The fix has three parts, and each is pinned here:
+ *   - an unresolvable name is reported (`MODEL_UNRESOLVED_EVENT`), naming the field and the check;
+ *   - the owning check still reports the defect in its own vocabulary when it can, and then the
+ *     sweep stays quiet about that name - one defect, one finding;
+ *   - a name that exists nowhere is a *warning* in the semaphore case below, where "there is no
+ *     timeout handler" is the defect the model means to declare.
+ */
+async function runUnresolvedNameTests() {
+  /** Whether a check carries a code, local to this runner. */
+  const hasCode = (report, checkId, want) => {
+    const check = report.checks.find((entry) => entry.id === checkId)
+    return check !== undefined && check.findings.some((finding) => finding.code === want)
+  }
+  const base = {
+    schemaVersion: 1, init: 'a',
+    states: [{ id: 'a' }, { id: 'b' }, { id: 'c', terminal: true }],
+    transitions: [{ from: 'a', event: 'acq', to: 'b' }, { from: 'b', event: 'rel', to: 'c' }],
+  }
+
+  // A4's acquire event misnamed: the check has nothing to acquire on, and must not pass.
+  const misnamedAcquire = {
+    ...base,
+    resourcePairs: [{ resource: 'lock', acquireEvent: 'aqc', releaseEvent: 'rel' }],
+  }
+  const acquireReport = runVerification(misnamedAcquire)
+  const a4 = acquireReport.checks.find((check) => check.id === 'A4')
+  if (a4 === undefined) throw new Error('A4 must be present')
+  if (a4.status !== 'fail') throw new Error('a check whose event does not exist must not report pass; got ' + a4.status + ' / ' + a4.detail)
+  if (!hasCode(acquireReport, 'A4', 'MODEL_UNRESOLVED_EVENT')) throw new Error('the dangling name must be reported')
+  const unresolved = a4.findings.find((finding) => finding.code === 'MODEL_UNRESOLVED_EVENT')
+  if (unresolved === undefined || !String(unresolved.message).includes('aqc')) throw new Error('the finding must name the event: ' + JSON.stringify(unresolved))
+  if (unresolved.severity !== 'warning') throw new Error('a dangling declaration is a warning, not a model defect: ' + unresolved.severity)
+
+  // A2, A8 and A14: the same shape, and each must stop claiming its all-clear.
+  const misnamedPair = { ...base, concurrentPairs: [['p', 'q']] }
+  const pairReport = runVerification(misnamedPair)
+  const a2 = pairReport.checks.find((check) => check.id === 'A2')
+  if (a2 === undefined || a2.status !== 'fail') throw new Error('A2 must not pass with a pair that names nothing')
+  if (!hasCode(pairReport, 'A2', 'MODEL_UNRESOLVED_EVENT')) throw new Error('the misnamed pair must be reported')
+
+  const misnamedIdempotent = { ...base, idempotentEvents: ['reel'] }
+  const idempotentReport = runVerification(misnamedIdempotent)
+  const a8 = idempotentReport.checks.find((check) => check.id === 'A8')
+  if (a8 === undefined || a8.status !== 'fail') throw new Error('A8 must not pass with an event that does not exist')
+
+  const misnamedTicks = {
+    schemaVersion: 1, init: 'a',
+    states: [{ id: 'a', maxTicks: 2 }, { id: 'b', terminal: true }],
+    transitions: [{ from: 'a', event: 'tick', to: 'a' }, { from: 'a', event: 'done', to: 'b' }],
+    tickEvents: ['tickk'],
+  }
+  const tickReport = runVerification(misnamedTicks)
+  const a14 = tickReport.checks.find((check) => check.id === 'A14')
+  if (a14 === undefined || a14.status !== 'fail') throw new Error('A14 must not pass with a tick event that does not exist')
+
+  // The owning check keeps its own code: a release event nobody built is A4's finding, and the
+  // sweep must not add a second one about the same name.
+  const danglingRelease = {
+    ...base,
+    resourcePairs: [{ resource: 'lock', acquireEvent: 'acq', releaseEvent: 'never_built' }],
+  }
+  const releaseReport = runVerification(danglingRelease)
+  const releaseA4 = releaseReport.checks.find((check) => check.id === 'A4')
+  if (releaseA4 === undefined || !releaseA4.findings.some((finding) => finding.code === 'A4_NO_RELEASE_EVENT')) {
+    throw new Error('A4 must report the missing release event in its own vocabulary')
+  }
+  const duplicates = releaseA4.findings.filter((finding) => finding.code === 'MODEL_UNRESOLVED_EVENT' && String(finding.message).includes('never_built'))
+  if (duplicates.length > 0) throw new Error('the same name must not be reported twice: A4 already accounted for it')
+
+  console.log('PASS unresolved-event-names')
+}
+
+await runUnresolvedNameTests()
+
 async function runDeadlineTests() {
   // advisory: maxTicks declared but no tickEvents -> cannot verify
   const noTicks = {
