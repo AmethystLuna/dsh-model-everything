@@ -309,6 +309,100 @@ Every finding has the same shape, in a report body or quoted in prose:
 
 Manual verification takes longer but produces identical-quality findings. The key advantage: it requires zero dependencies and works on any platform.
 
+## Method provenance
+
+Where each check comes from, and - just as important - where it does not.
+
+The distinction below is the one to keep: a **published method** has a definition and a body
+of work behind it, so its result means what that work says it means. An **engineering
+convention** is this plugin's own rule, chosen because it catches something real; nothing
+outside this repository defines it, and it may change without the literature moving. Neither
+is worse, but a reader has to know which one they are holding.
+
+| Check | Method | Provenance |
+|---|---|---|
+| S1, S2, S3 | Explicit-state reachability analysis: enumerate the reachable state space, then ask whether a state, a terminal trap, or a closed cycle exists | Published. Clarke & Emerson, *Design and Synthesis of Synchronization Skeletons Using Branching-Time Temporal Logic*, LNCS 131 (1981); Clarke, Grumberg & Peled, *Model Checking*, MIT Press (1999) |
+| A2, A3 | Interleaving semantics, with order permutation as the practical probe for it; the sampling beyond the permutation bound is deliberate weakening of partial-order reduction | Published, with a caveat: Godefroid, *Partial-Order Methods for the Verification of Concurrent Systems*, LNCS 1032 (1996); Holzmann, *The SPIN Model Checker*, Addison-Wesley (2003) |
+| A7 | Breadth-first shortest counterexample over the reachable graph | Published. Standard in explicit-state model checking (above); the BFS-as-minimal-witness idea is in the same tradition |
+| A13 | Discrete-time Markov chain reachability by value iteration | Published. Baier & Katoen, *Principles of Model Checking*, MIT Press (2008), ch. 10 |
+| `model_export` | Translation into the input language of a published checker, so a stronger engine can decide what this one approximates | UPPAAL: Behrmann, David & Larsen, *A Tutorial on UPPAAL*, SFM 2004. PRISM: Kwiatkowska, Norman & Parker, *PRISM 4.0: Verification of Probabilistic Real-Time Systems*, CAV 2011. TLA+: Lamport, *Specifying Systems*, Addison-Wesley (2002). SPIN: Holzmann (2003), above |
+| A5 | Boundary value analysis: 0, 1, max-1, max, max+1 for each counter | Published. Myers, *The Art of Software Testing* (1979) - the technique is textbook; applying it to a model's declared bounds rather than to code is this plugin's shape |
+| D1-D4 | Behaviour preservation across a refactor, decided by re-running the structural and invariant checks on the AFTER model through a state mapping | **Convention.** Regression checking of this kind has no canonical formulation for state machines. The nearest published ideas are regression test selection and metamorphic testing (see the next row), but the D1-D4 semantics are defined here, in this repository, and nowhere else |
+| A4, A8 | Paired-operation symmetry and idempotent replay | **Convention**, in the sense that the *questions* are standard engineering concerns (a lock without an unlock, a retry that is not idempotent) while the *decision procedure* - search for a path that acquires without releasing; apply each retryable event twice - is this plugin's own |
+| A6 | Resource-failure injection: what happens when malloc returns NULL, a queue is full, a pool is exhausted | **Convention.** The concern is fault injection / FMEA in spirit; the model-level check is ours |
+| A14 | Deadlines over a declared discrete tick clock | **Convention.** Discrete-time clocks appear in timed-automata work (UPPAAL, above), but `tickEvents` + `maxTicks` is this repository's notation for them, not a published one |
+| A12 | Path cost against a declared budget | **Convention.** Weighted shortest path is textbook; "this transition costs 1 unless the model says otherwise, and a positive-cost reachable cycle means unbounded cost" is a rule stated here |
+| C1, C2 | Composition of machines: a reachable node where no machine can advance, and a rendezvous that can never fire | **Convention.** Asynchronous product construction is standard; the two specific verdicts and their handshake semantics are defined in this plugin |
+| `model_verify` as a whole | Bounded explicit-state search with the model schema closed by construction | Same provenance as S1-S3, plus one design decision worth naming: the schema rejects unknown keys rather than ignoring them, because a mistyped guard variable reads as an always-false guard. That is a choice about soundness, not a published result |
+
+Two notes for a reader deciding how much weight to put on a finding.
+
+**The bound is part of the claim.** `maxStates` (default 10000) decides how much of the state
+space was explored, and truncation is reported rather than hidden. A "pass" from a truncated
+search is a statement about the part that was walked, which is why the report carries
+`summary.truncated` and why `*_UNDECIDED` codes exist: absence of a counterexample over a
+bounded walk is not a proof of the property.
+
+**This is not the only way to decide these properties.** The plugin takes the explicit-state
+route because it needs to run inside a session with no external toolchain, and because a
+shortest counterexample in the report is what makes a finding actionable. Section
+"What this method does not implement" below names the classical alternatives and why they are
+not here.
+
+## What this method does not implement
+
+Every entry is a real technique with a body of work behind it. None is present in this plugin.
+Where the plugin has a workaround, it is named; where it does not, the honest answer is that
+the property is not decided here.
+
+| Classical method | What it decides that this does not | What this plugin does instead |
+|---|---|---|
+| Symbolic model checking (BDDs, McMillan 1993) | Systems whose state space is far too large to enumerate. This plugin enumerates and truncates | Nothing. A model past `maxStates` is reported truncated, not verified |
+| Bounded model checking over SAT/SMT (Biere et al., 1999) | Bounded-depth properties, and it scales much further than enumeration | Nothing. `model_export` to a checker that does this is the route out |
+| CTL / LTL model checking (Clarke & Emerson 1981; Pnueli 1977) | Arbitrary temporal formulas, including nested and fairness-constrained ones. This plugin decides a fixed set of property shapes | The eight invariant kinds are the way to state a property. Anything they cannot express is not checked |
+| k-induction and IC3/PDR | Unbounded proofs over infinite or very large state spaces | Nothing. Guarantees are relative to the modelled bounds |
+| Abstraction interpretation (Cousot & Cousot, 1977) | Properties of the program the model came from, soundly over all inputs | Nothing at all: this plugin reasons about the *model*, and the model's fidelity to the code is the extractor's responsibility |
+| Theorem proving (Coq, Isabelle, KeY, KIV) | Unbounded arithmetic and data properties, with a proof object | `model_export` to TLA+ covers some of this ground with TLC as the backend |
+| Timed automata / real-time model checking (Alur & Dill 1994; UPPAAL) | Continuous-time deadlines and clock constraints | A14 over a declared discrete tick clock, and export to UPPAAL. The model has no continuous time |
+| Probabilistic model checking beyond reachability (PCTL, MDPs, CSL) | Expected reward, steady-state probability, strategies under nondeterminism | A13 decides "P(ever reaching the target) vs a bound" only. PRISM export is the route to the rest |
+| Symmetry reduction | Collapsing symmetric state spaces to make enumeration feasible | Nothing. A3's permutation sampling is a probe for order dependence, not a reduction |
+| Compositional / assume-guarantee reasoning | Deciding components separately and combining the results | C1/C2 decide two properties of a whole composition, by enumerating the product |
+
+## Structural review: what graph theory already answers
+
+The structure review (`UML020`-`UML026`) is graph algorithms over a dependency graph: isolated
+nodes, dangling endpoints, cycles, disallowed edges, layer violations, missing required edges.
+That places it firmly inside graph theory, and graph theory has a good deal more to say about
+dependency graphs than this plugin asks it.
+
+| Question about a dependency graph | Graph-theoretic formulation | In this plugin? |
+|---|---|---|
+| Is anything unreachable / isolated? | Connectivity, and the degree-0 vertices | Yes - `UML020` |
+| Is there a cycle? | Cycle detection, with the shortest one named | Yes - `UML022` |
+| Does an edge violate a declared dependency rule? | Edge legality against a matrix, and layered DAG constraints | Yes - `UML023`, `UML024`, `UML025` |
+| How tangled is it, in one number? | Cyclomatic complexity (McCabe, 1976) as `E - V + 2P` over the dependency graph | No |
+| What is the smallest set of edges to remove to make it acyclic? | **Minimum feedback arc set.** NP-hard (Garey & Johnson, *Computers and Intractability*, 1979); approximation and fixed-parameter algorithms exist | No. This is the difference between "a cycle exists" and "here is how much coupling you must break" |
+| How should it be partitioned into modules? | Community detection / modularity (Newman & Girvan, 2004), and spectral clustering via the graph Laplacian (Fiedler, 1973) | No. The plugin checks a declared matrix; it does not propose a partition |
+| Which edges are structurally most load-bearing? | Betweenness centrality (Freeman, 1977), and the `k`-core decomposition for layering | No |
+| Are there dependency layers at all, or is it one blob? | Topological ordering, and DAG-ness of the condensed graph | Partly - `UML024` checks a layer matrix the caller declares, rather than deriving layers |
+
+None of the five "No" rows is a gap in what the review *claims*: it says it audits the graph
+against a declared matrix, and it does. They are the answer to "what else could be computed
+here", and the feedback arc set row is the one most likely to earn its place, because
+"break these two edges and the architecture becomes acyclic" is actionable in a way that
+"there is a cycle" is not.
+
+**On topology specifically.** The user-facing question that prompted this section was whether
+topological methods apply. The honest answer: the dependency analysis here is *graph*-theoretic
+(combinatorial), and that is the established line for architecture review. Genuinely
+*topological* machinery - homology, persistent homology over a filtration, Betti numbers -
+is used on geometric and scientific data, and it does appear in netlist and circuit analysis.
+It is not an established technique for reviewing a UML or dependency diagram, and this
+repository has not evaluated it. Treating a dependency graph as a simplicial complex would
+need a filtration that means something in software terms before any of it could be reported
+as a finding; nobody here has defined one, and inventing one to fill a section would be the
+opposite of what this document is for.
+
 ## Integration with the Review Pipeline
 
 ```text
