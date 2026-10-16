@@ -15,6 +15,8 @@ metadata:
 
 - **挂载轮次已完整跑通（2026-10-16，`dsh 0.2.1-alpha.1`）**：装 → `--dump-config` 看到行（`enabled: true`）→ 技能与 `locale/` 在包内 → headless 启动止步 AUTH（说明整棵插件树加载通过）→ **从装好的副本跑出真实报告**（11 个工具全注册、`model_verify` 返回 `verdict: pass`、`schema: model-everything/verify/v1`、22 条检查）→ 卸载后行消失。脚本是 scratch 区 `model-everything-mount` 任务目录下的 `compat-round.ps1`，六步、插件参数化。此前只有 `0.2.0-rc.2` 的挂载与 0.1.7 的 API 面探针，**「装完跑一次真实调用」这步当时没做**，现在做了。
 - `dsh.compatibility.dshReleases` 已按实测写回：`0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`、`0.2.0-rc.2`、`0.2.1-alpha.1` 标 `compatible`；`0.2.0-rc.1`、`0.2.1-alpha.2` 仍是 `unknown`（没测过）。注意 `0.1.7-alpha.1` 装不上（npm 解析 `0.1.7-alpha.1` 那批包时 peer 冲突），不是本插件的问题。
+- **区间内十个发行版全部实测通过（2026-10-16 扫描）**：`0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`、`0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.1` … `0.2.1-alpha.5`——每版都装一棵隔离 dsh 树（registry 装 `@deepseek-ai/dsh@<版本>`，约 60–80 秒）、跑完整六步轮次，十个全绿：挂载行在、`enabled: true`、技能与 `locale/` 在包内、headless 启动止步 AUTH、**从装好的副本跑出真实报告**（11 个工具 + `model_verify` 返回 `pass` / 22 条检查）、卸载后行消失。因此 `dshReleases` 现在把这十个都记为 `compatible`，**没有 `unknown` 了**。扫描脚本 `sweep-versions.ps1` 与轮次脚本 `compat-round.ps1` 同在 scratch 区 `model-everything-mount` 任务目录，都是插件参数化的。
+- **`0.1.7-alpha.1` 不在区间内且装不上**（npm 解析那批包时 peer 冲突），不是本插件的问题；更老的 `0.1.2`–`0.1.6` 同样在区间外，未测。
 - 建 GitHub 仓库与 topic、`npm publish`、打 tag。
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
