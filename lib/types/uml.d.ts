@@ -38,6 +38,7 @@ import { type StructureModelV1 } from './uml-structure.js';
 import { type TimingModelV1 } from './uml-timing.js';
 import { type ProfileModelV1 } from './uml-profile.js';
 import { type CompositeModelV1 } from './uml-composite.js';
+import { type CommunicationModelV1 } from './uml-communication.js';
 export { UmlError, UML_NOTATIONS } from './uml-syntax.js';
 export type { UmlNotation, UmlFamilyId } from './uml-syntax.js';
 export { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES, parseTiming, renderTiming } from './uml-timing.js';
@@ -46,6 +47,8 @@ export { validateProfileModel, reviewProfileModel, PROFILE_FINDING_CODES, render
 export type { ProfileModelV1, ProfileExtension, ProfileApplication, ProfileFindingCode } from './uml-profile.js';
 export { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES, renderComposite, parseComposite, compositeModule } from './uml-composite.js';
 export type { CompositeModelV1, CompositePart, CompositePort, CompositeConnector, CompositeFindingCode } from './uml-composite.js';
+export { validateCommunicationModel, reviewCommunicationModel, COMMUNICATION_FINDING_CODES, renderCommunication, parseCommunication, communicationModule, communicationSequenceOrder } from './uml-communication.js';
+export type { CommunicationModelV1, CommunicationLifeline, CommunicationMessage, CommunicationFindingCode } from './uml-communication.js';
 /**
  * The diagram families this front end knows, in the engine's order. The name is kept
  * for callers that already use it: it is now the whole UML 2.5 family list rather
@@ -72,7 +75,7 @@ export interface UmlRenderResult {
     warnings: string[];
 }
 /** What a family's parse produces: a LogicModelV1 for the machine families, the family model otherwise. */
-export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1 | CompositeModelV1;
+export type UmlFamilyModel = LogicModelV1 | UseCaseModelV1 | StructureModelV1 | TimingModelV1 | ProfileModelV1 | CompositeModelV1 | CommunicationModelV1;
 export interface UmlParseResult {
     notation: UmlNotation;
     diagram: UmlDiagram;

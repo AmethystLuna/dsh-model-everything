@@ -11,6 +11,7 @@ import { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES } from '..
 // refuses as a matter of design and the module is reached directly.
 import { validateProfileModel, reviewProfileModel, profileModule, PROFILE_FINDING_CODES } from '../../lib/uml.js'
 import { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES } from '../../lib/uml.js'
+import { validateCommunicationModel, reviewCommunicationModel, COMMUNICATION_FINDING_CODES } from '../../lib/uml.js'
 
 let failures = 0
 function test(name, fn) {
@@ -847,10 +848,15 @@ test('use case: a model the diagram does not carry fails the fidelity check', ()
 })
 
 test('use case: the engine refuses a cell no notation has', () => {
+  // The cell, not the model: a use case model offered to a profile family has nowhere to
+  // go, and the refusal must name the notation that would work rather than the mismatch.
   let refusal
-  try { renderUml({ schemaVersion: 1, actors: [{ id: 'A' }], useCases: [], relations: [] }, 'plantuml', 'communication') } catch (error) { refusal = error }
-  if (!(refusal instanceof UmlError) || refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('communication render refusal: ' + String(refusal))
-  if (!refusal.message.includes('numbered message labels')) throw new Error('the refusal must say why: ' + refusal.message)
+  try { renderUml({ schemaVersion: 1, actors: [{ id: 'A' }], useCases: [], relations: [] }, 'mermaid', 'profile') } catch (error) { refusal = error }
+  if (!(refusal instanceof UmlError) || refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('profile render refusal: ' + String(refusal))
+  if (!refusal.message.includes('plantuml')) throw new Error('the refusal must name the notation that works: ' + refusal.message)
+  // And the family that has no module at all is refused by the registry, not by a notation.
+  const unimplemented = refusalOf(() => renderUml({ schemaVersion: 1 }, 'plantuml', 'interaction-overview'))
+  if (unimplemented.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('interaction-overview: ' + unimplemented.code)
 })
 
 // ------------------------------------------------------- the timing family --
@@ -1844,6 +1850,119 @@ test('entry: the ER refusal does not swallow the class diagram that shares its k
   const ids = (parsed.model.nodes ?? []).map((node) => node.id)
   if (!ids.includes('Foo') || !ids.includes('Bar')) throw new Error('nodes: ' + JSON.stringify(ids))
   if ((parsed.model.edges ?? []).length !== 1) throw new Error('edges: ' + JSON.stringify(parsed.model.edges))
+})
+
+// ------------------------------------------------ the communication family --
+
+// PlantUML has no communication-diagram type, and the family table used to refuse a parse
+// on the grounds that "neither notation spells the numbering". It does: the number lives
+// in the arrow's label (`C --> O : 1: create`). So this family is drawn approximately and
+// read back exactly, like the composite structure.
+const communicationModel = {
+  schemaVersion: 1,
+  lifelines: [{ id: 'C', classifier: 'Customer' }, { id: 'O', classifier: 'Order' }, { id: 'S', label: 'Stock' }],
+  links: [{ from: 'C', to: 'O' }, { from: 'O', to: 'S' }],
+  messages: [
+    { sequence: '1', from: 'C', to: 'O', label: 'create' },
+    { sequence: '2', from: 'O', to: 'S', label: 'reserve' },
+  ],
+}
+
+test('communication: the round trip carries lifelines, links and the numbers', () => {
+  const rendered = renderUml(communicationModel, 'plantuml', 'communication')
+  for (const needle of ['object ":Customer:" as C', 'object "Stock" as S', 'C -- O', 'C --> O : 1: create', 'O --> S : 2: reserve']) {
+    if (!rendered.primary.includes(needle)) throw new Error('missing ' + needle + '\n' + rendered.primary)
+  }
+  const parsed = parseUml(rendered.primary)
+  if (parsed.family !== 'communication') throw new Error('family: ' + parsed.family)
+  if (JSON.stringify(parsed.model) !== JSON.stringify(communicationModel)) {
+    throw new Error('the drawing does not carry the model:\n  want ' + JSON.stringify(communicationModel) + '\n  got  ' + JSON.stringify(parsed.model))
+  }
+  const roundTrip = reviewUml({ model: communicationModel, diagramKind: 'communication' }).roundTrip
+  if (roundTrip === null || roundTrip === undefined || !roundTrip.ok) {
+    throw new Error('the review must prove the round trip: ' + JSON.stringify(roundTrip?.diffs ?? null))
+  }
+  if (renderUml(parsed.model, 'plantuml', 'communication').primary !== rendered.primary) throw new Error('re-rendering is not byte-stable')
+})
+
+test('communication: a hand-written diagram needs no directives', () => {
+  const hand = ['@startuml', 'object ":Customer:" as C', 'object ":Order:" as O', 'C -- O', 'C -> O : 1: create', 'O -> O : 2: validate', '@enduml'].join('\n')
+  const parsed = parseUml(hand)
+  if (parsed.family !== 'communication') throw new Error('family: ' + parsed.family)
+  const model = parsed.model
+  if (model.lifelines.length !== 2) throw new Error('lifelines: ' + JSON.stringify(model.lifelines))
+  if (model.lifelines[0].classifier !== 'Customer') throw new Error('a `:Name` is a classifier: ' + JSON.stringify(model.lifelines[0]))
+  if (model.links.length !== 1) throw new Error('links: ' + JSON.stringify(model.links))
+  if (model.messages.length !== 2) throw new Error('messages: ' + JSON.stringify(model.messages))
+  if (model.messages[0].sequence !== '1' || model.messages[0].label !== 'create') throw new Error('the number and name must both survive: ' + JSON.stringify(model.messages[0]))
+  // A self-message is legal and is not a link.
+  if (model.messages[1].from !== 'O' || model.messages[1].to !== 'O') throw new Error('self message: ' + JSON.stringify(model.messages[1]))
+  if (parsed.discardedConstructs.length !== 0) throw new Error('nothing here is unrepresentable: ' + JSON.stringify(parsed.discardedConstructs))
+})
+
+test('communication: the validator refuses by field', () => {
+  const base = { schemaVersion: 1, lifelines: [{ id: 'A' }], links: [], messages: [] }
+  const refusals = [
+    ['must be an object with schemaVersion 1', 'x'],
+    ['must declare schemaVersion 1', { ...base, schemaVersion: 2 }],
+    ['every lifeline needs a non-empty string id', { ...base, lifelines: [{ id: '' }] }],
+    ['is declared more than once', { ...base, lifelines: [{ id: 'A' }, { id: 'A' }] }],
+    ['a link cannot join', { ...base, links: [{ from: 'A', to: 'A' }] }],
+    ['every message needs a sequence number as a non-empty string', { ...base, messages: [{ sequence: '', from: 'A', to: 'A' }] }],
+    ['is used twice', { ...base, messages: [{ sequence: '1', from: 'A', to: 'A' }, { sequence: '1', from: 'A', to: 'A' }] }],
+  ]
+  for (const [needle, input] of refusals) {
+    let refusal
+    try { validateCommunicationModel(input) } catch (error) { refusal = error }
+    if (!(refusal instanceof UmlError) || refusal.code !== 'UML_INPUT') throw new Error(needle + ': not an UML_INPUT refusal: ' + String(refusal))
+    if (!refusal.message.includes(needle)) throw new Error('refusal for "' + needle + '" said: ' + refusal.message)
+  }
+})
+
+test('communication: mermaid has no communication diagram', () => {
+  const refusal = refusalOf(() => renderUml(communicationModel, 'mermaid', 'communication'))
+  if (refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('refusal code: ' + refusal.code)
+})
+
+test('communication: every code the family declares is produced by its own case', () => {
+  const cases = [
+    ['UML063_COMMUNICATION_NO_LIFELINES', { lifelines: [], links: [], messages: [] }],
+    ['UML064_COMMUNICATION_LIFELINE_UNLINKED', {
+      // Only `Lonely` is unreachable: the other two are joined by a link between declared
+      // lifelines, so UML066 stays out of this case.
+      lifelines: [{ id: 'A', label: 'A' }, { id: 'B', label: 'B' }, { id: 'Lonely', label: 'Lonely' }],
+      links: [{ from: 'A', to: 'B' }], messages: [],
+    }],
+    ['UML065_COMMUNICATION_MESSAGE_WITHOUT_LINK', {
+      lifelines: [{ id: 'A', label: 'A' }, { id: 'B', label: 'B' }], links: [], messages: [{ sequence: '1', from: 'A', to: 'B' }],
+    }],
+    ['UML066_COMMUNICATION_UNDECLARED_ENDPOINT', {
+      lifelines: [{ id: 'A', label: 'A' }], links: [{ from: 'A', to: 'Ghost' }], messages: [], undeclared: ['Ghost'],
+    }],
+    ['UML067_COMMUNICATION_SEQUENCE_DUPLICATE', {
+      // A duplicate that the validator refuses by construction is still produced here: this
+      // is the review's own check, reached the way the parser can reach it.
+      lifelines: [{ id: 'A', label: 'A' }, { id: 'B', label: 'B' }], links: [], messages: [
+        { sequence: '1', from: 'A', to: 'B' }, { sequence: '1', from: 'B', to: 'A' },
+      ],
+    }],
+    ['UML068_COMMUNICATION_UNDOCUMENTED', {
+      lifelines: [{ id: 'A', label: 'A' }, { id: 'B' }], links: [], messages: [],
+    }],
+  ]
+  const declared = new Set(COMMUNICATION_FINDING_CODES)
+  for (const [code] of cases) declared.delete(code)
+  if (declared.size > 0) throw new Error('codes with no case: ' + [...declared].join(', '))
+  for (const [code, model] of cases) {
+    const produced = reviewCommunicationModel({ schemaVersion: 1, ...model }, {})
+    const codes = produced.map((finding) => finding.code)
+    if (!codes.includes(code)) throw new Error(code + ' missing from ' + JSON.stringify(codes))
+    // UML068 is a documentation gap, not a defect of the diagram, so it may sit beside
+    // anything; UML064 and UML065 describe the same emptiness from two sides and co-occur.
+    const beside = new Set(['UML068_COMMUNICATION_UNDOCUMENTED', 'UML064_COMMUNICATION_LIFELINE_UNLINKED', 'UML065_COMMUNICATION_MESSAGE_WITHOUT_LINK'])
+    const others = codes.filter((entry) => entry !== code && !beside.has(entry))
+    if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+  }
 })
 
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }

@@ -139,6 +139,7 @@ export declare function plantumlUseCaseSyntax(text: string): boolean;
 export declare function plantumlTimingSyntax(text: string): boolean;
 export declare function plantumlCompositeSyntax(text: string): boolean;
 export declare function plantumlErSyntax(text: string): boolean;
+export declare function plantumlCommunicationSyntax(text: string): boolean;
 export interface UmlDetectOptions {
     /** The family a `dsh-model-everything:uml` directive declared, when the text carries one. */
     hint?: UmlFamilyId;

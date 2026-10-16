@@ -232,10 +232,9 @@ export const UML_FAMILIES: readonly UmlFamilySpec[] = [
     mermaid: { fidelity: 'none', note: 'mermaid has no profile diagram: classDiagram draws classifiers and carries <<annotation>> markers as labels, with no metaclass, stereotype or extension element. Render it with notation "plantuml".' },
   },
   {
-    id: 'communication', name: 'communication diagram', nameZh: '通信图', group: 'interaction', machine: false, parseable: false,
-    parseRefusal: 'a communication diagram is a set of linked objects with numbered messages; neither notation spells the numbering or the link roles, so a parse would invent an order the diagram does not carry.',
-    mermaid: { fidelity: 'none', note: 'mermaid has no communication diagram. Model the same interaction as a sequence diagram and verify the machine that drives it.' },
-    plantuml: { fidelity: 'none', note: 'plantuml has no communication diagram: it has no numbered message labels and no link roles. Model the same interaction as a sequence diagram, or keep the object links as a component diagram.' },
+    id: 'communication', name: 'communication diagram', nameZh: '通信图', group: 'interaction', machine: false, parseable: true, parseThroughApproximation: true,
+    plantuml: { fidelity: 'approximate', declarations: ['object'], note: 'plantuml has no communication diagram type - the page is a 404 and the navigation lists none - but this build draws one with the object diagram\'s vocabulary: objects for the lifelines, arrows for the links, and the sequence number in the arrow\'s label, `C --> O : 1: create`. Lifelines, links and the numbers read back; the nesting a dotted number like `1.1` suggests is a claim about the design, so the model keeps the number as written and says nothing about the tree.' },
+    mermaid: { fidelity: 'none', note: 'mermaid has no communication diagram: nothing documents lifelines-plus-links with numbered messages. Model the same interaction as a sequence diagram, or render it with notation "plantuml".' },
   },
   {
     id: 'interaction-overview', name: 'interaction overview diagram', nameZh: '交互概览图', group: 'interaction', machine: false, parseable: false,
@@ -402,6 +401,20 @@ export function plantumlErSyntax(text: string): boolean {
   return PLANTUML_ER_CARDINALITY.test(text)
 }
 
+/**
+ * Communication-diagram syntax: an arrow whose label is a sequence number.
+ *
+ * `C --> O : 1: create` is the whole tell. An object diagram's arrows carry names
+ * (`C --> O : owns`), and only a communication diagram numbers them. Without this the text
+ * reads as an object diagram - which parses, and which drops every number into a label
+ * nobody checks.
+ */
+const PLANTUML_COMMUNICATION_ARROW = /^\s*\S+\s*(?:-->|->|--|\.\.>|\.\.)\s*\S+\s*:\s*\d+(?:\.\d+)*[a-zA-Z]?\s*:/m
+
+export function plantumlCommunicationSyntax(text: string): boolean {
+  return PLANTUML_COMMUNICATION_ARROW.test(text)
+}
+
 function sequenceMarkers(text: string): boolean {
   return /^\s*participant\b/m.test(text) || /->>\s*/.test(text)
 }
@@ -445,6 +458,9 @@ export function detectUmlFamily(text: string, notation: UmlNotation, options: Um
   // with a component block, and the ports are what make it that diagram rather than a
   // component diagram.
   if (plantumlCompositeSyntax(text)) return { family: 'composite-structure', evidence: 'composite syntax (port / portin / portout)' }
+  // A numbered arrow outranks the object declaration that carries it: the numbering is what
+  // makes the diagram a communication diagram.
+  if (plantumlCommunicationSyntax(text)) return { family: 'communication', evidence: 'numbered message labels (C --> O : 1: create)' }
   if (plantumlTimingSyntax(text)) return { family: 'timing', evidence: 'timing syntax (robust/concise/binary/clock or @tick)' }
 
   // Declaration keywords, most specific family first. component before package
