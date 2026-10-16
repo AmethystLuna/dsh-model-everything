@@ -21,6 +21,10 @@ const test = (name, fn) => {
 const PAIRS = [
   { source: 'docs/report-reading/guide.md', translated: 'docs/report-reading/guide.zh-CN.md' },
   { source: 'CONTRIBUTING.md', translated: 'docs/contributing/guide.zh-CN.md' },
+  // The issue templates are forms a contributor writes IN rather than documents a maintainer reads, so
+  // they ship in both languages: the same requests, in the language the reporter thinks in.
+  { source: '.github/ISSUE_TEMPLATE/problem-while-running.md', translated: '.github/ISSUE_TEMPLATE/problem-while-running.zh-CN.md' },
+  { source: '.github/ISSUE_TEMPLATE/improvement-with-a-source.md', translated: '.github/ISSUE_TEMPLATE/improvement-with-a-source.zh-CN.md' },
 ]
 
 const headings = (text) => [...text.matchAll(/^#{1,4} .+$/gm)].map((match) => match[0])
@@ -51,9 +55,10 @@ test('every guide with a translation has the same headings', () => {
  * An identifier - a field, a code, a command, a path - has to survive translation character for
  * character, and translating one would name nothing. A phrase like " and " or " runs the combined
  * path. " is prose that happens to sit inside backticks, and a translation necessarily changes it.
- * The distinction is mechanical: an identifier has no spaces around its edges and is not a sentence.
+ * The distinction is mechanical: an identifier is a single line, has no spaces around its edges, and is
+ * not a sentence. Multi-line spans are code fences and template placeholders, which hold prose.
  */
-const isIdentifier = (span) => span.trim() === span && !/[.!?]\s*$/.test(span) && /[A-Za-z0-9_[\]./:-]/.test(span) && !/\s{2,}/.test(span.trim())
+const isIdentifier = (span) => !span.includes('\n') && span.trim() === span && !/[.!?]\s*$/.test(span) && /[A-Za-z0-9_[\]./:-]/.test(span) && !/\s{2,}/.test(span.trim())
 
 test('a translation keeps every identifier verbatim', () => {
   for (const pair of PAIRS) {
@@ -111,9 +116,12 @@ test('the language policy is written down and reachable', () => {
   for (const side of ['skills/**', 'docs/**', 'README.md', 'CONTRIBUTING.md']) {
     if (!text.includes(side)) throw new Error('the policy does not say which language ' + side + ' is written in')
   }
-  // And it must name the pairs, so a reader can find both halves.
+  // And it must name the pairs, so a reader can find both halves. A family of files is named as a family:
+  // listing every template as it is added would make the policy a second index to maintain.
   for (const pair of PAIRS) {
-    if (!text.includes(pair.translated.split('/').pop())) throw new Error('the policy does not name ' + pair.translated)
+    const leaf = pair.translated.split('/').pop()
+    const family = pair.translated.includes('/ISSUE_TEMPLATE/') ? 'ISSUE_TEMPLATE' : leaf
+    if (!text.includes(family)) throw new Error('the policy does not name ' + family + ' (for ' + pair.translated + ')')
   }
 })
 
