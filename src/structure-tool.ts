@@ -46,7 +46,7 @@ export const umlStructureTool = defineTool({
   output: {
     schema: {
       type: 'json',
-      description: 'Structure review report: graph (nodes/edges), findings UML020-UML026, per-edge matrix verdicts, summary and next steps.',
+      description: 'Structure review report: graph (nodes/edges), the findings with their codes, per-edge matrix verdicts, summary and next steps.',
     },
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]

@@ -5,11 +5,11 @@
     "resourceHint": "Load referenced resources only as needed.\"];\n\tswitch (base.kind) {\n\t\tcase \"directory\""
   },
   "surfaces": {
-    "catalog": 3256,
-    "bodies": 77794,
+    "catalog": 3293,
+    "bodies": 77831,
     "references": 151067,
     "referenceFiles": 10,
-    "toolChars": 10145,
+    "toolChars": 10328,
     "toolCount": 12
   },
   "toolsWithWhen": 0,
@@ -28,7 +28,7 @@
     },
     {
       "name": "model_datamodel_verify",
-      "chars": 708
+      "chars": 719
     },
     {
       "name": "model_design_review",
@@ -64,7 +64,7 @@
     },
     {
       "name": "model_verify",
-      "chars": 1254
+      "chars": 1426
     }
   ]
 }

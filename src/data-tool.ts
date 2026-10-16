@@ -14,7 +14,7 @@ export const DATAMODEL_VERIFY_TOOL_NAME = 'model_datamodel_verify'
 export const modelDataModelVerifyTool = defineTool({
   name: DATAMODEL_VERIFY_TOOL_NAME,
   description:
-    'Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression (DD1-DD4). Takes a DataModelV1 object with schemaVersion=1, entities ({name, fields, primaryKey?, uniqueKeys?, indexes?}), relationships?, invariants?, boundaryChecks?. Optional beforeModel/fieldMapping/copyPairs/migrationMappings/backupPairs enable migration coverage, copy consistency, rollback symmetry, and before/after data regression (DD1-DD4). Returns a report with DS/DA/DD checks. For a state machine or protocol use `model_verify`; for module or package dependencies use `uml_structure_verify`. See skills/model-everything-datamodel/references/data-model-schema.md.',
+    'Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression. Takes a DataModelV1 object with schemaVersion=1, entities ({name, fields, primaryKey?, uniqueKeys?, indexes?}), relationships?, invariants?, boundaryChecks?. Optional beforeModel/fieldMapping/copyPairs/migrationMappings/backupPairs enable migration coverage, copy consistency, rollback symmetry, and before/after data regression. Returns a report of finding codes with `verdict` and `verdictReason`. For a state machine or protocol use `model_verify`; for module or package dependencies use `uml_structure_verify`. See skills/model-everything-datamodel/references/data-model-schema.md.',
   parameters: {
     model: {
       type: 'json',

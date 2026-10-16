@@ -83,6 +83,28 @@ test('every skill row names a sibling and states a boundary', async () => {
   if (offenders.length > 0) throw new Error(offenders.join(', '))
 })
 
+test('no early text names a code range', async () => {
+  // A range like `S1-S8` fails twice at the moment it is read. It asserts how many checks exist - a count
+  // a release changes - and it is meaningless before the codes are known, so it teaches nothing to a
+  // reader who has not loaded the skill yet. Progressive disclosure means the early text says what the
+  // checks DO and the detail arrives with the skill.
+  const RANGE = /\b[A-Z]{1,4}\d{1,3}\s*[-–—]\s*[A-Z]{1,4}\d{1,3}\b/g
+  const offenders = []
+  for (const tool of tools) {
+    for (const match of tool.description.matchAll(RANGE)) offenders.push(tool.name + ': ' + match[0])
+  }
+  // A skill row is early text too: it is what the model routes on before loading anything.
+  const { readdirSync } = await import('node:fs')
+  for (const skill of readdirSync(repo + 'skills', { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)) {
+    const body = readFileSync(repo + 'skills/' + skill + '/SKILL.md', 'utf8')
+    const description = /^description:\s*"([\s\S]*?)"\s*$/m.exec(body)[1]
+    for (const match of description.matchAll(RANGE)) offenders.push(skill + ' row: ' + match[0])
+  }
+  if (offenders.length > 0) {
+    throw new Error('these assert a count and mean nothing before the skill is loaded: ' + offenders.join(', ') + '. Say what the checks do instead.')
+  }
+})
+
 test('the toolset map matches the measurement', () => {
   // The generator in check mode compares instead of writing, so this does not race on the file.
   const output = execFileSync(process.execPath, [repo + 'docs/toolset/generate-mindmap.mjs', '--check'], { encoding: 'utf8', timeout: 300_000 })

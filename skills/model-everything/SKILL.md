@@ -1,6 +1,6 @@
 ---
 name: model-everything
-description: "Use when a document claims something checkable about code: API names, paths, enums, feasibility, protocol behaviour, timing, 'always/never'. It enumerates the claims, verifies each against the code with file:line evidence, then escalates to model checks (S1-S8 + A1-A14) when behaviour is at stake. Diagrams: model-everything-uml; design principles: model-everything-design; concurrency: model-everything-concurrency; data: model-everything-datamodel; dependencies: model-everything-structure."
+description: "Use when a document claims something checkable about code: API names, paths, enums, feasibility, protocol behaviour, timing, 'always/never'. It enumerates the claims, verifies each against the code with file:line evidence, then builds an executable model when behaviour, safety or deadlock is at stake. Diagrams: model-everything-uml; design principles: model-everything-design; concurrency: model-everything-concurrency; data: model-everything-datamodel; dependencies: model-everything-structure."
 ---
 
 # Model Everything
