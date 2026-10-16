@@ -10,9 +10,9 @@
 // This test is the number, not an impression: it renders each description the way the
 // catalog does, fails when anything would be cut, and requires the decision-critical
 // trigger words to survive inside the visible budget.
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 /** dsh-tool-skill: DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH (catalogDescriptionMaxLength). */
 const CATALOG_DESCRIPTION_MAX_LENGTH = 500
@@ -191,6 +191,95 @@ for (const directory of skills) {
   console.log('- `' + frontmatter.name + '`: ' + visible)
   console.log('  (' + String(frontmatter.description.length) + ' chars written, ' + String(visible.length) + ' visible, budget ' + String(CATALOG_DESCRIPTION_MAX_LENGTH) + ')')
 }
+
+// A skill's body is read by a model to do a task, so repository-maintenance content in there spends
+// context on something its reader cannot use: a generator it cannot run, a suite it does not own, a
+// release step that is not its job. The markers are paths and artefacts rather than words, because a
+// word like "CI" appears in legitimate prose - a hash is compared "in a CI comparison" - and a gate
+// that fires on that is worse than no gate.
+//
+// What is deliberately NOT flagged: `tests/skills/run.mjs` as the enforcement of the catalog budget.
+// The budget is a constraint on whoever WRITES a skill, the model is that writer when it adds one, and
+// the rule is useless to it without the thing that enforces it. Where a marker would fire on content
+// like that, it is listed below with the reason, so allowing it is a decision rather than a silence.
+const MAINTENANCE_MARKERS = [
+  { id: 'test-path', re: /\btests\/[a-zA-Z0-9-]+\//g, why: 'a regression suite path' },
+  { id: 'docs-path', re: /(?<![\w`/"])docs\/[a-zA-Z0-9]/g, why: 'a path into docs/, which the package does not publish' },
+  { id: 'generator', re: /\bgenerate-[a-z-]+\.mjs\b/g, why: 'a generator of this repository' },
+  { id: 'npm-script', re: /\bnpm run [a-z:]+/g, why: 'a package script' },
+  { id: 'release', re: /\bRELEASE\.md\b|\bnpm publish\b|\bbump-version\b/g, why: 'the release process' },
+  { id: 'memory', re: /\.github\/memory/g, why: 'the project memory tree' },
+  { id: 'contributor-guide', re: /\bAGENTS\.md\b|\bCONTRIBUTING\.md\b/g, why: 'a contributor guide' },
+  { id: 'roster', re: /\b(?:two|three|four|five|six|seven|eight|nine|ten)\s+(?:skills?|tools?|checks?|families|suites?)\b/gi, why: 'a count of a roster that changes' },
+]
+
+/** Content a marker would flag that is a constraint the skill's reader has to work within. */
+const ALLOWED_MAINTENANCE_MENTIONS = [
+  {
+    file: 'skills/model-everything/SKILL.md',
+    marker: 'test-path',
+    match: 'tests/skills/',
+    why: 'the catalog budget is a constraint on whoever writes a skill, and the model is that writer; the suite is what enforces the rule it is being told',
+  },
+  {
+    file: 'skills/model-everything/references/hash-spec.md',
+    marker: 'test-path',
+    match: 'tests/engine/',
+    why: 'the hash specification says how it is kept honest; "pinned by golden tests" is what makes the published algorithm checkable rather than asserted',
+  },
+]
+
+/** Every markdown file a skill ships: its own body, and the references beside it. */
+function shippedSkillFiles(directory) {
+  const files = [join(skillsRoot, directory, 'SKILL.md')]
+  try {
+    for (const name of readdirSync(join(skillsRoot, directory, 'references')).filter((entry) => entry.endsWith('.md'))) {
+      files.push(join(skillsRoot, directory, 'references', name))
+    }
+  } catch { /* a skill with no references directory is normal */ }
+  return files
+}
+
+check('skill bodies carry no repository-maintenance content', () => {
+  const offenders = []
+  for (const directory of skills) {
+    for (const file of shippedSkillFiles(directory)) {
+      const text = readFileSync(file, 'utf8')
+      const relative = file.slice(file.indexOf('skills')).replaceAll('\\', '/')
+      for (const marker of MAINTENANCE_MARKERS) {
+        for (const match of text.matchAll(marker.re)) {
+          const allowed = ALLOWED_MAINTENANCE_MENTIONS.some((entry) => entry.file === relative && entry.marker === marker.id && entry.match === match[0])
+          if (allowed) continue
+          offenders.push(relative + ': ' + match[0] + ' (' + marker.why + ')')
+        }
+      }
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error('a model reads these to do a task, not to maintain this repository:\n    ' + offenders.join('\n    '))
+  }
+})
+
+check('a skill references only files that ship beside it', () => {
+  // A relative link inside a skill resolves against the package, so a link that leaves `skills/` is a
+  // dangling pointer for the model that follows it - the published package has no `docs/`.
+  const offenders = []
+  for (const directory of skills) {
+    for (const file of shippedSkillFiles(directory)) {
+      const text = readFileSync(file, 'utf8')
+      const relative = file.slice(file.indexOf('skills')).replaceAll('\\', '/')
+      for (const match of text.matchAll(/\]\(([^)]*)\)/g)) {
+        // A link may carry an anchor, and the anchor is not part of the path: comparing the whole thing
+        // against the filesystem reported `references/uml-modeling-guide.md#choosing-the-view` as missing
+        // while the file it names was there.
+        const target = match[1].split('#')[0]
+        if (target === '' || target.startsWith('http')) continue
+        if (!existsSync(resolve(dirname(file), target))) offenders.push(relative + ' -> ' + match[1])
+      }
+    }
+  }
+  if (offenders.length > 0) throw new Error('a link a model would follow does not resolve: ' + offenders.join(', '))
+})
 
 if (failures > 0) {
   console.log('skill catalog checks failed:', failures)
