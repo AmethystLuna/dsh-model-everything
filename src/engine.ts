@@ -931,6 +931,100 @@ export function validateModel(input: unknown): { ok: true; model: LogicModelV1 }
   return { ok: true, model: root as unknown as LogicModelV1 }
 }
 
+/**
+ * Event names in the adversarial declarations that no transition and no entry/exit action
+ * declares.
+ *
+ * The robustness audit called this the dominant defect class: a misspelled name made a check
+ * skip and then report its all-clear - "All pairs balanced", "No race conditions detected", "All
+ * deadlines respected" - for a model it never ran on. A reader cannot tell an empty check from a
+ * passing one, which is what a verifier must never do.
+ *
+ * A name that resolves to nothing is reported by the check that would have used it, not refused
+ * by validation, because for some fields the absence IS the defect: a
+ * `resourcePairs[].releaseEvent` naming a step nobody built is what `A4_NO_RELEASE_EVENT` says,
+ * and refusing it would replace a finding that names the missing step with a generic one.
+ */
+export function unresolvedEventNames(root: Record<string, unknown>): Array<{ path: string; value: string; check: string }> {
+  const declared = new Set<string>(
+    Array.isArray(root.transitions) ? (root.transitions as TransitionSpec[]).map((transition) => transition.event) : [],
+  )
+  // `onEntry`/`onExit` actions count: A4 treats them as implicit acquire/release events, so a
+  // lock modelled as an entry action is declared even though no transition names it.
+  if (Array.isArray(root.states)) {
+    for (const state of root.states as StateSpec[]) {
+      for (const action of state.onEntry ?? []) declared.add(action)
+      for (const action of state.onExit ?? []) declared.add(action)
+    }
+  }
+  const found: Array<{ path: string; value: string; check: string }> = []
+  const note = (value: unknown, path: string, check: string): void => {
+    if (typeof value !== 'string' || declared.has(value)) return
+    found.push({ path, value, check })
+  }
+  if (Array.isArray(root.concurrentPairs)) {
+    root.concurrentPairs.forEach((entry, index) => {
+      if (!Array.isArray(entry) || entry.length !== 2) return
+      note(entry[0], 'concurrentPairs[' + String(index) + '][0]', 'A2')
+      note(entry[1], 'concurrentPairs[' + String(index) + '][1]', 'A2')
+    })
+  }
+  if (Array.isArray(root.idempotentEvents)) {
+    root.idempotentEvents.forEach((entry, index) => note(entry, 'idempotentEvents[' + String(index) + ']', 'A8'))
+  }
+  if (Array.isArray(root.tickEvents)) {
+    root.tickEvents.forEach((entry, index) => note(entry, 'tickEvents[' + String(index) + ']', 'A14'))
+  }
+  if (Array.isArray(root.resourcePairs)) {
+    root.resourcePairs.forEach((entry, index) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return
+      const pair = entry as Record<string, unknown>
+      const path = 'resourcePairs[' + String(index) + ']'
+      note(pair.acquireEvent, path + '.acquireEvent', 'A4')
+      note(pair.releaseEvent, path + '.releaseEvent', 'A4')
+      note(pair.failEvent, path + '.failEvent', 'A6')
+    })
+  }
+  return found
+}
+
+/**
+ * The check's own findings, plus a note for each declared event name it did not already account
+ * for.
+ *
+ * The severity is a warning, and that is a measured decision rather than a hedge. Three shapes
+ * exist, and the repository's own textbook cases pin all three:
+ *
+ * - the check can still run and reports the defect itself (`A4_NO_RELEASE_EVENT`,
+ *   `A6_NO_FAILURE_HANDLER`): the check's code owns it and the sweep stays silent. The textbook
+ *   semaphore case declares `failEvent: 'timeout'`, a name that exists nowhere, and expects A6
+ *   to fire with no error - because "there is no timeout handler" is the defect;
+ * - the check cannot run at all because the name resolved to nothing (A2 with a misnamed pair,
+ *   A8, A14, and A4's acquire event): its `detail` would otherwise read "No race conditions
+ *   detected" beside a `fail` status, and the finding supplies what the `detail` cannot;
+ * - a check with nothing to run on for other reasons is a `skip`, and stays one.
+ *
+ * Raising it to an error would make a working model unshippable for a merely sloppy declaration,
+ * which is a different defect from a check that lied about what it examined.
+ */
+function withUnresolved(model: LogicModelV1, check: string, findings: Finding[]): Finding[] {
+  const accounted = new Set<string>()
+  for (const finding of findings) {
+    const event = (finding.evidence as Record<string, unknown> | undefined)?.event
+    if (typeof event === 'string') accounted.add(event)
+  }
+  const extra = unresolvedEventNames(model as unknown as Record<string, unknown>)
+    .filter((entry) => entry.check === check && !accounted.has(entry.value))
+    .map((entry) => ({
+      code: 'MODEL_UNRESOLVED_EVENT',
+      severity: 'warning' as const,
+      message: entry.path + ': no transition and no entry/exit action declares ' + JSON.stringify(entry.value) + ', so ' + entry.check + ' had nothing to run on it. Declare the event, or remove the declaration if it is a typo',
+      detail: 'While a declared name resolves to nothing, this check reports a result it did not earn. The rest of the report is unaffected: the name is a declaration defect, not a model defect.',
+      evidence: { path: entry.path, event: entry.value, check: entry.check },
+    }))
+  return extra.length === 0 ? findings : [...findings, ...extra]
+}
+
 function validateGuard(input: unknown, path: string, errors: string[], bad: (path: string, message: string) => void): void {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     bad(path, 'must be an object')
@@ -1724,7 +1818,7 @@ function A2_raceInterleaving(model: LogicModelV1, exploration: Exploration): Che
       }
     }
   }
-  return checkResult('A2', 'Race Interleaving', findings, findings.length === 0 ? 'No race conditions detected' : 'Order-dependent outcomes: ' + findings.length)
+  return checkResult('A2', 'Race Interleaving', withUnresolved(model, 'A2', findings), findings.length === 0 ? 'No race conditions detected' : 'Order-dependent outcomes: ' + findings.length)
 }
 
 function stepSequence(model: LogicModelV1, init: RuntimeState, events: string[]): RuntimeState {
@@ -1826,6 +1920,9 @@ function A4_pairSymmetry(model: LogicModelV1): CheckResult {
         code: 'A4_NO_RELEASE_EVENT',
         severity: 'error',
         message: 'Resource "' + pair.resource + '": acquire event ' + pair.acquireEvent + ' exists but release event ' + pair.releaseEvent + ' is never defined.',
+        // In the evidence so the sweep can see that this finding already accounts for the name:
+        // one defect, one finding, in the vocabulary of the check that owns it.
+        evidence: { resource: pair.resource, acquireEvent: pair.acquireEvent, releaseEvent: pair.releaseEvent, event: pair.releaseEvent },
       })
       continue
     }
@@ -1940,7 +2037,7 @@ function A4_pairSymmetry(model: LogicModelV1): CheckResult {
       }
     }
   }
-  return checkResult('A4', 'Pair Symmetry', findings, findings.length === 0 ? 'All pairs balanced' : 'Asymmetric pairs: ' + findings.length)
+  return checkResult('A4', 'Pair Symmetry', withUnresolved(model, 'A4', findings), findings.length === 0 ? 'All pairs balanced' : 'Asymmetric pairs: ' + findings.length)
 }
 
 function stateGraphEdges(model: LogicModelV1): Map<string, TransitionSpec[]> {
@@ -2022,7 +2119,7 @@ function A6_resourceInjection(model: LogicModelV1): CheckResult {
       }
     }
   }
-  return checkResult('A6', 'Resource Injection', findings, findings.length === 0 ? 'No resource vulnerabilities detected' : 'Resource failure paths missing: ' + findings.length)
+  return checkResult('A6', 'Resource Injection', withUnresolved(model, 'A6', findings), findings.length === 0 ? 'No resource vulnerabilities detected' : 'Resource failure paths missing: ' + findings.length)
 }
 
 function A7_shortestViolations(model: LogicModelV1, options: NormalizedOptions): CheckResult {
@@ -2394,7 +2491,7 @@ function A8_idempotentReplay(model: LogicModelV1, exploration: Exploration): Che
       }
     }
   }
-  return checkResult('A8', 'Idempotent Replay', findings, findings.length === 0 ? 'Idempotent events are replay-safe' : 'Idempotent replay findings: ' + findings.length)
+  return checkResult('A8', 'Idempotent Replay', withUnresolved(model, 'A8', findings), findings.length === 0 ? 'Idempotent events are replay-safe' : 'Idempotent replay findings: ' + findings.length)
 }
 /**
  * Whether the guard proves `variable` stays at or below `bound` wherever it holds.
@@ -3095,14 +3192,14 @@ function A14_deadline(model: LogicModelV1, options: NormalizedOptions): CheckRes
     }
   }
   if (!hasLimit) {
-    return checkResult('A14', 'Deadline', [], 'No state declares maxTicks')
+    return checkResult('A14', 'Deadline', withUnresolved(model, 'A14', []), 'No state declares maxTicks')
   }
   if (tickEvents.size === 0) {
-    return checkResult('A14', 'Deadline', [{
+    return checkResult('A14', 'Deadline', withUnresolved(model, 'A14', [{
       code: 'A14_NO_TICK_EVENTS',
       severity: 'warning',
       message: 'States declare maxTicks, but no tickEvents are declared, so deadline compliance cannot be verified.',
-    }], 'Missing tick events')
+    }]), 'Missing tick events')
   }
   const groupMap = groupTransitions(model)
   const init = initialState(model)
@@ -3150,7 +3247,7 @@ function A14_deadline(model: LogicModelV1, options: NormalizedOptions): CheckRes
       }
     }
   }
-  return checkResult('A14', 'Deadline', findings, findings.length === 0 ? 'All deadlines respected' : 'Deadline findings: ' + findings.length)
+  return checkResult('A14', 'Deadline', withUnresolved(model, 'A14', findings), findings.length === 0 ? 'All deadlines respected' : 'Deadline findings: ' + findings.length)
 }
 
 // ---------------------------------------------------------------------------
