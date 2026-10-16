@@ -86,6 +86,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_concurrency_scan` | 并发声明的挖掘与路由 |
 | `model_export` | 导出到外部检查器（UPPAAL / TLA+ / PRISM / SPIN） |
 | `uml_structure_verify` | 依赖图审计（含依赖矩阵与多层级细化） |
+| `model_design_review` | 设计审阅：依赖图形状 + 设计自身声明的契约（分层、职责边界、可替换性、接口宽度） |
 | `report_diff` | 两份报告比对：新增/消失/变化的发现 |
 
 ## 怎么读报告

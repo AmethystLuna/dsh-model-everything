@@ -20,6 +20,7 @@ For an unverified design, failure is only a matter of time. Complex code becomes
 | A refactoring that changes state topology or guard conditions | BEFORE/AFTER models compared for behavioral preservation, invariant continuity and deadlock regression (D1-D4) |
 | Explicit request to prove code correct, formally verify a module, or check a migration for breakage | Route by domain — the table under [Routing to the Sibling Skills](#routing-to-the-sibling-skills) — and keep the doctrine |
 | An architecture or dependency question about a component/package/class diagram | `model-everything-structure`: parse the diagram into a dependency graph and judge every edge against the dependency matrix |
+| Whether a design keeps its own declarations — a layering, a responsibility boundary, an interface wider than its callers, a subtype that cannot replace its base | `model-everything-design`: `model_design_review` decides the declared contracts (`DES1`-`DES11`) and reports the graph's shape |
 
 **Catalog budget**: DSH renders only the frontmatter `description`, and truncates it at 500 characters (`dsh-tool-skill`, `DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH`). Every description in this plugin is written to fit that budget, and the triggers that do not fit live in this table. `tests/skills/run.mjs` fails when any skill's catalog line would be cut, or would lose one of its use-case triggers.
 
@@ -193,6 +194,7 @@ not a bound on the search.
 | `uml_review` | audit the modelling: structural defects, documentation gaps and the render-and-read-back fidelity check. |
 | `uml_explain_labels` | print the label and comment contract the parser accepts, for one notation. |
 | `uml_structure_verify` | Reviews a structure diagram as a dependency graph. It reports isolated nodes, dangling endpoints, cycles, disallowed edges, layer violations and missing required edges, and it checks refinement across declared levels. The diagram domain belongs to the `model-everything-structure` skill. |
+| `model_design_review` | Reviews a design: the shape of its dependency graph, and the contracts the design declares about itself. Violations of a declaration decide the verdict; structural facts are reported as signals and never do. A check with nothing to hold the design to is `skip`, not `pass`. The design domain belongs to the `model-everything-design` skill. |
 | `report_diff` | Compares two reports of the same family. A finding's identity is its check, its code and its machine-readable locator, so reworded prose reads as changed rather than new. This is slice acceptance computed instead of eyeballed. |
 
 These tools are the engine: every capability this plugin claims is one of the tools above. What is not on that list is out of scope, and the skills name where it is answered instead.
