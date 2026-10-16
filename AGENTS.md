@@ -23,7 +23,10 @@ host guide: this plugin has exactly one host.
   family is an engine-table plus family-module change and touches no tool schema. Keep it
   that way: open for extension, closed for modification.
 - **Reports are contracts.** Every result carries a versioned `schema` and a `verdict`.
-  Read `verdict`, never `ok`: `ok` only means the tool ran.
+  Read `verdict`, never `ok`: `ok` carries a per-family historical meaning - most families set
+  it `true` for a failing review, a composition sets it `false` when an error finding exists -
+  so it cannot be read as a verdict. Reading it as one is how a reader concludes the opposite
+  of what the report says.
 
 ## Layout
 
@@ -60,6 +63,10 @@ Before committing: `npm run build` then `git diff --exit-code -- lib`. A change 
 ## Writing rules
 
 These apply to every file this repository ships or publishes.
+
+Where a change begins: [docs/feature-checklist.md](docs/feature-checklist.md) is the order to do things
+in, and [docs/principles.md](docs/principles.md) is the index of what this repository believes and where
+each belief is stated.
 
 - **Short sentences, one idea each.** The reader does not have the author's context.
 - **No brittle counts.** Never write how many tools, skills, checks or families exist; a
