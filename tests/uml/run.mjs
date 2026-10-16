@@ -10,6 +10,7 @@ import { validateTimingModel, reviewTimingModel, TIMING_FINDING_CODES } from '..
 // The profile family is the one whose notation only approximates it, so its parse
 // refuses as a matter of design and the module is reached directly.
 import { validateProfileModel, reviewProfileModel, profileModule, PROFILE_FINDING_CODES } from '../../lib/uml.js'
+import { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES } from '../../lib/uml.js'
 
 let failures = 0
 function test(name, fn) {
@@ -1645,6 +1646,174 @@ test('profile white box: the validator refuses by field', () => {
   if (normalized.undeclared === undefined || !normalized.undeclared.includes('M')) {
     throw new Error('an extension to an undeclared metaclass must be recorded: ' + JSON.stringify(normalized))
   }
+})
+
+// ------------------------------------------- the composite structure family --
+
+// This family is drawn approximately - PlantUML has no composite structure diagram - and
+// still reads back exactly, because nesting, port direction and both connector ends are
+// spelled. The capability table says so explicitly (`parseThroughApproximation`), which is
+// what lets a measured round trip through an approximate view be used instead of refused.
+const compositeModel = {
+  schemaVersion: 1,
+  self: { id: 'order', label: 'Order Processing', kind: 'component' },
+  ports: [{ id: 'pay', direction: 'in' }, { id: 'ship', direction: 'out' }, { id: 'ops', direction: 'inout' }],
+  parts: [{ id: 'gw', label: 'Payment Gateway' }, { id: 'inv', label: 'Inventory' }, { id: 'shipment', label: 'Shipment' }],
+  connectors: [
+    { from: 'pay', to: 'gw' },
+    { from: 'gw', to: 'inv' },
+    { from: 'inv', to: 'shipment', label: 'ready' },
+    { from: 'shipment', to: 'ship' },
+  ],
+}
+
+test('composite: the round trip is exact through an approximate view', () => {
+  const rendered = renderUml(compositeModel, 'plantuml', 'composite-structure')
+  for (const needle of [
+    "'dsh-model-everything:compositeSelf component order",
+    'component "Order Processing" as order {',
+    '  portin pay',
+    '  portout ship',
+    '  port ops',
+    '  component "Payment Gateway" as gw',
+    '  component "Inventory" as inv',
+    '}',
+    'inv --> shipment : ready',
+  ]) {
+    if (!rendered.primary.includes(needle)) throw new Error('missing ' + needle + '\n' + rendered.primary)
+  }
+  if (!rendered.warnings.some((warning) => warning.includes('UML_RENDER_APPROXIMATE_VIEW'))) {
+    throw new Error('the approximate view must be named: ' + JSON.stringify(rendered.warnings))
+  }
+  const parsed = parseUml(rendered.primary)
+  // `diffModels` compares machines; for a family that is not one, the fidelity proof is the
+  // review's own round trip, which reads the drawing back and reports every path that moved.
+  const roundTrip = reviewUml({ model: compositeModel, diagramKind: 'composite-structure' }).roundTrip
+  if (roundTrip === null || roundTrip === undefined) throw new Error('the review must report a round trip')
+  if (!roundTrip.ok) throw new Error('the drawing does not carry the model: ' + roundTrip.diffs.join(' | '))
+  if (roundTrip.diffs.length > 0) throw new Error('round trip diffs: ' + roundTrip.diffs.join(' | '))
+  // Labels a reader gave the drawing come back as labels, and the model is not padded with
+  // a field it never carried.
+  if (parsed.labels.gw !== 'Payment Gateway') throw new Error('labels: ' + JSON.stringify(parsed.labels))
+  if (parsed.model.narrative !== undefined) throw new Error('the parser invented a narrative: ' + JSON.stringify(parsed.model.narrative))
+  const again = renderUml(parsed.model, 'plantuml', 'composite-structure')
+  if (again.primary !== rendered.primary) throw new Error('re-rendering a parsed model is not byte-stable:\n' + again.primary)
+})
+
+test('composite: a hand-written diagram needs no directives', () => {
+  const hand = [
+    '@startuml',
+    'component App as app {',
+    '  portin http',
+    '  portout db',
+    '  component cache as cache',
+    '  component store',
+    '}',
+    'http --> cache',
+    'cache --> store',
+    'store --> db',
+    '@enduml',
+  ].join('\n')
+  const parsed = parseUml(hand)
+  const model = parsed.model
+  if (model.self.id !== 'app' || model.self.kind !== 'component') throw new Error('self: ' + JSON.stringify(model.self))
+  if (model.self.label !== 'App') throw new Error('the label must survive: ' + JSON.stringify(model.self))
+  if (model.ports.length !== 2 || model.ports[0].id !== 'http' || model.ports[0].direction !== 'in') throw new Error('ports: ' + JSON.stringify(model.ports))
+  if (model.ports[1].direction !== 'out') throw new Error('port direction: ' + JSON.stringify(model.ports))
+  if (model.parts.map((part) => part.id).join(',') !== 'cache,store') throw new Error('parts: ' + JSON.stringify(model.parts))
+  if (model.connectors.length !== 3) throw new Error('connectors: ' + JSON.stringify(model.connectors))
+  if (model.undeclared !== undefined) throw new Error('every end is declared here: ' + JSON.stringify(model.undeclared))
+  if (parsed.discardedConstructs.length !== 0) throw new Error('nothing here is unrepresentable: ' + JSON.stringify(parsed.discardedConstructs))
+})
+
+test('composite: a nested block is reported, not silently flattened', () => {
+  // The port is what makes the text this family: detection keys on port declarations, so a
+  // composite structure drawn without a single port reads as the component diagram it also
+  // is. That boundary is real and is why the renderer always writes the ports it has.
+  const nested = [
+    '@startuml',
+    'component Outer as outer {',
+    '  portin in1',
+    '  component Inner as inner {',
+    '    component Deep as deep',
+    '  }',
+    '}',
+    'in1 --> inner',
+    '@enduml',
+  ].join('\n')
+  const parsed = parseUml(nested)
+  // The part is kept; the block it opened is reported, because the model has no nesting.
+  if (parsed.model === undefined || !Array.isArray(parsed.model.parts)) {
+    throw new Error('the nested diagram must parse into a composite model: ' + JSON.stringify(parsed.model ?? null))
+  }
+  if (parsed.model.parts.map((part) => part.id).join(',') !== 'inner') throw new Error('parts: ' + JSON.stringify(parsed.model.parts))
+  if (!parsed.discardedConstructs.some((entry) => entry.construct === 'nested block inside a part')) {
+    throw new Error('the nested block must be reported: ' + JSON.stringify(parsed.discardedConstructs))
+  }
+  if (!['deep', 'inner --> outer'].some((needle) => parsed.discardedConstructs.some((entry) => entry.text.includes(needle.split(' ')[0])))) {
+    throw new Error('the lines inside the nested block must be reported too: ' + JSON.stringify(parsed.discardedConstructs))
+  }
+})
+
+test('composite: every code the family declares is produced by its own case', () => {
+  const cases = [
+    ['UML057_COMPOSITE_NO_PARTS', { self: { id: 's', label: 'S' }, parts: [], ports: [], connectors: [] }],
+    ['UML058_COMPOSITE_PORT_UNCONNECTED', {
+      self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [{ id: 'orphan', direction: 'in' }], connectors: [],
+    }],
+    ['UML059_COMPOSITE_CONNECTOR_ENDPOINT_MISSING', {
+      self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [], connectors: [{ from: 'a', to: 'ghost' }], undeclared: ['ghost'],
+    }],
+    ['UML060_COMPOSITE_DUPLICATE_PART', {
+      self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }, { id: 'a', label: 'A' }], ports: [], connectors: [],
+    }],
+    ['UML061_COMPOSITE_PORT_COLLISION', {
+      // The port is connected, so UML058 is not what this case is about.
+      self: { id: 's', label: 'S' }, parts: [{ id: 'a', label: 'A' }], ports: [{ id: 'a', direction: 'out' }],
+      connectors: [{ from: 'a', to: 'a' }],
+    }],
+    ['UML062_COMPOSITE_UNDOCUMENTED', {
+      self: { id: 's', label: 'S' }, parts: [{ id: 'a' }], ports: [], connectors: [],
+    }],
+  ]
+  const declared = new Set(COMPOSITE_FINDING_CODES)
+  for (const [code] of cases) declared.delete(code)
+  if (declared.size > 0) throw new Error('codes with no case: ' + [...declared].join(', '))
+  for (const [code, model] of cases) {
+    const produced = reviewCompositeModel({ schemaVersion: 1, ...model }, {})
+    const codes = produced.map((finding) => finding.code)
+    if (!codes.includes(code)) throw new Error(code + ' missing from ' + JSON.stringify(codes))
+    // UML062 says an id has no reader-facing name, which is not a defect of the structure,
+    // so it may sit beside anything. Nothing else may.
+    const others = codes.filter((entry) => entry !== code && entry !== 'UML062_COMPOSITE_UNDOCUMENTED')
+    if (others.length > 0) throw new Error(code + ' also reported ' + JSON.stringify(others))
+  }
+})
+
+test('composite: the validator refuses by field', () => {
+  const base = { schemaVersion: 1, self: { id: 's', kind: 'component' }, parts: [], ports: [], connectors: [] }
+  const refusals = [
+    ['must be an object with schemaVersion 1', 'x'],
+    ['must declare schemaVersion 1', { ...base, schemaVersion: 2 }],
+    ['needs a `self` with a non-empty id', { ...base, self: { id: '' } }],
+    ['self.kind must be one of', { ...base, self: { id: 's', kind: 'wibble' } }],
+    ['needs a non-empty string id', { ...base, parts: [{ id: '' }] }],
+    ['is declared more than once', { ...base, parts: [{ id: 'a' }, { id: 'a' }] }],
+    ['port direction must be', { ...base, ports: [{ id: 'p', direction: 'sideways' }] }],
+    ['cannot join', { ...base, connectors: [{ from: 's', to: 's' }] }],
+  ]
+  for (const [needle, input] of refusals) {
+    let refusal
+    try { validateCompositeModel(input) } catch (error) { refusal = error }
+    if (!(refusal instanceof UmlError) || refusal.code !== 'UML_INPUT') throw new Error(needle + ': not an UML_INPUT refusal: ' + String(refusal))
+    if (!refusal.message.includes(needle)) throw new Error('refusal for "' + needle + '" said: ' + refusal.message)
+  }
+})
+
+test('composite: mermaid has no composite structure diagram', () => {
+  let refusal
+  try { renderUml(compositeModel, 'mermaid', 'composite-structure') } catch (error) { refusal = error }
+  if (!(refusal instanceof UmlError) || refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('render: ' + String(refusal))
 })
 
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }

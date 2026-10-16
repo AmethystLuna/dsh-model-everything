@@ -359,6 +359,40 @@ here. The specification's own constraints on profiles — an extension end's agg
 `isRequired`, the ProfileApplication correspondence — need the drawing to carry the
 extension endpoints and the application, which this notation does not.
 
+### Composite structure diagrams
+
+A composite structure diagram is a classifier seen from the inside: the parts it is made of,
+the ports on its boundary, and the connectors between them. PlantUML has no page for it, so
+the drawing is an approximation built from the deployment diagram's vocabulary - and unlike
+a profile, this one **reads back exactly**, because nesting, port direction and both
+connector ends are all spelled.
+
+| Action | What happens |
+|---|---|
+| `uml_render` with `kind: "composite-structure"` | Draws a nested element for the classifier, the nestable elements for its parts, `port`/`portin`/`portout` for its boundary, and arrows for the connectors. An `UML_RENDER_APPROXIMATE_VIEW` warning names what the notation cannot carry. |
+| `uml_parse` | Reads it back. The round trip is measured, not assumed, and `uml_review` proves it every time it renders a model. |
+| `uml_review` | Reports the family's own findings, and checks fidelity by rendering the model and reading it back. |
+
+The model is `CompositeModelV1`: `self` (the classifier, with the keyword it is drawn with),
+`parts`, `ports` (each with `in` / `out` / `inout`), and `connectors` (each end naming the
+classifier, a port, or a part). There is no nesting: a part's inside is a second diagram.
+
+| Code | Severity | What it means |
+|---|---|---|
+| `UML057_COMPOSITE_NO_PARTS` | error | The classifier is drawn as a composite structure but holds no part. |
+| `UML058_COMPOSITE_PORT_UNCONNECTED` | warning | A port has no connector, so nothing reaches the classifier through it. |
+| `UML059_COMPOSITE_CONNECTOR_ENDPOINT_MISSING` | error | A connector ends at a name the classifier never declares. |
+| `UML060_COMPOSITE_DUPLICATE_PART` | error | A part is declared more than once, so a connector naming it is ambiguous. |
+| `UML061_COMPOSITE_PORT_COLLISION` | error | A port shares its name with a part: a connector naming it cannot be read. |
+| `UML062_COMPOSITE_UNDOCUMENTED` | info | The classifier or a part carries no name a reader can map back to the design. |
+
+Two limits worth stating. Detection keys on a port declaration, so a composite structure
+drawn without a single port is read as the component diagram it also is. And the
+specification's own constraints on the decomposition - a part's type and multiplicity, a
+port's required and provided interfaces, a connector's role names and end compatibility,
+collaborations - need notation that does not exist here, so they are neither checked nor
+guessed at.
+
 ### What the round trip proves
 
 It proves the diagram is a faithful rendering of the model:

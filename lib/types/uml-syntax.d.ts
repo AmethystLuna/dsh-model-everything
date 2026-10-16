@@ -87,6 +87,19 @@ export interface UmlFamilySpec {
      * branches that were not.
      */
     parseable: boolean;
+    /**
+     * Whether this build can read the family back out of a notation that only approximates
+     * it. Absent means no.
+     *
+     * This is not derivable from the notation's fidelity. `fidelity` says how much of the
+     * specification the drawing carries; this says whether what the model *does* carry
+     * survives a round trip, which is a measurement, not a label. A composite structure is
+     * drawn approximately and reads back exactly - nesting, port direction and both
+     * connector ends are all spelled - while a profile is drawn approximately and cannot be
+     * read back at all. Refusing the first because the second is impossible would leave a
+     * working view switched off.
+     */
+    parseThroughApproximation?: boolean;
     /** Why a parse is refused, when `parseable` is false. */
     parseRefusal?: string;
     /** Code the parse refusal carries; defaults to `UML_NOT_A_STATE_DIAGRAM`. */
@@ -124,6 +137,7 @@ export interface UmlFamilyDetection {
 }
 export declare function plantumlUseCaseSyntax(text: string): boolean;
 export declare function plantumlTimingSyntax(text: string): boolean;
+export declare function plantumlCompositeSyntax(text: string): boolean;
 export interface UmlDetectOptions {
     /** The family a `dsh-model-everything:uml` directive declared, when the text carries one. */
     hint?: UmlFamilyId;

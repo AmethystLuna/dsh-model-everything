@@ -21,10 +21,11 @@ metadata:
 
 ## 2. 未实现的图族模块
 
-`composite-structure`、`communication`、`interaction-overview` 目前**按名拒绝并给出理由**，没有模块。要真正 render / parse / review，按[架构](../design/architecture.md)加模块：在图族表补一条，再写一个 `UmlFamilyModule`。
+`communication`、`interaction-overview` 目前**按名拒绝并给出理由**，没有模块。要真正 render / parse / review，按[架构](../design/architecture.md)加模块：在图族表补一条，再写一个 `UmlFamilyModule`。
 
-- **`profile` 已落地（2026-10，`src/uml-profile.ts`）**：记号只有近似视图，所以这一族按记号如实做成**只能画、不能读回**——`UML_FAMILIES` 里 `parseable: false` 并写明理由（PlantUML 没有 profile 元素，且「扩展」与「泛化」是同一个 `--|>` 箭头，读回必须猜），模型（`ProfileModelV1`）仍然完整，`uml_review` 只给模型时照常审（`UML050`–`UML056`），给图时返回一份说明性的 info 报告而不是抛错。这是「近似族」的样板：**画得出来就画，读不回来就说不读**。
-- `composite-structure` 与 `profile` 同类（PlantUML `approximate`），可以照这个样板做；`communication` 与 `interaction-overview` 两种记号都是 `none`，本构建没有可做的实现路径——继续按名拒绝才是正确答案。
+- **`profile` 已落地（2026-10，`src/uml-profile.ts`）**：记号只有近似视图，所以这一族按记号如实做成**只能画、不能读回**——`UML_FAMILIES` 里 `parseable: false` 并写明理由（PlantUML 没有 profile 元素，且「扩展」与「泛化」是同一个 `--|>` 箭头，读回必须猜），模型（`ProfileModelV1`）仍然完整，`uml_review` 只给模型时照常审（`UML050`–`UML056`），给图时返回一份说明性的 info 报告而不是抛错。这是「画得出来就画，读不回来就说不读」的样板。
+- **`composite-structure` 已落地（2026-10，`src/uml-composite.ts`）**：同样只有近似视图（PlantUML 没有这一族的页面），但**实测往返无损**（嵌套、端口方向、连接器两端都在文本里），所以它是**唯一一个走近似视图却能读回的族**。为此图族表新增 `parseThroughApproximation`：**能不能读回是实测事实，不是从 fidelity 标签推出来的**——判定曾用「是否 faithful」去推断，把这个能用的视图关掉了。发现它的是白盒用例：`parseUml` 直接抛 `UML_VIEW_UNREPRESENTABLE`。识别器同时补了 `plantumlCompositeSyntax`（`port`/`portin`/`portout` 是这一族独有记号，否则文本会被读成组件图——一个能解析但是另一个模型的结果）。
+- `communication` 与 `interaction-overview` 两种记号都是 `none`，本构建没有可做的实现路径——继续按名拒绝才是正确答案。
 
 动手前先读[记号调研](../research/uml-notation-support.md)，确认这种记号的表达能力支持你要做的事；表里 `faithful` 但本构建尚无模块的族，注册表会按名拒绝，不会交给错的解析器。注意记忆里那张总表把活动图标成「PlantUML faithful」，而**本构建**的图族表对 PlantUML 活动标的是 `none`（结构化流程语法无法承载带汇合或环的图）——以图族表为准。
 
