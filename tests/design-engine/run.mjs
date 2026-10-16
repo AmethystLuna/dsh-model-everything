@@ -60,26 +60,71 @@ const cycle = design({ architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'
 expectPresent('a dependency cycle', cycle, 'DES1_CYCLE')
 expectAbsent('the same graph with the cycle cut', design({ architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c']] } }), 'DES1_CYCLE')
 
-test('design: the unpeelable edges are reported as unpeelable, not as a set to delete', () => {
+test('design: a cycle reports the fewest edges that break it, and says the count is a minimum', () => {
   const report = runDesignReview(cycle)
   const finding = report.violations.find((entry) => entry.code === 'DES1_CYCLE')
   if (finding === undefined) throw new Error('missing the cycle finding')
-  // A directed 3-cycle has no node without a dependent, so a peel has nowhere to start and
-  // leaves all three edges: the honest count, and not the two edges that would break it.
+  // A directed 3-cycle: breaking it costs exactly one edge, while a peel has nowhere to start
+  // and would report all three. The search decides the number; the peel is only the fallback.
   const arcs = report.facts.feedbackArcs
-  if (!Array.isArray(arcs) || arcs.length !== 3) throw new Error('a 3-cycle peels to three edges, got ' + JSON.stringify(arcs))
-  if (!String(finding.detail).includes('NP-hard')) throw new Error('the wording must not promise a minimum: ' + String(finding.detail))
-  if (String(finding.detail).includes('one way to break')) throw new Error('the wording must not present the set as a repair: ' + String(finding.detail))
+  if (!Array.isArray(arcs) || arcs.length !== 1) throw new Error('a 3-cycle is broken by one edge, got ' + JSON.stringify(arcs))
+  if (report.facts.feedbackArcsExact !== true) throw new Error('this size is decided exactly, so the flag must say so')
+  if (!String(finding.detail).includes('A minimum')) throw new Error('the wording must claim the minimum it computed: ' + String(finding.detail))
+  if (String(finding.message).includes('at least')) throw new Error('an exact count must not be hedged: ' + String(finding.message))
   if (JSON.stringify(report.facts.largestCycle) !== JSON.stringify(['a', 'b', 'c'])) throw new Error('largestCycle: ' + JSON.stringify(report.facts.largestCycle))
 })
 
-test('design: a cycle with a way in still peels the edges that have a way in', () => {
-  // `entry` has nothing depending on it, so its edge peels; the cycle behind it does not.
-  const report = runDesignReview(design({
-    architecture: { nodes: ['entry', 'a', 'b'], edges: [['entry', 'a'], ['a', 'b'], ['b', 'a']] },
-  }))
-  const arcs = report.facts.feedbackArcs
-  if (JSON.stringify(arcs) !== JSON.stringify([['a', 'b'], ['b', 'a']])) throw new Error('peel: ' + JSON.stringify(arcs))
+// The decision table for that count: what the exact search must answer on shapes whose
+// minimum is known by hand, including the two where the peel's leftover differs from it.
+test('design: the minimum feedback arc set matches the known answer on five shapes', () => {
+  const table = [
+    ['a DAG needs nothing removed', { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c']] }, 0],
+    // The peel leaves 3 here; the minimum is 1.
+    ['a 3-cycle is broken by one edge', { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] }, 1],
+    ['a 4-cycle is broken by one edge', { nodes: ['a', 'b', 'c', 'd'], edges: [['a', 'b'], ['b', 'c'], ['c', 'd'], ['d', 'a']] }, 1],
+    // Two cycles sharing one node are independent: neither edge can break both.
+    ['two 2-cycles sharing a node need two', { nodes: ['m', 'x', 'y'], edges: [['m', 'x'], ['x', 'm'], ['m', 'y'], ['y', 'm']] }, 2],
+    ['a cycle with a tail is broken by one edge', { nodes: ['t', 'a', 'b'], edges: [['t', 'a'], ['a', 'b'], ['b', 'a']] }, 1],
+  ]
+  for (const [name, architecture, expected] of table) {
+    const report = runDesignReview({ schemaVersion: 1, architecture })
+    const count = report.facts.feedbackArcs.length
+    if (count !== expected) throw new Error(name + ': expected ' + String(expected) + ', got ' + String(count) + ' ' + JSON.stringify(report.facts.feedbackArcs))
+    if (expected === 0 && report.facts.feedbackArcsExact !== true) throw new Error(name + ': an acyclic graph is exact')
+    if (expected > 0 && report.facts.feedbackArcsExact !== true) throw new Error(name + ': this size is decided exactly')
+  }
+})
+
+test('design: past the exact limit the count is reported as an upper bound, and says so', () => {
+  // A ring of sixteen nodes: the cyclic part is past the search limit, so the report must
+  // stop claiming a minimum and say which number it is giving instead.
+  const ring = Array.from({ length: 16 }, (_, index) => 'n' + String(index))
+  const edges = ring.map((id, index) => [id, ring[(index + 1) % ring.length]])
+  const report = runDesignReview({ schemaVersion: 1, architecture: { nodes: ring, edges } })
+  if (report.facts.feedbackArcsExact !== false) throw new Error('sixteen nodes are past the limit: ' + String(report.facts.feedbackArcsExact))
+  const finding = report.violations.find((entry) => entry.code === 'DES1_CYCLE')
+  if (!String(finding.message).includes('at least')) throw new Error('an upper bound must be hedged in the message: ' + String(finding.message))
+  if (!String(finding.detail).includes('upper bound')) throw new Error('the detail must name it an upper bound: ' + String(finding.detail))
+  if (!String(finding.detail).includes('NP-hard')) throw new Error('the detail must say why it is not decided: ' + String(finding.detail))
+})
+
+test('design: cutting the reported edges really makes the graph acyclic', () => {
+  // The claim the report makes, checked rather than trusted: remove what it named and see
+  // whether a cycle is left. This is the metamorphic half of the decision table above.
+  const shapes = [
+    { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] },
+    { nodes: ['m', 'x', 'y'], edges: [['m', 'x'], ['x', 'm'], ['m', 'y'], ['y', 'm']] },
+    { nodes: ['t', 'a', 'b', 'c'], edges: [['t', 'a'], ['a', 'b'], ['b', 'c'], ['c', 'a'], ['b', 't']] },
+  ]
+  for (const architecture of shapes) {
+    const report = runDesignReview({ schemaVersion: 1, architecture })
+    const cut = new Set(report.facts.feedbackArcs.map(([from, to]) => from + '\u0000' + to))
+    const remaining = architecture.edges.filter(([from, to]) => !cut.has(from + '\u0000' + to))
+    const after = runDesignReview({ schemaVersion: 1, architecture: { nodes: architecture.nodes, edges: remaining } })
+    if (after.facts.feedbackArcs.length !== 0) {
+      throw new Error('cutting the reported edges left a cycle in ' + JSON.stringify(architecture) + ': ' + JSON.stringify(after.facts.feedbackArcs))
+    }
+  }
 })
 
 // -------------------------------------------------------------- DES2 layer order --
