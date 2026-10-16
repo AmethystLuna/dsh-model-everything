@@ -1,0 +1,70 @@
+{
+  "mentionGaps": [],
+  "codeGaps": [
+    "MATRIX_NODE_UNLAYERED",
+    "MATRIX_LAYER_MEMBER_UNKNOWN",
+    "MATRIX_JUDGES_NOTHING",
+    "MODEL_UNRESOLVED_EVENT",
+    "S6_UNBOUNDED_VARIABLE",
+    "DS5_INVARIANT_ENTITY_MISSING",
+    "DES12_UNKNOWN_TYPE"
+  ],
+  "newCodes": [
+    "MATRIX_NODE_UNLAYERED",
+    "MATRIX_LAYER_MEMBER_UNKNOWN",
+    "MATRIX_JUDGES_NOTHING",
+    "MODEL_UNRESOLVED_EVENT",
+    "S6_UNBOUNDED_VARIABLE",
+    "DS5_INVARIANT_ENTITY_MISSING",
+    "DES12_UNKNOWN_TYPE"
+  ],
+  "referenceFiles": [
+    {
+      "path": "model-everything/references/dsh-model-schema.md",
+      "hasProvenance": true
+    },
+    {
+      "path": "model-everything/references/gap-routing-guide.md",
+      "hasProvenance": false
+    },
+    {
+      "path": "model-everything/references/hash-spec.md",
+      "hasProvenance": false
+    },
+    {
+      "path": "model-everything/references/logic-verification-guide.md",
+      "hasProvenance": true
+    },
+    {
+      "path": "model-everything-concurrency/references/concurrency-risk-guide.md",
+      "hasProvenance": false
+    },
+    {
+      "path": "model-everything-datamodel/references/data-model-guide.md",
+      "hasProvenance": true
+    },
+    {
+      "path": "model-everything-datamodel/references/data-model-schema.md",
+      "hasProvenance": false
+    },
+    {
+      "path": "model-everything-report-reading/references/reading-a-report.md",
+      "hasProvenance": false
+    },
+    {
+      "path": "model-everything-structure/references/structure-review-guide.md",
+      "hasProvenance": true
+    },
+    {
+      "path": "model-everything-uml/references/uml-modeling-guide.md",
+      "hasProvenance": false
+    }
+  ],
+  "citedFiles": [
+    "skills/model-everything/references/dsh-model-schema.md",
+    "skills/model-everything/references/logic-verification-guide.md",
+    "skills/model-everything/SKILL.md",
+    "skills/model-everything-datamodel/references/data-model-guide.md",
+    "skills/model-everything-structure/references/structure-review-guide.md"
+  ]
+}

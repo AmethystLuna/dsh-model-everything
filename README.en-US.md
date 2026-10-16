@@ -91,7 +91,7 @@ The limit: it stores and compares **model and diagram source**; a rendered pictu
 
 ## Reading a report
 
-What a tool returns is a report, and the outcome is in `verdict`: read `verdict`, never `ok`, which only says the tool ran.
+What a tool returns is a report, and the outcome is in `verdict`: read `verdict`, never `ok`. `ok` carries a different historical meaning in each family — most set it to `true` for a failing review, and a composition sets it to `false` when any error-severity finding exists — so it cannot be read as a verdict, and reading it as one is how a reader concludes the opposite of what the report says.
 
 | Field | Meaning |
 |---|---|
@@ -105,6 +105,8 @@ What a tool returns is a report, and the outcome is in `verdict`: read `verdict`
 The body is what comes back by default. For the whole structured result, pass `reportView: "full"`.
 
 When `ok` is `false` the verdict is `fail` as well, but it means something else: the tool did not run. The reason is in `errorCode` - invalid input, an unsupported diagram family, or a declared `intent` this view cannot serve. Such a refusal starts its `verdictReason` with `the tool did not run:`.
+
+The method behind reading one of these has a home of its own: [`skills/model-everything-report-reading/`](skills/model-everything-report-reading/) gives the reading order (did it run, what did it decide, what next), where each family keeps its findings, and the two readings that are easy to get backwards. Its structure comes from a **generated mind map**: [`docs/report-reading/mindmap.mmd`](docs/report-reading/mindmap.mmd), and `tests/report-reading` fails when the map and the engines disagree.
 
 `uml_render`, `uml_parse` and `uml_review` take one more field, `intent`, which says what the artifact is for: a human will read it (`present`), the verification engine has to read it back (`verify`), or the point is to prove the render matches the model (`fidelity`). A view that cannot serve the declared purpose is refused rather than drawn anyway.
 
@@ -131,7 +133,11 @@ The skills carry how to use the tools and what counts as evidence, split by doma
 | `model-everything-uml` | UML diagrams: which view to pick, label conventions, review codes, what the fidelity check does and does not prove |
 | `model-everything-structure` | Architecture and dependencies: writing the matrix, what each structural check means |
 | `model-everything-datamodel` | Data models and migrations: invariants, coverage, rollback |
+| `model-everything-design` | A design against its own declarations: layering, responsibilities against the dependencies they own, substitutability, interface width |
 | `model-everything-concurrency` | Concurrency claims: which can be proven, and with which tool |
+| `model-everything-report-reading` | Reading a report: the reading order, where the findings are, the two easy misreadings |
+
+The descriptions are themselves the routing signal, and how much of one the model can see is capped: a catalog row is **truncated at 500 characters**, and the rest is never shown. Who owns which question, and what each row has to carry, is recorded in a generated map: [`docs/routing-map.md`](docs/routing-map.md), from `docs/tools/generate-routing-map.mjs`, with `tests/routing-map` failing when it drifts from the catalog.
 
 ## Install (dsh)
 
@@ -214,6 +220,12 @@ MODEL_EVERYTHING_SPIN=/path/to/spin MODEL_EVERYTHING_GCC=/path/to/gcc npm run te
 The plugin never calls `spin`, `gcc`, UPPAAL, TLA+ or PRISM itself: `model_export` writes the input they read.
 
 Conventions, the directory map and the hard rules are in [AGENTS.md](AGENTS.md); project memory (research, architecture decisions, handover) starts at [.github/memory/MEMORY.md](.github/memory/MEMORY.md).
+
+To contribute: the two kinds of report have different structures — **an improvement with a source** (cite the method, name the check code, say whether it changes a verdict or adds a signal, and bring the nearest case that must still pass plus a mutation that makes the new case go red) and **a problem while running it** (quote the report, give the smallest reproduction). See [CONTRIBUTING.md](CONTRIBUTING.md) and [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/).
+
+## References
+
+The published work behind the checks — and which checks have none — is in [docs/references.md](docs/references.md). Every entry is **extracted verbatim** from a `Provenance` section in this repository (generator: `docs/references/generate.mjs`) with the file that cites it. The list exists to keep two things apart: a published method, and a convention of this repository's own. Most of the checks are the second, and dressing a convention as a citation is worse than saying it is one.
 
 ## License and security
 

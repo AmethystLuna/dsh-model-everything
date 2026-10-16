@@ -91,7 +91,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 
 ## 怎么读报告
 
-工具的产出是一份报告，结论只在 `verdict` 里：**看 `verdict`，不看 `ok`**。`ok` 只表示工具跑过了。
+工具的产出是一份报告，结论只在 `verdict` 里：**看 `verdict`，不看 `ok`**。`ok` 在各族的含义不同——多数族在评审失败时仍是 `true`，组合族在出现 error 级发现时是 `false`——所以它不能当判定读；把它当判定读，会得出与报告相反的结论。
 
 | 字段 | 说明 |
 |---|---|
@@ -105,6 +105,8 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 默认返回正文。要完整 JSON，传 `reportView: "full"`。
 
 `ok` 为 `false` 时判定也是 `fail`，但含义不同：工具根本没跑。原因写在 `errorCode` 里——输入不合法、图族不支持，或声明的 `intent` 服务不了。这类拒绝的 `verdictReason` 以 `the tool did not run:` 开头。
+
+报告怎么读，有一份成体系的说明：[`skills/model-everything-report-reading/`](skills/model-everything-report-reading/) 讲阅读顺序（先看跑没跑、再看判了什么、最后看该做什么）、发现分别放在哪一层、以及两处最容易读反的地方。结构由一个**从真实报告生成的思维导图**给出：[`docs/report-reading/mindmap.mmd`](docs/report-reading/mindmap.mmd)，`tests/report-reading` 会在图与引擎不一致时失败。
 
 `uml_render`、`uml_parse`、`uml_review` 另收一个 `intent`，用来说明这份产物要做什么：给人看（`present`）、要被验证引擎读回（`verify`）、还是要证明渲染与模型一致（`fidelity`）。服务不了这个用途的视图会被直接拒绝，而不是勉强画出来。
 
@@ -131,7 +133,11 @@ model_verify model=examples/control-dispatcher.json
 | `model-everything-uml` | UML 图：选哪种视图、标签约定、审查码、往返一致性检查的边界 |
 | `model-everything-structure` | 架构与依赖：矩阵怎么写、各条结构检查意味着什么 |
 | `model-everything-datamodel` | 数据模型与迁移：不变式（任何时刻都必须成立的约束）、迁移覆盖、回滚对称 |
+| `model-everything-design` | 设计自洽：分层是否成立、职责与依赖是否匹配、子类型能否替父类型、接口是否宽于调用方 |
 | `model-everything-concurrency` | 并发声明：哪些能证明、用哪个工具证明 |
+| `model-everything-report-reading` | 读报告：阅读顺序、发现放在哪一层、容易读反的两处 |
+
+技能描述本身就是路由依据，而它们能写的长度有硬上限（目录行**截断在 500 字符**，之后的部分模型看不到）。谁负责哪个问题、每行必须携带什么，由一张生成的图记录：[`docs/routing-map.md`](docs/routing-map.md)，生成器是 `docs/tools/generate-routing-map.mjs`；`tests/routing-map` 会在图与目录不一致时失败。
 
 ## 安装（dsh）
 
@@ -214,6 +220,12 @@ MODEL_EVERYTHING_SPIN=/path/to/spin MODEL_EVERYTHING_GCC=/path/to/gcc npm run te
 插件自己不调用 `spin`、`gcc`、UPPAAL、TLA+ 或 PRISM：`model_export` 只写出它们能读的输入。
 
 约定、目录地图与硬约束见 [AGENTS.md](AGENTS.md)。项目记忆（调研结论、架构决定、交接）的入口在 [.github/memory/MEMORY.md](.github/memory/MEMORY.md)。
+
+想参与：两种来件的结构不同——**有出处的改进**（要引用方法、点名改哪个码、说明是改判定还是加信号，并附最邻近反例与一条能红的变异）与**运行中遇到的问题**（要原样引用报告、给最小复现），分别见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/)。
+
+## 参考文献
+
+各条检查背后的已发表工作——以及哪些检查**没有**已发表来源——收在 [docs/references.md](docs/references.md)。每一条都从仓库里 `Provenance` 表**逐字提取**（生成器 `docs/references/generate.mjs`），并标注它在哪个文件里被引用。这份清单存在的意义是把「已发表方法」与「本仓库自己的约定」分开：多数检查是后者，而把约定当成引用写出来，比说明它是约定更糟。
 
 ## 许可证与安全
 
