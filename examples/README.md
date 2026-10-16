@@ -1,6 +1,8 @@
 # Examples
 
-Sample models for testing the verification engines and the data-model engine.
+Sample models to run as they are. These files are documentation, not test fixtures:
+every suite reads its own fixtures from `tests/<suite>/fixtures/`, so nothing here is
+asserted on and a file may be edited to show a different result.
 
 ## State machine
 

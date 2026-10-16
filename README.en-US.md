@@ -109,7 +109,7 @@ When `ok` is `false` the verdict is `fail` as well, but it means something else:
 
 ## Examples
 
-`examples/` holds sample models that run as they are, with [`examples/README.md`](examples/README.md) saying what each one shows and what to expect:
+`examples/` holds sample models that run as they are, with [`examples/README.md`](examples/README.md) saying what each one shows and what to expect. They are documentation, not test fixtures — every suite reads its own `tests/<suite>/fixtures/`:
 
 - `examples/order-state-machine.before.json` and `examples/order-state-machine.after.json`: two versions of an order flow, for the D1-D4 regression.
 - `examples/control-dispatcher.json`: a dispatch machine with budgets and paired lock actions, expected to report no errors.
@@ -173,7 +173,7 @@ Override it by row id in the profile's `cordis.patch.yml`:
 
 ## Requirements
 
-- DeepSeek Harness: see `dsh.compatibility` in `package.json`. Per-release compatibility is a **measurement**; releases that were not measured are marked `unknown`.
+- DeepSeek Harness: admission reads `peerDependencies` in `package.json` — that is what the plugin manager checks before installing — while `dsh.compatibility.dshReleases` only records what was measured. Per-release compatibility is a **measurement**; releases that were not measured are marked `unknown`.
 - Node.js: `>=20`.
 - No Python dependency and no network calls.
 
@@ -198,10 +198,19 @@ npm run typecheck     # tsc --noEmit
 npm run build         # tsc -> lib/ (lib/ is committed and must stay in step with src/)
 npm run test:engine   # every regression suite, including the memory gate
 npm run test:full     # end-to-end combined suite
+npm run lint:md       # markdownlint, the same version CI pins
 npm run bump -- <x.y.z>          # sync declared versions
 npm run bump -- --check          # version consistency
 npm run bump -- --audit          # version reference audit
 ```
+
+The external-checker round trips (`tests/external/run.mjs`) invoke a real `spin` and `gcc` on the exported result. When a checker is not on `PATH` the whole group skips itself — a skip is not a pass. Point the suite at executables elsewhere with:
+
+```bash
+MODEL_EVERYTHING_SPIN=/path/to/spin MODEL_EVERYTHING_GCC=/path/to/gcc npm run test:engine
+```
+
+The plugin never calls `spin`, `gcc`, UPPAAL, TLA+ or PRISM itself: `model_export` writes the input they read.
 
 Conventions, the directory map and the hard rules are in [AGENTS.md](AGENTS.md); project memory (research, architecture decisions, handover) starts at [.github/memory/MEMORY.md](.github/memory/MEMORY.md).
 
