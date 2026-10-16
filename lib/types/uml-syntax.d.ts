@@ -226,6 +226,16 @@ export interface UmlFamilyModule<Model> {
     notation?: UmlNotation;
     render(input: unknown, notation: UmlNotation, options: UmlFamilyRenderOptions): UmlFamilyRender;
     parse(text: string, notation: UmlNotation): UmlFamilyParse<Model>;
+    /**
+     * The model in the family's own canonical shape, or undefined when the input is not one.
+     *
+     * Fidelity is checked by rendering a model and comparing what comes back with what went
+     * in. Where the parser necessarily normalizes - filling in a default the diagram always
+     * draws, or recording a drawn name as a label - comparing against the *raw* input reports
+     * the module's own convention as a mismatch. This is how a family says which model the
+     * comparison is about; a family that normalizes nothing can leave it out.
+     */
+    normalize?(input: unknown): Model | undefined;
     /** Family findings for the review: what the diagram itself gets wrong. */
     review?(model: Model, labels: Record<string, string>, notation: UmlNotation): UmlFamilyFinding[];
 }
