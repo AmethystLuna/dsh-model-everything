@@ -19,7 +19,7 @@ metadata:
 - **`0.1.7-alpha.1` 不在区间内且装不上**（npm 解析那批包时 peer 冲突），不是本插件的问题；更老的 `0.1.2`–`0.1.6` 同样在区间外，未测。
 - 建 GitHub 仓库与 topic、`npm publish`、打 tag。
 - **设计审阅专项已完成（2026-10-16）**：`model_design_review` + `DES1`-`DES11` + 技能 `model-everything-design`。细节见[设计审阅](../design/design-review.md)。**首次发布前版本一直停在 `0.1.0`**——没发布过就没有「版本推进」可言，semver 描述的是已发布版本之间的关系；记忆因此**不记当前版本号**，记住就会在首次发布时变错（见 RELEASE.md 的版本策略）。两处后续都做了：**最小反馈弧集**已真正算出（环核 ≤ 14 节点给证明过的最小值，超过退回剥离剩余并标 `feedbackArcsExact: false`）；`report_diff` **本来就兼容**设计报告（走 `checks[].findings` + `check.id` + 证据定位），无需改动，已实测（加环报 2 条新增、信号消失报 1 条移除）。
-- **进行中：稳健性审查的缺陷修复（2026-10-16）**：只读子代理跑完约 549 次调用，结论与 D1-D12 逐条见[稳健性审查](../design/robustness-audit.md)。**主缺陷族是「拼错的名称把检查静默关掉、然后报出正面的全部通过」**（状态机的对抗探针声明、数据族的键与不变式引用、设计族的类型关系），全部是普通 JSON 就能触发。修复按 7 步走，每条先写一条能红的用例。**尚未开工。**
+- **进行中：稳健性审查的缺陷修复（2026-10-16）**：只读子代理跑完约 549 次调用，结论与 D1-D12 逐条见[稳健性审查](../design/robustness-audit.md)。**主缺陷族是「拼错的名称把检查静默关掉、然后报出正面的全部通过」**，三个引擎都中。**D1/D2/D3 已修并各有能红的回归用例**；非机器族 UML 校验器审计也做完了（七个里只有 `composite-structure` 有该缺陷，顺带挖出「族审查拿到的是原始模型而非规范形态」与「复合族缺 normalize」两层）。**剩下 D4、D5、D6-D10、D11-D12 未做**，其中 D5 最重（`maxStates: NaN` 会把宿主进程 OOM 掉）。
 - **待办：非机器族 UML 校验器的引用解析审计**：use-case、class、timing、profile、composite、communication、interaction-overview 的 `validate*Model`/`review*Model` 只经 `parseUml`/`renderUml` 探过，审查者预计 D1-D3 那一族在那里还有更多。
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
