@@ -31,7 +31,6 @@ metadata:
 
 **本轮的四张生成图**（都随测试守漂移）：`docs/routing-map.md`（技能/工具的文字分配）、`docs/report-reading/mindmap.mmd`（报告阅读方法）、`docs/report-reading/skill-routing.mmd`（该不该单独成技能）、`docs/contributing/mindmap.mmd`（贡献两种情形）、`docs/documentation/mindmap.mmd`（本次文档更新）。生成器的共同纪律：**从真实语料读、自检语法、拒绝产出坏图**；它们各自抓出过我的错误（写错的符号数、漂移的旧图、自己编的引用年份）。
 
-- **待办：非机器族 UML 校验器的引用解析审计**：use-case、class、timing、profile、composite、communication、interaction-overview 的 `validate*Model`/`review*Model` 只经 `parseUml`/`renderUml` 探过，审查者预计 D1-D3 那一族在那里还有更多。
 - 注册创意工坊商店条目：文案与分类备在[注册草稿](../design/store-entry.md)，分类填 `tools/dev`。`package.json` 的 `dsh.category` 已改成 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读，商店读不读未确认，注册时以商店表单为准。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
 
