@@ -2470,5 +2470,329 @@
       ]
     },
     "body": "model-everything/baseline/v1  verdict=fail  1 finding(s) escalated to error (1 error) (first error: S5_UNHANDLED_EVENT)  ok=true\n\nCHANGED (1)\n  S5_UNHANDLED_EVENT  severity warning → error\nCURRENT  verdict=fail\n\nNEXT  A finding moved from warning to error (1): the slice added nothing but still made the report worse, so the baseline is less strict than the run.\nNEXT  Review the 1 changed finding(s): the same locator now reports something different, which usually means the fix moved the problem.\nNEXT  The current report still fails on its own terms, and the delta already says the slice made it worse: settle both before accepting it."
+  },
+  "compose: two machines through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/compose/v1",
+    "summary": {
+      "machineCount": 2,
+      "machines": [
+        {
+          "modelHash": "96bdcac57564b3f484bdc0e0fd09f262a36f55bcacd4cdf4dc48411e9a66fbed",
+          "states": 2,
+          "transitions": 1
+        },
+        {
+          "modelHash": "781b06f10c981d974fbb4af0239bc557f91ee645c4d6f99e1af7eb67ff34a4c5",
+          "states": 2,
+          "transitions": 1
+        }
+      ],
+      "compositeStates": 2,
+      "errors": 0,
+      "warnings": 0,
+      "truncated": false
+    },
+    "checks": [
+      {
+        "id": "C1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C2",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+    ],
+    "body": "model-everything/compose/v1  verdict=pass  no error or warning findings  ok=true  errors=0 warnings=0\nCHECKS  pass C1 C2\n\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+  },
+  "datamodel: a valid model through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/datamodel/v1",
+    "modelHash": "d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966",
+    "summary": {
+      "entities": 2,
+      "fields": 4,
+      "errors": 0,
+      "warnings": 0,
+      "checksRun": 9,
+      "checksSkipped": [
+        "DA2",
+        "DA5",
+        "DA6",
+        "DA7",
+        "DA9",
+        "DA10",
+        "DA11",
+        "DA12"
+      ]
+    },
+    "checks": [
+      {
+        "id": "DS1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DS5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA2",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA5",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA6",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA7",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DA9",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA10",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA11",
+        "status": "skip",
+        "findings": []
+      },
+      {
+        "id": "DA12",
+        "status": "skip",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "These examined nothing, so their silence is not a result: Boundary Blast (DA2), Migration Coverage (DA5), Copy Consistency (DA6), Rollback/Backup Symmetry (DA7), Data Monotonic (DA9), Data Sequence (DA10), Data Leads-To (DA11), Data Atomicity (DA12). Declare what each one would need, or accept that the model is unverified on those points.",
+      "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side."
+    ],
+    "body": "model-everything/datamodel/v1  verdict=pass  no error or warning findings  ok=true  modelHash=d9d5ccf936db… errors=0 warnings=0 checksRun=9\nCHECKS  pass DS1 DS2 DS3 DS4 DS5 DA1 DA3 DA4 DA8 | skip DA2 DA5 DA6 DA7 DA9 DA10 DA11 DA12\n\nNEXT  These examined nothing, so their silence is not a result: Boundary Blast (DA2), Migration Coverage (DA5), Copy Consistency (DA6), Rollback/Backup Symmetry (DA7), Data Monotonic (DA9), Data Sequence (DA10), Data Leads-To (DA11), Data Atomicity (DA12). Declare what each one would need, or accept that the model is unverified on those points.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side."
+  },
+  "design: a layered design through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "8 warning finding(s)",
+    "schema": "model-everything/design/v1",
+    "modelHash": "4da2d99acbca316ce59fcac6260c20779ca0eaba7ced21a9d31e06a8d7840897",
+    "summary": {
+      "errors": 0,
+      "warnings": 8,
+      "info": 0,
+      "checksRun": 12,
+      "nodes": 7,
+      "edges": 6
+    },
+    "checks": [
+      {
+        "id": "DES1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES2",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES4",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.",
+            "detail": "This is a fact about the graph, not a verdict about the design. A gateway layer is supposed to be such a node; the point is that it was not stated."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.",
+            "detail": "This is a fact about the graph, not a verdict about the design. A gateway layer is supposed to be such a node; the point is that it was not stated."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge repo -> db is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> audit is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> orderstore is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> pricelist is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge service -> repo is a bridge: it is the only dependency joining its two sides."
+          },
+          {
+            "code": "DES4_LOAD_BEARING_ELEMENT",
+            "severity": "warning",
+            "message": "the edge ui -> service is a bridge: it is the only dependency joining its two sides."
+          }
+        ]
+      },
+      {
+        "id": "DES5",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES6",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES7",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES8",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES9",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES10",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES11",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "DES12",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Read the 8 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
+    ],
+    "body": "model-everything/design/v1  verdict=pass_with_findings  8 warning finding(s)  ok=true  modelHash=4da2d99acbca… errors=0 warnings=8 checksRun=12\nCHECKS  pass DES1 DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11 DES12 | warn DES4\n\nWARN DES4 Load-Bearing Elements — 8 element(s) the graph depends on (8 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge repo -> db is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> audit is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> orderstore is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> pricelist is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> repo is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> service is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 8 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
+  },
+  "concurrency: absolute claims through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "2 error finding(s) (first error: CONCURRENCY_ABSOLUTE_CLAIM)",
+    "schema": "model-everything/concurrency/v1",
+    "summary": {
+      "lines": 1,
+      "keywords": 3,
+      "absoluteClaims": 2,
+      "warnings": 1,
+      "errors": 2
+    },
+    "findings": [
+      {
+        "code": "CONCURRENCY_ABSOLUTE_CLAIM",
+        "severity": "error",
+        "message": "Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+      },
+      {
+        "code": "CONCURRENCY_ABSOLUTE_CLAIM",
+        "severity": "error",
+        "message": "Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+      },
+      {
+        "code": "CONCURRENCY_KEYWORD",
+        "severity": "warning",
+        "message": "Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk."
+      }
+    ],
+    "nextSteps": [
+      "Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.",
+      "Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.",
+      "This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
+    ],
+    "body": "model-everything/concurrency/v1  verdict=fail  2 error finding(s) (first error: CONCURRENCY_ABSOLUTE_CLAIM)  ok=true  errors=2 warnings=1\nFINDINGS  3 total (2 error, 1 warning): CONCURRENCY_ABSOLUTE_CLAIM x2 | CONCURRENCY_KEYWORD x1\n\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk.\n\nNEXT  Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.\nNEXT  Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.\nNEXT  This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
   }
 }
