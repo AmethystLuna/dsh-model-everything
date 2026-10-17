@@ -2144,5 +2144,77 @@ test('overview: every code the family declares is produced by its own case', () 
   }
 })
 
+// ------------------------------------------------------- render -> parse, the long families --
+
+const CLASS_MODEL = {
+  schemaVersion: 1,
+  family: 'class',
+  nodes: [{ id: 'Order', kind: 'class' }, { id: 'User', kind: 'class' }],
+  edges: [{ from: 'Order', to: 'User', label: 'places' }],
+}
+
+test('round trip: a class diagram reads back as the model it was drawn from', () => {
+  const out = renderUml(CLASS_MODEL, 'plantuml', 'class')
+  const back = parseUml(out.primary, 'plantuml')
+  // A structure model is declarative: nothing about drawing it should add or drop a node, an edge or a kind.
+  if (JSON.stringify(back.model) !== JSON.stringify(CLASS_MODEL)) {
+    throw new Error('the model did not survive the round trip:\n  before ' + JSON.stringify(CLASS_MODEL) + '\n  after  ' + JSON.stringify(back.model))
+  }
+})
+
+test('round trip: the comparison is not vacuous - one changed edge label shows up', () => {
+  // Without this, "the model came back equal" would also hold for a parser that returned a constant.
+  const changed = { ...CLASS_MODEL, edges: [{ from: 'Order', to: 'User', label: 'owns' }] }
+  const back = parseUml(renderUml(changed, 'plantuml', 'class').primary, 'plantuml')
+  if (JSON.stringify(back.model) === JSON.stringify(CLASS_MODEL)) throw new Error('a changed label must not read back as the old model')
+  if (JSON.stringify(back.model) !== JSON.stringify(changed)) throw new Error('and it must read back as the new one')
+})
+
+const TIMING_MODEL = {
+  schemaVersion: 1,
+  unit: 's',
+  lifelines: [{ id: 'A' }, { id: 'B' }],
+  states: [{ id: 'Idle' }, { id: 'Run' }],
+  segments: [
+    { lifeline: 'A', state: 'Idle', from: 0 },
+    { lifeline: 'A', state: 'Run', from: 5 },
+  ],
+  messages: [{ from: 'A', to: 'B', time: 2, label: 'start' }],
+  constraints: [],
+}
+
+test('round trip: a timing diagram reads back normatively, with the drawing defaults made explicit', () => {
+  const out = renderUml(TIMING_MODEL, 'plantuml', 'timing')
+  const back = parseUml(out.primary, 'plantuml')
+  const parsed = back.model
+  // PlantUML draws a lifeline with a style; the model left it absent, and the parsed model names the style
+  // that was actually drawn. That is the renderer telling the truth about what it emitted, not a defect.
+  for (const lifeline of parsed.lifelines) {
+    if (lifeline.kind !== 'robust') throw new Error('a drawn lifeline names its style: ' + JSON.stringify(lifeline))
+  }
+  // A segment from 0 marks the left edge, and the renderer declares it so the reader does not have to infer it.
+  const first = parsed.segments[0]
+  if (first.lifeline !== 'A' || first.state !== 'Idle' || first.from !== 0 || first.atStart !== true) {
+    throw new Error('the first segment must read back at t=0 with the left edge marked: ' + JSON.stringify(first))
+  }
+  // The rest of the axis is unchanged.
+  if (parsed.segments[1].from !== 5 || parsed.segments[1].state !== 'Run') throw new Error('the second segment moved: ' + JSON.stringify(parsed.segments[1]))
+  if (parsed.messages.length !== 1 || parsed.messages[0].time !== 2 || parsed.messages[0].label !== 'start') throw new Error('the message did not survive: ' + JSON.stringify(parsed.messages))
+  if (parsed.unit !== 's') throw new Error('the unit did not survive: ' + String(parsed.unit))
+})
+
+test('round trip: rendering twice is a fixed point', () => {
+  // The stronger property, and the one that catches a renderer whose output is not stable under its own
+  // reading: re-rendering what was read back must produce the same diagram. It is also what makes a model
+  // diff over a render meaningful.
+  for (const [model, notation, family] of [[CLASS_MODEL, 'plantuml', 'class'], [TIMING_MODEL, 'plantuml', 'timing']]) {
+    const once = renderUml(model, notation, family).primary
+    const twice = renderUml(parseUml(once, notation).model, notation, family).primary
+    if (once !== twice) {
+      throw new Error(family + ': the second render differs from the first\n  once  ' + JSON.stringify(once.slice(0, 200)) + '\n  twice ' + JSON.stringify(twice.slice(0, 200)))
+    }
+  }
+})
+
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }
 console.log('all uml tests passed')
