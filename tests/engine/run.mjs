@@ -2842,7 +2842,11 @@ async function runCapTests() {
   console.log('PASS cap: a deadline walk that hit its budget is undecided, not clean')
 
   // The near miss: with a budget that finishes, A14 decides, and says so without an undecided finding.
-  const decided = runVerification(model, { maxStates: 10000 })
+  // A cyclic model cannot hold any finite budget - the cycle accumulates - so the decided case is a straight
+  // line. Using the cyclic one here is what the first draft did, and it asserted holds about a model that
+  // overruns by construction.
+  const acyclic = { ...model, transitions: [{ from: 'A', event: 'go', to: 'B', cost: 1 }, { from: 'B', event: 'stop', to: 'C', cost: 1 }] }
+  const decided = runVerification(acyclic, { maxStates: 10000 })
   const decidedA14 = decided.checks.find((check) => check.id === 'A14')
   if (decidedA14.findings.some((finding) => finding.code === 'A14_UNDECIDED')) {
     throw new Error('a search that finished must not claim to be undecided: ' + JSON.stringify(decidedA14.findings.map((finding) => finding.code)))
@@ -2853,6 +2857,53 @@ async function runCapTests() {
 }
 
 await runCapTests()
+
+
+// ------------------------------------------- A12 under a budget it cannot finish --
+
+async function runBudgetCapTests() {
+  const model = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B', cost: 1 },
+      { from: 'B', event: 'back', to: 'A', cost: 1 },
+      { from: 'A', event: 'stop', to: 'C', cost: 1 },
+    ],
+    invariants: [{ id: 'cap', description: 'stays under budget', kind: 'budget', budget: 100 }],
+  }
+
+  // The walk stops when the budget runs out, which decides nothing about the paths it never expanded. It used
+  // to return undefined and the check answered "All budget invariants hold".
+  const capped = runVerification(model, { maxStates: 2 })
+  const a12 = capped.checks.find((check) => check.id === 'A12')
+  if (!a12.findings.some((finding) => finding.code === 'A12_UNDECIDED')) {
+    throw new Error('a budget walk that hit its budget must say it did not finish, got ' + JSON.stringify(a12.findings.map((finding) => finding.code)))
+  }
+  if (/All budget invariants hold/.test(String(a12.detail))) throw new Error('and must not claim they hold: ' + String(a12.detail))
+  console.log('PASS cap: a budget walk that hit its budget is undecided, not clean')
+
+  // The near miss, in both directions: a walk that finishes decides, and a budget of 0 is still violated.
+  // A cyclic model cannot hold any finite budget - the cycle accumulates - so the decided case is a straight
+  // line. Using the cyclic one here is what the first draft did, and it asserted holds about a model that
+  // overruns by construction.
+  const acyclic = { ...model, transitions: [{ from: 'A', event: 'go', to: 'B', cost: 1 }, { from: 'B', event: 'stop', to: 'C', cost: 1 }] }
+  const decided = runVerification(acyclic, { maxStates: 10000 })
+  const decidedA12 = decided.checks.find((check) => check.id === 'A12')
+  if (decidedA12.findings.some((finding) => finding.code === 'A12_UNDECIDED')) throw new Error('a finished walk must not claim undecided')
+  if (!/All budget invariants hold/.test(String(decidedA12.detail))) throw new Error('and it must say the budget holds: ' + String(decidedA12.detail))
+  const tooTight = runVerification({ ...model, invariants: [{ id: 'cap', description: 'stays under budget', kind: 'budget', budget: 0 }] }, { maxStates: 10000 })
+  const tightA12 = tooTight.checks.find((check) => check.id === 'A12')
+  if (!tightA12.findings.some((finding) => finding.code === 'A12_BUDGET_OVER')) {
+    throw new Error('a budget of 0 must still be violated, got ' + JSON.stringify(tightA12.findings.map((finding) => finding.code)))
+  }
+  console.log('PASS cap: the budget walk still decides when it finishes, and still fails a real overrun')
+
+  console.log('PASS budget-cap')
+}
+
+await runBudgetCapTests()
 
 
 if (failures > 0) {
