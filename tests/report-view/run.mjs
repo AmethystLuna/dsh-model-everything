@@ -66,12 +66,16 @@ test('passing checks are silenced but still inventoried', () => {
   const failed = report.checks.filter((check) => check.status === 'fail').map((check) => check.id)
   assert(passed.length > 0 && failed.length > 0, 'fixture precondition: both outcomes present')
   const inventory = body.split('\n').find((line) => line.startsWith('CHECKS'))
-  for (const id of [...passed, ...failed]) assert(inventory.includes(id), `check ${id} missing from the inventory line`)
-  for (const id of passed) {
-    assert(!new RegExp(`^PASS ${id} `, 'm').test(body), `passing check ${id} must not expand a body`)
-  }
-  for (const id of failed) {
-    assert(new RegExp(`^FAIL ${id} `, 'm').test(body), `failing check ${id} must expand a body`)
+  for (const check of report.checks) assert(inventory.includes(check.id), `check ${check.id} missing from the inventory line`)
+  for (const check of report.checks) {
+    if (check.status === 'pass') {
+      assert(!new RegExp(`^PASS ${check.id} `, 'm').test(body), `passing check ${check.id} must not expand a body`)
+      continue
+    }
+    if (check.status !== 'fail') continue // a skipped check has nothing to expand
+    // The heading follows the severity, so a warning-only check says WARN while its status stays `fail`.
+    const label = check.findings.some((finding) => finding.severity === 'error') ? 'FAIL' : 'WARN'
+    assert(new RegExp(`^${label} ${check.id} `, 'm').test(body), `check ${check.id} with findings must expand a body headed ${label}`)
   }
 })
 
@@ -202,6 +206,42 @@ test('full is the escape hatch for a caller that needs the object itself', () =>
 
 test('rendering is deterministic', () => {
   assert(renderReportText(report) === renderReportText(report), 'two renders of one report must be identical')
+})
+
+test('a warning-only check is grouped and headed as warn, not as fail', () => {
+  // `status` is `fail` for any check with a finding, which is right for a machine and misleading for a
+  // reader: a report can say "no error findings" on its first line and then label the same checks FAIL. The
+  // body has to agree with the inventory, or the misreading simply moves down a line.
+  const reportWithWarnings = {
+    schema: 'model-everything/verify/v1',
+    verdict: 'pass_with_findings',
+    ok: true,
+    ran: true,
+    summary: { errors: 0, warnings: 1, checksRun: 2 },
+    checks: [
+      { id: 'S1', name: 'Reachability', status: 'pass', detail: 'All states reachable', findings: [] },
+      { id: 'S5', name: 'Event Completeness', status: 'fail', detail: '1 unhandled pair (1 warnings)', findings: [
+        { code: 'S5_UNHANDLED_EVENT', severity: 'warning', message: 'A does not handle stop' },
+      ] },
+      { id: 'A12', name: 'Budget', status: 'fail', detail: 'Budget exceeded (1 errors)', findings: [
+        { code: 'A12_BUDGET_OVER', severity: 'error', message: 'worst-case path cost 115 is over budget 100' },
+      ] },
+      { id: 'A14', name: 'Deadline', status: 'skip', detail: 'skipped: no state declares maxTicks', findings: [] },
+    ],
+    nextSteps: ['nothing to do'],
+  }
+  const text = renderReportText(reportWithWarnings)
+  const inventory = text.split('\n').find((line) => line.startsWith('CHECKS'))
+  assert(inventory.includes('warn S5'), `the inventory groups the warning-only check under warn — got ${inventory}`)
+  assert(inventory.includes('fail A12'), `and the error-carrying check under fail — got ${inventory}`)
+  assert(inventory.includes('skip A14'), `and the skipped check under skip — got ${inventory}`)
+  // The section headers must say the same thing as the inventory.
+  assert(text.includes('WARN S5 Event Completeness'), 'the body heading for a warning-only check says WARN')
+  assert(!text.includes('FAIL S5'), 'and never FAIL')
+  assert(text.includes('FAIL A12 Budget'), 'an error-carrying check still says FAIL')
+  // A skipped check is named in the inventory and expands nothing: there is no finding to show, which is
+  // exactly what skipping means. Its heading would be a paragraph about nothing.
+  assert(!/^SKIP A14 /m.test(text), 'a skipped check must not expand a body')
 })
 
 test('the body costs a fraction of the pretty JSON it replaces', () => {

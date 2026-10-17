@@ -255,8 +255,12 @@ function renderChecksReport(report: Record_, options: Required<ReportViewOptions
     const body = findingLines(findings, options, seenFacts)
     if (status !== 'fail' && body.length === 0) continue
     lines.push('')
+    // The section header says what the inventory said: `fail` for a check carrying an error, `warn` for one
+    // carrying warnings only. Printing FAIL here while the CHECKS line grouped the same check under `warn`
+    // put the misreading one line below where it had just been removed.
+    const label = status === 'fail' ? (failingKind(check) === 'error' ? 'FAIL' : 'WARN') : status.toUpperCase()
     lines.push(
-      `${status.toUpperCase()} ${text(check.id) ?? '?'} ${text(check.name) ?? ''} — ${text(check.detail) ?? ''} (${String(findings.length)} finding(s))`.replace(/ +— +$/, ''),
+      `${label} ${text(check.id) ?? '?'} ${text(check.name) ?? ''} — ${text(check.detail) ?? ''} (${String(findings.length)} finding(s))`.replace(/ +— +$/, ''),
     )
     lines.push(...body)
   }
