@@ -309,6 +309,7 @@ export declare const REPORT_SCHEMAS: {
     readonly umlParse: 'model-everything/uml/parse/v1';
     readonly umlReview: 'model-everything/uml/review/v1';
     readonly umlExplainLabels: 'model-everything/uml/explain-labels/v1';
+    readonly umlRefusal: 'model-everything/uml/refusal/v1';
     readonly structure: 'model-everything/structure/v1';
     readonly granularity: 'model-everything/granularity/v1';
     readonly design: 'model-everything/design/v1';

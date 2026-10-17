@@ -276,7 +276,11 @@ function renderFindingsReport(report: Record_, options: Required<ReportViewOptio
   for (const finding of findings) byCode.set(finding.code, (byCode.get(finding.code) ?? 0) + 1)
   const lines = [
     ...headerLines(report, options),
-    `FINDINGS  ${String(findings.length)} total (${String(errors)} error, ${String(warnings)} warning): ${[...byCode].map(([code, n]) => `${code} x${String(n)}`).join(' | ')}`,
+    // An empty roster says so in one word. `0 total (0 error, 0 warning):` with a dangling colon read like a
+    // line that had lost its content.
+    findings.length === 0
+      ? 'FINDINGS  none — nothing was reported'
+      : `FINDINGS  ${String(findings.length)} total (${String(errors)} error, ${String(warnings)} warning): ${[...byCode].map(([code, n]) => `${code} x${String(n)}`).join(' | ')}`,
   ]
   const body = findingLines(findings, options, new Set<string>())
   if (body.length > 0) lines.push('', ...body)
@@ -350,7 +354,10 @@ export function renderReportText(value: unknown, options: ReportViewOptions = {}
   const report = record(value)
   if (report === undefined) return JSON.stringify(value as JsonValue) ?? String(value)
   const hasChecks = array(report.checks).some((check) => record(check) !== undefined)
-  const hasFindings = array(report.findings).length > 0
+  // A report that CARRIES a findings list is a findings report even when the list is empty. Routing on
+  // length sent a clean report to the unknown-shape fallback, which printed the whole JSON - so the default
+  // view cost more than the `full` escape hatch it exists to be cheaper than.
+  const hasFindings = Array.isArray(report.findings)
   const isDelta = array(report.added).length + array(report.removed).length + array(report.changed).length > 0
   const isPayload = typeof report.diagram === 'string' || typeof report.primary === 'string'
   const lines = hasChecks
