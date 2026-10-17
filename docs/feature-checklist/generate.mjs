@@ -17,7 +17,10 @@ const suiteChecks = new Map()
 for (const step of chain) {
   const suite = step.split('/')[1]
   const text = readFileSync(repo + step, 'utf8')
-  const checks = [...text.matchAll(/^(?:check|test)\('([^']+)'/gm)].map((match) => match[1])
+  // Either quote style: a check name carrying an apostrophe ("that skill's catalog line") is
+  // written with double quotes, and a counter that read only single quotes silently lost it -
+  // the checklist then said the suite had one check fewer than it does.
+  const checks = [...text.matchAll(/^(?:check|test)\((['"])(.+?)\1/gm)].map((match) => match[2])
   suiteChecks.set(suite, checks)
 }
 
