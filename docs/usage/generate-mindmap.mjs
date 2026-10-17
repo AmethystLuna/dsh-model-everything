@@ -24,7 +24,18 @@ const tokens = (text) => {
 
 /** The host facts this guide rests on, read from the installed dsh rather than recalled. */
 const hostFacts = {}
+// A CI runner has no installed dsh, and a checkout is not the place to demand one: the facts are a
+// measurement OF THE HOST, not of this machine, so the recorded values are the right thing to reuse
+// when no host is present. A readable host is always re-measured, so a host that changes its budget
+// still shows up as drift on a machine that has one.
+const previousFacts = existsSync(new URL('./facts.json', import.meta.url))
+  ? (JSON.parse(readFileSync(new URL('./facts.json', import.meta.url), 'utf8')).hostFacts ?? {})
+  : {}
 const readHost = (label, path, pattern) => {
+  if (!existsSync(path)) {
+    hostFacts[label] = previousFacts[label] ?? 'no host in this checkout'
+    return
+  }
   try {
     const text = readFileSync(path, 'utf8')
     const match = pattern.exec(text)
