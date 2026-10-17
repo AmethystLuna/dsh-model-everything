@@ -16,7 +16,7 @@ metadata:
 | `dsh-model-everything` | 全部工具与技能 | 开 |
 | `dsh-model-everything-gate` | 会话第一条模型步注入的一条路由消息 | **关** |
 
-`enabled` 是 live 字段（schemastery `.volatile()`），所以 Plugins 页翻开关**不用重启**；老 host 没有 `.volatile()` 时退化成普通布尔，要重启。`gateContent` 故意不是 live——设置面板是表单，一千多字的散文不适合放进表单，要在 profile 的 `cordis.patch.yml` 里覆盖。
+`enabled` 是 live 字段（schemastery `.volatile()`）：**宿主挂了设置服务时**，Plugins 页翻开关不用重启；老 host 没有 `.volatile()` 时退化成普通布尔，要重启。**本项目自己的 `desktop` profile 实测没挂设置服务**（`Config.listConfigs` 里 `include:settings` 与 `include:config-editor` 都是 `absent`），所以在那里「打开」的可行路径是改行配置 + 重启，或由插件管理器把这一行 `enabled` 掉/开起来——那管的是行，不是行内 config。写文档时别把「有 live 开关」当成所有部署的既有条件：它是有条件的。`gateContent` 故意不是 live——设置面板是表单，一千多字的散文不适合放进表单，要在 profile 的 `cordis.patch.yml` 里覆盖。
 
 ## 为什么要它
 
