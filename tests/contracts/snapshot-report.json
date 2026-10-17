@@ -1687,7 +1687,7 @@
     "summary": {},
     "findings": [],
     "nextSteps": [],
-    "body": "none  verdict=fail  threw: model invalid: schemaVersion: must be 1; init: must be a non-empty string; states: must be a non-empty array; transitions: must be an array  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\n\n{\"ok\":false,\"ran\":false,\"verdict\":\"fail\",\"verdictReason\":\"threw: model invalid: schemaVersion: must be 1; init: must be a non-empty string; states: must be a non-empty array; transitions: must be an array\",\"schema\":\"none\",\"summary\":{},\"findings\":[],\"nextSteps\":[]}"
+    "body": "none  verdict=fail  threw: model invalid: schemaVersion: must be 1; init: must be a non-empty string; states: must be a non-empty array; transitions: must be an array  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\nFINDINGS  none — nothing was reported"
   },
   "report diff: a machine against its own refactor": {
     "ok": true,

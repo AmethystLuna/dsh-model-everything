@@ -357,26 +357,21 @@ await test('uml_review: neither model nor diagram is refused by the tool as a re
   expectEq(value.ok, false, 'ok is false: the request was not answered')
   expectEq(value.ran, false, 'ran is false: no review was attempted')
   expectEq(value.errorCode, 'UML_INPUT', 'the refusal carries its code')
-  // The refusal contract is not uniform: this one carries no `schema`. See the case below.
-  expectEq(value.schema, undefined, 'the UML front end does not stamp a schema on a refusal')
+  // The refusal carries a schema of its own: it happens before the action resolves, so there is no action
+  // schema to name, and one of its own is what makes it identifiable from the field every family sets.
+  expectEq(value.schema, 'model-everything/uml/refusal/v1', 'the refusal carries the refusal schema')
 })
 
-// PINNED GAP. Basis: `errorResult` in src/uml-tool.ts builds
-// `{ ok, ran, ...refusalVerdict(message), errorCode, error }` and never a `schema`, so every
-// refusal from the UML front end lacks the field — while the in-body refusal in
-// src/structure-tool.ts adds `schema: REPORT_SCHEMAS.structure` and the catch in
-// src/export-tool.ts adds `schema: REPORT_SCHEMAS.export`. A consumer that branches on
-// `schema` therefore cannot do it for every refusal. Recorded, not endorsed.
-await test('uml_review: PINNED — a UML refusal carries no `schema`, unlike a structure or export refusal', async () => {
-  const uml = expectReport(await call('uml_review', {}), 'a UML refusal')
-  const structure = expectReport(await call('uml_structure_verify', {}), 'a structure refusal')
-  const exported = expectReport(await call('model_export', { model: 'nope', format: 'tla' }), 'an export refusal')
-  expectEq(uml.ran, false, 'all three refused')
-  expectEq(structure.ran, false, 'all three refused')
-  expectEq(exported.ran, false, 'all three refused')
-  expectEq(uml.schema, undefined, 'the UML refusal has no family schema — this is the gap')
-  expectEq(structure.schema, 'model-everything/structure/v1', 'the structure refusal has one')
-  expectEq(exported.schema, 'model-everything/export/v1', 'the export refusal has one')
+// This was a PINNED GAP: the UML front end built its refusals by hand and stamped no `schema`, so it was the
+// one refusal a reader could not identify from the field every other family sets. It carries one now, and a
+// schema of its own because a refusal happens before the action resolves.
+await test('uml_review: a refusal carries the refusal schema, like every other family', async () => {
+  // No model and no diagram: the tool's own refusal, which the argument layer lets through because both
+  // parameters are optional. An unknown notation never reaches here - the enum refuses it first.
+  const value = expectReport(await call('uml_review', {}), 'neither a model nor a diagram')
+  expectEq(value.ok, false, 'the notation is refused')
+  expectEq(value.errorCode, 'UML_INPUT', 'with a code')
+  expectEq(value.schema, 'model-everything/uml/refusal/v1', 'and a schema naming what it is')
 })
 
 await test('uml_review: the nearest case — a model and no diagram — is a real review', async () => {
@@ -725,22 +720,21 @@ await test('reportView: digest is the shorter view for a checks-report family', 
   expect(digestText.includes('CHECKS'), `the digest still carries the inventory line, got ${show(digestText.slice(0, 160))}`)
 })
 
-// PINNED INVERSION. Basis: `renderReportText` (src/report-view.ts) recognizes a `checks[]`
-// report, then a `findings[]` report, then a delta, then a payload, and otherwise falls back to
-// `renderFallbackReport`, which prints the header plus `JSON.stringify(rest)` COMPACT — while
-// `full` prints the same object INDENTED. A small findings-free structure report therefore
-// makes the default view larger than the escape hatch. Recorded, not endorsed: this case goes
-// red the day the fallback stops costing more than the structured report.
-await test('uml_structure_verify: PINNED — on a findings-free report the default view is larger than full', async () => {
+// This was a PINNED INVERSION: a findings-free report took the unknown-shape fallback, which printed the
+// whole compact JSON, so the default view cost more than the `full` escape hatch it exists to be cheaper than.
+// The dispatcher now routes on "carries a findings list" rather than on "the list is non-empty", and the
+// empty roster prints one line. The assertion is the direction a view is supposed to have.
+await test('uml_structure_verify: on a findings-free report the default view is cheaper than full', async () => {
   const digest = await call('uml_structure_verify', { diagram: STRUCTURE_DIAGRAM })
   const full = await call('uml_structure_verify', { diagram: STRUCTURE_DIAGRAM, reportView: 'full' })
   const digestText = digest.content[0]?.text ?? ''
   const fullText = full.content[0]?.text ?? ''
   expectEq(fullText, JSON.stringify(full.value, null, 2), 'full view prints the structured report verbatim')
   expect(
-    digestText.length > fullText.length,
-    `the pinned inversion is gone: the fallback View is now ${String(digestText.length)} chars against ${String(fullText.length)} for full — rewrite this case`,
+    digestText.length < fullText.length,
+    `the default view must cost less than full, got ${String(digestText.length)} against ${String(fullText.length)}`,
   )
+  expect(digestText.includes('FINDINGS'), 'and it still names the roster, empty or not')
 })
 
 // ---------------------------------------------------------------------------

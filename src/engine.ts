@@ -472,6 +472,9 @@ export const REPORT_SCHEMAS = {
   umlParse: 'model-everything/uml/parse/v1',
   umlReview: 'model-everything/uml/review/v1',
   umlExplainLabels: 'model-everything/uml/explain-labels/v1',
+  // A UML refusal happens before the action resolves, so there is no action schema to name. It still carries
+  // one: every other family's refusal does, and a reader who keys on `schema` was left with nothing.
+  umlRefusal: 'model-everything/uml/refusal/v1',
   structure: 'model-everything/structure/v1',
   granularity: 'model-everything/granularity/v1',
   design: 'model-everything/design/v1',

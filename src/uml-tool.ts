@@ -222,5 +222,7 @@ function refusal(error: unknown): JsonValue {
 }
 
 function errorResult(message: string, errorCode = 'UML_INPUT'): JsonValue {
-  return { ok: false, ran: false, ...refusalVerdict(message), errorCode, error: message } as unknown as JsonValue
+  // Carries the refusal schema. Every other family's refusal carries one, and a reader who decides "what am I
+  // holding" from `schema` got nothing from this one - it was the only refusal shaped differently.
+  return { ok: false, ran: false, ...refusalVerdict(message), schema: REPORT_SCHEMAS.umlRefusal, errorCode, error: message } as unknown as JsonValue
 }
