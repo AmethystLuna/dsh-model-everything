@@ -226,8 +226,7 @@ Turn the verdict into an answer, never into a summary of `ok`:
 
 Exit codes: `0` for `pass` / `pass_with_findings`, `2` for `fail`, a refusal, or an unreadable input. In DSH the native tools return the report as data — read `verdict`, and treat `errorCode`/`error` as the refusal path.
 
-`summary.truncated: true`, or a finding whose code ends in `_UNDECIDED`
-(`S7_UNDECIDED`, `A7_UNDECIDED`, `A9_LEADS_TO_UNDECIDED`, `D2_UNDECIDED`), means the search
+`summary.truncated: true`, or a finding whose code ends in `_UNDECIDED`, means the search
 stopped before deciding. That is **not** a pass: name the invariant that went undecided,
 and say the property is undecided rather than reading the silence as success.
 
