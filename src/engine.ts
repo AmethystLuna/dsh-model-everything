@@ -4094,6 +4094,19 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
   const c2Findings: Finding[] = []
   const allEventsSet = new Set<string>()
   for (const set of machineEventSets) for (const event of set) allEventsSet.add(event)
+  // A name the machines never declare resolves to nothing, and the loop below used to `continue` past it: a
+  // typo in `rendezvous` skipped the handshake entirely while the detail still reported that every rendezvous
+  // can fire - a pass over a check that never ran. The verify family answers the same mistake with
+  // MODEL_UNRESOLVED_EVENT; this is that answer for the composition.
+  for (const event of rendezvous) {
+    if (allEventsSet.has(event)) continue
+    c2Findings.push({
+      code: 'C2_RENDEZVOUS_UNRESOLVED',
+      severity: 'warning',
+      message: 'Rendezvous event "' + event + '" is declared nowhere: no machine has a transition or action on it, so this handshake was not checked. Name an event the machines declare, or remove it from `rendezvous`.',
+      evidence: { event, declared: [...allEventsSet].sort() },
+    })
+  }
   for (const event of rendezvous) {
     if (!allEventsSet.has(event)) continue
     if ((firedCount.get(event) ?? 0) === 0) {
@@ -4139,8 +4152,13 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
     : truncated
       ? 'No composition deadlock found, but the search was truncated at ' + String(maxStates) + ' composite states: absence is not proven'
       : 'No composition deadlock reachable'
+  // The detail has to describe what was established. A name that resolved to nothing was never examined, so
+  // the count of findings is not the same statement as "every rendezvous can fire".
+  const unresolvedCount = c2Findings.filter((finding) => finding.code === 'C2_RENDEZVOUS_UNRESOLVED').length
   const c2Detail = c2Findings.length > 0
-    ? 'Rendezvous errors: ' + String(c2Findings.length)
+    ? (unresolvedCount === c2Findings.length && c2Findings.length > 0
+      ? String(unresolvedCount) + ' rendezvous name(s) resolved to no event, so that handshake was not checked'
+      : 'Rendezvous errors: ' + String(c2Findings.length) + (unresolvedCount > 0 ? ' (' + String(unresolvedCount) + ' unresolved name(s))' : ''))
     : truncated
       ? 'All rendezvous events fired, but the search was truncated at ' + String(maxStates) + ' composite states'
       : 'All rendezvous events can fire'

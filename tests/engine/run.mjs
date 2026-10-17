@@ -2770,6 +2770,45 @@ await runSkipSemanticsTests()
 
 await runEntryShapeTests()
 
+// ------------------------------------------------- compose: a name that resolves to nothing --
+
+async function runRendezvousTests() {
+  const A = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
+  const B = { schemaVersion: 1, init: 'X', states: [{ id: 'X' }, { id: 'Y', terminal: true }], transitions: [{ from: 'X', event: 'go', to: 'Y' }] }
+
+  const declared = runCompositionVerification([A, B], { rendezvous: ['go'] })
+  const c2 = declared.checks.find((check) => check.id === 'C2')
+  if (c2 === undefined) throw new Error('C2 is missing')
+  // A declared name that every machine carries is a handshake this can actually decide.
+  if (c2.findings.length !== 0) throw new Error('a resolvable rendezvous must not produce a finding: ' + JSON.stringify(c2.findings))
+  if (!/can fire/.test(String(c2.detail))) throw new Error('and the detail says so: ' + String(c2.detail))
+  console.log('PASS compose: a resolvable rendezvous is decided')
+
+  // A typo used to be skipped in silence: the loop only looked at names the machines declared, so an
+  // undeclared name was never examined and the detail still said every rendezvous can fire. That is a pass
+  // over a check that never ran.
+  const typo = runCompositionVerification([A, B], { rendezvous: ['ack_recived'] })
+  const typoC2 = typo.checks.find((check) => check.id === 'C2')
+  if (!typoC2.findings.some((finding) => finding.code === 'C2_RENDEZVOUS_UNRESOLVED')) {
+    throw new Error('an undeclared rendezvous must be reported, got ' + JSON.stringify(typoC2.findings))
+  }
+  if (typo.verdict === 'pass') throw new Error('a check that examined nothing must not leave a clean verdict: ' + typo.verdict)
+  if (/can fire/.test(String(typoC2.detail))) throw new Error('the detail must not claim what it did not establish: ' + String(typoC2.detail))
+  console.log('PASS compose: an unresolved rendezvous becomes a finding, not silence')
+
+  // Two names, one of them real: the real one still resolves, and the report says how many did not.
+  const mixed = runCompositionVerification([A, B], { rendezvous: ['go', 'also_typo'] })
+  const mixedC2 = mixed.checks.find((check) => check.id === 'C2')
+  const unresolved = mixedC2.findings.filter((finding) => finding.code === 'C2_RENDEZVOUS_UNRESOLVED').length
+  if (unresolved !== 1) throw new Error('exactly the unresolved name must be reported, got ' + String(unresolved))
+  console.log('PASS compose: the resolved and the unresolved name are told apart')
+
+  console.log('PASS compose-rendezvous')
+}
+
+await runRendezvousTests()
+
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)
