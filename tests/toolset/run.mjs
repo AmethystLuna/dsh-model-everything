@@ -203,6 +203,42 @@ test('the skipped-check list stays a list of codes', async () => {
   if (skipped.length === 0) throw new Error('this design skips checks, so the list must not be empty; the check would pass vacuously')
 })
 
+test('every tool appears in at least one typical use', () => {
+  // The user asked whether "Typical uses" covers the capability list, and it did not: five of twelve tools
+  // were named only in the tool table. A reader learns that a capability exists without learning when to
+  // reach for it, which is the documentation half of the usage problem this repository has been fixing.
+  // Ask the built objects, not the source text: a tool's name is exported as a constant and referenced
+  // inside `defineTool`, so a regex over src/ found zero of them. That is the second time this session a
+  // source-shaped probe measured nothing.
+  const names = new Set(tools.map((tool) => tool.name))
+  if (names.size < 10) throw new Error('this check found only ' + String(names.size) + ' tools; it would pass vacuously')
+
+  for (const readme of ['README.md', 'README.en-US.md']) {
+    const text = readFileSync(repo + readme, 'utf8')
+    const usageStart = Math.max(text.indexOf('## Typical uses'), text.indexOf('## 典型用法'))
+    const toolsStart = Math.min(...[text.indexOf('## Tools'), text.indexOf('## 工具')].filter((index) => index > 0))
+    if (usageStart < 0 || toolsStart < 0) throw new Error(readme + ' lost one of the two sections this check reads')
+    const usage = text.slice(usageStart, toolsStart)
+    const absent = [...names].filter((name) => !usage.includes(name))
+    if (absent.length > 0) {
+      throw new Error(readme + ': these tools are in the tool table but in no use, so a reader never learns when to reach for them: ' + absent.join(', '))
+    }
+  }
+})
+
+test('the README pair has the same number of uses', () => {
+  // The pair moves in one commit; a use added to one side is a use the other language does not have.
+  const sections = (name) => {
+    const text = readFileSync(repo + name, 'utf8')
+    const start = Math.max(text.indexOf('## Typical uses'), text.indexOf('## 典型用法'))
+    const end = Math.min(...[text.indexOf('## Tools'), text.indexOf('## 工具')].filter((index) => index > 0))
+    return [...text.slice(start, end).matchAll(/^### /gm)].length
+  }
+  const zh = sections('README.md')
+  const en = sections('README.en-US.md')
+  if (zh !== en) throw new Error('the pair has ' + String(zh) + ' and ' + String(en) + ' typical uses; they move in one commit')
+})
+
 test('the toolset map matches the measurement', () => {
   // The generator in check mode compares instead of writing, so this does not race on the file.
   const output = execFileSync(process.execPath, [repo + 'docs/toolset/generate-mindmap.mjs', '--check'], { encoding: 'utf8', timeout: 300_000 })
