@@ -27,7 +27,7 @@ as outside this engine and points at tooling that can handle it.
   with the same routing as above.
 - A12 advisory: transitions declaring `cost` without a `budget` invariant produce
   `A12_COST_WITHOUT_BUDGET`, pointing at the budget check.
-- `model_interleaving_scan`: absolute concurrency claims (thread-safe, lock-free,
+- `model_interleaving_scan`: absolute synchrony/async/concurrency claims (thread-safe, lock-free, non-blocking,
   interrupt-safe, ...) carry `suggestions` naming dedicated tools.
 - Manual review: when reading a plan, match its claims against the table above and
   require dedicated evidence before accepting "always"/"never"/"guaranteed" language

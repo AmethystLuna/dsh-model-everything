@@ -186,8 +186,8 @@ not a bound on the search.
 |------|--------|
 | `model_verify` | S1-S8 structural + A1-A14 adversarial, including A12 budget / worst-case path cost, A13 probabilistic reachability over a DTMC, and A14 discrete-tick deadlines. `beforeModel` + `stateMapping` add the D1-D4 before/after regression. |
 | `model_datamodel_verify` | Data models and schema migrations: DS/DA checks plus the DD1-DD4 data regression. See the `model-everything-datamodel` skill. |
-| `model_compose_verify` | Two or more machines checked together (rendezvous handshake semantics): C1 composition deadlock, C2 rendezvous never fires. |
-| `model_interleaving_scan` | Mines concurrency claims (thread-safe, lock-free, race condition, mutex, ISR-safe, and their Chinese counterparts) and routes them to dedicated verification. It does not prove concurrency safety, and it refuses text it can mine nothing from (`CONCURRENCY_NO_CLAIM`) rather than calling it clean. |
+| `model_compose_verify` | Two or more machines checked together (rendezvous handshake semantics): C1 composition deadlock, C2 rendezvous never fires. When `shared` and `accesses` declare a location both machines touch, it also decides the sharing: C3 a declaration that names nothing, C4 an unordered write, C5 a read-modify-write pair the model does not make atomic (the lost update). |
+| `model_interleaving_scan` | Mines claims about how work is executed: threads, synchronization, async, interrupts, shared state. Every finding carries a `family`; async terms (async, await, promise, event loop, callback, and their Chinese counterparts) are in the vocabulary, and an absolute async claim such as "non-blocking" is an error like "thread-safe" is. It routes each claim to the tool that decides it - and for a shared location two machines both update, that tool is `model_compose_verify` (C5), not an external analyzer. It proves nothing itself, and it refuses text it can mine nothing from (`CONCURRENCY_NO_CLAIM`) rather than calling it clean. |
 | `model_export` | Emits external-checker input from a verified model: UPPAAL, TLA+, PRISM, SPIN. |
 | `uml_render` | model → Mermaid/PlantUML source, for any family the notation can draw; a view it cannot draw is refused with the reason. |
 | `uml_parse` | diagram text → the model of the family it declares, so a hand-drawn diagram can be checked. |
@@ -447,7 +447,7 @@ This skill owns behavioural claims. Three neighbouring domains have their own sk
 |---|---|
 | Drawing a code flow as UML, or auditing a diagram somebody drew (render / parse / review / explain-labels, round-trip fidelity, component and class diagrams refused) | `model-everything-uml` |
 | Reviewing architecture, module structure or a dependency diagram (isolated nodes, dangling endpoints, cycles, allowed-dependency and layer violations, missing required edges) | `model-everything-structure` |
-| Concurrency claims — "thread-safe", "lock-free", "no data race", "ISR-safe" — mined and routed to TSan/Helgrind/CBMC/TLA+, never proven here | `model-everything-concurrency` |
+| Concurrency, synchrony and async claims — "thread-safe", "lock-free", "no data race", "ISR-safe", "non-blocking", `async`/`await` — mined and routed to TSan/Helgrind/CBMC/TLA+/UPPAAL, never proven here; a shared-location update is decided here by `model_compose_verify` (C5) | `model-everything-concurrency` |
 | Entities, fields, relationships, data invariants, schema migrations (DS1-DS4, DA1-DA12, DD1-DD4) | `model-everything-datamodel` |
 
 ---

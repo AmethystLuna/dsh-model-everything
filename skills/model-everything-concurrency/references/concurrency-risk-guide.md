@@ -12,6 +12,11 @@ Use when a document contains:
 - "race condition", "data race", "atomic", "synchronized"
 - "mutex", "semaphore", "spinlock", "reentrant", "interrupt-safe"
 - "concurrent", "parallel", "multi-threaded", "shared variable", "shared memory"
+- Async: "non-blocking", "never blocks", "async", "await", "promise", "event loop",
+  "callback", "microtask", "coroutine", "fire-and-forget", "backpressure"
+
+The families are threads, synchronization, async, interrupts and shared state. A
+single-threaded async service is not sequential: interleaving exists at every `await`.
 
 ## DSH tool
 
@@ -21,8 +26,10 @@ model_interleaving_scan text="..."
 
 Returns:
 
-- `CONCURRENCY_ABSOLUTE_CLAIM` (error) for guarantees like "thread-safe" / "lock-free" / "no data race"
-- `CONCURRENCY_KEYWORD` (warning) for risk-related terms like "race condition" / "shared memory" / "mutex"
+- `CONCURRENCY_ABSOLUTE_CLAIM` (error) for guarantees like "thread-safe" / "lock-free" / "no data race" / "non-blocking"
+- `CONCURRENCY_KEYWORD` (warning) for risk-related terms like "race condition" / "shared memory" / "mutex" / "async" / "event loop"
+
+Each finding carries a `family` (threads, synchronization, async, interrupts, shared-state), and the routing in its `suggestions` follows the family: threads to TSan/Helgrind/CBMC/TLA+, interrupts to RTOS-aware analysis, async to TLA+/UPPAAL plus the runtime checks a model cannot make.
 
 ## Manual mining checklist
 
