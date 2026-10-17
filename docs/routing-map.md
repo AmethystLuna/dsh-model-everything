@@ -21,61 +21,61 @@ mindmap
       sees: the parameter schema, field by field
       closed schema: an unknown key is refused, not ignored
       the body it just loaded is where the field semantics live
-    `me - 7 corpus trigger(s)`
-      `row: 497 of 500 chars`
+    me - 7 corpus triggers
+      row: 497 of 500 chars
       tool: model_verify
       tool: model_compose_verify
       tool: model_export
       tool: report_diff
-      `near miss x2 -> me-concurrency`
-      `near miss x2 -> me-datamodel`
-      `near miss x2 -> me-structure`
-      `near miss x2 -> me-uml`
-    `me-concurrency - 5 corpus trigger(s)`
-      `row: 341 of 500 chars`
+      near miss x2 → me-concurrency
+      near miss x2 → me-datamodel
+      near miss x2 → me-structure
+      near miss x2 → me-uml
+    me-concurrency - 5 corpus triggers
+      row: 341 of 500 chars
       tool: model_concurrency_scan
-      `near miss x1 -> me`
-      `near miss x1 -> me-datamodel`
-      `near miss x1 -> me-uml`
-      `near miss x1 -> me-structure`
-    `me-datamodel - 8 corpus trigger(s)`
-      `row: 483 of 500 chars`
+      near miss x1 → me
+      near miss x1 → me-datamodel
+      near miss x1 → me-uml
+      near miss x1 → me-structure
+    me-datamodel - 8 corpus triggers
+      row: 483 of 500 chars
       tool: model_datamodel_verify
-      `near miss x2 -> me-uml`
-      `near miss x2 -> me-concurrency`
-      `near miss x2 -> me`
-      `near miss x2 -> me-structure`
-    `me-design - 6 corpus trigger(s)`
-      `row: 478 of 500 chars`
+      near miss x2 → me-uml
+      near miss x2 → me-concurrency
+      near miss x2 → me
+      near miss x2 → me-structure
+    me-design - 6 corpus triggers
+      row: 478 of 500 chars
       tool: model_design_review
-      `near miss x2 -> me-structure`
-      `near miss x1 -> me-uml`
-      `near miss x1 -> me-concurrency`
-    `me-report-reading - 6 corpus trigger(s)`
-      `row: 420 of 500 chars`
-      `near miss x1 -> me`
-      `near miss x1 -> me-concurrency`
-      `near miss x1 -> me-datamodel`
-      `near miss x1 -> me-structure`
-      `near miss x1 -> me-uml`
-    `me-structure - 7 corpus trigger(s)`
-      `row: 476 of 500 chars`
+      near miss x2 → me-structure
+      near miss x1 → me-uml
+      near miss x1 → me-concurrency
+    me-report-reading - 6 corpus triggers
+      row: 420 of 500 chars
+      near miss x1 → me
+      near miss x1 → me-concurrency
+      near miss x1 → me-datamodel
+      near miss x1 → me-structure
+      near miss x1 → me-uml
+    me-structure - 7 corpus triggers
+      row: 476 of 500 chars
       tool: uml_structure_verify
-      `near miss x2 -> me-uml`
-      `near miss x2 -> me-concurrency`
-      `near miss x2 -> me`
-      `near miss x1 -> me-datamodel`
-      `near miss x1 -> me-design`
-      `near miss x1 -> me-report-reading`
-    `me-uml - 9 corpus trigger(s)`
-      `row: 428 of 500 chars`
+      near miss x2 → me-uml
+      near miss x2 → me-concurrency
+      near miss x2 → me
+      near miss x1 → me-datamodel
+      near miss x1 → me-design
+      near miss x1 → me-report-reading
+    me-uml - 9 corpus triggers
+      row: 428 of 500 chars
       tool: uml_render
       tool: uml_parse
       tool: uml_review
       tool: uml_explain_labels
-      `near miss x3 -> me-structure`
-      `near miss x2 -> me`
-      `near miss x2 -> me-datamodel`
+      near miss x3 → me-structure
+      near miss x2 → me
+      near miss x2 → me-datamodel
 ```
 
 ## Who owns which question (from the corpus)
