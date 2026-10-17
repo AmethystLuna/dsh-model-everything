@@ -254,7 +254,14 @@ export function diffReports(baseline: unknown, current: unknown): BaselineReport
   }
   if (changed.length > 0) nextSteps.push('Review the ' + String(changed.length) + ' changed finding(s): the same locator now reports something different, which usually means the fix moved the problem.')
   if (removed.length > 0) nextSteps.push(String(removed.length) + ' finding(s) from the baseline are gone — confirm they were fixed rather than renamed out of the report (a renamed check or a reworded message changes the identity).')
-  if (verdictOfReport(current) === 'fail') nextSteps.push('The current report still fails on its own terms; the delta being clean does not make the run clean.')
+  if (verdictOfReport(current) === 'fail') {
+    // The sentence has to match the delta it sits beside: "the delta being clean" is false when the delta failed,
+    // which is exactly the case an escalation now produces.
+    const deltaClean = delta.verdict === 'pass' || delta.verdict === 'pass_with_findings'
+    nextSteps.push(deltaClean
+      ? 'The current report still fails on its own terms; the delta being clean does not make the run clean.'
+      : 'The current report still fails on its own terms, and the delta already says the slice made it worse: settle both before accepting it.')
+  }
 
   return {
     ok: true,
