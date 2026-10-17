@@ -3046,6 +3046,63 @@ async function runInvariantCapTests() {
 await runInvariantCapTests()
 
 
+// ------------------------ A10: a sequence walk that ran out of budget ---
+
+async function runSequenceCapTests() {
+  // The sequence walk keys on the runtime PLUS how far along the declared order it is, so it visits more
+  // states than the exploration does: three progress values (nothing seen, `a` seen, both seen) over a bounded
+  // counter is three times the exploration's space. Each event is only enabled where the order allows it, so
+  // the order holds and the walk has nothing to report except how far it got.
+  const model = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'D', terminal: true }],
+    variables: [{ name: 'y', kind: 'integer', init: 0 }],
+    transitions: [
+      { from: 'A', event: 'tick', guard: { variable: 'y', op: '<', value: 40 }, to: 'A', updates: [{ variable: 'y', op: 'inc', value: 1 }] },
+      { from: 'B', event: 'tick', guard: { variable: 'y', op: '<', value: 40 }, to: 'B', updates: [{ variable: 'y', op: 'inc', value: 1 }] },
+      { from: 'A', event: 'a', to: 'B' },
+      { from: 'B', event: 'b', to: 'A' },
+      { from: 'A', event: 'done', guard: { variable: 'y', op: '>=', value: 39 }, to: 'D' },
+    ],
+    invariants: [{ id: 'a-then-b', description: 'a precedes b', kind: 'sequence', events: ['a', 'b'] }],
+  }
+  const capped = runVerification(model, { maxStates: 100 })
+  const s1 = capped.checks.find((check) => check.id === 'S1')
+  // D can only be reached after thirty-nine ticks, so "all states reachable" is evidence that the exploration
+  // finished inside the bound and the finding can only come from the sequence walk.
+  if (String(s1.detail) !== 'All states reachable') throw new Error('this case needs a finished exploration, got S1: ' + String(s1.detail))
+  const a10 = capped.checks.find((check) => check.id === 'A10')
+  if (!a10.findings.some((finding) => finding.code === 'A10_UNDECIDED')) {
+    throw new Error('a capped sequence walk must say it did not finish, got ' + JSON.stringify(a10.findings.map((finding) => finding.code)))
+  }
+  if (/All sequence invariants hold/.test(String(a10.detail))) throw new Error('and must not claim they hold: ' + String(a10.detail))
+  console.log('PASS cap: a sequence walk that hit its budget is undecided, not clean')
+
+  // Near miss, both directions: the same model with a budget that finishes decides, and an out-of-order pair
+  // is still a violation. Without the second one, a check that always said "undecided" would pass.
+  const decided = runVerification(model, { maxStates: 10000 })
+  const decidedA10 = decided.checks.find((check) => check.id === 'A10')
+  if (decidedA10.findings.some((finding) => finding.code === 'A10_UNDECIDED')) throw new Error('a finished sequence walk must not claim undecided')
+  if (!/All sequence invariants hold/.test(String(decidedA10.detail))) throw new Error('and it must say the order holds: ' + String(decidedA10.detail))
+  // Both events are enabled from the start here, so `b` can come first.
+  const outOfOrder = {
+    ...model,
+    transitions: [{ from: 'A', event: 'a', to: 'A' }, { from: 'A', event: 'b', to: 'A' }],
+  }
+  const violated = runVerification(outOfOrder, { maxStates: 10000 })
+  const violatedA10 = violated.checks.find((check) => check.id === 'A10')
+  if (!violatedA10.findings.some((finding) => finding.code === 'A10_SEQUENCE_VIOLATION')) {
+    throw new Error('an out-of-order pair must still be reported, got ' + JSON.stringify(violatedA10.findings.map((finding) => finding.code)))
+  }
+  console.log('PASS cap: a finished sequence walk still decides, holds or violated')
+
+  console.log('PASS sequence-cap')
+}
+
+await runSequenceCapTests()
+
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)
