@@ -178,7 +178,7 @@ And the gates around it:
 | `skills` | 3 | shipped text carries no catalogue counts |
 | `gate` | 13 | the package exposes the gate as its own entry point |
 | `skill-routing` | 6 | every case names a skill that ships |
-| `toolset` | 12 | every tool description names at least one sibling |
+| `toolset` | 13 | every tool description names at least one sibling |
 | `principles` | 4 | the principles index is the one the repository produces now |
 | `feature-checklist` | 4 | the checklist is the one the repository produces now |
 | `usage` | 4 | the usage map is the one the plugin and the host produce now |

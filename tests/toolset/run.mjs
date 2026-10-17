@@ -158,6 +158,29 @@ test('every declared display string states what the plugin does', () => {
   console.log('      (' + String(declared.length) + ' declared display string(s) checked: ' + declared.map((entry) => entry.where).join(', ') + ')')
 })
 
+test('the compatibility declarations agree with each other', () => {
+  // Three fields in this repository say which dsh releases this plugin works on: `dsh.engines.dsh`,
+  // `dsh.compatibility.dsh` and the `@deepseek-ai/dsh-*` peer ranges. Only the peers admit an install -
+  // `dsh.engines` and `dsh.compatibility` have no reader in dsh - but a reader or a store can see any of
+  // them, and three answers to one question is how a plugin gets advertised on a release its peers
+  // refuse. They ship in lockstep here, so they are the same string by construction; a test is what
+  // keeps that true after the next edit.
+  const pkg = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
+  const engines = pkg.dsh?.engines?.dsh
+  const declared = pkg.dsh?.compatibility?.dsh
+  const peers = pkg.peerDependencies?.['@deepseek-ai/dsh-tools']
+  if (engines === undefined || declared === undefined || peers === undefined) {
+    throw new Error('a compatibility declaration is missing: engines=' + String(engines) + ' compatibility=' + String(declared) + ' peers=' + String(peers))
+  }
+  const disagreements = [
+    ['dsh.engines.dsh', engines],
+    ['dsh.compatibility.dsh', declared],
+  ].filter(([, value]) => value !== peers)
+  if (disagreements.length > 0) {
+    throw new Error('three fields answer one question:\n    peer  ' + peers + '\n' + disagreements.map(([where, value]) => '    ' + where + ' ' + value).join('\n'))
+  }
+})
+
 test('nextSteps leads with a check name, not a bare code', async () => {
   // A model repeats nextSteps to a user more readily than any other field, so the sentence has to be
   // actionable for someone who has never seen a report. `Deadlock (S2)` works; `S2` alone does not.
