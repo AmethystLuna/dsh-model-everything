@@ -134,6 +134,7 @@
     "external",
     "feature-checklist",
     "fixtures",
+    "gate",
     "granularity",
     "memory",
     "negatives",

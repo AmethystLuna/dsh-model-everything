@@ -208,6 +208,17 @@ Restart the profile afterwards; `dsh --profile <profile> --dump-config` should l
 
 It registers its skills through the standard DSH filesystem skill provider and its tools on `ctx.tools`, plus one model-visible status entry that reports registration state and the model schema versions the bundled engines accept.
 
+### Two components, two rows
+
+| Row id | Carries | Default |
+|---|---|---|
+| `dsh-model-everything` | every tool and skill | on |
+| `dsh-model-everything-gate` | one routing message at the start of a session | **off** |
+
+The second row is optional and switched separately. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything. Turned on, it injects a short message (about 1.1k characters) into the **first model step** of each session, naming what each skill answers. It routes only - it checks nothing, and it cannot make a skill load.
+
+It is off by default because the measurement says routing is right once a session engages, while this message is paid for by the sessions that never engage. Turn it on through configuration, or the switch on the Plugins page (`enabled` is a live field, so a running host can flip it without a restart).
+
 ## Configuration
 
 | Key | Type | Default | Meaning |
@@ -223,6 +234,13 @@ Override it by row id in the profile's `cordis.patch.yml`:
       config:
         enabled: false
 ```
+
+The routing row has two keys of its own:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | boolean | `false` | Whether to inject. A live field: it can be flipped on a running host. |
+| `gateContent` | string | the built-in text | The text to inject. Replacing it means writing your own routing rules; `tests/gate` still requires it to name every shipped skill. |
 
 ## Boundaries
 

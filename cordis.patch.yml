@@ -1,11 +1,21 @@
-# dsh-model-everything bundle patch — one insert over the profile root.
+# dsh-model-everything bundle patch — two inserts over the profile root.
 #
 # Row ids are stable identity in the config tree; later layers (the user's profile
 # cordis.patch.yml, $DSH_HOME/cordis.patch.yml, --patch overlays) override a row by
 # id, replacing the whole `config` (no deep merge).
+#
+# Two components, two rows. The first carries the tools and the skills. The second
+# injects a routing message at the start of a session; it is off by default, because
+# routing already works through the skill text and the message costs tokens in every
+# session that enables it. Turn it on per deployment (`config.enabled: true`, or the
+# live switch on the Plugins page) rather than by editing the package.
 
 - insert:
     - id: dsh-model-everything
       name: 'dsh-model-everything'
       config:
         enabled: true
+    - id: dsh-model-everything-gate
+      name: 'dsh-model-everything/gate'
+      config:
+        enabled: false
