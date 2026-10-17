@@ -22,7 +22,7 @@ mod.apply(ctx, config)
 const modules = {
   model_verify: (await import('../lib/tool.js')).modelVerifyTool,
   model_datamodel_verify: (await import('../lib/data-tool.js')).modelDataModelVerifyTool,
-  model_concurrency_scan: (await import('../lib/concurrency-tool.js')).modelConcurrencyScanTool,
+  model_interleaving_scan: (await import('../lib/concurrency-tool.js')).modelConcurrencyScanTool,
   model_compose_verify: (await import('../lib/compose-tool.js')).modelComposeTool,
   model_export: (await import('../lib/export-tool.js')).modelExportTool,
   uml_render: (await import('../lib/uml-tool.js')).umlRenderTool,

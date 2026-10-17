@@ -37,7 +37,7 @@ const reports = {
   design: { report: runDesignReview({ schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } }), tool: 'model_design_review' },
   structure: { report: reviewStructure({ diagram: 'component a\ncomponent b\na --> b\n' }), tool: 'uml_structure_verify' },
   uml: { report: reviewUml({ model: machine, diagramKind: 'state' }), tool: 'uml review' },
-  concurrency: { report: runConcurrencyScan('this code is thread-safe'), tool: 'model_concurrency_scan' },
+  concurrency: { report: runConcurrencyScan('this code is thread-safe'), tool: 'model_interleaving_scan' },
   baseline: { report: diffReports(runVerification(machine), runVerification(machine)), tool: 'report_diff' },
 }
 

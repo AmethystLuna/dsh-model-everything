@@ -4,12 +4,12 @@
     {
       "skill": "model-everything",
       "chars": 497,
-      "body": 36033
+      "body": 36035
     },
     {
       "skill": "model-everything-concurrency",
       "chars": 389,
-      "body": 6859
+      "body": 6861
     },
     {
       "skill": "model-everything-datamodel",
@@ -24,7 +24,7 @@
     {
       "skill": "model-everything-report-reading",
       "chars": 420,
-      "body": 7316
+      "body": 7317
     },
     {
       "skill": "model-everything-structure",
@@ -37,14 +37,14 @@
       "body": 8203
     }
   ],
-  "toolChars": 11955,
+  "toolChars": 11956,
   "tools": [
     {
       "name": "model_compose_verify",
       "chars": 1362
     },
     {
-      "name": "model_concurrency_scan",
+      "name": "model_interleaving_scan",
       "chars": 1834
     },
     {
@@ -61,7 +61,7 @@
     },
     {
       "name": "report_diff",
-      "chars": 1219
+      "chars": 1220
     },
     {
       "name": "uml_structure_verify",
@@ -89,7 +89,7 @@
     }
   ],
   "perTurn": {
-    "chars": 15348,
+    "chars": 15349,
     "tokens": 3837
   },
   "routing": {

@@ -57,7 +57,7 @@ interface UmlFamilyModule<Model> {
 | `uml_parse` | 图源 → 该族模型 |
 | `uml_review` | 审查建模：结构缺陷、文档缺口、render↔parse 往返一致性；给模型、给图、或两者对照 |
 | `uml_explain_labels` | 打印解析器接受的标签/注释契约（不需图，也不服务任何 `intent`） |
-| `model_verify` / `model_datamodel_verify` / `model_compose_verify` / `model_concurrency_scan` / `model_export` / `uml_structure_verify` / `report_diff` | 行为验证、数据模型与迁移、多机组合、并发声明路由、外部检查器导出、依赖图审计、报告比对 |
+| `model_verify` / `model_datamodel_verify` / `model_compose_verify` / `model_interleaving_scan` / `model_export` / `uml_structure_verify` / `report_diff` | 行为验证、数据模型与迁移、多机组合、并发声明路由、外部检查器导出、依赖图审计、报告比对 |
 
 拆分原则（这是决定，不是偏好）：
 

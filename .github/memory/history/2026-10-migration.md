@@ -18,7 +18,7 @@ metadata:
 | 图 | UML 14 族：记号语法引擎、图族表与能力矩阵、用例族模块、结构族模块（class·object·package·component·deployment）、状态机/活动/顺序三视图 |
 | 行为验证 | `model_verify`（S1-S8 / A1-A14 / D1-D4）、`model_compose_verify`（C1/C2）、`model_export`（UPPAAL / TLA+ / PRISM / SPIN） |
 | 数据 | `model_datamodel_verify`（DS / DA / DD） |
-| 并发 | `model_concurrency_scan`（挖声明并路由，不证明） |
+| 并发 | `model_interleaving_scan`（挖声明并路由，不证明） |
 | 结构 | `uml_structure_verify`（UML020-UML026 + 依赖矩阵）、多层级审查（UML028-UML031） |
 | 报告 | 报告正文渲染、`report_diff`、baseline 比对、哈希规范 |
 
@@ -36,7 +36,7 @@ metadata:
 ## 命名（一次性决定）
 
 - 包与仓库：`dsh-model-everything`（中性名，避免验证能力被 UML 之名窄化）。
-- 工具：`uml_render` / `uml_parse` / `uml_review` / `uml_explain_labels` / `model_verify` / `model_datamodel_verify` / `model_compose_verify` / `model_concurrency_scan` / `model_export` / `uml_structure_verify` / `report_diff`（共 11 个）。
+- 工具：`uml_render` / `uml_parse` / `uml_review` / `uml_explain_labels` / `model_verify` / `model_datamodel_verify` / `model_compose_verify` / `model_interleaving_scan` / `model_export` / `uml_structure_verify` / `report_diff`（共 11 个）。
 - schema 前缀 `model-everything/…`；指令命名空间 `dsh-model-everything:`；skills 目录名 `model-everything{,-uml,-structure,-datamodel,-concurrency}`。
 
 ## 验证到什么程度

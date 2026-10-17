@@ -169,7 +169,7 @@ function inspectProvider(config: Config, isToolRegistered: () => boolean, isData
               interaction: { type: 'string', enum: ['ask', 'auto', 'follow-approval'], description: 'Configured interaction mode. follow-approval resolves per session from approval/policy.' },
               toolRegistered: { type: 'boolean', description: 'Whether the model_verify tool is registered on ctx.tools.' },
               dataToolRegistered: { type: 'boolean', description: 'Whether the model_datamodel_verify tool is registered on ctx.tools.' },
-              concurrencyToolRegistered: { type: 'boolean', description: 'Whether the model_concurrency_scan tool is registered on ctx.tools.' },
+              concurrencyToolRegistered: { type: 'boolean', description: 'Whether the model_interleaving_scan tool is registered on ctx.tools.' },
               composeToolRegistered: { type: 'boolean', description: 'Whether the model_compose_verify tool is registered on ctx.tools.' },
               exportToolRegistered: { type: 'boolean', description: 'Whether the model_export tool is registered on ctx.tools.' },
               umlToolsRegistered: { type: 'boolean', description: 'Whether the four UML tools (uml_render, uml_parse, uml_review, uml_explain_labels) are registered on ctx.tools.' },

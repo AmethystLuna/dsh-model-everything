@@ -124,7 +124,7 @@ ${rows.join('\n')}
 - \`model_compose_verify\` — two or more machines: deadlock, a rendezvous that never fires, and - with \`shared\` + \`accesses\` - an unordered write (C4) or a non-atomic update (C5).
 - \`model_datamodel_verify\` — a data model and its migration: keys, domains, migration coverage, copy consistency, rollback symmetry.
 - \`model_design_review\` — a design against its own declarations: layering, boundaries, substitutability, interface width. The graph's shape is reported, not judged.
-- \`model_concurrency_scan\` — finds claims about threads, synchronization, async and interrupts, names the family, and routes each to the tool that decides it. It proves nothing about any of them.
+- \`model_interleaving_scan\` — finds claims about threads, synchronization, async and interrupts, names the family, and routes each to the tool that decides it. It proves nothing about any of them.
 - \`model_export\` — UPPAAL, TLA+, PRISM or SPIN input from a verified model. It exports; it does not check the target tool.
 - \`uml_render\`, \`uml_parse\`, \`uml_review\` — draw a model, read a diagram into one, audit one. Round-trip fidelity is measured, never assumed.
 - \`uml_explain_labels\` — the accepted label and comment forms for one notation.

@@ -81,7 +81,7 @@
     "design": "model_design_review",
     "structure": "uml_structure_verify",
     "uml": "uml review",
-    "concurrency": "model_concurrency_scan",
+    "concurrency": "model_interleaving_scan",
     "baseline": "report_diff"
   }
 }

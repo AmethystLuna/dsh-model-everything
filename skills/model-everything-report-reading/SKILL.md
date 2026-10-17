@@ -64,7 +64,7 @@ This is the part that varies, and it is worth knowing before you go looking:
 | Where | Families |
 |---|---|
 | Inside each check, as `checks[].findings` | `model_verify`, `model_compose_verify`, `model_datamodel_verify`, `model_design_review` |
-| At the top level, as `findings` | `uml_structure_verify`, the `uml` review path, `model_concurrency_scan` |
+| At the top level, as `findings` | `uml_structure_verify`, the `uml` review path, `model_interleaving_scan` |
 | Nowhere — compare `added` / `changed` / `removed` | `report_diff` |
 
 A check-carried finding is attributed to a check, and the check carries a status of its own: `pass`,

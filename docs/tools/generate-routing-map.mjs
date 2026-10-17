@@ -75,7 +75,7 @@ const TOOL_OWNER = {
   'model-everything-uml': ['uml_render', 'uml_parse', 'uml_review', 'uml_explain_labels'],
   'model-everything-structure': ['uml_structure_verify'],
   'model-everything-datamodel': ['model_datamodel_verify'],
-  'model-everything-concurrency': ['model_concurrency_scan'],
+  'model-everything-concurrency': ['model_interleaving_scan'],
   'model-everything-design': ['model_design_review'],
 }
 

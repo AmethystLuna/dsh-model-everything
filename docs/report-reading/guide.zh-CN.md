@@ -69,7 +69,7 @@ id 为 `MODEL`、`DATA_MODEL` 或 `DESIGN` 的检查下，且 `summary.checksRun
 | 位置 | 族 |
 |---|---|
 | 在**各检查内部**，即 `checks[].findings` | `model_verify`、`model_compose_verify`、`model_datamodel_verify`、`model_design_review` |
-| 在**顶层**，即 `findings` | `uml_structure_verify`、`uml` 的 review 路径、`model_concurrency_scan` |
+| 在**顶层**，即 `findings` | `uml_structure_verify`、`uml` 的 review 路径、`model_interleaving_scan` |
 | **哪里都没有**——比较 `added` / `changed` / `removed` | `report_diff` |
 
 挂在检查下的发现归属于某个检查，而检查自己也带状态：`pass`、`fail` 或 `skip`。顶层发现没有检查

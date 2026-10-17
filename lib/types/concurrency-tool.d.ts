@@ -1,4 +1,4 @@
-export declare const CONCURRENCY_SCAN_TOOL_NAME = "model_concurrency_scan";
+export declare const INTERLEAVING_SCAN_TOOL_NAME = "model_interleaving_scan";
 /**
  * Model-visible DSH tool that mines design documents/plans for concurrency-related
  * claims and risk keywords. It does not prove concurrency safety; it flags terms

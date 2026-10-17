@@ -20,7 +20,7 @@ English: [SKILL.md](SKILL.md)
 | 异步关键词：「async」「await」「promise」「event loop」「callback」「microtask」「coroutine」「fire-and-forget」「backpressure」 | warning —— 要审的是交错，不是词汇 |
 | lock/unlock、alloc/free、start/stop 这类顺序敏感的配对 | 转给 `model_verify`（A4 配对对称性），它能在被建模的机器上判定是否平衡 |
 
-在 DSH 里跑 `model_concurrency_scan` 工具。人工审查请照 [`references/concurrency-risk-guide.md`](references/concurrency-risk-guide.md)。
+在 DSH 里跑 `model_interleaving_scan` 工具。人工审查请照 [`references/concurrency-risk-guide.md`](references/concurrency-risk-guide.md)。
 
 ## 路由：每条断言由什么来判定
 
@@ -56,5 +56,5 @@ English: [SKILL.md](SKILL.md)
 2. **答案里不许出现绝对语气。**「这是线程安全的」正是被挖的那条断言，不是这项技能能产出的结果。
 3. **一个反例就足以推翻。** 若怀疑存在竞争，交付物是能打破它的那个交错序列，以及把它演出来的 harness（TSan/Helgrind 的输出），而不是一段论证。
 4. **纯顺序的目标不在范围内。** 如果没有东西并发运行，说出来并停下。单线程的异步服务不是纯顺序的：每一个 `await` 处都存在交错。
-5. **扫描器是 `model_concurrency_scan`。** 如果本部署没有注册它，就照上面的关键词表人工挖文本，并按同样的方式路由每一条断言。
+5. **扫描器是 `model_interleaving_scan`。** 如果本部署没有注册它，就照上面的关键词表人工挖文本，并按同样的方式路由每一条断言。
 6. **用文字说出断言和它的路由。**「QoS 1 只投递一次」加上判定它的工具，绝不是一个光秃秃的检查项名字。没背下本技能表格的读者，从一串枚举里学不到任何东西。完整规则在 `model_verify` 技能的「Writing the Answer」一节。

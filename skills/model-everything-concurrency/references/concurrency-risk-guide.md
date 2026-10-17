@@ -16,7 +16,7 @@ Use when a document contains:
 ## DSH tool
 
 ```text
-model_concurrency_scan text="..."
+model_interleaving_scan text="..."
 ```
 
 Returns:

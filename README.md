@@ -96,7 +96,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 
 「线程安全」「lock-free」「ISR 安全」都是需要某个能判定它们的工具的断言，而第一步是**把它们找出来**：
 
-1. **扫文本**：`model_concurrency_scan` 收文档、计划或笔记，报出风险点——那条声明、共享状态、中断、临界区，以及异步的那些（`async`、`await`、`promise`、事件循环、回调）。每条发现都带 `family`（threads / synchronization / async / interrupts / shared-state），绝对式断言按 error 报。
+1. **扫文本**：`model_interleaving_scan` 收文档、计划或笔记，报出风险点——那条声明、共享状态、中断、临界区，以及异步的那些（`async`、`await`、`promise`、事件循环、回调）。每条发现都带 `family`（threads / synchronization / async / interrupts / shared-state），绝对式断言按 error 报。
 2. **看每条绝对声明欠着什么**：「不可能有数据竞争」这类声明会被报为 error，要求**专门的**验证，且每条发现都点名能判定它的分析——竞争用 TSan 或 Helgrind，有界证明用 CBMC，协议用 TLA+，中断用 RTOS 感知的分析。
 3. **去做那个分析**：本插件不运行它，也不对并发安全作任何证明。
 
@@ -135,7 +135,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_verify` | 状态机 / 协议的可执行验证（结构检查、对抗性探测、预算、时限、前后回归） |
 | `model_compose_verify` | 两台及以上机器的组合检查（死锁、永不发生的会合；声明了共享位置后还有无序写 C4 与非原子更新 C5） |
 | `model_datamodel_verify` | 数据模型与迁移验证 |
-| `model_concurrency_scan` | 并发 / 同步 / 异步声明的挖掘与路由 |
+| `model_interleaving_scan` | 并发 / 同步 / 异步声明的挖掘与路由 |
 | `model_export` | 导出到外部检查器（UPPAAL / TLA+ / PRISM / SPIN） |
 | `uml_structure_verify` | 依赖图审计（含依赖矩阵与多层级细化） |
 | `model_design_review` | 设计审阅：依赖图形状 + 设计自身声明的契约（分层、职责边界、可替换性、接口宽度） |
@@ -261,7 +261,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 ## 边界
 
 - **不拥有你的代码。** 只读必要的文件，给出带出处的结论。结论对不对，以源码为准。
-- **并发只做路由。** `model_concurrency_scan` 找出并发、同步与异步的声明，并按 family 指出该由哪个工具证明（线程→TSan/Helgrind/CBMC/TLA+，中断→RTOS 感知分析，异步→TLA+/UPPAAL 加运行时检查）。证明本身不归它做。
+- **并发只做路由。** `model_interleaving_scan` 找出并发、同步与异步的声明，并按 family 指出该由哪个工具证明（线程→TSan/Helgrind/CBMC/TLA+，中断→RTOS 感知分析，异步→TLA+/UPPAAL 加运行时检查）。证明本身不归它做。
 - **图的审查不等于代码审查。** 图与它声称的模型一致，只说明图画对了。代码是不是这样，还得对着源码核验。
 
 ## 环境要求

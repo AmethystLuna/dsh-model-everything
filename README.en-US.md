@@ -96,7 +96,7 @@ There is no rate ratio and no fairness bound in the model. For one machine on it
 
 "Thread-safe", "lock-free", "ISR-safe" are claims that need a tool that can settle them, and the first job is finding them:
 
-1. **Scan the text**: `model_concurrency_scan` takes the document, plan or notes and reports the risk points - the claim, the shared state, the interrupt, the critical section, and the async ones (`async`, `await`, `promise`, the event loop, a callback). Every finding carries a `family` (threads / synchronization / async / interrupts / shared-state), and an absolute claim is an error.
+1. **Scan the text**: `model_interleaving_scan` takes the document, plan or notes and reports the risk points - the claim, the shared state, the interrupt, the critical section, and the async ones (`async`, `await`, `promise`, the event loop, a callback). Every finding carries a `family` (threads / synchronization / async / interrupts / shared-state), and an absolute claim is an error.
 2. **Read what each absolute claim owes**: a claim like "no data race is possible" is reported as an error requiring dedicated verification, and each finding names the analysis that could settle it - TSan or Helgrind for a race, CBMC for a bounded proof, TLA+ for a protocol, RTOS-aware interrupt analysis for an ISR.
 3. **Run that analysis**: this plugin does not run it and proves nothing about concurrency itself.
 
@@ -135,7 +135,7 @@ The limit: it stores and compares **model and diagram source**; a rendered pictu
 | `model_verify` | Executable verification of state machines and protocols |
 | `model_compose_verify` | Two or more machines together: deadlock, a rendezvous that never fires, and - with `shared` and `accesses` declared - an unordered write (C4) or a non-atomic read-modify-write pair (C5) |
 | `model_datamodel_verify` | Data models and migrations |
-| `model_concurrency_scan` | Mines and routes concurrency, synchrony and async claims |
+| `model_interleaving_scan` | Mines and routes concurrency, synchrony and async claims |
 | `model_export` | Exports to an external checker (UPPAAL, TLA+, PRISM, SPIN) |
 | `uml_structure_verify` | Dependency-graph audit, including a dependency matrix and multi-level refinement |
 | `model_design_review` | Design review: the dependency graph's shape, plus the contracts the design declares about itself - layering, responsibility boundaries, substitutability, interface width |
@@ -261,7 +261,7 @@ Write it into the profile's `cordis.patch.yml` by row id:
 ## Boundaries
 
 - **It does not own your code.** It reads what you point it at and reports conclusions with citations; the source is the authority.
-- **Concurrency is routing only.** `model_concurrency_scan` finds the claims and names - by family - the tool that can settle them: threads to TSan/Helgrind/CBMC/TLA+, interrupts to RTOS-aware analysis, async to TLA+/UPPAAL plus a runtime check. Proving them is not its job.
+- **Concurrency is routing only.** `model_interleaving_scan` finds the claims and names - by family - the tool that can settle them: threads to TSan/Helgrind/CBMC/TLA+, interrupts to RTOS-aware analysis, async to TLA+/UPPAAL plus a runtime check. Proving them is not its job.
 - **A diagram review is not a code review.** A diagram that matches the model it was drawn from proves the drawing; the code still has to be checked against the source.
 
 ## Requirements

@@ -23,7 +23,7 @@ Async counts as concurrency here, and it is the case most often missed: a single
 | Async keyword: "async", "await", "promise", "event loop", "callback", "microtask", "coroutine", "fire-and-forget", "backpressure" | warning — review the interleaving, not the vocabulary |
 | Lock/unlock, alloc/free, start/stop pairing where ordering matters | routed to `model_verify` (A4 pair symmetry), which can decide balance inside the modelled machine |
 
-In DSH, run the `model_concurrency_scan` tool. For manual review, follow [`references/concurrency-risk-guide.md`](references/concurrency-risk-guide.md).
+In DSH, run the `model_interleaving_scan` tool. For manual review, follow [`references/concurrency-risk-guide.md`](references/concurrency-risk-guide.md).
 
 ## Routing: What Decides Each Claim
 
@@ -59,5 +59,5 @@ Each of these is a place where "no finding" and "no problem" differ. Say which o
 2. **No absolute language in the answer.** "This is thread-safe" is exactly the claim being mined, not a result this skill can produce.
 3. **One counterexample is enough to refute.** If a race is suspected, the deliverable is the interleaving that breaks it plus the harness that demonstrates it (TSan/Helgrind output), not an argument.
 4. **Sequential targets are out of scope.** If nothing runs concurrently, say so and stop. A single-threaded async service is not sequential: interleaving exists at every `await`.
-5. **The scanner is `model_concurrency_scan`.** If it is not registered in this deployment, mine the text by hand against the keyword table above and route each claim the same way.
+5. **The scanner is `model_interleaving_scan`.** If it is not registered in this deployment, mine the text by hand against the keyword table above and route each claim the same way.
 6. **Name the claim and its routing in words.** 「QoS 1 只投递一次」plus the tool that decides it, never a bare check name. A reader who has not memorized this skill's tables learns nothing from an enumeration. The full rule is under "Writing the Answer" in the `model_verify` skill.

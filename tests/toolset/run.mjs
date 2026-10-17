@@ -209,7 +209,7 @@ test('nextSteps leads with a check name, not a bare code', async () => {
 
   // And the successful path of each family has to route onward: the result is the only channel that can
   // redirect a model mid-task, because it is the only one read after the model already chose something.
-  const NAMES = ['model_verify', 'model_compose_verify', 'model_datamodel_verify', 'model_design_review', 'uml_structure_verify', 'uml_render', 'uml_parse', 'uml_review', 'report_diff', 'model_concurrency_scan']
+  const NAMES = ['model_verify', 'model_compose_verify', 'model_datamodel_verify', 'model_design_review', 'uml_structure_verify', 'uml_render', 'uml_parse', 'uml_review', 'report_diff', 'model_interleaving_scan']
   const silent = Object.entries(reports).filter(([, report]) => !(report.nextSteps ?? []).some((step) => NAMES.some((name) => step.includes(name)))).map(([family]) => family)
   if (silent.length > 0) throw new Error('these families route nowhere: ' + silent.join(', ') + '. Name the tool that answers the adjacent question.')
 })

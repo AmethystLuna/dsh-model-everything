@@ -244,7 +244,7 @@ const REPORT_CURRENT = {
 const REQUIRED_PARAMS = {
   model_verify: { required: ['model'], valid: () => ({ model: MACHINE }) },
   model_datamodel_verify: { required: ['model'], valid: () => ({ model: DATA_MODEL }) },
-  model_concurrency_scan: { required: ['text'], valid: () => ({ text: SCAN_TEXT_PLAIN }) },
+  model_interleaving_scan: { required: ['text'], valid: () => ({ text: SCAN_TEXT_PLAIN }) },
   model_compose_verify: { required: ['machines'], valid: () => ({ machines: [MACHINE, SECOND_MACHINE] }) },
   model_export: { required: ['model', 'format'], valid: () => ({ model: MACHINE, format: 'tla' }) },
   uml_render: { required: ['model'], valid: () => ({ model: MACHINE }) },
@@ -260,7 +260,7 @@ const REQUIRED_PARAMS = {
 const TYPE_ERRORS = {
   model_verify: { args: { model: MACHINE, maxStates: 'ten' }, param: 'maxStates', violation: '"maxStates" must be an integer' },
   model_datamodel_verify: { args: { model: DATA_MODEL, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
-  model_concurrency_scan: { args: { text: 42 }, param: 'text', violation: '"text" must be a string' },
+  model_interleaving_scan: { args: { text: 42 }, param: 'text', violation: '"text" must be a string' },
   model_compose_verify: { args: { machines: [MACHINE, SECOND_MACHINE], maxStates: 1.5 }, param: 'maxStates', violation: '"maxStates" must be an integer' },
   model_export: { args: { model: MACHINE, format: 7 }, param: 'format', violation: '"format" must be a string' },
   uml_render: { args: { model: MACHINE, notation: 'graphviz' }, param: 'notation', violation: 'must be one of ["auto","mermaid","plantuml"]' },
@@ -276,7 +276,7 @@ const TYPE_ERRORS = {
 const VIEW_CASES = {
   model_verify: () => ({ model: MACHINE }),
   model_datamodel_verify: () => ({ model: DATA_MODEL }),
-  model_concurrency_scan: () => ({ text: SCAN_TEXT_ABSOLUTE }),
+  model_interleaving_scan: () => ({ text: SCAN_TEXT_ABSOLUTE }),
   model_compose_verify: () => ({ machines: [MACHINE, SECOND_MACHINE] }),
   model_export: () => ({ model: MACHINE, format: 'prism' }),
   uml_render: () => ({ model: MACHINE }),
@@ -722,7 +722,7 @@ for (const [name, argsFor] of Object.entries(VIEW_CASES)) {
 await test('reportView: a failing verdict survives the full view on every family that carries one', async () => {
   const failing = [
     ['model_verify', { model: { schemaVersion: 1 } }],
-    ['model_concurrency_scan', { text: SCAN_TEXT_ABSOLUTE }],
+    ['model_interleaving_scan', { text: SCAN_TEXT_ABSOLUTE }],
     ['uml_parse', { diagram: 'sequenceDiagram\n  A->>B: hi\n' }],
     ['uml_review', { model: MACHINE, diagram: WIDER_DIAGRAM }],
     ['uml_structure_verify', {}],
@@ -765,8 +765,8 @@ await test('uml_structure_verify: on a findings-free report the default view is 
 // verdict against tool failure: three outcomes that must stay distinguishable
 // ---------------------------------------------------------------------------
 
-await test('model_concurrency_scan: an absolute claim fails the review but not the call', async () => {
-  const res = await call('model_concurrency_scan', { text: SCAN_TEXT_ABSOLUTE })
+await test('model_interleaving_scan: an absolute claim fails the review but not the call', async () => {
+  const res = await call('model_interleaving_scan', { text: SCAN_TEXT_ABSOLUTE })
   const value = expectReport(res, 'a document claiming thread safety')
   expectEq(value.ok, true, 'ok means the tool ran')
   expectEq(value.ran, true, 'the scan ran')
@@ -776,11 +776,11 @@ await test('model_concurrency_scan: an absolute claim fails the review but not t
   expectEq(value.summary.absoluteClaims, 1, 'the summary counts it once')
 })
 
-await test('model_concurrency_scan: a text with no claim is refused, not passed', async () => {
+await test('model_interleaving_scan: a text with no claim is refused, not passed', async () => {
   // It used to answer `verdict: pass` with `keywords: 0`, which said "no concurrency problem" about a text
   // the scan could not see. "Found nothing to examine" and "examined it and it holds" are different
   // answers, and the tool now says which one it is.
-  const value = expectReport(await call('model_concurrency_scan', { text: SCAN_TEXT_PLAIN }), 'a sequential sentence')
+  const value = expectReport(await call('model_interleaving_scan', { text: SCAN_TEXT_PLAIN }), 'a sequential sentence')
   expectEq(value.ok, false, 'a scan that mined nothing did not succeed')
   expectEq(value.ran, false, 'and it says so rather than reporting a scan')
   expectEq(value.errorCode, 'CONCURRENCY_NO_CLAIM', 'with a code to route on')
@@ -788,8 +788,8 @@ await test('model_concurrency_scan: a text with no claim is refused, not passed'
   expect(/no concurrency claim/.test(String(value.verdictReason)), `the reason names what it looked for — got ${show(value.verdictReason)}`)
 })
 
-await test('model_concurrency_scan: a hedged keyword lands between the two, as pass_with_findings', async () => {
-  const value = expectReport(await call('model_concurrency_scan', { text: SCAN_TEXT_KEYWORD }), 'a shared-state sentence')
+await test('model_interleaving_scan: a hedged keyword lands between the two, as pass_with_findings', async () => {
+  const value = expectReport(await call('model_interleaving_scan', { text: SCAN_TEXT_KEYWORD }), 'a shared-state sentence')
   expectEq(value.verdict, 'pass_with_findings', 'a keyword is not a proof claim')
   expectEq(value.findings[0]?.code, 'CONCURRENCY_KEYWORD', 'the warning names the term')
   expectEq(value.findings[0]?.severity, 'warning', 'a term to review is a warning')

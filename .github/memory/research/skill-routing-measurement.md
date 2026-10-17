@@ -103,13 +103,13 @@ metadata:
 | 状态机：RFC 正文说 DONE 是终态，图上却有 `DONE --> DONE : retry` | model-everything | model-everything + uml / `uml_parse` + `model_verify` | **none** / `model_verify` |
 | 部署图：只有 db 能直接碰 postgres | structure | structure / `uml_structure_verify` | structure / `uml_structure_verify` |
 | 迁移：4M 行的表加一个 `NOT NULL` 列 | datamodel | **none** / none | **none** / none |
-| 并发：lock-free 环形缓冲 + ISR 里的原子自增 | concurrency | concurrency / `model_concurrency_scan` | concurrency / `model_concurrency_scan` |
+| 并发：lock-free 环形缓冲 + ISR 里的原子自增 | concurrency | concurrency / `model_interleaving_scan` | concurrency / `model_interleaving_scan` |
 
 **工具 3/4 vs 3/4，技能 3/4 vs 2/4。**差的那一条是状态机。
 
 要分两层读：
 
-- **工具那一层没有被改变。**工具描述本来就在每一轮的上下文里，所以两种条件下模型都会去调 `model_verify`、`uml_structure_verify`、`model_concurrency_scan`。**门禁不是让插件变得可用的东西。**
+- **工具那一层没有被改变。**工具描述本来就在每一轮的上下文里，所以两种条件下模型都会去调 `model_verify`、`uml_structure_verify`、`model_interleaving_scan`。**门禁不是让插件变得可用的东西。**
 - **技能那一层只差一条，而且两个答案都抓到了同一个矛盾。**开的那次先 `uml_parse` 读图、按图建模：结论是"照这么画，DONE 会一直 retry"；关的那次按正文把 DONE 当终态：结论是"终态不该有出边，图和正文矛盾"。两条都对，角度不同——这正是教义（照着物料建、不照着散文建）起作用的那一条，但它只值一条。
 
 **所以：单次版本没有证明注入带来路由收益。** n=4/组、只跑一次；最能考验门禁的那条（迁移：既没加载技能也没用工具，而门禁文本明确列了 datamodel）**没有任何变化**。要判断它有没有用，需要更大的样本和更难的题——比如没有物料、只有一句话的请求（干净对照里那种会被正确拒绝的）。**下一节把这条约束加在首尾再跑了一次，结论变了。**

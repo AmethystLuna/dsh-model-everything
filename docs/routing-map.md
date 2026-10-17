@@ -33,7 +33,7 @@ mindmap
       near miss x2 → me-uml
     me-concurrency - 5 corpus triggers
       row: 389 of 500 chars
-      tool: model_concurrency_scan
+      tool: model_interleaving_scan
       near miss x1 → me
       near miss x1 → me-datamodel
       near miss x1 → me-uml
@@ -119,10 +119,10 @@ nothing else at that moment.
 | Tool | Owned by skill | First sentence (what the model reads first) |
 |---|---|---|
 | `model_compose_verify` | `model-everything` | "Check two or more LogicModelV1 machines together." |
-| `model_concurrency_scan` | `model-everything-concurrency` | "Scan a document or plan text for claims about how work is executed: threads, synchronization, async tasks, interrupts, shared state." |
 | `model_datamodel_verify` | `model-everything-datamodel` | "Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression." |
 | `model_design_review` | `model-everything-design` | "Hold a design to the contracts it declares about itself: layering, responsibility ownership, substitutability, interface width." |
 | `model_export` | `model-everything` | "Translate a LogicModelV1 into the input language of an external checker - UPPAAL, TLA+, PRISM or SPIN - for a property this plugin does not decide its" |
+| `model_interleaving_scan` | `model-everything-concurrency` | "Scan a document or plan text for claims about how work is executed: threads, synchronization, async tasks, interrupts, shared state." |
 | `model_verify` | `model-everything` | "Verify one state machine: does this LogicModelV1 reach a state it must not, deadlock, livelock, or leave an invariant undecided." |
 | `report_diff` | `model-everything` | "Compare two reports of the same family, to accept a change by what it added rather than by reading two reports: `baseline` (earlier) against `current`" |
 | `uml_explain_labels` | `model-everything-uml` | "Print the label and comment conventions the UML parser accepts, for one notation: the accepted label spellings, the form the renderer writes, the dire" |
