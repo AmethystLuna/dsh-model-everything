@@ -25,6 +25,8 @@
  * @module dsh-model-everything-gate
  */
 
+import { readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -58,14 +60,63 @@ const GATE_SOURCE_KIND: 'plugin:dsh-model-everything-gate' = 'plugin:dsh-model-e
  * added no load on a control that must load nothing. Two sentences cost 403 characters; the
  * comparison is in the routing measurement under "第三臂".
  */
-export const DEFAULT_GATE_TEXT = `<EXTREMELY_IMPORTANT>
-Before answering anything about code, a design or a diagram: load the skill whose routing applies, and let its tool decide. Do not answer from memory first.
+/** One row per skill: the request it answers, in the words a user would use. */
+const SKILL_ROWS: Record<string, string> = {
+  'model-everything': 'claims against code, state machines, protocols',
+  'model-everything-uml': 'drawing a diagram, or reading one someone drew',
+  'model-everything-structure': 'an architecture or dependency drawing',
+  'model-everything-design': 'layering, responsibilities, substitutability, interface width',
+  'model-everything-datamodel': 'a schema, a migration, a data guarantee',
+  'model-everything-concurrency': 'thread-safe, lock-free, ISR; routing only',
+  'model-everything-report-reading': 'reading a report this plugin returned',
+}
+
+/**
+ * The skills this package actually ships, read from disk when the module loads.
+ *
+ * The table below advertises only these. A row for a skill that is not in the package sends the
+ * model to a name that resolves to nothing, which is the one failure a routing message must not
+ * have; a skill added without a row still gets an entry, reading "see its catalog line", so the
+ * table can be incomplete but never wrong.
+ */
+export function shippedSkills(): string[] {
+  try {
+    return readdirSync(fileURLToPath(new URL('../skills/', import.meta.url)), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+  } catch {
+    return []
+  }
+}
+
+/**
+ * The text, rendered from the skills that ship.
+ *
+ * The rule is stated at both ends, in different words. That is a measured change, not a stylistic
+ * one: with a single statement, the one case that needed the plugin - a migration question the
+ * session believed it could answer from memory - loaded no skill and ran no tool. Stated at the
+ * start and restated at the end, it did both, and a control task was not over-triggered.
+ *
+ * The shape follows the ops plugin's injected section: a table that chooses between near-equals,
+ * rows only for what is installed, and a rule against degrading silently when a tool refuses.
+ *
+ * @param skills - the skills to advertise; defaults to the ones on disk.
+ * @param extraGuidance - a deployment's own sentence, appended last.
+ */
+export function renderGateText(skills: string[] = shippedSkills(), extraGuidance = ''): string {
+  const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '` |')
+  const extra = extraGuidance.trim()
+  return `<EXTREMELY_IMPORTANT>
+Before answering anything about code, a design or a diagram: load the skill whose row matches, and let its tool decide. Do not answer from memory first.
 
 Plugin dsh-model-everything is active. It checks claims about designs and code: facts against the source, behaviour as an executable model, structure as a graph.
 
-**Unsure whether a check applies?** Load \`model-everything\` first. It is the entry point: it owns the doctrine, the model schema and the routing to its siblings.
+**Unsure which row applies?** Load \`model-everything\` first: it owns the doctrine, the model schema and the routing to its siblings.
 
-**Load the skill that matches the claim**: \`model-everything\` (entry point; claims, state machines), \`model-everything-uml\` (drawing a diagram, or reading one someone drew), \`model-everything-structure\` (an architecture or dependency drawing), \`model-everything-design\` (layering, responsibilities, substitutability, interface width), \`model-everything-datamodel\` (a schema, a migration, a data guarantee), \`model-everything-concurrency\` (thread-safe, lock-free, ISR; routing only), \`model-everything-report-reading\` (reading a report this plugin returned).
+| The request | The skill |
+| --- | --- |
+${rows.join('\n')}
 
 **Tools** (dsh):
 
@@ -82,8 +133,14 @@ Plugin dsh-model-everything is active. It checks claims about designs and code: 
 
 **Read a report**: gate on \`verdict\` (\`pass\`, \`pass_with_findings\`, \`fail\`), never on \`ok\`. \`verdictReason\` says why and \`nextSteps\` says what to do. \`ran\` says whether it executed, \`checksRun\` how much it examined: a \`skip\` is not a \`pass\`, and a code ending \`_UNDECIDED\` means the search hit its limit and decided nothing. Keys starting with \`_\` are notes: ignored, and left out of the model hash.
 
+**When a tool refuses, or is not there.** Read its \`errorCode\` and fix the input before retrying; if the tool is not registered in this deployment, say so and use the general method. A check that nothing ran is not a passing check.${extra === '' ? '' : '\n\n' + extra}
+
 The rule again, because it is the one that gets skipped: before answering anything about code, a design or a diagram, load the skill whose routing applies and let its tool decide - a claim you can check is not a claim you may answer from memory.
 </EXTREMELY_IMPORTANT>`
+}
+
+/** The shipped default: every row the package can advertise, no deployment guidance. */
+export const DEFAULT_GATE_TEXT = renderGateText()
 
 /**
  * A live switch, when this host's schemastery supports one.
@@ -103,18 +160,25 @@ function live<T>(field: T): T {
 }
 
 export interface Config {
-  /** Whether the gate may be injected. Read through {@link injectionEnabled}. */
+  /** Whether the gate is injected. Read through {@link injectionEnabled}. On unless a deployment says otherwise. */
   enabled: Volatile<boolean> | boolean
   /** The text to inject. Override in the profile's `cordis.patch.yml` row, not in a GUI form. */
   gateContent: string
+  /** A deployment's own sentence, appended to whatever text is injected. */
+  extraGuidance: string
 }
 
 export const Config = z.object({
-  // Off by default: see the module comment. Live so enabling it does not need a restart.
-  enabled: live(z.boolean().default(false)),
+  // On by default, and live so a deployment can turn it off without a restart. The comparison that
+  // decided this is in the routing measurement: at 2933 characters it fixed the one request class
+  // the plugin otherwise never reached, and a control task was not over-triggered.
+  enabled: live(z.boolean().default(true)),
   // Not volatile on purpose: the settings projection feeds a GUI form, and a kilobyte of
   // prose does not belong in one.
   gateContent: z.string().default(DEFAULT_GATE_TEXT),
+  // The ops plugin's technique, adopted: a short free-text slot a deployment can use for its own
+  // rule without forking the package. Appended last, so it is read after the routing.
+  extraGuidance: z.string().default(''),
 })
 
 /**
@@ -125,6 +189,11 @@ export const Config = z.object({
 function injectionEnabled(config: Config): boolean {
   const value = config.enabled
   return typeof value === 'boolean' ? value : value.get()
+}
+
+function gateText(config: Config): string {
+  const extra = typeof config.extraGuidance === 'string' ? config.extraGuidance.trim() : ''
+  return extra === '' ? config.gateContent : config.gateContent + '\n\n' + extra
 }
 
 function gateMessage(text: string): UserMessage {
@@ -255,7 +324,7 @@ export function apply(ctx: Context, config: Config): void {
     if (gateInHistory(agent.session)) return decision
     return {
       kind: 'enter',
-      messages: [...decision.messages, gateMessage(config.gateContent)],
+      messages: [...decision.messages, gateMessage(gateText(config))],
     }
   })
 }

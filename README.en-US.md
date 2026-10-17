@@ -213,20 +213,26 @@ It registers its skills through the standard DSH filesystem skill provider and i
 | Component | Row id | Carries | Default |
 |---|---|---|---|
 | `dsh-model-everything` | `dsh-model-everything` | every tool and skill | on |
-| Injected routing prompt | `dsh-model-everything-gate` | one routing message in the first model step of a session | **off** |
+| Injected routing prompt | `dsh-model-everything-gate` | one routing message in the first model step of a session | on |
 
-**Injected routing prompt** is the optional second component, switched on its own. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything.
+**Injected routing prompt** is the second component, switched on its own. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything.
 
-Turned on, it injects a message (about 2.9k characters) into the session. It carries four things: which skill to load when it is unclear whether a check applies, what each skill answers, what each tool does **and what it does not prove**, and how to read a report (`verdict`, never `ok`; `skip` is not `pass`). **The rule - load the skill, do not answer from memory - is stated at the start and restated at the end.** That is measured, not stylistic: with one statement, a request the session believed it could answer itself (a migration) loaded no skill and ran no tool; stated at both ends, it did both, and a control task was not over-triggered.
+It injects a message (about 3.2k characters) into the session. It carries four things: which skill to load when it is unclear which applies, what each skill answers, what each tool does **and what it does not prove**, and how to read a report (`verdict`, never `ok`; `skip` is not `pass`). **The rule - load the skill, do not answer from memory - is stated at the start and restated at the end.** That is measured, not stylistic: with one statement, a request the session believed it could answer itself (a migration) loaded no skill and ran no tool; stated at both ends, it did both, and a control task was not over-triggered.
+
+Its shape borrows three techniques from the section `a neighbouring plugin` injects, which is the existing precedent for this in the same harness:
+
+- **Advertise only what is installed**: the skill table is rendered from the directories actually under `skills/`, so it cannot name a skill that resolves to nothing; a skill added without a row falls back to "see its catalog line", so the table can be incomplete but never wrong.
+- **A chooser table, not a sentence list**: `| The request | The skill |`, because routing *is* an ordering between near-equals and a table reads as one.
+- **A rule against degrading silently**: when a tool refuses, read its `errorCode` and fix the input; when a tool is not registered, say so and use the general method - **a check that nothing ran is not a passing check**.
 
 How it works, in four sentences:
 
 - **Where**: `agent/pre-step` - the message is appended to the decision of the session's **first** model step, not sent at session start, where it would land in an inbox a blank-session preset switch can clear;
 - **Once**: the message carries its own producer source kind, and every step checks the session history for it; a gate dropped before any step ran reappears at the next step that does;
-- **The switch**: `enabled` is a live field, so the Plugins-page toggle reaches a running host; `gateContent` is not live (a kilobyte of prose does not belong in a form) and is overridden in the profile's `cordis.patch.yml`;
+- **The switch**: `enabled` is a live field, so the Plugins-page toggle reaches a running host; `gateContent` is not live (a kilobyte of prose does not belong in a form) and is overridden in the profile's `cordis.patch.yml`; `extraGuidance` is a slot a deployment can append its own sentence to;
 - **It routes only**: it checks nothing, and it cannot make a skill load.
 
-**Default and switch**: off by default. Not because it is useless, but because the benefit holds for some deployments while the cost is paid by every session that turns it on. Pin a value in the profile's `cordis.patch.yml` (below), or use the Plugins-page toggle to run a comparison - the same request with the gate off and on. For a single machine, one line in `~/.dsh/AGENTS.md` costs nothing extra: it is injected into every session and ships with nothing.
+**Default and switch**: on by default. That default was measured: it reaches the one request class the plugin otherwise never sees, and a control task was not over-triggered. The price is about 3.2k characters per session; turn it off in `cordis.patch.yml` (below) or with the Plugins-page switch, which is also how to run a comparison - the same request with the gate off and on.
 
 `gateContent` can be replaced wholesale to try different wording; `tests/gate` still requires it to name every shipped skill.
 

@@ -36,30 +36,47 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 export declare const name = "dsh-model-everything-gate";
 /**
- * The default text. It names every skill the package ships, because its job is the routing
- * the catalog line cannot carry once the line is long; `tests/gate` fails when a skill is
- * added and this list is not, which is the only thing keeping the two in step.
+ * The skills this package actually ships, read from disk when the module loads.
  *
- * The rule is stated at both ends, in different words. That is a measured change, not a
- * stylistic one: the single-statement version left the one case that needed the plugin - a
- * migration question the session believed it could answer from memory - with no skill loaded
- * and no tool run. Stating it at the start and restating it at the end fixed that case and
- * added no load on a control that must load nothing. Two sentences cost 403 characters; the
- * comparison is in the routing measurement under "第三臂".
+ * The table below advertises only these. A row for a skill that is not in the package sends the
+ * model to a name that resolves to nothing, which is the one failure a routing message must not
+ * have; a skill added without a row still gets an entry, reading "see its catalog line", so the
+ * table can be incomplete but never wrong.
  */
-export declare const DEFAULT_GATE_TEXT = "<EXTREMELY_IMPORTANT>\nBefore answering anything about code, a design or a diagram: load the skill whose routing applies, and let its tool decide. Do not answer from memory first.\n\nPlugin dsh-model-everything is active. It checks claims about designs and code: facts against the source, behaviour as an executable model, structure as a graph.\n\n**Unsure whether a check applies?** Load `model-everything` first. It is the entry point: it owns the doctrine, the model schema and the routing to its siblings.\n\n**Load the skill that matches the claim**: `model-everything` (entry point; claims, state machines), `model-everything-uml` (drawing a diagram, or reading one someone drew), `model-everything-structure` (an architecture or dependency drawing), `model-everything-design` (layering, responsibilities, substitutability, interface width), `model-everything-datamodel` (a schema, a migration, a data guarantee), `model-everything-concurrency` (thread-safe, lock-free, ISR; routing only), `model-everything-report-reading` (reading a report this plugin returned).\n\n**Tools** (dsh):\n\n- `model_verify` \u2014 one state machine: structural checks, adversarial probes, budgets, deadlines, before/after regression.\n- `model_compose_verify` \u2014 two or more machines: deadlock, and a rendezvous that never fires.\n- `model_datamodel_verify` \u2014 a data model and its migration: keys, domains, migration coverage, copy consistency, rollback symmetry.\n- `model_design_review` \u2014 a design against its own declarations: layering, boundaries, substitutability, interface width. The graph's shape is reported, not judged.\n- `model_concurrency_scan` \u2014 finds concurrency claims and routes them. It proves nothing about concurrency.\n- `model_export` \u2014 UPPAAL, TLA+, PRISM or SPIN input from a verified model. It exports; it does not check the target tool.\n- `uml_render`, `uml_parse`, `uml_review` \u2014 draw a model, read a diagram into one, audit one. Round-trip fidelity is measured, never assumed.\n- `uml_explain_labels` \u2014 the accepted label and comment forms for one notation.\n- `uml_structure_verify` \u2014 dependency review of a structure drawing, one level or several. It audits the drawing, not the code.\n- `report_diff` \u2014 baseline against current: what a change added, removed or changed.\n\n**Read a report**: gate on `verdict` (`pass`, `pass_with_findings`, `fail`), never on `ok`. `verdictReason` says why and `nextSteps` says what to do. `ran` says whether it executed, `checksRun` how much it examined: a `skip` is not a `pass`, and a code ending `_UNDECIDED` means the search hit its limit and decided nothing. Keys starting with `_` are notes: ignored, and left out of the model hash.\n\nThe rule again, because it is the one that gets skipped: before answering anything about code, a design or a diagram, load the skill whose routing applies and let its tool decide - a claim you can check is not a claim you may answer from memory.\n</EXTREMELY_IMPORTANT>";
+export declare function shippedSkills(): string[];
+/**
+ * The text, rendered from the skills that ship.
+ *
+ * The rule is stated at both ends, in different words. That is a measured change, not a stylistic
+ * one: with a single statement, the one case that needed the plugin - a migration question the
+ * session believed it could answer from memory - loaded no skill and ran no tool. Stated at the
+ * start and restated at the end, it did both, and a control task was not over-triggered.
+ *
+ * The shape follows the ops plugin's injected section: a table that chooses between near-equals,
+ * rows only for what is installed, and a rule against degrading silently when a tool refuses.
+ *
+ * @param skills - the skills to advertise; defaults to the ones on disk.
+ * @param extraGuidance - a deployment's own sentence, appended last.
+ */
+export declare function renderGateText(skills?: string[], extraGuidance?: string): string;
+/** The shipped default: every row the package can advertise, no deployment guidance. */
+export declare const DEFAULT_GATE_TEXT: string;
 export interface Config {
-    /** Whether the gate may be injected. Read through {@link injectionEnabled}. */
+    /** Whether the gate is injected. Read through {@link injectionEnabled}. On unless a deployment says otherwise. */
     enabled: Volatile<boolean> | boolean;
     /** The text to inject. Override in the profile's `cordis.patch.yml` row, not in a GUI form. */
     gateContent: string;
+    /** A deployment's own sentence, appended to whatever text is injected. */
+    extraGuidance: string;
 }
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     enabled: z<boolean, boolean, "defined">;
     gateContent: z<string, string, "defined">;
+    extraGuidance: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     enabled: z<boolean, boolean, "defined">;
     gateContent: z<string, string, "defined">;
+    extraGuidance: z<string, string, "defined">;
 }>>, "plain">;
 /**
  * Mount the gate.

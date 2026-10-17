@@ -102,14 +102,14 @@ await check('the gate has a card of its own: manifest, two locales, all shipped 
   }
 })
 
-await check('the loader patch mounts the gate as a separate row, switched off', () => {
+await check('the loader patch mounts the gate as a separate row, switched on', () => {
   const patch = readFileSync(new URL('../../cordis.patch.yml', import.meta.url), 'utf8')
   const rows = [...patch.matchAll(/^ {4}- id: (.+)$/gm)].map((match) => match[1].trim())
   if (!rows.includes('dsh-model-everything')) throw new Error('the main row is gone; rows are ' + rows.join(', '))
   if (!rows.includes('dsh-model-everything-gate')) throw new Error('no gate row; one component per row, rows are ' + rows.join(', '))
   if (!/name: 'dsh-model-everything\/gate'/.test(patch)) throw new Error('the gate row does not name the subpath entry point')
   const gateRow = patch.slice(patch.indexOf('dsh-model-everything-gate'))
-  if (!/enabled: false/.test(gateRow)) throw new Error('the gate row does not mount it off, so every install would pay for it')
+  if (!/enabled: true/.test(gateRow)) throw new Error('the gate row does not mount it on; the package default and the row must agree')
 })
 
 await check('the default text names every shipped skill, and nothing else', () => {
@@ -141,19 +141,39 @@ await check('the default text stays inside its cost ceiling', () => {
   // tool inventory with what each does not prove, how to read a report - the same four parts
   // the sibling plugin's gate carries - and the rule stated at both ends, which is what the
   // three-arm comparison found worth its 403 characters.
-  const limit = 3200
+  const limit = 3400
   const length = gate.DEFAULT_GATE_TEXT.length
   if (length > limit) throw new Error('the gate text is ' + String(length) + ' characters, over the ' + String(limit) + ' ceiling')
 })
 
-await check('the component is off, and pointed at the default text, unless configured', async () => {
+await check('the default configuration injects, and points at the default text', async () => {
   // `Config()` resolves the switch to whatever this host's schemastery produces - a Volatile
   // here, a plain boolean on an older host. Assert the behaviour the default produces, not
   // the shape it arrives in: that is also what the host does.
   const defaults = gate.Config()
   if (defaults.gateContent !== gate.DEFAULT_GATE_TEXT) throw new Error('gateContent default is not the default text')
   const decision = await pass(mountWith(defaults))
-  if (decision.messages.length !== 0) throw new Error('the default configuration injects ' + String(decision.messages.length) + ' message(s)')
+  if (decision.messages.length !== 1) throw new Error('the default configuration injects ' + String(decision.messages.length) + ' message(s), and it should inject one')
+})
+
+await check('a row for a skill that does not ship is never advertised', () => {
+  // The ops plugin's technique: render only what is installed. A row naming a skill the package
+  // does not contain sends the model to a name that resolves to nothing, so the renderer takes the
+  // list as an argument and this proves it uses it.
+  const subset = gate.renderGateText(['model-everything'])
+  if (!subset.includes('`model-everything`')) throw new Error('the entry skill vanished from a one-skill render')
+  const absent = shipped.filter((skill) => skill !== 'model-everything' && subset.includes('`' + skill + '`'))
+  if (absent.length > 0) throw new Error('a skill that was not passed to the renderer is still advertised: ' + absent.join(', '))
+  // And the shipped default advertises exactly the skills on disk.
+  const rendered = [...gate.DEFAULT_GATE_TEXT.matchAll(/\| `(model-everything[a-z-]*)` \|/g)].map((match) => match[1])
+  const missing = shipped.filter((skill) => !rendered.includes(skill))
+  if (missing.length > 0) throw new Error('the rendered table has no row for: ' + missing.join(', '))
+})
+
+await check('a deployment can append its own sentence, after the routing', () => {
+  const withExtra = gate.renderGateText(undefined, 'Run tests serially in this repository.')
+  if (!withExtra.includes('Run tests serially in this repository.')) throw new Error('extraGuidance was dropped')
+  if (withExtra.indexOf('Run tests serially') < withExtra.indexOf('The request')) throw new Error('extraGuidance landed before the routing table')
 })
 
 await check('a switched-off gate injects nothing', async () => {
