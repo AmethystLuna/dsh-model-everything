@@ -20,7 +20,11 @@ for (const step of chain) {
   // Either quote style: a check name carrying an apostrophe ("that skill's catalog line") is
   // written with double quotes, and a counter that read only single quotes silently lost it -
   // the checklist then said the suite had one check fewer than it does.
-  const checks = [...text.matchAll(/^(?:check|test)\((['"])(.+?)\1/gm)].map((match) => match[2])
+  //
+  // An awaited call is still a check, and `await check(...)` is how an asynchronous one is
+  // written: without the prefix the gate suite counted zero, which reads as "this suite
+  // guards nothing".
+  const checks = [...text.matchAll(/^(?:await\s+)?(?:check|test)\((['"])(.+?)\1/gm)].map((match) => match[2])
   suiteChecks.set(suite, checks)
 }
 
