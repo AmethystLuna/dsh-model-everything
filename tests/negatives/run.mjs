@@ -437,6 +437,32 @@ expectAbsent('a dependency graph whose endpoints are declared', 'UML021_DANGLING
 expectAbsent('a document that claims nothing absolutely', 'CONCURRENCY_ABSOLUTE_CLAIM',
   runConcurrencyScan('The cache is guarded by a mutex; the queue is drained on shutdown.'))
 
+// The three async absolute forms, each with the claim removed and the async vocabulary left in
+// place: a refusal would pass a case like this for the wrong reason, so every text below still
+// yields findings. "blocks" is what the absolute rule must NOT catch - only the negated forms are
+// claims about safety.
+expectAbsent('an async handler that blocks without claiming it does not', 'CONCURRENCY_ABSOLUTE_CLAIM',
+  runConcurrencyScan('The handler blocks the event loop while it reads the file synchronously in an async task.'))
+
+expectAbsent('an async design that says nothing about blocking', 'CONCURRENCY_ABSOLUTE_CLAIM',
+  runConcurrencyScan('Each request runs as an async task that awaits a promise; the callback runs on the event loop.'))
+
+expectAbsent('a Chinese async design that only reports blocking', 'CONCURRENCY_ABSOLUTE_CLAIM',
+  runConcurrencyScan('这个回调会阻塞事件循环，异步任务要等它结束。'))
+
+// Metamorphic: the same design in the other language must mine the same families. The Chinese
+// vocabulary was added for exactly this reason, and a translation is the cheapest way to notice
+// that one of the two tables has drifted.
+test('metamorphic: the same async design in Chinese mines the same families', () => {
+  const english = runConcurrencyScan('The gateway is non-blocking; each request is an async task awaiting a promise.')
+  const chinese = runConcurrencyScan('网关是非阻塞的；每个请求是一个异步任务，等待 promise。')
+  const familiesOf = (report) => [...new Set(report.findings.map((finding) => finding.family))].sort()
+  const left = familiesOf(english).join(',')
+  const right = familiesOf(chinese).join(',')
+  if (left !== right) throw new Error('families differ: english=' + left + ' chinese=' + right)
+  if (left === '') throw new Error('neither text mined a family; this case would pass vacuously')
+})
+
 // ------------------------------------------------------------------ design engine --
 // Eleven codes, each with the declaration put right. The near miss matters more here than in
 // most domains: a signal like "this edge is a bridge" is true of many healthy designs, so a

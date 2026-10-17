@@ -194,7 +194,7 @@ And the gates around it:
 | `report-view` | 22 | the report object is not mutated by rendering |
 | `contracts` | 4 | every frozen case still exists |
 | `tool-boundary` | 73 | every tool the plugin registers on ctx.tools is exercised by this suite |
-| `negatives` | 0 | (read the file) |
+| `negatives` | 1 | metamorphic: the same async design in Chinese mines the same families |
 | `external` | 2 | spin: never-states violated (A is initial) |
 
 ## When the change is a fix, not a feature
