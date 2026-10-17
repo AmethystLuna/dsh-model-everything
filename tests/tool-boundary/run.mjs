@@ -985,11 +985,26 @@ await test('report_diff: the nearest case still reports — a real baseline agai
 // A non-array reaches the engine and escapes as a raw TypeError: the call fails, but with no
 // `errorCode` a caller can route on. Asserted as-is; the case must be rewritten the day the
 // tool refuses this input with a code instead.
-await test('model_compose_verify: PINNED — a non-array `machines` escapes as an uncoded failure', async () => {
-  const res = await call('model_compose_verify', { machines: 'not-an-array' })
-  const error = expectToolError(res, 'machines given as a string')
-  expectEq(error?.info, undefined, `the gap is the missing error code; got ${show(error?.info)}`)
-  expect(typeof error?.message === 'string' && error.message.length > 0, 'the message must at least say something')
+// This was a PINNED GAP until the shape check closed it: `machines` is declared `type: 'json'`,
+// `runCompositionVerification` opens with `machinesInput.forEach(...)`, and the tool had no try/catch, so a
+// string escaped as a raw TypeError with no `errorCode`. The pin said it had to be rewritten the day the
+// tool refused this input with a code; that day is this one.
+await test('model_compose_verify: a non-array `machines` is refused with a code that names the option', async () => {
+  const value = expectReport(await call('model_compose_verify', { machines: 'not-an-array' }), 'machines given as a string')
+  expectEq(value.ok, false, 'a string is not a list of machines')
+  expectEq(value.ran, false, 'and nothing was composed')
+  expectEq(value.errorCode, 'COMPOSE_OPTION_INVALID', 'the refusal carries a code to route on')
+  expect(/machines/.test(String(value.verdictReason)), `the message names the option — got ${show(value.verdictReason)}`)
+})
+
+await test('model_compose_verify: an empty `machines` list is refused by name, not by a deeper failure', async () => {
+  // `[]` used to reach the engine and come back as MODEL_INVALID, which is true but hides the real problem:
+  // there was nothing to compose. A position with no machine in it is the same mistake one level in.
+  const empty = expectReport(await call('model_compose_verify', { machines: [] }), 'an empty list')
+  expectEq(empty.errorCode, 'COMPOSE_OPTION_INVALID', 'an empty list is an option problem, not a model one')
+  const hole = expectReport(await call('model_compose_verify', { machines: [MACHINE, null] }), 'a hole in the list')
+  expectEq(hole.errorCode, 'COMPOSE_OPTION_INVALID', 'and a null entry names the position')
+  expect(/\[1\]/.test(String(hole.verdictReason)), `the message names the index — got ${show(hole.verdictReason)}`)
 })
 
 await test('model_compose_verify: the nearest case — one machine is refused with a code and a report', async () => {
@@ -1040,33 +1055,37 @@ await test('uml_structure_verify: the nearest case — the same level with a nam
   expectEq(value.schema, 'model-everything/granularity/v1', 'and reports the levels schema')
 })
 
-// PINNED GAP. Basis: `model_datamodel_verify` declares `copyPairs`, `migrationMappings` and
-// `backupPairs` as `type: 'json'`, and `runDataVerification` iterates each one unguarded
-// (`(options.migrationMappings ?? []).map(...)` and friends), so a non-array escapes as a raw
-// TypeError with no code — while `fieldMapping`, read through `Object.entries`, tolerates the
-// same junk. The asymmetry is the gap; the tolerant neighbour is asserted beside it.
-await test('model_datamodel_verify: PINNED — a non-array `copyPairs` escapes as an uncoded failure', async () => {
-  const res = await call('model_datamodel_verify', { model: DATA_MODEL, copyPairs: 'junk' })
-  const error = expectToolError(res, 'copyPairs given as a string')
-  expectEq(error?.info, undefined, `the gap is the missing error code; got ${show(error?.info)}`)
+// These were PINNED GAPS until the shape check closed them: each option is declared `type: 'json'`, the
+// engine iterates it, and a string escaped as a raw TypeError with no code. `fieldMapping` used to be the
+// tolerant neighbour that read junk through `Object.entries` and reported a clean pass; tolerating it was
+// the asymmetry, not the model, so it is refused now too.
+await test('model_datamodel_verify: a non-array option is refused with a code that names it', async () => {
+  for (const option of ['copyPairs', 'migrationMappings', 'backupPairs']) {
+    const value = expectReport(await call('model_datamodel_verify', { model: DATA_MODEL, [option]: 'junk' }), option + ' given as a string')
+    expectEq(value.ok, false, option + ': a string is not a list')
+    expectEq(value.ran, false, option + ': nothing was verified')
+    expectEq(value.errorCode, 'DATA_OPTION_INVALID', option + ': the refusal carries a code')
+    expect(new RegExp(option).test(String(value.verdictReason)), option + ': the message names the option — got ' + show(value.verdictReason))
+  }
 })
 
-await test('model_datamodel_verify: PINNED — a non-array `migrationMappings` escapes as an uncoded failure', async () => {
-  const res = await call('model_datamodel_verify', { model: DATA_MODEL, migrationMappings: 'junk' })
-  const error = expectToolError(res, 'migrationMappings given as a string')
-  expectEq(error?.info, undefined, `the gap is the missing error code; got ${show(error?.info)}`)
+await test('model_datamodel_verify: `fieldMapping` given junk is refused, not read through Object.entries', async () => {
+  // It answered `verdict: pass` before: a string has entries, none of them the mapping meant, so the option
+  // was silently ignored while the report said the model was fine.
+  const value = expectReport(await call('model_datamodel_verify', { model: DATA_MODEL, fieldMapping: 'junk' }), 'fieldMapping given a string')
+  expectEq(value.ok, false, 'a string is not a mapping')
+  expectEq(value.errorCode, 'DATA_OPTION_INVALID', 'and it says so with a code')
+  expect(/fieldMapping/.test(String(value.verdictReason)), 'the message names the option — got ' + show(value.verdictReason))
+  // The near miss: a real mapping still reports.
+  const fine = expectReport(await call('model_datamodel_verify', { model: DATA_MODEL, fieldMapping: {} }), 'an empty mapping')
+  expectEq(fine.ok, true, 'an empty mapping is a mapping')
 })
 
-await test('model_datamodel_verify: PINNED — a non-array `backupPairs` escapes as an uncoded failure', async () => {
-  const res = await call('model_datamodel_verify', { model: DATA_MODEL, backupPairs: 'junk' })
-  const error = expectToolError(res, 'backupPairs given as a string')
-  expectEq(error?.info, undefined, `the gap is the missing error code; got ${show(error?.info)}`)
-})
-
-await test('model_datamodel_verify: the nearest case — `fieldMapping` takes the same junk and still reports', async () => {
-  const value = expectReport(await call('model_datamodel_verify', { model: DATA_MODEL, fieldMapping: 'junk' }), 'fieldMapping given as a string')
-  expectEq(value.ok, true, 'this option is read tolerantly')
-  expectEq(value.verdict, 'pass', 'and the model itself is fine')
+await test('model_datamodel_verify: a null entry names its position', async () => {
+  // `[null]` reached `pair.mapping` and threw a read of null, which says nothing about which entry.
+  const value = expectReport(await call('model_datamodel_verify', { model: DATA_MODEL, copyPairs: [null] }), 'a hole in copyPairs')
+  expectEq(value.errorCode, 'DATA_OPTION_INVALID', 'a hole is an option problem')
+  expect(/\[0\]/.test(String(value.verdictReason)), 'the message names the index — got ' + show(value.verdictReason))
 })
 
 // PINNED GAP. Basis: `model_export` declares `model` as `type: 'json'` and `format` as a

@@ -1,6 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runCompositionVerification } from './engine.js'
+import { OptionShapeError, optionRefusal, requireArrayOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
 
 export const COMPOSE_TOOL_NAME = 'model_compose_verify'
@@ -45,9 +46,19 @@ export const modelComposeTool = defineTool({
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
-    return runCompositionVerification(args.machines as unknown[], {
-      rendezvous: args.rendezvous as string[] | undefined,
-      maxStates: args.maxStates,
-    }) as unknown as JsonValue
+    try {
+      // `machines` is declared `json`, so a string reached `machinesInput.forEach` as a raw TypeError. The
+      // array-ness is the tool's contract; check it here and refuse with a code that names the option.
+      requireArrayOption(args.machines, 'machines', 'COMPOSE_OPTION_INVALID')
+      if (args.machines !== undefined && (args.machines as unknown[]).length === 0) {
+        throw new OptionShapeError('COMPOSE_OPTION_INVALID', 'machines is an empty array. A composition needs at least two machines to compose; with none there is nothing to decide.')
+      }
+      return runCompositionVerification(args.machines as unknown[], {
+        rendezvous: args.rendezvous as string[] | undefined,
+        maxStates: args.maxStates,
+      }) as unknown as JsonValue
+    } catch (error) {
+      return optionRefusal(error, 'COMPOSE_OPTION_INVALID') as unknown as JsonValue
+    }
   },
 })
