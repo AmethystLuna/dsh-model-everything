@@ -2,6 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runVerification } from './engine.js'
 import { renderReportText } from './report-view.js'
+import { OptionShapeError, optionRefusal, requireObjectOption } from './option-shape.js'
 
 export const MODEL_VERIFY_TOOL_NAME = 'model_verify'
 
@@ -58,11 +59,36 @@ export const modelVerifyTool = defineTool({
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
-    return runVerification(args.model, {
-      maxStates: args.maxStates,
-      maxPermutationEvents: args.maxPermutationEvents,
-      beforeModel: args.beforeModel,
-      stateMapping: args.stateMapping as Record<string, string> | undefined,
-    }) as unknown as JsonValue
+    try {
+      // `stateMapping` is declared `json`, so a string, a list or a map to non-strings all arrive here, and the
+      // engine reads the option with `mapping[state] ?? state`: every one of those quietly became the identity
+      // mapping. A renamed state then read as "A was removed and A2 was added" - a D1 error produced by the shape
+      // of an option rather than by the refactor, which is the one thing a regression comparison must not do.
+      requireObjectOption(args.stateMapping, 'stateMapping', 'VERIFY_OPTION_INVALID')
+      const mapping = args.stateMapping as Record<string, unknown> | undefined
+      if (mapping !== undefined) {
+        if (args.beforeModel === undefined) {
+          throw new OptionShapeError(
+            'VERIFY_OPTION_INVALID',
+            'stateMapping was passed without beforeModel: the mapping says how BEFORE state ids turn into AFTER ones, so there is nothing to map. Pass beforeModel, or omit the mapping.',
+          )
+        }
+        const [from, to] = Object.entries(mapping).find(([, value]) => typeof value !== 'string' || value === '') ?? []
+        if (from !== undefined) {
+          throw new OptionShapeError(
+            'VERIFY_OPTION_INVALID',
+            'stateMapping.' + from + ' is not a state id (it is ' + (Array.isArray(to) ? 'an array' : to === null ? 'null' : 'a ' + typeof to) + '). Every value is the AFTER state id the BEFORE state maps to, so it has to be a non-empty string.',
+          )
+        }
+      }
+      return runVerification(args.model, {
+        maxStates: args.maxStates,
+        maxPermutationEvents: args.maxPermutationEvents,
+        beforeModel: args.beforeModel,
+        stateMapping: mapping as Record<string, string> | undefined,
+      }) as unknown as JsonValue
+    } catch (error) {
+      return optionRefusal(error, 'VERIFY_OPTION_INVALID') as unknown as JsonValue
+    }
   },
 })

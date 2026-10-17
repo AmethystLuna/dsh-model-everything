@@ -37,7 +37,12 @@ function expectPresent(name, model, code) {
     const codes = codesOf(report)
     if (!codes.includes(code)) throw new Error(code + ' missing; the review reported ' + JSON.stringify(codes))
     if (DESIGN_CODE_LEVEL[code] === undefined) throw new Error(code + ' has no declared level')
-    if (report.summary.checksRun !== 12) throw new Error('expected 11 checks, ran ' + String(report.summary.checksRun))
+    // `checksRun` counts the checks that examined the design. A check with nothing to hold the design to is a
+    // skip, and counting it here said a design that declared nothing was fully reviewed.
+    const skippedCount = report.checks.filter((check) => check.status === 'skip').length
+    if (report.summary.checksRun !== report.checks.length - skippedCount) {
+      throw new Error('checksRun must count the checks that ran: ' + String(report.summary.checksRun) + ' of ' + String(report.checks.length) + ', ' + String(skippedCount) + ' skipped')
+    }
     // The level decides the bucket: a signal must never be what fails the verdict.
     if (DESIGN_CODE_LEVEL[code] === 'signal' && report.violations.some((finding) => finding.code === code)) {
       throw new Error(code + ' is a signal and must not sit in violations')

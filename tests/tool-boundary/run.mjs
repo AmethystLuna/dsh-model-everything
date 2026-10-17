@@ -570,6 +570,30 @@ await test('model_verify: omitting `stateMapping` equals the identity mapping in
   expectDeepEq(identity.comparison.stateMapping, { A: 'A', B: 'B' }, 'an explicit mapping is echoed verbatim')
 })
 
+await test('model_verify: a `stateMapping` the engine cannot read is refused, not applied as identity', async () => {
+  // The option is declared `json`, so a string, a list or a map to non-strings all arrive here. The engine reads it
+  // with `mapping[state] ?? state`, so every one of those silently became the identity mapping - and a renamed state
+  // then read as "A was removed, A2 was added": a real-looking D1 error, produced by the shape of an option.
+  const refused = async (stateMapping, why) => {
+    const result = expectReport(await call('model_verify', { model: MACHINE, beforeModel: MACHINE, stateMapping }), why)
+    expectEq(result.ran, false, why + ': the tool must not run on an option it cannot read')
+    expectEq(result.errorCode, 'VERIFY_OPTION_INVALID', why + ': refusal code')
+    expect(result.checks === undefined, why + ': a refusal carries no checks')
+  }
+  await refused('A=A2', 'a string')
+  await refused(['A', 'B'], 'an array')
+  await refused({ A: 7 }, 'a map to a number')
+  await refused({ A: null }, 'a map to null')
+  // A mapping with nothing to compare is the same silence one step earlier: the caller asked for a comparison.
+  const orphan = expectReport(await call('model_verify', { model: MACHINE, stateMapping: { A: 'A2' } }), 'a mapping without beforeModel')
+  expectEq(orphan.ran, false, 'a mapping without a beforeModel must be refused')
+  expectEq(orphan.errorCode, 'VERIFY_OPTION_INVALID', 'through the same code')
+  expect(String(orphan.error).includes('beforeModel'), 'and name the option that is missing: ' + String(orphan.error))
+  // The near miss: the mapping the engine does read still compares.
+  const real = expectReport(await call('model_verify', { model: MACHINE, beforeModel: MACHINE, stateMapping: { A: 'A', B: 'B' } }), 'a usable mapping')
+  expect(real.checks.some((check) => check.id === 'D1'), 'the identity mapping must still run the comparison')
+})
+
 await test('model_compose_verify: omitting `maxStates` equals the documented default of 10000', async () => {
   const args = { machines: [MACHINE, SECOND_MACHINE] }
   const omitted = expectReport(await call('model_compose_verify', args), 'omitted maxStates')

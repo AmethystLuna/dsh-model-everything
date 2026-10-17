@@ -391,6 +391,11 @@ When `beforeModel` is passed to `model_verify`, the engine treats `model` as AFT
 
 `stateMapping` maps BEFORE state ids to AFTER state ids. Omit it when state names are unchanged.
 
+It is checked at the tool boundary, because every wrong shape of it used to read as "no mapping at all": a
+string, a list, or a map whose values are not state ids is refused with `VERIFY_OPTION_INVALID` and a message
+naming the entry. A mapping passed without `beforeModel` is refused too — there is no BEFORE model to map from,
+and the caller plainly meant to compare.
+
 Example tool call shape:
 
 ```json
