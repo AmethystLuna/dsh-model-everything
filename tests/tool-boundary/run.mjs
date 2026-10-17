@@ -1016,37 +1016,39 @@ await test('model_compose_verify: the nearest case — one machine is refused wi
   expectEq(value.summary.machineCount, 1, 'and the count of accepted machines')
 })
 
-// PINNED GAP. Basis: `uml_structure_verify` declares `diagrams` as `type: 'json'`, and
-// `reviewGranularity` (src/granularity.ts) starts with `diagrams.map(...)` behind no guard;
-// `structure-tool.ts` wraps nothing in try/catch. A non-array therefore escapes as a raw
-// TypeError with no code — the one input class this tool does not answer with a report.
-await test('uml_structure_verify: PINNED — a non-array `diagrams` escapes as an uncoded failure', async () => {
-  const res = await call('uml_structure_verify', { diagrams: 'not-an-array' })
-  const error = expectToolError(res, 'diagrams given as a string')
-  expectEq(error?.info, undefined, `the gap is the missing error code; got ${show(error?.info)}`)
+// This was a PINNED GAP: `diagrams` is declared `type: 'json'`, `reviewGranularity` starts with
+// `diagrams.map(...)` behind no guard, and the tool wrapped nothing in try/catch, so a string escaped as a
+// raw TypeError with no code — the one input class this tool did not answer with a report.
+await test('uml_structure_verify: a non-array `diagrams` is refused with a code', async () => {
+  const value = expectReport(await call('uml_structure_verify', { diagrams: 'not-an-array' }), 'diagrams given as a string')
+  expectEq(value.ok, false, 'a string is not a list of levels')
+  expectEq(value.ran, false, 'and nothing was reviewed')
+  expectEq(value.errorCode, 'STRUCTURE_OPTION_INVALID', 'the refusal carries a code')
+  expect(/diagrams/.test(String(value.verdictReason)), `the message names the option — got ${show(value.verdictReason)}`)
 })
 
-// PINNED GAP, same shape: a level object with no `diagram` reaches `entry.diagram.split(...)`
-// inside `reviewGranularity`.
-await test('uml_structure_verify: PINNED — a level without `diagram` escapes as an uncoded failure', async () => {
-  const res = await call('uml_structure_verify', { diagrams: [{ name: 'top' }] })
-  const error = expectToolError(res, 'a level with a name and no diagram')
-  expectEq(error?.info, undefined, `the gap is the missing error code; got ${show(error?.info)}`)
+// The same pin, closed the same way: `entry.diagram.split(...)` inside `reviewGranularity` threw a raw
+// TypeError when a level carried a name and no diagram.
+await test('uml_structure_verify: a level without `diagram` is refused by name and position', async () => {
+  const value = expectReport(await call('uml_structure_verify', { diagrams: [{ name: 'top' }] }), 'a level with a name and no diagram')
+  expectEq(value.ok, false, 'a level with no diagram has nothing to review')
+  expectEq(value.errorCode, 'STRUCTURE_OPTION_INVALID', 'the refusal carries a code')
+  expect(/diagrams\[0\]\.diagram is missing/.test(String(value.verdictReason)), `the message names the field and the position — got ${show(value.verdictReason)}`)
+  // The near miss: the same level with its diagram still reviews.
+  const fine = expectReport(await call('uml_structure_verify', { diagrams: [{ name: 'top', diagram: STRUCTURE_DIAGRAM }] }), 'a complete level')
+  expectEq(fine.ok, true, 'a complete level reviews')
 })
 
-// PINNED GAP. Basis: `reviewGranularity` hashes each level as `{ name: entry.name, hash }`
-// (src/granularity.ts); a level without `name` puts `undefined` into the canonical value,
-// which the registry's lossless-JSON output contract rejects. The defect is real and the
-// failure is at least coded, but it is the tool's own return value that is malformed.
-await test('uml_structure_verify: PINNED — a level without `name` returns a value the output contract rejects', async () => {
-  const res = await call('uml_structure_verify', { diagrams: [{ diagram: STRUCTURE_DIAGRAM }] })
-  const error = expectToolError(res, 'a level with a diagram and no name')
-  expectEq(error?.info?.code, 'INVALID_TOOL_OUTPUT', 'the failure is the output contract, not the input guard')
-  expectEq(error?.info?.name, 'ToolOutputError', 'and it names the contract that caught it')
-  expect(
-    typeof error?.message === 'string' && error.message.includes('lossless JSON'),
-    `the reason must be the non-lossless value, got ${show(error?.message)}`,
-  )
+// This was a PINNED GAP with a real defect behind it: `reviewGranularity` hashes each level as
+// `{ name: entry.name, hash }`, so a level without `name` put `undefined` into the canonical value and the
+// registry's lossless-JSON contract rejected the tool's own return value. The tool now refuses the level
+// before the engine sees it, which is where the fix belongs: the caller wrote the level.
+await test('uml_structure_verify: a level without `name` is refused by name and position', async () => {
+  const value = expectReport(await call('uml_structure_verify', { diagrams: [{ diagram: STRUCTURE_DIAGRAM }] }), 'a level with a diagram and no name')
+  expectEq(value.ok, false, 'a level with no name is not a level')
+  expectEq(value.ran, false, 'nothing was reviewed')
+  expectEq(value.errorCode, 'STRUCTURE_OPTION_INVALID', 'the refusal carries a code')
+  expect(/diagrams\[0\]\.name is missing/.test(String(value.verdictReason)), `the message names the field and the position — got ${show(value.verdictReason)}`)
 })
 
 await test('uml_structure_verify: the nearest case — the same level with a name returns a report', async () => {
