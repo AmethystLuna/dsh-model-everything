@@ -2015,7 +2015,7 @@
       "errors": 0,
       "warnings": 1,
       "info": 0,
-      "checksRun": 12,
+      "checksRun": 3,
       "nodes": 2,
       "edges": 1
     },
@@ -2092,7 +2092,7 @@
       "Read the 1 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.",
       "These had nothing to hold the design to: Layer Order (DES2); Boundary Leak (DES3); Placement (DES5); Required Dependencies (DES6); Substitutability (DES7); Interface Width (DES8); Interface Cohesion (DES9); Responsibility Boundaries (DES10); Dependency Inversion (DES11). Declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact."
     ],
-    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=12\nCHECKS  pass DES1 DES12 | warn DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nWARN DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.\nNEXT  These had nothing to hold the design to: Layer Order (DES2); Boundary Leak (DES3); Placement (DES5); Required Dependencies (DES6); Substitutability (DES7); Interface Width (DES8); Interface Cohesion (DES9); Responsibility Boundaries (DES10); Dependency Inversion (DES11). Declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact."
+    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=3\nCHECKS  pass DES1 DES12 | warn DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nWARN DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.\nNEXT  These had nothing to hold the design to: Layer Order (DES2); Boundary Leak (DES3); Placement (DES5); Required Dependencies (DES6); Substitutability (DES7); Interface Width (DES8); Interface Cohesion (DES9); Responsibility Boundaries (DES10); Dependency Inversion (DES11). Declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact."
   },
   "design: a model the schema refuses": {
     "ok": false,

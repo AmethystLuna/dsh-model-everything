@@ -1247,7 +1247,10 @@ export function runDesignReview(input: unknown): DesignReport {
       declared,
       checksSkipped: skippedCodes,
     },
-    summary: { errors, warnings, info, checksRun: checks.length, nodes: features.nodes, edges: features.edges },
+    // `checksRun` counts the checks that examined the design: a skipped check examined nothing, so counting it
+    // here answered "fully reviewed" for a design that declared nothing to review it against. The roster is
+    // `checks`, and `facts.checksSkipped` names the ones this number excludes.
+    summary: { errors, warnings, info, checksRun: checks.length - skipped.length, nodes: features.nodes, edges: features.edges },
     hashes: { modelHash },
     modelHash,
     nextSteps,
