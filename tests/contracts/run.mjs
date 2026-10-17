@@ -181,9 +181,10 @@ function projection(report) {
 // `@deepseek-ai/dsh-tools` (a devDependency) - loaded the way tests/uml loads it, with a visible skip.
 let toolCases = {}
 try {
-  const [umlTool, exportTool, structureTool, verifyTool, diffTool] = await Promise.all([
+  const [umlTool, exportTool, structureTool, verifyTool, diffTool, composeTool, dataTool, designTool, concurrencyTool] = await Promise.all([
     import('../../lib/uml-tool.js'), import('../../lib/export-tool.js'), import('../../lib/structure-tool.js'),
     import('../../lib/tool.js'), import('../../lib/report-diff-tool.js'),
+    import('../../lib/compose-tool.js'), import('../../lib/data-tool.js'), import('../../lib/design-tool.js'), import('../../lib/concurrency-tool.js'),
   ])
   toolCases = {
     'uml parse: a hand-drawn state diagram': () => umlTool.umlParseTool.execute({ diagram: stateDiagramText, notation: 'mermaid' }),
@@ -205,6 +206,10 @@ try {
     // that were wrong until this session.
     'report diff: a clean delta through the tool': () => diffTool.reportDiffTool.execute({ baseline: runVerification(stateMachine), current: runVerification(stateMachine) }),
     'report diff: an escalation through the tool': () => diffTool.reportDiffTool.execute({ baseline: escalatingBaseline, current: escalatingCurrent }),
+    'compose: two machines through the tool': () => composeTool.modelComposeTool.execute({ machines: [leftMachine, rightMachine], rendezvous: ['go'] }),
+    'datamodel: a valid model through the tool': () => dataTool.modelDataModelVerifyTool.execute({ model: dataModel }),
+    'design: a layered design through the tool': () => designTool.designTool.execute({ model: declaredDesign }),
+    'concurrency: absolute claims through the tool': () => concurrencyTool.modelConcurrencyScanTool.execute({ text: 'The cache is thread-safe and lock-free. Shared state is protected by a mutex.' }),
   }
 } catch (error) {
   console.log('SKIP tool-layer contract cases: the dsh tool modules did not load (' + (error instanceof Error ? error.message : String(error)) + ')')
