@@ -83,6 +83,10 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
 - **a mutation that does not parse proves nothing.** Check the mutated file compiles before
   believing a "not caught" result: swallowing a brace once produced a syntax error that read
   as a passing test.
+- **a SKIP also reads as a pass.** Some suites import a tool module dynamically and print `SKIP` when
+  `@deepseek-ai/dsh-tools` does not resolve. A scratch copy without a `node_modules` junction hit exactly that, and two
+  mutations came back "not caught" for a case that never ran. Read the mutated suite's output for `SKIP` before
+  believing a green result - or give the copy the repository's `node_modules` (a junction is enough).
 
 ## Routing, where the user meets the plugin
 
