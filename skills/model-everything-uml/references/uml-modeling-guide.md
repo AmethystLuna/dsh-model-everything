@@ -412,6 +412,11 @@ The model is `CommunicationModelV1`: `lifelines` (an id, and either a `classifie
 (a `sequence` string plus its two ends). Links and messages are kept apart because a link
 with no message is a real thing to notice, and so is a message with no link to carry it.
 
+Those three lists are the family, so a model that declares other fields and none of them is
+refused with `UML041_MODEL_FAMILY_MISMATCH`, naming what the family needs and what the model
+declared instead. A model that declares nothing at all is not a mismatch — it is an empty
+communication diagram, which the review reports as `UML063_COMMUNICATION_NO_LIFELINES`.
+
 | Code | Severity | What it means |
 |---|---|---|
 | `UML063_COMMUNICATION_NO_LIFELINES` | error | The diagram declares no lifeline. |

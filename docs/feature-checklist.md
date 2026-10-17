@@ -171,7 +171,7 @@ And the gates around it:
 | `catalog` | 8 | catalog: every skill row fits the budget, so nothing it needs is cut off |
 | `data-engine` | 15 | valid data model passes |
 | `concurrency` | 6 | flags absolute concurrency claims and risk keywords |
-| `uml` | 97 | render: mermaid state diagram carries directives, guards and terminal marks |
+| `uml` | 98 | render: mermaid state diagram carries directives, guards and terminal marks |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 7 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
