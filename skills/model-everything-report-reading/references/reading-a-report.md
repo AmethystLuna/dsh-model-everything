@@ -120,10 +120,6 @@ One code is worth relaying with its reason rather than its name. A model whose r
 infinite is reported as `S6_UNBOUNDED_VARIABLE`, an error, and the point to pass on is that **no** search
 bound would have decided it: the question is undecidable for that model, not merely unanswered.
 
-One family of findings deserves its own note: a model whose reachable state space is infinite is
-reported as `S6_UNBOUNDED_VARIABLE`, an error. It is not a defect of the search — it is a property
-of the model, and it means no search bound would have decided the question.
-
 ## What each family adds
 
 Beyond the skeleton, each family carries what its own domain needs: a graph, a round-trip record,
