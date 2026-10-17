@@ -191,7 +191,7 @@ And the gates around it:
 | `exporters` | 9 | source model still verifies (sanity) |
 | `report-view` | 22 | the report object is not mutated by rendering |
 | `contracts` | 4 | every frozen case still exists |
-| `tool-boundary` | 0 | (read the file) |
+| `tool-boundary` | 73 | every tool the plugin registers on ctx.tools is exercised by this suite |
 | `negatives` | 0 | (read the file) |
 | `external` | 2 | spin: never-states violated (A is initial) |
 
