@@ -1,6 +1,6 @@
 ---
 name: model-everything-uml
-description: "Use when drawing a code flow as UML or auditing a diagram someone drew: parse a hand-drawn state, activity, timing, profile or composite structure diagram, render a model, and check round-trip fidelity. A component, class, object, package or deployment diagram goes to the model-everything-structure skill; an entity-relationship diagram is not a UML family and is refused, with the reason. Doctrine: the model-everything skill."
+description: "Use when drawing a UML diagram or auditing a hand-drawn one: parse it as a state, activity, timing, profile or composite structure model, render a model in a notation that can draw it, and check round-trip fidelity. A component, class, object, package or deployment diagram is read as a dependency graph by the model-everything-structure skill; an entity-relationship diagram is not a UML family and is refused, with the reason. Doctrine: the model-everything skill."
 ---
 
 # Model Everything — UML Modelling
