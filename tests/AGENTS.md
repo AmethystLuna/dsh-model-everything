@@ -111,12 +111,26 @@ Two details of that last check are the whole of its value, and both were wrong o
   cases. That is the mutation to try on this suite: delete a decisive word from a description
   and the check must go red. It did not, before.
 
-The scoring half is run by hand, because the plugin never calls a model:
+The scoring half is run by hand, because the plugin never calls a model. There are two ways
+to ask the question, and they measure different things:
 
 ```bash
-node tests/skill-routing/run.mjs --print-prompt          # the question, as the model sees it
+node tests/skill-routing/run.mjs --print-prompt          # the catalog line, in one message
 node tests/skill-routing/run.mjs --decisions answer.json # score {"0": "<skill>", ...}
 ```
+
+- **The printed prompt** hands the model the catalog text and asks it to route. It measures
+  the descriptions and nothing else: cheap, reproducible, unaffected by the system prompt.
+- **A live session** is given the utterance alone and nothing about routing. It measures what
+  the user actually experiences - the catalog, the system prompt and the model together. It
+  costs a session per case, so run a sample: one request per domain skill, plus the near
+  misses where a domain skill could swallow a request that belongs elsewhere.
+
+A live session has to be asked to report what it loaded, because the transcript is not the
+result: end the prompt with a single line `SKILLS LOADED: <names, or none>`. That is a
+self-report, and it is the weakest part of this method - it can be answered from what the
+session remembers doing, not from what it did. Read it with that in mind, and prefer the
+printed prompt where a description-level answer is enough.
 
 A misroute is a corpus or a description defect, not a model defect: fix whichever of the two
 the answer exposes, then re-run.
