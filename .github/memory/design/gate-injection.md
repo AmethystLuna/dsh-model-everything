@@ -1,6 +1,6 @@
 ---
 name: gate-injection
-description: 会话开头路由注入（第二个 loader 行）——为什么要它、它替代不了什么、代价与开关、默认开是怎么定的，以及从 a neighbouring plugin 借的三种写法
+description: 会话开头路由注入（第二个 loader 行）——为什么要它、它替代不了什么、代价与开关、默认开是怎么定的，以及从同类插件借的三种写法
 metadata:
   type: design
 ---
@@ -89,7 +89,7 @@ dsh 的 `readPluginMeta(specifier, parentURL)` 拿**完整说明符（含子路�
 
 仓库的原则是「能力必须能通过它自己的工具描述或技能文字被发现」。注入**偏离**这条原则：它把路由搬到会话里，而不是让它待在目录行里。
 
-原来的处理是把它做成**可选、默认关**的例外。现在默认开，理由不是原则不重要了，而是**同一个 harness 里已经有先例**：`a neighbouring plugin` 一直在往系统提示里注入一节路由（`a neighbouring plugin:repository-tooling`，1476 字符，默认开），因为「同质工具之间怎么选」这件事本来就不在单个工具的描述里。既然那个先例被接受，我们的例外就不再是例外，而是一种既有的写法。
+原来的处理是把它做成**可选、默认关**的例外。现在默认开，理由不是原则不重要了，而是**同一个 harness 里已经有先例**：另一个插件一直在往系统提示里注入一节路由（1476 字符，默认开），因为「同质工具之间怎么选」这件事本来就不在单个工具的描述里。既然那个先例被接受，我们的例外就不再是例外，而是一种既有的写法。
 
 ## 实测与验证
 
@@ -97,7 +97,7 @@ dsh 的 `readPluginMeta(specifier, parentURL)` 拿**完整说明符（含子路�
 - 变异：去掉历史守卫、忽略开关、从文本里删掉一个技能行——三条都被套件抓到（基线先跑、且没有 SKIP 才算数）。
 - 部署层：装进 profile 后，`cordis_inspect_query`（provider `dsh-model-everything-gate`，method `status`）回答 `enabled` 与注入文本长度；行的存在看 `Config.listConfigs`。
 
-## 从 a neighbouring plugin 借的三招（2026-10-18）
+## 从同类插件借的三招（2026-10-18）
 
 读它的 `lib/policy.js` 之后搬过来的，都带着它们的理由：
 

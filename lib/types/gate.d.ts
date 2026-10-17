@@ -52,7 +52,7 @@ export declare function shippedSkills(): string[];
  * session believed it could answer from memory - loaded no skill and ran no tool. Stated at the
  * start and restated at the end, it did both, and a control task was not over-triggered.
  *
- * The shape follows the ops plugin's injected section: a table that chooses between near-equals,
+ * The shape follows a neighbouring plugin's injected section: a table that chooses between near-equals,
  * rows only for what is installed, and a rule against degrading silently when a tool refuses.
  *
  * @param skills - the skills to advertise; defaults to the ones on disk.

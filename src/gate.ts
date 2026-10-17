@@ -98,7 +98,7 @@ export function shippedSkills(): string[] {
  * session believed it could answer from memory - loaded no skill and ran no tool. Stated at the
  * start and restated at the end, it did both, and a control task was not over-triggered.
  *
- * The shape follows the ops plugin's injected section: a table that chooses between near-equals,
+ * The shape follows a neighbouring plugin's injected section: a table that chooses between near-equals,
  * rows only for what is installed, and a rule against degrading silently when a tool refuses.
  *
  * @param skills - the skills to advertise; defaults to the ones on disk.
@@ -176,7 +176,7 @@ export const Config = z.object({
   // Not volatile on purpose: the settings projection feeds a GUI form, and a kilobyte of
   // prose does not belong in one.
   gateContent: z.string().default(DEFAULT_GATE_TEXT),
-  // The ops plugin's technique, adopted: a short free-text slot a deployment can use for its own
+  // A neighbour's technique, adopted: a short free-text slot a deployment can use for its own
   // rule without forking the package. Appended last, so it is read after the routing.
   extraGuidance: z.string().default(''),
 })

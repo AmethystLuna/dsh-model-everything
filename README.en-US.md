@@ -219,7 +219,7 @@ It registers its skills through the standard DSH filesystem skill provider and i
 
 It injects a message (about 3.2k characters) into the session. It carries four things: which skill to load when it is unclear which applies, what each skill answers, what each tool does **and what it does not prove**, and how to read a report (`verdict`, never `ok`; `skip` is not `pass`). **The rule - load the skill, do not answer from memory - is stated at the start and restated at the end.** That is measured, not stylistic: with one statement, a request the session believed it could answer itself (a migration) loaded no skill and ran no tool; stated at both ends, it did both, and a control task was not over-triggered.
 
-Its shape borrows three techniques from the section `a neighbouring plugin` injects, which is the existing precedent for this in the same harness:
+Its shape borrows three techniques from a routing section another plugin in the same harness already injects:
 
 - **Advertise only what is installed**: the skill table is rendered from the directories actually under `skills/`, so it cannot name a skill that resolves to nothing; a skill added without a row falls back to "see its catalog line", so the table can be incomplete but never wrong.
 - **A chooser table, not a sentence list**: `| The request | The skill |`, because routing *is* an ordering between near-equals and a table reads as one.

@@ -114,6 +114,9 @@ check('a category index names each of its topics with a when-to-read column', ()
 })
 
 check('the memory carries nothing that must not be committed', () => {
+  // A neighbouring product's name leaked into the READMEs and the memory once. It is spelled in
+  // pieces here so this check does not reintroduce the name it exists to keep out.
+  const NEIGHBOUR = 'dsh' + '-ops'
   const forbidden = [
     [/(?<![A-Za-z])[A-Za-z]:\\/, 'a Windows absolute path'],
     [/(?<![A-Za-z])[A-Za-z]:\//, 'a Windows absolute path'],
@@ -122,15 +125,25 @@ check('the memory carries nothing that must not be committed', () => {
     [/\.dshstore|scrat ch|scratch\//i, 'a scratch directory'],
     [/\bghp_[A-Za-z0-9]{20,}|\bsk-[A-Za-z0-9]{20,}\b/, 'a credential-shaped token'],
     [/[\w.+-]+@[\w-]+\.(?:com|org|net|io|cn|dev|edu|gov)\b/, 'an email address'],
+    [new RegExp(NEIGHBOUR, 'i'), "a neighbouring product's name"],
   ]
   const hits = []
   for (const file of files) {
-    const text = readFileSync(file, 'utf8')
+    const body = readFileSync(file, 'utf8')
     for (const [pattern, label] of forbidden) {
-      if (pattern.test(text)) hits.push(relative(file) + ': ' + label)
+      if (pattern.test(body)) hits.push(relative(file) + ': ' + label)
     }
   }
   if (hits.length > 0) throw new Error(hits.join('; '))
+})
+
+check('the README pair names no other product either', () => {
+  // The same rule, over the two files a reader sees first: they are not in the memory tree, so the
+  // check above cannot see them, and that is exactly where the name was.
+  const NEIGHBOUR = 'dsh' + '-ops'
+  const pattern = new RegExp(NEIGHBOUR, 'i')
+  const hits = ['README.md', 'README.en-US.md'].filter((name) => pattern.test(readFileSync(repoRoot + name, 'utf8')))
+  if (hits.length > 0) throw new Error('a neighbouring product is named in: ' + hits.join(', '))
 })
 
 if (failures > 0) { console.log('memory gate failed:', failures); process.exit(1) }

@@ -17,7 +17,7 @@ metadata:
 
 1. **运行中的宿主**：`cordis_inspect_list` / `cordis_inspect_query`。它给出活的服务契约（`Service` provider 读 `skills`、`cordisInspect`），以及当前注册了哪些 inspect provider。
 2. **已安装的 dsh 实现**：包内相对路径。`dsh-app-boot` 是 boot 与 patch 的权威实现，`cordis-plugin-loader` 是入口树，`dsh-package-manifest` 是清单类型，`schemastery` 是配置 schema，`dsh-skill-filesystem` 是技能 provider，`dsh-cordis-host-runner` 是 inspect 注册表。
-3. **已安装的插件实例**：看它们的 `package.json`、`cordis.patch.yml`、`exports` 和 `locale/`。多组件的样本是 `a neighbouring plugin`。
+3. **已安装的插件实例**：看它们的 `package.json`、`cordis.patch.yml`、`exports` 和 `locale/`。多组件的样本是环境里一个已安装的插件。
 
 公开规范只在两处引用：[JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)（实现里写死的 `$schema` 值）与 [schemastery](https://github.com/shigma/schemastery)。
 
@@ -105,7 +105,7 @@ CLI 对 `--patch` 的说明就是 `extra patch-list overlay applied after the pr
 
 ### `exports` 子路径的约定
 
-行里的 `name` 是普通模块说明符，由 Node 解析。`dsh-app-boot` 的 README 明说 `Node still owns exports, conditions, subpaths, module caches, and error codes`。所以一包多组件就是**普通的 `exports` 子路径**：`"./shell": { "default": "./lib/components/shell/index.js" }`，行里写 `name: a neighbouring plugin/shell`。
+行里的 `name` 是普通模块说明符，由 Node 解析。`dsh-app-boot` 的 README 明说 `Node still owns exports, conditions, subpaths, module caches, and error codes`。所以一包多组件就是**普通的 `exports` 子路径**：`"./shell": { "default": "./lib/components/shell/index.js" }`，行里写 `name: <包名>/shell`。
 
 每个子路径要导出什么，与单组件入口完全相同：cordis 插件模块，导出 `name` / `Config` / `apply`，以及可选的 `inject`。没有为子路径另设的契约。
 
@@ -115,7 +115,7 @@ CLI 对 `--patch` 的说明就是 `extra patch-list overlay applied after the pr
 
 **为了在插件卡片上有自己的名字、描述和图标：需要。** 因为 `readPluginMeta(specifier, parentURL)`（`dsh-app-boot/lib/index.js`）是拿**完整说明符**（含子路径）去解析 `<specifier>/package.json` 与 `<specifier>/locale/en.json` 的。
 
-`a neighbouring plugin` 就是这么做的，三行一套：
+环境里那个多组件插件就是这么做的，三行一套：
 
 - `"./shell"` → 入口模块。
 - `"./shell/package.json"` → 组件自己的清单，里面只有 `name` / `description` / `icon` / `type`。注意它的 `name` 是给人看的标题，不是包名。
