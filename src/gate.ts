@@ -67,7 +67,7 @@ const SKILL_ROWS: Record<string, string> = {
   'model-everything-structure': 'an architecture or dependency drawing',
   'model-everything-design': 'layering, responsibilities, substitutability, interface width',
   'model-everything-datamodel': 'a schema, a migration, a data guarantee',
-  'model-everything-interleaving': 'thread-safe, lock-free, ISR, async interleaving; routing only',
+  'model-everything-interleaving': 'thread-safe, lock-free, ISR, async interleaving; a shared location is decided, the rest is routed',
   'model-everything-report-reading': 'reading a report this plugin returned',
 }
 

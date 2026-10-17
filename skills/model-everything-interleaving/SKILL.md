@@ -55,7 +55,7 @@ Each of these is a place where "no finding" and "no problem" differ. Say which o
 
 ## Rules for This Mode
 
-1. **Mining, not proof.** Report a concurrency claim as `UNVERIFIED` with the routing target; never as passing.
+1. **Mining, not proof - except for a declared shared location.** Report a concurrency claim as `UNVERIFIED` with the routing target; never as passing. The one exception is a location two models both touch: hand `shared` and `accesses` to `model_compose_verify`, which decides C3/C4/C5, and quote its verdict with its witness rather than calling the claim unverified.
 2. **No absolute language in the answer.** "This is thread-safe" is exactly the claim being mined, not a result this skill can produce.
 3. **One counterexample is enough to refute.** If a race is suspected, the deliverable is the interleaving that breaks it plus the harness that demonstrates it (TSan/Helgrind output), not an argument.
 4. **Sequential targets are out of scope.** If nothing runs concurrently, say so and stop. A single-threaded async service is not sequential: interleaving exists at every `await`.

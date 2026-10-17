@@ -59,7 +59,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 3. **写清"永远/绝不"**：把这类断言写进 `invariants`，引擎会在全部可达状态上搜反例，并给出它找到的最短路径。
 4. **落回源码**：报告里的 error 发现逐条回到代码。
 
-它不证明并发安全，那类声明会被路由到 TSan、CBMC 或 TLA+；硬实时语义（deadline、period）也不在它的范围内。
+并发断言分两半：**两个模型都碰同一个共享位置**这一类，由我们自己的 `model_compose_verify` 判（声明 `shared` 与 `accesses` 之后的 C3/C4/C5，包括丢更新）；源码级数据竞争、中断延迟、阻塞调用与漏掉的 `await` 仍路由到 TSan/Helgrind/CBMC/TLA+。硬实时语义（deadline、period）不在它的范围内。
 
 ### 审计一张依赖图
 
@@ -261,7 +261,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 ## 边界
 
 - **不拥有你的代码。** 只读必要的文件，给出带出处的结论。结论对不对，以源码为准。
-- **并发只做路由。** `model_interleaving_scan` 找出并发、同步与异步的声明，并按 family 指出该由哪个工具证明（线程→TSan/Helgrind/CBMC/TLA+，中断→RTOS 感知分析，异步→TLA+/UPPAAL 加运行时检查）。证明本身不归它做。
+- **并发：一半路由，一半判定。** `model_interleaving_scan` 挖出声明并按 family 路由（线程→TSan/Helgrind/CBMC/TLA+，中断→RTOS 感知分析，异步→TLA+/UPPAAL 加运行时检查）。**但共享位置不再只是路由**：把 `shared` 与 `accesses` 交给 `model_compose_verify`，它会判定无序写（C4）与非原子更新/丢更新（C5）——那是一个能在模型上给出最短路见证的决定，不是某个检查的名字。源码级竞争、阻塞调用、漏 `await` 与锁是否跨整个操作持有，仍在路由的另一半。
 - **图的审查不等于代码审查。** 图与它声称的模型一致，只说明图画对了。代码是不是这样，还得对着源码核验。
 
 ## 环境要求

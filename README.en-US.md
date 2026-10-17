@@ -59,7 +59,7 @@ Build the machine as an executable model and let an engine run it, instead of re
 3. **State the always/never claims**: put them in `invariants`. The engine searches every reachable state for a counterexample and returns the shortest one it finds.
 4. **Reconcile with the source**: every error finding goes back to the code.
 
-It does not prove concurrency safety; those claims are routed to TSan, CBMC or TLA+. Hard real-time semantics - deadlines and periods - are outside its scope as well.
+Concurrency claims split in two: the ones about **two models touching one shared location** are decided here, by `model_compose_verify` (declare `shared` and `accesses`; C3/C4/C5 decide the declaration, the unordered write and the lost update). Source-level data races, interrupt latency, a blocking call and a missing `await` are still routed to TSan/Helgrind/CBMC/TLA+. Hard real-time semantics - deadlines and periods - are outside its scope.
 
 ### Auditing a dependency diagram
 
@@ -261,7 +261,7 @@ Write it into the profile's `cordis.patch.yml` by row id:
 ## Boundaries
 
 - **It does not own your code.** It reads what you point it at and reports conclusions with citations; the source is the authority.
-- **Concurrency is routing only.** `model_interleaving_scan` finds the claims and names - by family - the tool that can settle them: threads to TSan/Helgrind/CBMC/TLA+, interrupts to RTOS-aware analysis, async to TLA+/UPPAAL plus a runtime check. Proving them is not its job.
+- **Concurrency is half routing, half decision.** `model_interleaving_scan` finds the claims and names - by family - the tool that can settle them: threads to TSan/Helgrind/CBMC/TLA+, interrupts to RTOS-aware analysis, async to TLA+/UPPAAL plus a runtime check. **A shared location is no longer routed away**: give `model_compose_verify` the `shared` locations and both sides' `accesses` and it decides the unordered write (C4) and the non-atomic update, the lost update (C5) - a decision with a shortest-path witness on the model, not the name of a check. Source-level races, blocking calls, a missing `await` and whether a lock is held across the whole operation stay on the routing side.
 - **A diagram review is not a code review.** A diagram that matches the model it was drawn from proves the drawing; the code still has to be checked against the source.
 
 ## Requirements
