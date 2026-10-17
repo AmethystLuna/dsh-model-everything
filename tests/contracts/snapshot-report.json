@@ -1730,32 +1730,32 @@
       {
         "code": "CONCURRENCY_ABSOLUTE_CLAIM",
         "severity": "error",
-        "message": "Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+        "message": "Concurrency safety claim \"thread-safe\" detected; this plugin does not verify it — it needs dedicated verification."
       },
       {
         "code": "CONCURRENCY_ABSOLUTE_CLAIM",
         "severity": "error",
-        "message": "Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+        "message": "Concurrency safety claim \"lock-free\" detected; this plugin does not verify it — it needs dedicated verification."
       },
       {
         "code": "CONCURRENCY_KEYWORD",
         "severity": "warning",
-        "message": "Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk."
+        "message": "Synchronization-related term \"mutex\" detected; review whether the plan addresses this risk."
       },
       {
         "code": "CONCURRENCY_KEYWORD",
         "severity": "warning",
-        "message": "Concurrency-related term \"shared memory\" detected; review whether the plan addresses this risk."
+        "message": "Shared-state-related term \"shared memory\" detected; review whether the plan addresses this risk."
       },
       {
         "code": "CONCURRENCY_ABSOLUTE_CLAIM",
         "severity": "error",
-        "message": "Concurrency safety claim \"ISR-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+        "message": "Interrupt safety claim \"ISR-safe\" detected; this plugin does not verify it — it needs dedicated verification."
       },
       {
         "code": "CONCURRENCY_KEYWORD",
         "severity": "warning",
-        "message": "Concurrency-related term \"ISR\" detected; review whether the plan addresses this risk."
+        "message": "Interrupt-related term \"ISR\" detected; review whether the plan addresses this risk."
       }
     ],
     "nextSteps": [
@@ -1763,7 +1763,7 @@
       "Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.",
       "This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
     ],
-    "body": "model-everything/concurrency/v1  verdict=fail  3 error finding(s) (first error: CONCURRENCY_ABSOLUTE_CLAIM)  ok=true  errors=3 warnings=3\nFINDINGS  6 total (3 error, 3 warning): CONCURRENCY_ABSOLUTE_CLAIM x3 | CONCURRENCY_KEYWORD x3\n\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"shared memory\" detected; review whether the plan addresses this risk.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"ISR-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"ISR\" detected; review whether the plan addresses this risk.\n\nNEXT  Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.\nNEXT  Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.\nNEXT  This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
+    "body": "model-everything/concurrency/v1  verdict=fail  3 error finding(s) (first error: CONCURRENCY_ABSOLUTE_CLAIM)  ok=true  errors=3 warnings=3\nFINDINGS  6 total (3 error, 3 warning): CONCURRENCY_ABSOLUTE_CLAIM x3 | CONCURRENCY_KEYWORD x3\n\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"thread-safe\" detected; this plugin does not verify it — it needs dedicated verification.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"lock-free\" detected; this plugin does not verify it — it needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Synchronization-related term \"mutex\" detected; review whether the plan addresses this risk.\n  [warning/CONCURRENCY_KEYWORD] Shared-state-related term \"shared memory\" detected; review whether the plan addresses this risk.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Interrupt safety claim \"ISR-safe\" detected; this plugin does not verify it — it needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Interrupt-related term \"ISR\" detected; review whether the plan addresses this risk.\n\nNEXT  Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.\nNEXT  Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.\nNEXT  This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
   },
   "export: a verified machine to spin": {
     "findings": [],
@@ -2784,17 +2784,17 @@
       {
         "code": "CONCURRENCY_ABSOLUTE_CLAIM",
         "severity": "error",
-        "message": "Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+        "message": "Concurrency safety claim \"thread-safe\" detected; this plugin does not verify it — it needs dedicated verification."
       },
       {
         "code": "CONCURRENCY_ABSOLUTE_CLAIM",
         "severity": "error",
-        "message": "Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification."
+        "message": "Concurrency safety claim \"lock-free\" detected; this plugin does not verify it — it needs dedicated verification."
       },
       {
         "code": "CONCURRENCY_KEYWORD",
         "severity": "warning",
-        "message": "Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk."
+        "message": "Synchronization-related term \"mutex\" detected; review whether the plan addresses this risk."
       }
     ],
     "nextSteps": [
@@ -2802,6 +2802,6 @@
       "Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.",
       "This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
     ],
-    "body": "model-everything/concurrency/v1  verdict=fail  2 error finding(s) (first error: CONCURRENCY_ABSOLUTE_CLAIM)  ok=true  errors=2 warnings=1\nFINDINGS  3 total (2 error, 1 warning): CONCURRENCY_ABSOLUTE_CLAIM x2 | CONCURRENCY_KEYWORD x1\n\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"thread-safe\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"lock-free\" detected; this plugin does not verify concurrency — this needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Concurrency-related term \"mutex\" detected; review whether the plan addresses this risk.\n\nNEXT  Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.\nNEXT  Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.\nNEXT  This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
+    "body": "model-everything/concurrency/v1  verdict=fail  2 error finding(s) (first error: CONCURRENCY_ABSOLUTE_CLAIM)  ok=true  errors=2 warnings=1\nFINDINGS  3 total (2 error, 1 warning): CONCURRENCY_ABSOLUTE_CLAIM x2 | CONCURRENCY_KEYWORD x1\n\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"thread-safe\" detected; this plugin does not verify it — it needs dedicated verification.\n  [error/CONCURRENCY_ABSOLUTE_CLAIM] Concurrency safety claim \"lock-free\" detected; this plugin does not verify it — it needs dedicated verification.\n  [warning/CONCURRENCY_KEYWORD] Synchronization-related term \"mutex\" detected; review whether the plan addresses this risk.\n\nNEXT  Every absolute claim must either cite dedicated evidence (a TSan/Helgrind run, a CBMC harness, a TLA+ model of the interleaving) or be restated as a bounded, testable property.\nNEXT  Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.\nNEXT  This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions."
   }
 }

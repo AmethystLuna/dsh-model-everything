@@ -5,11 +5,11 @@
     "resourceHint": "Load referenced resources only as needed.\"];\n\tswitch (base.kind) {\n\t\tcase \"directory\""
   },
   "surfaces": {
-    "catalog": 3331,
-    "bodies": 78897,
+    "catalog": 3379,
+    "bodies": 81169,
     "references": 153640,
     "referenceFiles": 10,
-    "toolChars": 10885,
+    "toolChars": 11427,
     "toolCount": 12
   },
   "toolsWithWhen": 0,
@@ -28,7 +28,7 @@
     },
     {
       "name": "model_concurrency_scan",
-      "chars": 1292
+      "chars": 1834
     },
     {
       "name": "model_datamodel_verify",

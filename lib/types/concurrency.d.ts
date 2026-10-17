@@ -6,6 +6,8 @@ export interface ConcurrencyFinding {
     line?: number;
     snippet?: string;
     keyword: string;
+    /** Which execution model the claim belongs to; a reader routes on it, and `nextSteps` reads it. */
+    family: 'threads' | 'synchronization' | 'async' | 'interrupts' | 'shared-state';
     /** Route to dedicated verification tools when an absolute claim is detected (this plugin does not prove concurrency safety). */
     suggestions?: string[];
 }

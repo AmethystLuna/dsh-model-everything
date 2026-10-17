@@ -67,7 +67,7 @@ const SKILL_ROWS: Record<string, string> = {
   'model-everything-structure': 'an architecture or dependency drawing',
   'model-everything-design': 'layering, responsibilities, substitutability, interface width',
   'model-everything-datamodel': 'a schema, a migration, a data guarantee',
-  'model-everything-concurrency': 'thread-safe, lock-free, ISR; routing only',
+  'model-everything-concurrency': 'thread-safe, lock-free, ISR, async interleaving; routing only',
   'model-everything-report-reading': 'reading a report this plugin returned',
 }
 
@@ -124,7 +124,7 @@ ${rows.join('\n')}
 - \`model_compose_verify\` — two or more machines: deadlock, and a rendezvous that never fires.
 - \`model_datamodel_verify\` — a data model and its migration: keys, domains, migration coverage, copy consistency, rollback symmetry.
 - \`model_design_review\` — a design against its own declarations: layering, boundaries, substitutability, interface width. The graph's shape is reported, not judged.
-- \`model_concurrency_scan\` — finds concurrency claims and routes them. It proves nothing about concurrency.
+- \`model_concurrency_scan\` — finds claims about threads, synchronization, async and interrupts, names the family, and routes each to the tool that decides it. It proves nothing about any of them.
 - \`model_export\` — UPPAAL, TLA+, PRISM or SPIN input from a verified model. It exports; it does not check the target tool.
 - \`uml_render\`, \`uml_parse\`, \`uml_review\` — draw a model, read a diagram into one, audit one. Round-trip fidelity is measured, never assumed.
 - \`uml_explain_labels\` — the accepted label and comment forms for one notation.

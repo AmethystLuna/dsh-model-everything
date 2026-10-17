@@ -1,5 +1,5 @@
 {
-  "catalogChars": 3345,
+  "catalogChars": 3393,
   "catalogRows": [
     {
       "skill": "model-everything",
@@ -8,8 +8,8 @@
     },
     {
       "skill": "model-everything-concurrency",
-      "chars": 341,
-      "body": 4067
+      "chars": 389,
+      "body": 6339
     },
     {
       "skill": "model-everything-datamodel",
@@ -37,7 +37,7 @@
       "body": 8203
     }
   ],
-  "toolChars": 10885,
+  "toolChars": 11427,
   "tools": [
     {
       "name": "model_compose_verify",
@@ -45,7 +45,7 @@
     },
     {
       "name": "model_concurrency_scan",
-      "chars": 1292
+      "chars": 1834
     },
     {
       "name": "model_datamodel_verify",
@@ -89,8 +89,8 @@
     }
   ],
   "perTurn": {
-    "chars": 14230,
-    "tokens": 3558
+    "chars": 14820,
+    "tokens": 3705
   },
   "routing": {
     "rowsWithSibling": 7,

@@ -17,5 +17,6 @@ metadata:
 | [plugin-dev-spec](design/plugin-dev-spec.md) | dsh 插件开发规范的实测结论：bundle 与 patch 语义、一包多组件、配置 schema、技能注册、模型可见目录、商店元数据与 release 实测办法 | 改 cordis.patch.yml、动 package.json 的 dsh 块、加组件、动技能注册或 inspect provider、做发布挂载之前 |
 | [uml-check-coverage](design/uml-check-coverage.md) | UML 检查码的覆盖与编号：每条规范约束落在哪个模块、是实现了还是按设计拒绝，以及用例族与多层级复用同一段号码这一处编号冲突 | 报出或读到一个 `UML0xx` 码、判断哪个图族的哪些缺陷根本没检查、或想动检查码编号时 |
 | [design-review](design/design-review.md) | 设计审阅引擎（DES1-DES11）：三级发现（violation／signal／fact）、每码判据与所需词汇、可判与不可判的边界、原则出处，以及为什么不做社区发现与模块度 | 读到一个 `DES*` 码、判断某个设计原则能否被判定、或想给审阅加一条设计判据之前 |
+| [synchrony-vocabulary](design/synchrony-vocabulary.md) | 并发扫描器的射程从"并发"扩到"同步 / 异步"：family 分组与按家族路由、异步三种模型看不见的缺陷、以及为什么不开第二个工具 | 改 `src/concurrency.ts` 的词表、给发现加字段、或判断某条异步断言该路由到谁时 |
 | [robustness-audit](design/robustness-audit.md) | 异常/非法输入专项审查的结论：以「拼错的名称静默关掉检查、再报正面全部通过」为主的一族缺陷、D1-D12 逐条位置、审查者未能判定的模糊点与覆盖缺口、按严重度的修复计划 | 修任何一条引擎的校验/引用解析、判断某个 `pass` 是否可信、或给引擎加新的声明式字段之前 |
 | [deployed-surface](design/deployed-surface.md) | 只在装进 profile 实跑时才现形的缺陷族：两种拒绝形状（`ran: true` 无 `errorCode` 的那种）与解读技能的说法冲突、并发扫描与跨族 diff 的静默通过、验证部署面的办法 | 判断一个 `pass` 是不是「其实什么都没看」、查「已解决」的 diff 可不可信、或装进 profile 验证改动时 |

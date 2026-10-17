@@ -114,6 +114,35 @@ test('absolute claims carry dedicated-tool routing suggestions', () => {
   assertNoUndefinedValues(report)
 })
 
+test('an async design is mined, not refused', () => {
+  // The vocabulary was threads and interrupts, so an async document landed in the no-claim refusal: a scan
+  // that saw nothing reported that it saw nothing, which is the same blind spot the Chinese vocabulary had.
+  const report = runConcurrencyScan('Each request is handled in an async task that awaits the database promise; callbacks run on the event loop.')
+  if (report.errorCode === 'CONCURRENCY_NO_CLAIM') throw new Error('an async design must not land in the no-claim path')
+  const families = new Set(report.findings.map((finding) => finding.family))
+  if (!families.has('async')) throw new Error('expected async findings, got ' + JSON.stringify(report.findings.map((finding) => finding.family)))
+  if (!report.nextSteps.some((step) => step.includes('event loop'))) throw new Error('an async scan must name the three defects it cannot see')
+  assertNoUndefinedValues(report)
+})
+
+test('an absolute async claim is an error with async routing', () => {
+  const report = runConcurrencyScan('The gateway is non-blocking and never blocks on I/O.')
+  const absolute = report.findings.filter((finding) => finding.code === 'CONCURRENCY_ABSOLUTE_CLAIM')
+  const claim = absolute.find((finding) => finding.keyword === 'non-blocking')
+  if (claim === undefined) throw new Error('expected non-blocking to be an absolute claim')
+  if (!claim.suggestions.some((s) => s.includes('TLA+') || s.includes('UPPAAL'))) {
+    throw new Error('an async absolute claim must route to the interleaving or timing tools, got ' + JSON.stringify(claim.suggestions))
+  }
+  if (!report.findings.every((finding) => typeof finding.family === 'string')) throw new Error('every finding names its family')
+})
+
+test('the Chinese async vocabulary is mined too', () => {
+  const report = runConcurrencyScan('网关是非阻塞的，每个请求在事件循环里异步处理，回调不能丢。')
+  if (report.errorCode === 'CONCURRENCY_NO_CLAIM') throw new Error('Chinese async text must not be refused')
+  if (!report.findings.some((finding) => finding.family === 'async')) throw new Error('expected async findings for the Chinese text')
+  if (!report.findings.some((finding) => finding.keyword.includes('非阻塞'))) throw new Error('expected the Chinese non-blocking claim')
+})
+
 if (failures > 0) {
   console.log('concurrency tests failed:', failures)
   process.exit(1)

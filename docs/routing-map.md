@@ -32,7 +32,7 @@ mindmap
       near miss x2 → me-structure
       near miss x2 → me-uml
     me-concurrency - 5 corpus triggers
-      row: 341 of 500 chars
+      row: 389 of 500 chars
       tool: model_concurrency_scan
       near miss x1 → me
       near miss x1 → me-datamodel
@@ -83,7 +83,7 @@ mindmap
 | Skill | Row length | Owns these questions | Sends the near miss to |
 |---|---|---|---|
 | `model-everything` | 497/500 | "the README says the API accepts a batch of 100, check that"<br>"verify the claims in this design doc against the code"<br>"this spec says a job can never be both queued and running - is that enforced?" | me-concurrency x2, me-datamodel x2, me-structure x2, me-uml x2 |
-| `model-everything-concurrency` | 341/500 | "this design claims the queue is thread-safe and lock-free"<br>"is this counter monotonic under concurrent writers?"<br>"the doc says the ISR-safe path touches no shared memory" | me x1, me-datamodel x1, me-uml x1, me-structure x1 |
+| `model-everything-concurrency` | 389/500 | "this design claims the queue is thread-safe and lock-free"<br>"is this counter monotonic under concurrent writers?"<br>"the doc says the ISR-safe path touches no shared memory" | me x1, me-datamodel x1, me-uml x1, me-structure x1 |
 | `model-everything-datamodel` | 483/500 | "review this migration: the orders table gains a required column"<br>"does the migration preserve every required field?"<br>"our schema says ids are unique and no row may be orphaned - check the model" | me-uml x2, me-concurrency x2, me x2, me-structure x2 |
 | `model-everything-design` | 478/500 | "does this design keep its layering, or does something reach across a boundary"<br>"tag each module with its responsibilities and check the split"<br>"this interface forces callers to depend on methods they never call" | me-structure x2, me-uml x1, me-concurrency x1 |
 | `model-everything-report-reading` | 420/500 | "the verify tool gave me a report - what does this verdict mean?"<br>"why did the review come out pass_with_findings instead of pass?"<br>"which findings should I act on in this report?" | me x1, me-concurrency x1, me-datamodel x1, me-structure x1, me-uml x1 |
@@ -119,7 +119,7 @@ nothing else at that moment.
 | Tool | Owned by skill | First sentence (what the model reads first) |
 |---|---|---|
 | `model_compose_verify` | `model-everything` | "Check two or more LogicModelV1 machines together." |
-| `model_concurrency_scan` | `model-everything-concurrency` | "Scan a document or plan text for concurrency risk points." |
+| `model_concurrency_scan` | `model-everything-concurrency` | "Scan a document or plan text for claims about how work is executed: threads, synchronization, async tasks, interrupts, shared state." |
 | `model_datamodel_verify` | `model-everything-datamodel` | "Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression." |
 | `model_design_review` | `model-everything-design` | "Hold a design to the contracts it declares about itself: layering, responsibility ownership, substitutability, interface width." |
 | `model_export` | `model-everything` | "Translate a LogicModelV1 into the input language of an external checker - UPPAAL, TLA+, PRISM or SPIN - for a property this plugin does not decide its" |
