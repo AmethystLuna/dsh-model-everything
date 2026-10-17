@@ -66,13 +66,16 @@ const flat = corpus.cases.flatMap((group) => [
 ])
 
 let failures = 0
+/** `--print-prompt` emits a prompt for another program, so the checks narrate on stderr instead:
+ *  a reader that piped them would hand the model six PASS lines before the question. */
+const emit = process.argv.includes('--print-prompt') ? console.error : console.log
 function check(name, fn) {
   try {
     fn()
-    console.log('PASS', name)
+    emit('PASS', name)
   } catch (error) {
     failures += 1
-    console.log('FAIL', name, '-', error instanceof Error ? error.message : String(error))
+    emit('FAIL', name, '-', error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -230,6 +233,9 @@ function printPrompt() {
 const decisionsFlag = process.argv.indexOf('--decisions')
 if (process.argv.includes('--print-prompt')) {
   printPrompt()
+  // The prompt is the whole of stdout: the summary below would be the last line of the
+  // question. The exit code still reports whether the corpus itself is sound.
+  process.exit(failures > 0 ? 1 : 0)
 } else if (decisionsFlag !== -1) {
   const file = process.argv[decisionsFlag + 1]
   if (file === undefined) {
