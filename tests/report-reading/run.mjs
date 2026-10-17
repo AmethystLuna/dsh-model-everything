@@ -82,8 +82,10 @@ test('the guide names only fields the reports carry', () => {
     // Members of the design review's `facts` measurement object.
     'density', 'ranks', 'articulationPoints', 'feedbackArcs', 'largestCycle', 'nodes', 'edges',
   ]) known.add(extra)
-  // Values, not fields: the guide quotes these as the answer rather than as a member.
-  for (const value of ['pass', 'fail', 'true', 'false', 'uml', 'skip', 'pass_with_findings']) known.add(value)
+  // Values, not fields: the guide quotes these as the answer rather than as a member. `warn` is a RENDERED
+  // label rather than a report field - the body groups a warning-only check under `warn` while the JSON
+  // status for it stays `fail` - and the guide says as much, which is why it belongs here.
+  for (const value of ['pass', 'fail', 'true', 'false', 'uml', 'skip', 'pass_with_findings', 'warn']) known.add(value)
   // A backticked lowerCamel identifier that is not a known name is a claim about a field that may not
   // exist. Codes are excluded: they are upper case.
   const named = new Set()

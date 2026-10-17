@@ -11,7 +11,22 @@
       "transitions": 6,
       "errors": 0,
       "warnings": 31,
-      "checksRun": 22,
+      "checksRun": 9,
+      "checksSkipped": [
+        "S7",
+        "A2",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14"
+      ],
       "truncated": false
     },
     "checks": [
@@ -123,7 +138,7 @@
       },
       {
         "id": "S7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -214,7 +229,7 @@
       },
       {
         "id": "A2",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -230,67 +245,68 @@
       },
       {
         "id": "A4",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A5",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A6",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A8",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A9",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A10",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A11",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A12",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A13",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A14",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       }
     ],
     "findings": [],
     "nextSteps": [
       "Resolve the failing checks first: Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).",
+      "These examined nothing, so their silence is not a result: Invariant Validity (S7), Race Interleaving (A2), Pair Symmetry (A4), Boundary Blast (A5), Resource Injection (A6), Minimal Counter-Example (A7), Idempotent Replay (A8), Leads-To (A9), Sequence Order (A10), Atomicity (A11), Budget (A12), Probability Reachability (A13), Deadline (A14). Declare what each one would need, or accept that the model is unverified on those points.",
       "Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.",
       "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
     ],
-    "body": "model-everything/verify/v1  verdict=pass_with_findings  no error findings; 31 warning finding(s)  ok=true  modelHash=f93412c1445d… states=5 transitions=6 errors=0 warnings=31 checksRun=22\nCHECKS  pass S1 S2 S3 S4 S6 S7 S8 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 | fail S5 A1 A3\n\nFAIL S5 Event Completeness — 15 unhandled (state, event) pairs (15 warnings) (15 finding(s))\n  INIT (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, stop, timeout\n  STARTING (3) [warning/S5_UNHANDLED_EVENT]: cooldown, power_ready, stop\n  ACTIVE (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, power_ready, timeout\n  ERROR (4) [warning/S5_UNHANDLED_EVENT]: ack, power_ready, stop, timeout\n\nFAIL A1 Unexpected Event Injection — 15 unhandled combinations (15 warnings) (15 finding(s))\n  (15 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 7 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 7 different outcomes depending on order.\n\nCOVERAGE  The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).\nNEXT  Resolve the failing checks first: Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
+    "body": "model-everything/verify/v1  verdict=pass_with_findings  no error findings; 31 warning finding(s)  ok=true  modelHash=f93412c1445d… states=5 transitions=6 errors=0 warnings=31 checksRun=9\nCHECKS  pass S1 S2 S3 S4 S6 S8 | warn S5 A1 A3 | skip S7 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14\n\nFAIL S5 Event Completeness — 15 unhandled (state, event) pairs (15 warnings) (15 finding(s))\n  INIT (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, stop, timeout\n  STARTING (3) [warning/S5_UNHANDLED_EVENT]: cooldown, power_ready, stop\n  ACTIVE (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, power_ready, timeout\n  ERROR (4) [warning/S5_UNHANDLED_EVENT]: ack, power_ready, stop, timeout\n\nFAIL A1 Unexpected Event Injection — 15 unhandled combinations (15 warnings) (15 finding(s))\n  (15 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 7 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 7 different outcomes depending on order.\n\nCOVERAGE  The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).\nNEXT  Resolve the failing checks first: Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).\nNEXT  These examined nothing, so their silence is not a result: Invariant Validity (S7), Race Interleaving (A2), Pair Symmetry (A4), Boundary Blast (A5), Resource Injection (A6), Minimal Counter-Example (A7), Idempotent Replay (A8), Leads-To (A9), Sequence Order (A10), Atomicity (A11), Budget (A12), Probability Reachability (A13), Deadline (A14). Declare what each one would need, or accept that the model is unverified on those points.\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
   },
   "verify: a machine with one defect of each kind": {
     "ok": true,
@@ -304,7 +320,23 @@
       "transitions": 5,
       "errors": 3,
       "warnings": 10,
-      "checksRun": 22,
+      "checksRun": 8,
+      "checksSkipped": [
+        "S6",
+        "S7",
+        "A2",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14"
+      ],
       "truncated": false
     },
     "checks": [
@@ -380,12 +412,12 @@
       },
       {
         "id": "S6",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "S7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -421,7 +453,7 @@
       },
       {
         "id": "A2",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -437,67 +469,68 @@
       },
       {
         "id": "A4",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A5",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A6",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A8",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A9",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A10",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A11",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A12",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A13",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A14",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       }
     ],
     "findings": [],
     "nextSteps": [
       "Resolve the failing checks first: Reachability (S1), Deadlock (S2), Liveness (S3), Determinism (S4), Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).",
+      "These examined nothing, so their silence is not a result: Guard Completeness (S6), Invariant Validity (S7), Race Interleaving (A2), Pair Symmetry (A4), Boundary Blast (A5), Resource Injection (A6), Minimal Counter-Example (A7), Idempotent Replay (A8), Leads-To (A9), Sequence Order (A10), Atomicity (A11), Budget (A12), Probability Reachability (A13), Deadline (A14). Declare what each one would need, or accept that the model is unverified on those points.",
       "Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S1_UNREACHABLE_STATE, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.",
       "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
     ],
-    "body": "model-everything/verify/v1  verdict=fail  3 error finding(s) (first error: S2_NO_TRANSITIONS)  ok=true  modelHash=01f6bd510ae4… states=4 transitions=5 errors=3 warnings=10 checksRun=22\nCHECKS  pass S6 S7 S8 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 | fail S1 S2 S3 S4 S5 A1 A3\n\nFAIL S1 Reachability — Unreachable states: ORPHAN (1 warnings) (1 finding(s))\n  [warning/S1_UNREACHABLE_STATE] State ORPHAN is not reachable from init.\n\nFAIL S2 Deadlock — Deadlocks: Non-terminal state ORPHAN has no outgoing transitions. (1 errors) (1 finding(s))\n  [error/S2_NO_TRANSITIONS] Non-terminal state ORPHAN has no outgoing transitions.\n\nFAIL S3 Liveness — Closed SCCs: 1 (1 errors) (1 finding(s))\n  [error/S3_CLOSED_SCC] Closed SCC has no exit and contains no terminal state: LOOP evidence={\"states\":[\"LOOP\"],\"transitions\":1}\n\nFAIL S4 Determinism — Nondeterminism findings: 1 (1 errors) (1 finding(s))\n  [error/S4_AMBIGUOUS_DEFAULT] B + go has multiple unconditional transitions: B, LOOP\n\nFAIL S5 Event Completeness — 4 unhandled (state, event) pairs (4 warnings) (4 finding(s))\n  A (1) [warning/S5_UNHANDLED_EVENT]: spin\n  ORPHAN (2) [warning/S5_UNHANDLED_EVENT]: go, spin\n  LOOP (1) [warning/S5_UNHANDLED_EVENT]: go\n\nFAIL A1 Unexpected Event Injection — 4 unhandled combinations (4 warnings) (4 finding(s))\n  (4 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 2 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 2 different outcomes depending on order.\n\nNEXT  Resolve the failing checks first: Reachability (S1), Deadlock (S2), Liveness (S3), Determinism (S4), Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S1_UNREACHABLE_STATE, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
+    "body": "model-everything/verify/v1  verdict=fail  3 error finding(s) (first error: S2_NO_TRANSITIONS)  ok=true  modelHash=01f6bd510ae4… states=4 transitions=5 errors=3 warnings=10 checksRun=8\nCHECKS  pass S8 | fail S2 S3 S4 | warn S1 S5 A1 A3 | skip S6 S7 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14\n\nFAIL S1 Reachability — Unreachable states: ORPHAN (1 warnings) (1 finding(s))\n  [warning/S1_UNREACHABLE_STATE] State ORPHAN is not reachable from init.\n\nFAIL S2 Deadlock — Deadlocks: Non-terminal state ORPHAN has no outgoing transitions. (1 errors) (1 finding(s))\n  [error/S2_NO_TRANSITIONS] Non-terminal state ORPHAN has no outgoing transitions.\n\nFAIL S3 Liveness — Closed SCCs: 1 (1 errors) (1 finding(s))\n  [error/S3_CLOSED_SCC] Closed SCC has no exit and contains no terminal state: LOOP evidence={\"states\":[\"LOOP\"],\"transitions\":1}\n\nFAIL S4 Determinism — Nondeterminism findings: 1 (1 errors) (1 finding(s))\n  [error/S4_AMBIGUOUS_DEFAULT] B + go has multiple unconditional transitions: B, LOOP\n\nFAIL S5 Event Completeness — 4 unhandled (state, event) pairs (4 warnings) (4 finding(s))\n  A (1) [warning/S5_UNHANDLED_EVENT]: spin\n  ORPHAN (2) [warning/S5_UNHANDLED_EVENT]: go, spin\n  LOOP (1) [warning/S5_UNHANDLED_EVENT]: go\n\nFAIL A1 Unexpected Event Injection — 4 unhandled combinations (4 warnings) (4 finding(s))\n  (4 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 2 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 2 different outcomes depending on order.\n\nNEXT  Resolve the failing checks first: Reachability (S1), Deadlock (S2), Liveness (S3), Determinism (S4), Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).\nNEXT  These examined nothing, so their silence is not a result: Guard Completeness (S6), Invariant Validity (S7), Race Interleaving (A2), Pair Symmetry (A4), Boundary Blast (A5), Resource Injection (A6), Minimal Counter-Example (A7), Idempotent Replay (A8), Leads-To (A9), Sequence Order (A10), Atomicity (A11), Budget (A12), Probability Reachability (A13), Deadline (A14). Declare what each one would need, or accept that the model is unverified on those points.\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S1_UNREACHABLE_STATE, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
   },
   "verify: the same machine after a refactor, with regression": {
     "ok": true,
@@ -511,7 +544,22 @@
       "transitions": 6,
       "errors": 0,
       "warnings": 31,
-      "checksRun": 26,
+      "checksRun": 13,
+      "checksSkipped": [
+        "S7",
+        "A2",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14"
+      ],
       "truncated": false
     },
     "checks": [
@@ -623,7 +671,7 @@
       },
       {
         "id": "S7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -714,7 +762,7 @@
       },
       {
         "id": "A2",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -730,57 +778,57 @@
       },
       {
         "id": "A4",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A5",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A6",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A8",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A9",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A10",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A11",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A12",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A13",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "A14",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -807,10 +855,11 @@
     "findings": [],
     "nextSteps": [
       "Resolve the failing checks first: Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).",
+      "These examined nothing, so their silence is not a result: Invariant Validity (S7), Race Interleaving (A2), Pair Symmetry (A4), Boundary Blast (A5), Resource Injection (A6), Minimal Counter-Example (A7), Idempotent Replay (A8), Leads-To (A9), Sequence Order (A10), Atomicity (A11), Budget (A12), Probability Reachability (A13), Deadline (A14). Declare what each one would need, or accept that the model is unverified on those points.",
       "Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.",
       "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
     ],
-    "body": "model-everything/verify/v1  verdict=pass_with_findings  no error findings; 31 warning finding(s)  ok=true  modelHash=5e188ab2ea9c… states=5 transitions=6 errors=0 warnings=31 checksRun=26\nCHECKS  pass S1 S2 S3 S4 S6 S7 S8 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 D1 D2 D3 D4 | fail S5 A1 A3\n\nFAIL S5 Event Completeness — 15 unhandled (state, event) pairs (15 warnings) (15 finding(s))\n  INIT (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, stop, timeout\n  STARTING (3) [warning/S5_UNHANDLED_EVENT]: cooldown, power_ready, stop\n  ACTIVE (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, power_ready, timeout\n  ERROR (4) [warning/S5_UNHANDLED_EVENT]: ack, power_ready, stop, timeout\n\nFAIL A1 Unexpected Event Injection — 15 unhandled combinations (15 warnings) (15 finding(s))\n  (15 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 7 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 7 different outcomes depending on order.\n\nCOVERAGE  The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).\nNEXT  Resolve the failing checks first: Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side.\nCOMPARISON  beforeModelHash=f93412c1445d8c03acd24829fa41d6eaf988eff5e5a5e606d77250f58834bb6a afterModelHash=5e188ab2ea9c8f954d5b31d7342e16eae830af0f43f7251cf35a6bd95ce0e26e beforeStates=5 beforeTransitions=6 afterStates=5 afterTransitions=6"
+    "body": "model-everything/verify/v1  verdict=pass_with_findings  no error findings; 31 warning finding(s)  ok=true  modelHash=5e188ab2ea9c… states=5 transitions=6 errors=0 warnings=31 checksRun=13\nCHECKS  pass S1 S2 S3 S4 S6 S8 D1 D2 D3 D4 | warn S5 A1 A3 | skip S7 A2 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14\n\nFAIL S5 Event Completeness — 15 unhandled (state, event) pairs (15 warnings) (15 finding(s))\n  INIT (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, stop, timeout\n  STARTING (3) [warning/S5_UNHANDLED_EVENT]: cooldown, power_ready, stop\n  ACTIVE (4) [warning/S5_UNHANDLED_EVENT]: ack, cooldown, power_ready, timeout\n  ERROR (4) [warning/S5_UNHANDLED_EVENT]: ack, power_ready, stop, timeout\n\nFAIL A1 Unexpected Event Injection — 15 unhandled combinations (15 warnings) (15 finding(s))\n  (15 finding(s) here repeat facts already reported above)\n\nFAIL A3 Order Permutation — Order-dependent outcomes: 7 (1 warnings) (1 finding(s))\n  [warning/A3_ORDER_DEPENDENT] Same event set produces 7 different outcomes depending on order.\n\nCOVERAGE  The model references time-like vocabulary (timeout/watchdog/timer/deadline...). This plugin verifies ordering, counts and path budgets (A12) but not hard real-time semantics: deadlines, periods, and clock invariants need a timed model checker (e.g. UPPAAL).\nNEXT  Resolve the failing checks first: Event Completeness (S5), Unexpected Event Injection (A1), Order Permutation (A3).\nNEXT  These examined nothing, so their silence is not a result: Invariant Validity (S7), Race Interleaving (A2), Pair Symmetry (A4), Boundary Blast (A5), Resource Injection (A6), Minimal Counter-Example (A7), Idempotent Replay (A8), Leads-To (A9), Sequence Order (A10), Atomicity (A11), Budget (A12), Probability Reachability (A13), Deadline (A14). Declare what each one would need, or accept that the model is unverified on those points.\nNEXT  Review the warning findings (A1_UNHANDLED_EVENT, A3_ORDER_DEPENDENT, S5_UNHANDLED_EVENT): they are not failures, but they are not silence either. Each one is explained in its own `message` under `findings`.\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side.\nCOMPARISON  beforeModelHash=f93412c1445d8c03acd24829fa41d6eaf988eff5e5a5e606d77250f58834bb6a afterModelHash=5e188ab2ea9c8f954d5b31d7342e16eae830af0f43f7251cf35a6bd95ce0e26e beforeStates=5 beforeTransitions=6 afterStates=5 afterTransitions=6"
   },
   "verify: a model the schema refuses": {
     "ok": false,
@@ -859,7 +908,7 @@
       "Resolve the failing checks first: Model Validation (MODEL).",
       "Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
     ],
-    "body": "model-everything/verify/v1  verdict=fail  4 error finding(s) (first error: MODEL_INVALID)  ok=false  modelHash=… states=0 transitions=0 errors=4 warnings=0 checksRun=0\nCHECKS  fail MODEL\n\nFAIL MODEL Model Validation — Model schema validation failed: 4 errors (4 finding(s))\n  [error/MODEL_INVALID] schemaVersion: must be 1\n  [error/MODEL_INVALID] init: must be a non-empty string\n  [error/MODEL_INVALID] states: must be a non-empty array\n  [error/MODEL_INVALID] transitions: must be an array\n\nNEXT  Resolve the failing checks first: Model Validation (MODEL).\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
+    "body": "model-everything/verify/v1  verdict=fail  4 error finding(s) (first error: MODEL_INVALID)  ok=false  states=0 transitions=0 errors=4 warnings=0 checksRun=0\nCHECKS  fail MODEL\n\nFAIL MODEL Model Validation — Model schema validation failed: 4 errors (4 finding(s))\n  [error/MODEL_INVALID] schemaVersion: must be 1\n  [error/MODEL_INVALID] init: must be a non-empty string\n  [error/MODEL_INVALID] states: must be a non-empty array\n  [error/MODEL_INVALID] transitions: must be an array\n\nNEXT  Resolve the failing checks first: Model Validation (MODEL).\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
   },
   "datamodel: a valid model": {
     "ok": true,
@@ -873,7 +922,17 @@
       "fields": 4,
       "errors": 0,
       "warnings": 0,
-      "checksRun": 17
+      "checksRun": 9,
+      "checksSkipped": [
+        "DA2",
+        "DA5",
+        "DA6",
+        "DA7",
+        "DA9",
+        "DA10",
+        "DA11",
+        "DA12"
+      ]
     },
     "checks": [
       {
@@ -908,7 +967,7 @@
       },
       {
         "id": "DA2",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -923,17 +982,17 @@
       },
       {
         "id": "DA5",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA6",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -943,30 +1002,31 @@
       },
       {
         "id": "DA9",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA10",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA11",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA12",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       }
     ],
     "findings": [],
     "nextSteps": [
+      "These examined nothing, so their silence is not a result: Boundary Blast (DA2), Migration Coverage (DA5), Copy Consistency (DA6), Rollback/Backup Symmetry (DA7), Data Monotonic (DA9), Data Sequence (DA10), Data Leads-To (DA11), Data Atomicity (DA12). Declare what each one would need, or accept that the model is unverified on those points.",
       "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side."
     ],
-    "body": "model-everything/datamodel/v1  verdict=pass  no error or warning findings  ok=true  modelHash=d9d5ccf936db… errors=0 warnings=0 checksRun=17\nCHECKS  pass DS1 DS2 DS3 DS4 DS5 DA1 DA2 DA3 DA4 DA5 DA6 DA7 DA8 DA9 DA10 DA11 DA12\n\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side."
+    "body": "model-everything/datamodel/v1  verdict=pass  no error or warning findings  ok=true  modelHash=d9d5ccf936db… errors=0 warnings=0 checksRun=9\nCHECKS  pass DS1 DS2 DS3 DS4 DS5 DA1 DA3 DA4 DA8 | skip DA2 DA5 DA6 DA7 DA9 DA10 DA11 DA12\n\nNEXT  These examined nothing, so their silence is not a result: Boundary Blast (DA2), Migration Coverage (DA5), Copy Consistency (DA6), Rollback/Backup Symmetry (DA7), Data Monotonic (DA9), Data Sequence (DA10), Data Leads-To (DA11), Data Atomicity (DA12). Declare what each one would need, or accept that the model is unverified on those points.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side."
   },
   "datamodel: a migration with no mapping": {
     "ok": true,
@@ -980,7 +1040,16 @@
       "fields": 2,
       "errors": 12,
       "warnings": 5,
-      "checksRun": 21
+      "checksRun": 14,
+      "checksSkipped": [
+        "DA2",
+        "DA6",
+        "DA7",
+        "DA9",
+        "DA10",
+        "DA11",
+        "DA12"
+      ]
     },
     "checks": [
       {
@@ -1034,7 +1103,7 @@
       },
       {
         "id": "DA2",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -1070,12 +1139,12 @@
       },
       {
         "id": "DA6",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA7",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -1085,22 +1154,22 @@
       },
       {
         "id": "DA9",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA10",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA11",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
         "id": "DA12",
-        "status": "pass",
+        "status": "skip",
         "findings": []
       },
       {
@@ -1186,10 +1255,11 @@
     "findings": [],
     "nextSteps": [
       "Resolve the failing checks first: Required-Field Completeness (DS2), Relationship Integrity (DS3), Invariant References (DS5), Migration Coverage (DA5), Data Behavior Preservation (DD1), Data Invariant Continuity (DD2), Delta Summary (DD3), Breaking Change Regression (DD4).",
+      "These examined nothing, so their silence is not a result: Boundary Blast (DA2), Copy Consistency (DA6), Rollback/Backup Symmetry (DA7), Data Monotonic (DA9), Data Sequence (DA10), Data Leads-To (DA11), Data Atomicity (DA12). Declare what each one would need, or accept that the model is unverified on those points.",
       "Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.",
       "Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side."
     ],
-    "body": "model-everything/datamodel/v1  verdict=fail  12 error finding(s) (first error: DS3_FROM_ENTITY_MISSING)  ok=true  modelHash=28f27c82dd4a… errors=12 warnings=5 checksRun=21\nCHECKS  pass DS1 DS4 DA1 DA2 DA3 DA4 DA6 DA7 DA8 DA9 DA10 DA11 DA12 | fail DS2 DS3 DS5 DA5 DD1 DD2 DD3 DD4\n\nFAIL DS2 Required-Field Completeness — Required-field findings: 1 (1 warnings) (1 finding(s))\n  [warning/DS2_REQUIRED_FIELD_UNSOURCED] Required field User.fullName has no explicit migration mapping or copy target in a before/after migration\n\nFAIL DS3 Relationship Integrity — Relationship findings: 1 (1 errors) (1 finding(s))\n  [error/DS3_FROM_ENTITY_MISSING] Relationship references unknown fromEntity Order evidence={\"relationship\":{\"fromEntity\":\"Order\",\"fromField\":\"user\",\"toEntity\":\"User\",\"toField\":\"id\",\"onDelete\":\"cascade\"}}\n\nFAIL DS5 Invariant References — Unresolved invariant references: 1 (1 errors) (1 finding(s))\n  [error/DS5_INVARIANT_ENTITY_MISSING] Invariant \"counts\" names the source entity \"Order\", which the model does not declare, so the invariant was never read. evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"},\"entity\":\"Order\",\"role\":\"…\n\nFAIL DA5 Migration Coverage — Migration coverage findings: 3 (3 errors) (3 finding(s))\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field User.email is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"afterField\":\"User.email\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.id is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"afterField\":\"Order.id\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.user is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"afterField\":\"Order.user\"}\n\nFAIL DD1 Data Behavior Preservation — Data behavior findings: 3 (3 errors) (3 finding(s))\n  [error/DD1_FIELD_REMOVED] BEFORE field User.email is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"mapped\":\"User.email\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.id is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"mapped\":\"Order.id\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.user is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"mapped\":\"Order.user\"}\n\nFAIL DD2 Data Invariant Continuity — Data invariant continuity findings: 1 (1 errors) (1 finding(s))\n  [error/DD2_INVARIANT_ENTITY_MISSING] BEFORE count-equal invariant \"counts\" references missing source entity Order evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"}}\n\nFAIL DD3 Delta Summary — Delta: +0 entities, -1 entities, +1 fields, -3 fields (4 warnings) (4 finding(s))\n  [warning/DD3_REMOVED_ENTITY] BEFORE entity Order is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field User.email is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.id is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.user is not present in AFTER\n\nFAIL DD4 Breaking Change Regression — Breaking change findings: 3 (3 errors) (3 finding(s))\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field User.email was removed without migration mapping evidence={\"beforeField\":\"User.email\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.id was removed without migration mapping evidence={\"beforeField\":\"Order.id\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.user was removed without migration mapping evidence={\"beforeField\":\"Order.user\"}\n\nNEXT  Resolve the failing checks first: Required-Field Completeness (DS2), Relationship Integrity (DS3), Invariant References (DS5), Migration Coverage (DA5), Data Behavior Preservation (DD1), Data Invariant Continuity (DD2), Delta Summary (DD3), Breaking Change Regression (DD4).\nNEXT  Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side.\nCOMPARISON  beforeModelHash=d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966 afterModelHash=28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83 beforeEntities=2 beforeFields=4 afterEntities=1 afterFields=2"
+    "body": "model-everything/datamodel/v1  verdict=fail  12 error finding(s) (first error: DS3_FROM_ENTITY_MISSING)  ok=true  modelHash=28f27c82dd4a… errors=12 warnings=5 checksRun=14\nCHECKS  pass DS1 DS4 DA1 DA3 DA4 DA8 | fail DS3 DS5 DA5 DD1 DD2 DD4 | warn DS2 DD3 | skip DA2 DA6 DA7 DA9 DA10 DA11 DA12\n\nFAIL DS2 Required-Field Completeness — Required-field findings: 1 (1 warnings) (1 finding(s))\n  [warning/DS2_REQUIRED_FIELD_UNSOURCED] Required field User.fullName has no explicit migration mapping or copy target in a before/after migration\n\nFAIL DS3 Relationship Integrity — Relationship findings: 1 (1 errors) (1 finding(s))\n  [error/DS3_FROM_ENTITY_MISSING] Relationship references unknown fromEntity Order evidence={\"relationship\":{\"fromEntity\":\"Order\",\"fromField\":\"user\",\"toEntity\":\"User\",\"toField\":\"id\",\"onDelete\":\"cascade\"}}\n\nFAIL DS5 Invariant References — Unresolved invariant references: 1 (1 errors) (1 finding(s))\n  [error/DS5_INVARIANT_ENTITY_MISSING] Invariant \"counts\" names the source entity \"Order\", which the model does not declare, so the invariant was never read. evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"},\"entity\":\"Order\",\"role\":\"…\n\nFAIL DA5 Migration Coverage — Migration coverage findings: 3 (3 errors) (3 finding(s))\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field User.email is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"afterField\":\"User.email\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.id is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"afterField\":\"Order.id\"}\n  [error/DA5_FIELD_NOT_MIGRATED] BEFORE field Order.user is not present in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"afterField\":\"Order.user\"}\n\nFAIL DD1 Data Behavior Preservation — Data behavior findings: 3 (3 errors) (3 finding(s))\n  [error/DD1_FIELD_REMOVED] BEFORE field User.email is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"User.email\",\"mapped\":\"User.email\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.id is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.id\",\"mapped\":\"Order.id\"}\n  [error/DD1_FIELD_REMOVED] BEFORE field Order.user is missing in AFTER and has no migration mapping evidence={\"beforeField\":\"Order.user\",\"mapped\":\"Order.user\"}\n\nFAIL DD2 Data Invariant Continuity — Data invariant continuity findings: 1 (1 errors) (1 finding(s))\n  [error/DD2_INVARIANT_ENTITY_MISSING] BEFORE count-equal invariant \"counts\" references missing source entity Order evidence={\"invariant\":{\"id\":\"counts\",\"description\":\"every order has a user\",\"kind\":\"count-equal\",\"sourceEntity\":\"Order\",\"targetEntity\":\"User\"}}\n\nFAIL DD3 Delta Summary — Delta: +0 entities, -1 entities, +1 fields, -3 fields (4 warnings) (4 finding(s))\n  [warning/DD3_REMOVED_ENTITY] BEFORE entity Order is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field User.email is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.id is not present in AFTER\n  [warning/DD3_REMOVED_FIELD] BEFORE field Order.user is not present in AFTER\n\nFAIL DD4 Breaking Change Regression — Breaking change findings: 3 (3 errors) (3 finding(s))\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field User.email was removed without migration mapping evidence={\"beforeField\":\"User.email\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.id was removed without migration mapping evidence={\"beforeField\":\"Order.id\"}\n  [error/DD4_REQUIRED_FIELD_REMOVED] Required field Order.user was removed without migration mapping evidence={\"beforeField\":\"Order.user\"}\n\nNEXT  Resolve the failing checks first: Required-Field Completeness (DS2), Relationship Integrity (DS3), Invariant References (DS5), Migration Coverage (DA5), Data Behavior Preservation (DD1), Data Invariant Continuity (DD2), Delta Summary (DD3), Breaking Change Regression (DD4).\nNEXT  These examined nothing, so their silence is not a result: Boundary Blast (DA2), Copy Consistency (DA6), Rollback/Backup Symmetry (DA7), Data Monotonic (DA9), Data Sequence (DA10), Data Leads-To (DA11), Data Atomicity (DA12). Declare what each one would need, or accept that the model is unverified on those points.\nNEXT  Review the warning findings (DD3_REMOVED_ENTITY, DD3_REMOVED_FIELD, DS2_REQUIRED_FIELD_UNSOURCED): a nullable field or a missing index is a decision, not silence.\nNEXT  Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side.\nCOMPARISON  beforeModelHash=d9d5ccf936db8cc169eda4a1b87e15482ea78d30ea9e813264c33deaf16b6966 afterModelHash=28f27c82dd4a05863384eed802583a292b3a848c5b000d845133a67ce2a93b83 beforeEntities=2 beforeFields=4 afterEntities=1 afterFields=2"
   },
   "uml: a use case model": {
     "ok": true,
@@ -1769,7 +1839,7 @@
     "nextSteps": [
       "Read the 8 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
     ],
-    "body": "model-everything/design/v1  verdict=pass_with_findings  8 warning finding(s)  ok=true  modelHash=4da2d99acbca… errors=0 warnings=8 checksRun=12\nCHECKS  pass DES1 DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11 DES12 | fail DES4\n\nFAIL DES4 Load-Bearing Elements — 8 element(s) the graph depends on (8 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge repo -> db is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> audit is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> orderstore is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> pricelist is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> repo is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> service is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 8 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
+    "body": "model-everything/design/v1  verdict=pass_with_findings  8 warning finding(s)  ok=true  modelHash=4da2d99acbca… errors=0 warnings=8 checksRun=12\nCHECKS  pass DES1 DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11 DES12 | warn DES4\n\nFAIL DES4 Load-Bearing Elements — 8 element(s) the graph depends on (8 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing service disconnects the dependency graph: everything on one side reaches the other only through it. service is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge repo -> db is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> audit is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> orderstore is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> pricelist is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge service -> repo is a bridge: it is the only dependency joining its two sides.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> service is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 8 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
   },
   "design: a design that contradicts its declarations": {
     "ok": true,
@@ -1932,7 +2002,7 @@
       "Fix the 8 violation(s) the design contradicts itself about, or change the declaration they contradict.",
       "Read the 4 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
     ],
-    "body": "model-everything/design/v1  verdict=fail  8 error finding(s) (first error: DES1_CYCLE)  ok=true  modelHash=66dad70532a4… errors=8 warnings=4 checksRun=12\nCHECKS  pass DES5 DES9 DES11 | fail DES1 DES2 DES3 DES4 DES6 DES7 DES8 DES10 DES12\n\nFAIL DES1 Acyclic Dependency — cycles: 1 (1 finding(s))\n  [error/DES1_CYCLE] the dependency graph is cyclic: the fewest edges that make it acyclic is 1, and the largest mutual-dependency group has 2 members. evidence={\"feedbackArcs\":[[\"service\",\"repo\"]],\"feedbackArcsExact\":true,\"largestCycle\":[\"repo\",\"service\"],\"ranks\":{\"repo\":1,\"service\":1,\"ui\":0}}\n\nFAIL DES2 Layer Order — 2 edge(s) against the declaration (2 finding(s))\n  [error/DES2_LAYER_ORDER] ui (layer ui) depends on repo (layer data), skipping service. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromLayer\":\"ui\",\"toLayer\":\"data\",\"skipped\":[\"service\"]}\n  [error/DES2_LAYER_ORDER] repo (layer data) depends upward on service (layer service). evidence={\"from\":\"repo\",\"to\":\"service\",\"fromLayer\":\"data\",\"toLayer\":\"service\"}\n\nFAIL DES3 Boundary Leak — 1 crossing(s) not allowed (1 finding(s))\n  [error/DES3_BOUNDARY_LEAK] ui (presentation) depends on repo (domain), and no declared rule allows presentation -> domain. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromBoundary\":\"presentation\",\"toBoundary\":\"domain\"}\n\nFAIL DES4 Load-Bearing Elements — 2 element(s) the graph depends on (2 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> repo is a bridge: it is the only dependency joining its two sides.\n\nFAIL DES6 Required Dependencies — 1 missing (1 finding(s))\n  [error/DES6_MISSING_REQUIRED_EDGE] ui-calls-service: the design requires ui -> service, and the architecture does not have it. evidence={\"id\":\"ui-calls-service\",\"from\":\"ui\",\"to\":\"service\"}\n\nFAIL DES7 Substitutability — 1 contract(s) against the declaration (1 finding(s))\n  [error/DES7_LSP_CONTRACT] FixedDeposit refuses withdraw, which its supertype Account declares it handles. A subtype may not strengthen a precondition. evidence={\"subtype\":\"FixedDeposit\",\"base\":\"Account\",\"event\":\"withdraw\",\"kind\":\"forbidden event\"}\n\nFAIL DES8 Interface Width — 1 interface(s) wider than their callers (1 finding(s))\n  [warning/DES8_ISP_UNUSED_OPERATION] Reader declares 1 operation(s) no client in this model calls: vacuum.\n\nFAIL DES10 Responsibility Boundaries — 1 mismatch(es) (1 finding(s))\n  [warning/DES10_RESPONSIBILITY_GAP] OrderService depends on AuditLog, which no declared responsibility owns.\n\nFAIL DES12 Type Relations — Unresolved relations: 2 (2 finding(s))\n  [error/DES12_UNKNOWN_TYPE] OrderService.dependsOn names a type the model does not declare: \"PriceList\". evidence={\"type\":\"OrderService\",\"field\":\"dependsOn\",\"name\":\"PriceList\"}\n  [error/DES12_UNKNOWN_TYPE] OrderService.dependsOn names a type the model does not declare: \"AuditLog\". evidence={\"type\":\"OrderService\",\"field\":\"dependsOn\",\"name\":\"AuditLog\"}\n\nNEXT  Fix the 8 violation(s) the design contradicts itself about, or change the declaration they contradict.\nNEXT  Read the 4 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
+    "body": "model-everything/design/v1  verdict=fail  8 error finding(s) (first error: DES1_CYCLE)  ok=true  modelHash=66dad70532a4… errors=8 warnings=4 checksRun=12\nCHECKS  pass DES5 DES9 DES11 | fail DES1 DES2 DES3 DES6 DES7 DES12 | warn DES4 DES8 DES10\n\nFAIL DES1 Acyclic Dependency — cycles: 1 (1 finding(s))\n  [error/DES1_CYCLE] the dependency graph is cyclic: the fewest edges that make it acyclic is 1, and the largest mutual-dependency group has 2 members. evidence={\"feedbackArcs\":[[\"service\",\"repo\"]],\"feedbackArcsExact\":true,\"largestCycle\":[\"repo\",\"service\"],\"ranks\":{\"repo\":1,\"service\":1,\"ui\":0}}\n\nFAIL DES2 Layer Order — 2 edge(s) against the declaration (2 finding(s))\n  [error/DES2_LAYER_ORDER] ui (layer ui) depends on repo (layer data), skipping service. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromLayer\":\"ui\",\"toLayer\":\"data\",\"skipped\":[\"service\"]}\n  [error/DES2_LAYER_ORDER] repo (layer data) depends upward on service (layer service). evidence={\"from\":\"repo\",\"to\":\"service\",\"fromLayer\":\"data\",\"toLayer\":\"service\"}\n\nFAIL DES3 Boundary Leak — 1 crossing(s) not allowed (1 finding(s))\n  [error/DES3_BOUNDARY_LEAK] ui (presentation) depends on repo (domain), and no declared rule allows presentation -> domain. evidence={\"from\":\"ui\",\"to\":\"repo\",\"fromBoundary\":\"presentation\",\"toBoundary\":\"domain\"}\n\nFAIL DES4 Load-Bearing Elements — 2 element(s) the graph depends on (2 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] removing repo disconnects the dependency graph: everything on one side reaches the other only through it. repo is an articulation point.\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge ui -> repo is a bridge: it is the only dependency joining its two sides.\n\nFAIL DES6 Required Dependencies — 1 missing (1 finding(s))\n  [error/DES6_MISSING_REQUIRED_EDGE] ui-calls-service: the design requires ui -> service, and the architecture does not have it. evidence={\"id\":\"ui-calls-service\",\"from\":\"ui\",\"to\":\"service\"}\n\nFAIL DES7 Substitutability — 1 contract(s) against the declaration (1 finding(s))\n  [error/DES7_LSP_CONTRACT] FixedDeposit refuses withdraw, which its supertype Account declares it handles. A subtype may not strengthen a precondition. evidence={\"subtype\":\"FixedDeposit\",\"base\":\"Account\",\"event\":\"withdraw\",\"kind\":\"forbidden event\"}\n\nFAIL DES8 Interface Width — 1 interface(s) wider than their callers (1 finding(s))\n  [warning/DES8_ISP_UNUSED_OPERATION] Reader declares 1 operation(s) no client in this model calls: vacuum.\n\nFAIL DES10 Responsibility Boundaries — 1 mismatch(es) (1 finding(s))\n  [warning/DES10_RESPONSIBILITY_GAP] OrderService depends on AuditLog, which no declared responsibility owns.\n\nFAIL DES12 Type Relations — Unresolved relations: 2 (2 finding(s))\n  [error/DES12_UNKNOWN_TYPE] OrderService.dependsOn names a type the model does not declare: \"PriceList\". evidence={\"type\":\"OrderService\",\"field\":\"dependsOn\",\"name\":\"PriceList\"}\n  [error/DES12_UNKNOWN_TYPE] OrderService.dependsOn names a type the model does not declare: \"AuditLog\". evidence={\"type\":\"OrderService\",\"field\":\"dependsOn\",\"name\":\"AuditLog\"}\n\nNEXT  Fix the 8 violation(s) the design contradicts itself about, or change the declaration they contradict.\nNEXT  Read the 4 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`."
   },
   "design: a design that declares nothing but a graph": {
     "ok": true,
@@ -2022,7 +2092,7 @@
       "Read the 1 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.",
       "These had nothing to hold the design to: Layer Order (DES2); Boundary Leak (DES3); Placement (DES5); Required Dependencies (DES6); Substitutability (DES7); Interface Width (DES8); Interface Cohesion (DES9); Responsibility Boundaries (DES10); Dependency Inversion (DES11). Declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact."
     ],
-    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=12\nCHECKS  pass DES1 DES12 | fail DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nFAIL DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.\nNEXT  These had nothing to hold the design to: Layer Order (DES2); Boundary Leak (DES3); Placement (DES5); Required Dependencies (DES6); Substitutability (DES7); Interface Width (DES8); Interface Cohesion (DES9); Responsibility Boundaries (DES10); Dependency Inversion (DES11). Declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact."
+    "body": "model-everything/design/v1  verdict=pass_with_findings  1 warning finding(s)  ok=true  modelHash=b85bb45059c0… errors=0 warnings=1 checksRun=12\nCHECKS  pass DES1 DES12 | warn DES4 | skip DES2 DES3 DES5 DES6 DES7 DES8 DES9 DES10 DES11\n\nFAIL DES4 Load-Bearing Elements — 1 element(s) the graph depends on (1 finding(s))\n  [warning/DES4_LOAD_BEARING_ELEMENT] the edge a -> b is a bridge: it is the only dependency joining its two sides.\n\nNEXT  Read the 1 signal(s) and decide which are intended: they are structural facts, not defects. To see whether the drawing this design came from holds up against a dependency matrix, use `uml_structure_verify`.\nNEXT  These had nothing to hold the design to: Layer Order (DES2); Boundary Leak (DES3); Placement (DES5); Required Dependencies (DES6); Substitutability (DES7); Interface Width (DES8); Interface Cohesion (DES9); Responsibility Boundaries (DES10); Dependency Inversion (DES11). Declare layers, transitions/forbids, interfaces with callers, or accept that those principles are unverified here. For behaviour rather than structure, `model_verify` decides a state machine on its own and `model_compose_verify` decides two that interact."
   },
   "design: a model the schema refuses": {
     "ok": false,
@@ -2056,6 +2126,6 @@
     "nextSteps": [
       "Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
     ],
-    "body": "model-everything/design/v1  verdict=fail  1 error finding(s) (first error: DESIGN_INVALID)  ok=false  modelHash=… errors=1 warnings=0 checksRun=0\nCHECKS  fail DESIGN\n\nFAIL DESIGN Design Model Validation — the model was rejected before any check ran (1 finding(s))\n  [error/DESIGN_INVALID] architecture.wibble: unknown field (the schema is closed; a typo would silently change the design under review)\n\nNEXT  Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
+    "body": "model-everything/design/v1  verdict=fail  1 error finding(s) (first error: DESIGN_INVALID)  ok=false  errors=1 warnings=0 checksRun=0\nCHECKS  fail DESIGN\n\nFAIL DESIGN Design Model Validation — the model was rejected before any check ran (1 finding(s))\n  [error/DESIGN_INVALID] architecture.wibble: unknown field (the schema is closed; a typo would silently change the design under review)\n\nNEXT  Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
   }
 }

@@ -1,9 +1,23 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { diffReports } from './baseline.js'
+import { refusalVerdict } from './engine.js'
 import { renderReportText } from './report-view.js'
 
 export const REPORT_DIFF_TOOL_NAME = 'report_diff'
+
+/**
+ * Turn a refusal into a report the model can route on.
+ *
+ * `diffReports` throws when a side is not a report, which is the right thing at the engine boundary -
+ * there is nothing to compare and no verdict to give. The tool boundary has a different obligation:
+ * malformed input has to come back as something with a code, never as a raw throw. This is the same
+ * shape the UML tools use, with a code of this tool's own.
+ */
+function refusal(error: unknown): JsonValue {
+  const message = error instanceof Error ? error.message : String(error)
+  return { ok: false, ran: false, ...refusalVerdict(message), errorCode: 'REPORT_INVALID', error: message } as unknown as JsonValue
+}
 
 /**
  * Model-visible DSH tool that compares two reports of the same family — the accepted
@@ -44,6 +58,10 @@ export const reportDiffTool = defineTool({
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
-    return diffReports(args.baseline, args.current) as unknown as JsonValue
+    try {
+      return diffReports(args.baseline, args.current) as unknown as JsonValue
+    } catch (error) {
+      return refusal(error)
+    }
   },
 })

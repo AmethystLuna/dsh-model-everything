@@ -774,7 +774,12 @@ async function runBudgetTests() {
   }
   assertNoUndefinedValues(dagReport)
 
-  // legacy machine without cost/budget: A12 passes cleanly and total checks stay 20
+  // legacy machine without cost/budget: A12 had nothing to examine, so it says `skip` - not `pass`.
+  //
+  // It used to assert `pass` with a detail reading "No budget invariants declared", and that is the false
+  // green this repository forbids: a reader told "read the verdict, never ok" has no way to tell a check
+  // that examined nothing from one that examined the model and cleared it. The count follows: `checksRun`
+  // counts the checks that ran, which is what its name promises.
   const legacy = {
     schemaVersion: 1,
     init: 'A',
@@ -783,8 +788,21 @@ async function runBudgetTests() {
   }
   const legacyReport = runVerification(legacy)
   const a12 = legacyReport.checks.find((check) => check.id === 'A12')
-  if (a12 === undefined || a12.findings.length !== 0 || a12.status !== 'pass') throw new Error('A12 must pass cleanly for legacy machines')
-  if (legacyReport.summary.checksRun !== 22) throw new Error('expected 22 checks, got ' + legacyReport.summary.checksRun)
+  if (a12 === undefined || a12.findings.length !== 0 || a12.status !== 'skip') throw new Error('A12 examined nothing, so it must report skip: ' + JSON.stringify(a12))
+  // And the detail says so in words rather than reading as a clearance.
+  if (!/^skipped: /.test(a12.detail)) throw new Error('a skipped check says it was skipped: ' + a12.detail)
+  if (legacyReport.summary.checksRun === legacyReport.checks.length) {
+    throw new Error('checksRun counted the skipped checks: ' + legacyReport.summary.checksRun + ' of ' + legacyReport.checks.length)
+  }
+  if (!Array.isArray(legacyReport.summary.checksSkipped) || !legacyReport.summary.checksSkipped.includes('A12')) {
+    throw new Error('the summary names what was skipped: ' + JSON.stringify(legacyReport.summary.checksSkipped))
+  }
+  // A skip is not a failure: the verdict for a legacy machine stays clean.
+  if (legacyReport.verdict === 'fail') throw new Error('a skipped check must not fail the run')
+  // And the next step says so, or the reader assumes every named check looked at the model.
+  if (!legacyReport.nextSteps.some((step) => step.includes('examined nothing'))) {
+    throw new Error('the report must say that some checks examined nothing: ' + JSON.stringify(legacyReport.nextSteps))
+  }
   assertNoUndefinedValues(legacyReport)
   console.log('PASS budget-tests')
 }
@@ -2675,13 +2693,78 @@ async function runEntryShapeTests() {
     throw new Error('a real diagram must still be reviewed')
   }
   if (runConcurrencyScan('').verdict === undefined) throw new Error('empty text is still text')
-  // Deliberately NOT refused: a wrong-typed string is at least present, so the diff reads two empty
-  // finding lists and `currentVerdict` carries the fact that the run was not clean.
-  const wrongTyped = diffReports('a', 'b')
-  if (wrongTyped.currentVerdict !== 'fail') throw new Error('a non-report run is not a clean one')
+  // A wrong-typed value IS refused now. It used to be tolerated on the argument that `currentVerdict`
+  // stayed `fail` - but `verdict` said `pass`, and `verdict` is the field a reader is told to act on.
+  let refused = false
+  try { diffReports('a', 'b') } catch (error) { refused = /not a report/.test(String(error instanceof Error ? error.message : error)) }
+  if (!refused) throw new Error('two non-reports must be refused with a message that says what a report is')
 
   console.log('PASS entry-shapes')
 }
+
+// ---------------------------------------------------------------------------
+// skip semantics: a check that examined nothing says `skip`, not `pass`
+// ---------------------------------------------------------------------------
+
+async function runSkipSemanticsTests() {
+  const minimal = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
+  const report = runVerification(minimal)
+
+  const skipped = report.checks.filter((check) => check.status === 'skip')
+  if (skipped.length === 0) throw new Error('the minimal machine must skip something, or the rest of this passes vacuously')
+  for (const check of skipped) {
+    if (check.findings.length !== 0) throw new Error(check.id + ' is skip and carries findings: ' + JSON.stringify(check.findings))
+    if (!/^skipped: /.test(check.detail)) throw new Error(check.id + ' does not say it was skipped: ' + check.detail)
+  }
+  console.log('PASS skip-carries-no-findings (' + skipped.length + ' skipped)')
+
+  // The count has to add up, or one of the two fields is lying about the same roster.
+  if (report.summary.checksSkipped === undefined) throw new Error('a report with skips names them')
+  if (report.summary.checksRun + report.summary.checksSkipped.length !== report.checks.length) {
+    throw new Error('ran + skipped must be every check: ' + report.summary.checksRun + ' + ' + report.summary.checksSkipped.length + ' != ' + report.checks.length)
+  }
+  const fromChecks = skipped.map((check) => check.id)
+  if (JSON.stringify(report.summary.checksSkipped) !== JSON.stringify(fromChecks)) {
+    throw new Error('the summary disagrees with the checks: ' + JSON.stringify(report.summary.checksSkipped) + ' vs ' + JSON.stringify(fromChecks))
+  }
+  if (report.summary.checksRun === 0) throw new Error('nothing ran at all, which is a different defect')
+  console.log('PASS checksRun-counts-what-ran')
+
+  // The shape of the defect exactly: `pass` beside a detail announcing an empty vocabulary. Asserted over
+  // several models rather than the minimal one, because a check can skip one model and run on its neighbour.
+  const corpus = [
+    minimal,
+    JSON.parse(readFileSync(new URL('leads-to-direct.json', root), 'utf8')),
+    { schemaVersion: 1, init: 'A', states: [{ id: 'A' }], transitions: [] },
+  ]
+  const NOTHING = [/no .* (declared|supplied)/i, /fewer than/i, /no state declares/i]
+  for (const model of corpus) {
+    for (const check of runVerification(model).checks) {
+      if (NOTHING.some((pattern) => pattern.test(check.detail)) && check.status === 'pass') {
+        throw new Error(check.id + ' passed while saying it had nothing to examine: ' + check.detail)
+      }
+    }
+  }
+  console.log('PASS no-pass-with-an-empty-vocabulary (' + corpus.length + ' models)')
+
+  // From the other side, so the rule cannot be satisfied by skipping everything.
+  const withBudget = { ...minimal, invariants: [{ id: 'b', description: 'stays under budget', kind: 'budget', budget: 100 }] }
+  const a12 = runVerification(withBudget).checks.find((check) => check.id === 'A12')
+  if (a12 === undefined || a12.status === 'skip') throw new Error('a declared budget must run the budget check: ' + JSON.stringify(a12))
+  const tooTight = { ...minimal, invariants: [{ id: 'b', description: 'stays under budget', kind: 'budget', budget: 0 }] }
+  const a12tight = runVerification(tooTight).checks.find((check) => check.id === 'A12')
+  if (a12tight.status !== 'fail') throw new Error('a budget of 0 must fail against a transition of cost 1: ' + JSON.stringify(a12tight?.findings))
+  console.log('PASS the-near-miss-declaring-it-runs-the-check')
+
+  // A skip is not a failure: a model that declared little is unverified, not broken.
+  if (report.verdict === 'fail') throw new Error('skips must not fail the run: ' + report.verdict)
+  if (report.summary.errors !== 0) throw new Error('and they are not errors')
+  console.log('PASS a-skip-is-not-a-failure')
+
+  console.log('PASS skip-semantics')
+}
+
+await runSkipSemanticsTests()
 
 await runEntryShapeTests()
 

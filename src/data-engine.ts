@@ -367,6 +367,51 @@ export function validateDataModel(input: unknown): { ok: true; model: DataModelV
   return { ok: true, model: root as unknown as DataModelV1 }
 }
 
+/**
+ * What a check would have needed in order to examine anything, or `undefined` if it had it.
+ *
+ * This family reported `pass` for checks whose vocabulary the model never declared - `DS3` with no
+ * relationships, `DA6` with no copy pairs, `DA5` with no before model, whose own detail read
+ * "No beforeModel supplied — skipped". The design family has always reported `skip` for that, and the
+ * verification family now does too, so the plugin has one meaning for the status rather than three.
+ *
+ * `DS1`, `DS2`, `DS4` and `DA1` are absent on purpose: they walk entities and fields, which every valid
+ * model has, so they always have something to look at.
+ */
+function nothingToExamine(id: string, model: DataModelV1, options: DataVerificationOptions): string | undefined {
+  const invariantsOfKind = (kind: string) => (model.invariants ?? []).filter((invariant) => invariant.kind === kind).length
+  switch (id) {
+    case 'DS3':
+    case 'DA4':
+      return (model.relationships ?? []).length === 0 ? 'no relationships were declared' : undefined
+    case 'DS5':
+      return (model.invariants ?? []).length === 0 ? 'no invariants were declared' : undefined
+    case 'DA2':
+      return (model.boundaryChecks ?? []).length === 0 ? 'no boundary checks were declared' : undefined
+    case 'DA3': {
+      const hasKeys = model.entities.some((entity) => (entity.primaryKey ?? []).length > 0 || (entity.uniqueKeys ?? []).length > 0)
+      return hasKeys ? undefined : 'no primary key or unique constraint was declared'
+    }
+    case 'DA5':
+      return options.beforeModel === undefined ? 'no beforeModel was supplied' : undefined
+    case 'DA6':
+    case 'DA7':
+      return (options.copyPairs ?? []).length === 0 ? 'no copy pairs were declared' : undefined
+    case 'DA8':
+      return (model.invariants ?? []).length === 0 ? 'no invariants were declared' : undefined
+    case 'DA9':
+      return invariantsOfKind('monotonic') === 0 ? 'no monotonic invariant was declared' : undefined
+    case 'DA10':
+      return invariantsOfKind('sequence') === 0 ? 'no sequence invariant was declared' : undefined
+    case 'DA11':
+      return invariantsOfKind('leads-to') === 0 ? 'no leads-to invariant was declared' : undefined
+    case 'DA12':
+      return invariantsOfKind('atomicity') === 0 ? 'no atomicity invariant was declared' : undefined
+    default:
+      return undefined
+  }
+}
+
 function checkResult(id: string, name: string, findings: Finding[], detail: string): CheckResult {
   const errors = findings.filter((finding) => finding.severity === 'error').length
   const warnings = findings.filter((finding) => finding.severity === 'warning').length
@@ -1103,6 +1148,15 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
     )
     comparison = buildDataComparisonSummary(before, model, options)
   }
+  // A check whose vocabulary the model never declared examined nothing, and says so. It has to run before
+  // the summary and `nextSteps` are derived, or both keep counting it as a run.
+  for (const check of checks) {
+    if (check.status !== 'pass') continue
+    const why = nothingToExamine(check.id, model, options)
+    if (why === undefined) continue
+    check.status = 'skip'
+    check.detail = 'skipped: ' + why
+  }
   const errors = checks.reduce((sum, check) => sum + check.findings.filter((finding) => finding.severity === 'error').length, 0)
   const warnings = checks.reduce((sum, check) => sum + check.findings.filter((finding) => finding.severity === 'warning').length, 0)
   return {
@@ -1118,7 +1172,12 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
       fields: allFieldPaths(model).length,
       errors,
       warnings,
-      checksRun: checks.length,
+      // What the name promises: the checks that examined the model, not every check object.
+      checksRun: checks.filter((check) => check.status !== 'skip').length,
+      ...(() => {
+        const skipped = checks.filter((check) => check.status === 'skip').map((check) => check.id)
+        return skipped.length === 0 ? {} : { checksSkipped: skipped }
+      })(),
     },
     checks,
     nextSteps: dataNextSteps(checks),
@@ -1137,6 +1196,12 @@ function dataNextSteps(checks: CheckResult[]): string[] {
   const failed = checks.filter((check) => check.status === 'fail').map((check) => check.name + ' (' + check.id + ')')
   const warningCodes = [...new Set(checks.flatMap((check) => check.findings).filter((finding) => finding.severity === 'warning').map((finding) => finding.code))].sort()
   if (failed.length > 0) steps.push('Resolve the failing checks first: ' + failed.join(', ') + '.')
+  // A check with nothing to examine is named, because a reader who is not told will assume every named
+  // check looked at the model. `pass` does not say that, and neither does a list of the failures.
+  const skipped = checks.filter((check) => check.status === 'skip').map((check) => check.name + ' (' + check.id + ')')
+  if (skipped.length > 0) {
+    steps.push('These examined nothing, so their silence is not a result: ' + skipped.join(', ') + '. Declare what each one would need, or accept that the model is unverified on those points.')
+  }
   if (warningCodes.length > 0) steps.push('Review the warning findings (' + warningCodes.join(', ') + '): a nullable field or a missing index is a decision, not silence.')
   steps.push('Re-run with beforeModel plus the mapping/copy/migration options after the change to prove the data behaviour did not regress: migration coverage, copy consistency, rollback symmetry, and the before/after comparison. Then compare the two reports with `report_diff` rather than reading them side by side.')
   return steps

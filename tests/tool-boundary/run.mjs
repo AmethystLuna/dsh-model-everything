@@ -914,11 +914,34 @@ await test('report_diff: the nearest counterexample — one new error fails the 
   expectEq(value.added[0]?.code, 'S1_INVENTED', 'the added finding is the new one')
 })
 
-await test('report_diff: a non-report current input reads as a failing run, not a clean one', async () => {
+await test('report_diff: a non-report input is refused with a code, not read as a clean delta', async () => {
+  // This used to assert `verdict: pass` with `currentVerdict: 'fail'` beside it, on the argument that a
+  // reader told to ignore `ok` and read the verdict would still see the failing run. Running the installed
+  // plugin showed the opposite: two 'junk' strings answered `verdict: pass`, and `verdict` is the field a
+  // reader IS told to act on. A mitigation in a field the reader is told to ignore is not a mitigation.
   const value = expectReport(await call('report_diff', { baseline: 'not a report', current: 'not a report' }), 'two non-reports')
-  expectEq(value.verdict, 'pass', 'the delta over two empty finding lists is empty')
-  expectEq(value.currentVerdict, 'fail', 'but the run cannot be called a pass: that is what currentVerdict is for')
-  expectEq(value.summary.added, 0, 'nothing to add')
+  expectEq(value.ok, false, 'the tool did not produce a report')
+  expectEq(value.ran, false, 'and it says so: nothing was compared')
+  expectEq(value.verdict, 'fail', 'a refusal is not a pass')
+  expectEq(value.errorCode, 'REPORT_INVALID', 'the refusal carries a code to route on')
+  expect(
+    typeof value.verdictReason === 'string' && value.verdictReason.startsWith('the tool did not run:'),
+    `a refusal says it did not run — got ${show(value.verdictReason)}`,
+  )
+  expect(
+    typeof value.verdictReason === 'string' && /not a report/.test(value.verdictReason),
+    `the refusal names what was wrong with the input — got ${show(value.verdictReason)}`,
+  )
+})
+
+await test('report_diff: the nearest case still reports — a real baseline against a partial current report', async () => {
+  // The guard must refuse non-reports without refusing partial ones. This is the line: an object with
+  // findings and no schema is a report for the purpose of a diff, and the delta still describes it.
+  const partial = { findings: [{ check: 'S2', code: 'S2_NO_TRANSITIONS', severity: 'error', message: 'no transitions' }] }
+  const value = expectReport(await call('report_diff', { baseline: { findings: [] }, current: partial }), 'a partial current report')
+  expectEq(value.ok, true, 'a partial report is comparable')
+  expectEq(value.summary.added, 1, 'its finding is the added one')
+  expectEq(value.verdict, 'fail', 'and it fails the delta')
 })
 
 // ---------------------------------------------------------------------------
@@ -1097,18 +1120,31 @@ await test('uml_review: a notation that is not a notation is refused, not coerce
   expectReport(await call('uml_review', { model: MACHINE, notation: 'mermaid' }), 'notation mermaid')
 })
 
-await test('report_diff: two absent reports are refused, and a wrong-typed one still reports', async () => {
-  // The false green: with no inputs, every comparison found nothing and the report said the two
-  // agree. The absence of an input is not agreement.
-  const missing = expectToolError(await call('report_diff', { baseline: null, current: null }), 'two nulls')
-  expect(missing.message.length > 0, 'the refusal must say something')
-  expectToolError(await call('report_diff', { baseline: MACHINE, current: null }), 'a null current')
-
-  // Deliberately unchanged, and pinned: a wrong-typed value that is at least present reads as two
-  // empty finding lists, and `currentVerdict` carries the fact that the run was not clean.
-  const wrongTyped = expectReport(await call('report_diff', { baseline: 'not a report', current: 'not a report' }), 'two strings')
-  expectEq(wrongTyped.currentVerdict, 'fail', 'a non-report run is not a clean one')
-  expectEq(wrongTyped.summary.added, 0, 'and there is nothing to add')
+await test('report_diff: an absent report and a wrong-typed one are refused the same way', async () => {
+  // The false green: with no inputs, every comparison found nothing and the report said the two agree.
+  // The absence of an input is not agreement.
+  //
+  // Both shapes are refusals, not tool errors, and that is the layering this repository draws: a MISSING
+  // parameter is the argument layer's tool error (asserted above), while `null` and `'junk'` are values
+  // that reach the tool, which then refuses with a code. They used to land in different layers - `null`
+  // threw out of execute, a string was reported as a pass - and neither is a shape a caller can route on.
+  for (const [label, args] of [
+    ['two nulls', { baseline: null, current: null }],
+    ['a null current', { baseline: MACHINE, current: null }],
+    ['two strings', { baseline: 'not a report', current: 'not a report' }],
+    ['a number', { baseline: 5, current: 5 }],
+  ]) {
+    const value = expectReport(await call('report_diff', args), label)
+    expectEq(value.ok, false, `${label}: no report was produced`)
+    expectEq(value.ran, false, `${label}: nothing was compared`)
+    expectEq(value.verdict, 'fail', `${label}: a refusal is not a pass`)
+    expectEq(value.errorCode, 'REPORT_INVALID', `${label}: the refusal carries a code to route on`)
+  }
+  // And the message distinguishes the two cases, because the fix differs: pass the thing, or pass a report.
+  const absent = expectReport(await call('report_diff', { baseline: null, current: null }), 'two nulls')
+  const wrong = expectReport(await call('report_diff', { baseline: 'not a report', current: 'not a report' }), 'two strings')
+  expect(String(absent.verdictReason).includes('is null'), `an absent report says it is absent — got ${show(absent.verdictReason)}`)
+  expect(/not a report/.test(String(wrong.verdictReason)), `a wrong-typed report says what was expected — got ${show(wrong.verdictReason)}`)
 })
 
 await test('uml_structure_verify: a diagram that is not text is refused, not thrown', async () => {

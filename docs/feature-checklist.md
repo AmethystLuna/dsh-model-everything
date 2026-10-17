@@ -186,7 +186,7 @@ And the gates around it:
 | `routing-map` | 4 | the routing map is the one the catalog produces now |
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 26 | parse: declarations, aliases, labels, containers and nesting |
-| `baseline` | 10 | self-baseline: the same report adds nothing and removes nothing |
+| `baseline` | 12 | self-baseline: the same report adds nothing and removes nothing |
 | `granularity` | 9 | a proper refinement passes and reports the expansion per pair |
 | `exporters` | 7 | source model still verifies (sanity) |
 | `report-view` | 14 | the report object is not mutated by rendering |
