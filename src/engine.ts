@@ -2066,6 +2066,10 @@ function pathPropertyViolation(model: LogicModelV1, options: NormalizedOptions, 
   if (invariant.kind === 'atomicity') return findAtomicityViolation(model, options, invariant)
   if (invariant.kind === 'budget') {
     const violation = findBudgetViolation(model, options, invariant)
+    // This walk can also stop early. Its undecided state is reported by A12; here it means no witness was
+    // found, which is what this caller already did with the old `undefined`. Tracking it per-walk here is the
+    // same fix applied to the remaining probes, and is deliberately not claimed by this change.
+    if (violation === 'undecided') return undefined
     if (violation === undefined) return undefined
     return {
       invariant,
@@ -3381,7 +3385,7 @@ function findBudgetViolation(
   model: LogicModelV1,
   options: NormalizedOptions,
   invariant: Extract<InvariantSpec, { kind: 'budget' }>,
-): BudgetViolation | undefined {
+): BudgetViolation | 'undecided' | undefined {
   const groupMap = groupTransitions(model)
   const init = initialState(model)
   const bestCost = new Map<string, number>([[runtimeKey(init), 0]])
@@ -3389,7 +3393,9 @@ function findBudgetViolation(
   let steps = 0
   while (queue.length > 0) {
     const entry = queue.shift()!
-    if (++steps > options.maxStates) break
+    // Stopping here decides nothing: the cost of the paths beyond the budget is unknown, which is not the
+    // same answer as 'no violation'. It is the third outcome this function now has.
+    if (++steps > options.maxStates) return 'undecided'
     for (const event of allEvents(model)) {
       const group = groupMap.get(entry.runtime.state + '|' + event)
       if (group === undefined || group.length === 0) continue
@@ -3429,6 +3435,15 @@ function A12_budget(model: LogicModelV1, options: NormalizedOptions): CheckResul
   }
   for (const invariant of budgets) {
     const violation = findBudgetViolation(model, options, invariant)
+    if (violation === 'undecided') {
+      findings.push({
+        code: 'A12_UNDECIDED',
+        severity: 'warning',
+        message: 'The worst-case path search for budget invariant "' + invariant.id + '" stopped at the ' + String(options.maxStates) + ' state budget before it finished, so the budget is undecided rather than met. Raise maxStates, or narrow the model.',
+        evidence: { invariant, maxStates: options.maxStates },
+      })
+      continue
+    }
     if (violation !== undefined) {
       findings.push({
         code: 'A12_BUDGET_OVER',
@@ -3441,7 +3456,8 @@ function A12_budget(model: LogicModelV1, options: NormalizedOptions): CheckResul
       })
     }
   }
-  return checkResult('A12', 'Budget', findings, findings.length === 0 ? (budgets.length === 0 ? 'No budget invariants declared' : 'All budget invariants hold') : 'Budget findings: ' + findings.length)
+  const undecided = findings.some((finding) => finding.code === 'A12_UNDECIDED')
+  return checkResult('A12', 'Budget', findings, undecided ? 'Budget walk stopped at the state budget: undecided' : findings.length === 0 ? (budgets.length === 0 ? 'No budget invariants declared' : 'All budget invariants hold') : 'Budget findings: ' + findings.length)
 }
 // ---------------------------------------------------------------------------
 // A13 — Probability reachability (DTMC)
