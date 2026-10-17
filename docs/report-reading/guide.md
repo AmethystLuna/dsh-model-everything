@@ -59,6 +59,11 @@ of them. `schema` is the versioned contract, so a reader can tell which shape it
 spec give the same hash; a changed hash means the model changed, which is what makes a diff
 meaningful.
 
+`summary.boundNotes` records a budget that was replaced or clamped, and `metadataKeys` lists the
+`_`-prefixed keys the schema ignored. Both are printed by the rendered body (`BOUND`, `METADATA`),
+so a reader who only has the text still learns that the numbers came from a different bound than
+the one they asked for, and that a field they wrote was treated as annotation.
+
 ## Where the findings are
 
 This is the part that varies, and it is worth knowing before you go looking:
@@ -98,7 +103,8 @@ Within a finding, the severity decides whether it changed the verdict:
 - **warning** — reported, does not fail the delta;
 - **info** — context, for example that one element makes an inseparable group of findings;
 - **undecided** — the search stopped before deciding. Not a pass. `summary.truncated` says the same
-  thing for the report as a whole.
+  thing for the report as a whole, and the rendered body leads with a `LIMIT` line, so a reader who
+  only has the text is told before reaching any finding.
 
 The finding codes are prefixed by the check that owns them (`S1`, `A4`, `DS5`, `DA2`, `DES12`,
 `UML023`), so a code tells you where to look even before you read its message.
