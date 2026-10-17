@@ -87,8 +87,6 @@ metadata:
 
 ## 4. 较小的整理项
 
-- **技能触发评估**：harness 与实测都有，细节在[路由实测](../research/skill-routing-measurement.md)——`tests/skill-routing/`（结构半随 `test:engine`）、`--print-prompt` / `--decisions`（打分半）、`--live-sample`（挑值得花一个会话的 12 条）。**这一轮修了两处判定**：结构半原先只要求一个子串命中（`"review"` 落在 `"Use when reviewing…"` 里就算数，删掉决定性词照样绿），现在要求点到该技能目录行确实有的词、且动词不算；`--print-prompt` 原先把六行 `PASS` 打在提问前面，现在只出提问。
-  **还欠的是 live 那一半**：同一天两次实测都是把目录行交给模型（93/93，然后 92/93，一条翻转），**目录行 + 系统提示 + 模型一起作用的情形还只有一次试点**（那一次的技能选对了，但会话先找了二十分钟不存在的物料）。文本已按翻转的那条修过（`model-everything-uml` 的移交句从「这类图去 structure」改成「这类图由 structure **读取**」），**改完必须重装 + 重启**才能在 live 侧测到。
 - **技能文档双语**：技能文档目前是英文单语，只有 README 成对。若要双语，是一次成规模补写（每个 `SKILL.md` 加各自的 `references/*.md`），动手前先定样例再铺开。
 
 ## 5. 部署面实测后剩下的缺口（2026-10-17，装进 desktop profile 实跑 + 一次只读复审）
