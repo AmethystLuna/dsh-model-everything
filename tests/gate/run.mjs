@@ -83,20 +83,33 @@ await check('the loader patch mounts the gate as a separate row, switched off', 
 
 await check('the default text names every shipped skill, and nothing else', () => {
   const text = gate.DEFAULT_GATE_TEXT
-  const missing = shipped.filter((skill) => !text.includes(skill))
+  // Read the skill names out of the text as whole backticked tokens: `model-everything` is a
+  // prefix of every other skill name, so a substring test would find the entry point inside
+  // each sibling and call that a second mention.
+  const tokens = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1])
+  const skillLike = tokens.filter((token) => token === 'model-everything' || token.startsWith('model-everything-'))
+  const count = (skill) => skillLike.filter((token) => token === skill).length
+  const missing = shipped.filter((skill) => count(skill) === 0)
   if (missing.length > 0) throw new Error('a shipped skill has no line in the gate: ' + missing.join(', '))
-  // The reverse direction: a line for a skill that does not exist sends the model nowhere.
-  const named = [...text.matchAll(/^- ([a-z][a-z-]+):/gm)].map((match) => match[1])
-  const stale = named.filter((skill) => !shipped.includes(skill))
-  if (stale.length > 0) throw new Error('the gate names skills that are not shipped: ' + stale.join(', '))
-  if (new Set(named).size !== named.length) throw new Error('the gate names a skill twice')
+  // The reverse direction: a name for a skill that does not exist sends the model nowhere.
+  const stale = skillLike.filter((token) => !shipped.includes(token))
+  if (stale.length > 0) throw new Error('the gate names skills that are not shipped: ' + [...new Set(stale)].join(', '))
+  const twice = shipped.filter((skill) => count(skill) > (skill === 'model-everything' ? 2 : 1))
+  if (twice.length > 0) {
+    // The entry skill is named twice on purpose: once as the thing to load when it is unclear
+    // whether a check applies, once in the routing list. That is the shape the sibling
+    // plugin's gate uses, and the first mention is the one that answers "where do I start".
+    throw new Error('the gate names a skill more often than its line: ' + twice.join(', '))
+  }
 })
 
 await check('the default text stays inside its cost ceiling', () => {
   // A cost ceiling, not a catalogue count: the message lands in every session that enables
   // the gate, so its growth is a per-session price. Raising the ceiling is a decision, which
-  // is why the number is written down here rather than derived.
-  const limit = 1400
+  // is why the number is written down here rather than derived. It carries the routing, the
+  // tool inventory with what each does not prove, and how to read a report - the same four
+  // parts the sibling plugin's gate carries.
+  const limit = 2800
   const length = gate.DEFAULT_GATE_TEXT.length
   if (length > limit) throw new Error('the gate text is ' + String(length) + ' characters, over the ' + String(limit) + ' ceiling')
 })
