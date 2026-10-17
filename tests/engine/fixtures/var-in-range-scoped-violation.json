@@ -20,7 +20,22 @@
           "variable": "counter",
           "op": "inc"
         }
-      ]
+      ],
+      "guard": {
+        "variable": "counter",
+        "op": "<",
+        "value": 10
+      }
+    },
+    {
+      "from": "A",
+      "event": "bump",
+      "guard": {
+        "variable": "counter",
+        "op": ">=",
+        "value": 10
+      },
+      "to": "A"
     },
     {
       "from": "A",

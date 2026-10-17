@@ -1303,7 +1303,6 @@ async function runBoundedSearchTests() {
   // Decision table for the analysis: each clause of "monotone over a reachable cycle, unbounded in
   // the direction of travel" turned false in turn.
   const cases = [
-    ['bounded in the direction of travel', { ...unbounded, variables: [{ name: 'n', kind: 'integer', init: 0, max: 5 }] }],
     ['the update is not on a cycle', {
       schemaVersion: 1, init: 'A',
       states: [{ id: 'A' }, { id: 'B', terminal: true }],
@@ -1330,6 +1329,86 @@ async function runBoundedSearchTests() {
     const report = runVerification(model, {})
     const hit = report.checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))
     if (hit) throw new Error('S6_UNBOUNDED_VARIABLE fired although ' + why)
+  }
+
+  // A guard that pins the counter bounds the space, and the schema reference tells modellers to do exactly
+  // that. The analysis read the declaration and never the guard, so the documented idiom was reported as an
+  // infinite state space - while the same report said `truncated: false`, i.e. the search had finished.
+  const pinned = (guard, variables = [{ name: 'n', kind: 'integer', init: 0 }]) => ({
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A' }],
+    transitions: [{ from: 'A', event: 'up', guard, to: 'A', updates: [{ variable: 'n', op: 'inc' }] }],
+    variables,
+  })
+  const pin = { variable: 'n', op: '<', value: 40 }
+  const pinnedReport = runVerification(pinned(pin), { maxStates: 200 })
+  const pinnedS6 = pinnedReport.checks.find((check) => check.id === 'S6')
+  if (pinnedS6.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE')) {
+    throw new Error('a guard that pins the counter bounds the climb, so the reachable set is finite')
+  }
+  if (pinnedReport.summary.truncated !== false) throw new Error('and the exploration must finish: ' + String(pinnedReport.summary.truncated))
+
+  // The decision table for reading a guard as a pin: only shapes that certainly fail as the value climbs count,
+  // because the finding accuses the model and a guess in that direction is a false accusation.
+  const pinCases = [
+    // `other` never changes, so this guard is true forever: the climb really is unbounded, and the pin is
+    // correctly not read.
+    ['the pin is on another variable', { variable: 'other', op: '<', value: 40 }, false, [{ name: 'n', kind: 'integer', init: 0 }, { name: 'other', kind: 'integer', init: 0 }]],
+    // `n > 0` holds however far n climbs, so one pinning disjunct is not enough.
+    ['one pinning branch of an `any` is not enough', { any: [pin, { variable: 'n', op: '>', value: 0 }] }, false],
+    ['under `all` one failing branch is enough', { all: [pin, { variable: 'n', op: '>', value: 0 }] }, true],
+    ['a negation is read, not ignored', { not: { variable: 'n', op: '>=', value: 40 } }, true],
+    ['a negation of a non-pin is not a pin', { not: { variable: 'n', op: '==', value: 40 } }, false],
+    ['a comparison that keeps holding as it climbs', { variable: 'n', op: '>', value: 0 }, false],
+  ]
+  for (const [why, guard, pins, variables] of pinCases) {
+    const report = runVerification(pinned(guard, variables), { maxStates: 100 })
+    const hit = report.checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))
+    if (hit === pins) throw new Error('guard reading is wrong for "' + why + '": expected the pin to be ' + (pins ? 'read' : 'rejected'))
+  }
+
+  // A declared max is not a bound: `inc` is never clamped to it, which S7 shows by reporting the range violation
+  // the same model produces. Treating the declaration as a bound made the two checks disagree about one model,
+  // and it is the half of the documented rule that reads "however narrow the declaration looks".
+  const declaredOnly = {
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A' }],
+    transitions: [{ from: 'A', event: 'up', to: 'A', updates: [{ variable: 'n', op: 'inc' }] }],
+    variables: [{ name: 'n', kind: 'integer', init: 0, max: 5 }],
+    invariants: [{ id: 'range', description: 'n stays in its declared range', kind: 'var-in-range', variable: 'n', min: 0, max: 5 }],
+  }
+  const declaredReport = runVerification(declaredOnly, { maxStates: 50 })
+  if (!declaredReport.checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))) {
+    throw new Error('an unguarded climb past a declared max is still an infinite reachable set')
+  }
+  // The two checks now agree about that model: S7 reports the escape that proves the climb, S6 reports the
+  // consequence for the search.
+  if (!declaredReport.checks.some((check) => check.findings.some((finding) => finding.code === 'S7_INVARIANT_VIOLATION'))) {
+    throw new Error('and S7 must report the escape: the two findings are about the same model')
+  }
+  // The near miss: the declaration plus a guard that pins it is what the schema reference asks for.
+  const declaredAndPinned = { ...declaredOnly, transitions: [{ from: 'A', event: 'up', guard: pin, to: 'A', updates: [{ variable: 'n', op: 'inc' }] }] }
+  const bothReport = runVerification(declaredAndPinned, { maxStates: 100 })
+  if (bothReport.checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))) {
+    throw new Error('a counter with a declared max and a pinning guard must not be reported as infinite')
+  }
+  // A `set` on the cycle pins the value at a constant, so the climb cannot continue lap after lap either. `set`
+  // used to be skipped as "neither proves monotonicity nor breaks it", which left the climb looking unbounded.
+  const withReset = {
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }],
+    transitions: [
+      { from: 'A', event: 'up', to: 'B', updates: [{ variable: 'n', op: 'inc' }] },
+      { from: 'B', event: 'reset', to: 'A', updates: [{ variable: 'n', op: 'set', value: 0 }] },
+    ],
+    variables: [{ name: 'n', kind: 'integer', init: 0 }],
+  }
+  const climbOnly = { ...withReset, transitions: [{ from: 'A', event: 'up', to: 'B', updates: [{ variable: 'n', op: 'inc' }] }, { from: 'B', event: 'reset', to: 'A' }] }
+  if (!runVerification(climbOnly, { maxStates: 20 }).checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))) {
+    throw new Error('without the reset the same climb must be reported, or the case below proves nothing')
+  }
+  if (runVerification(withReset, { maxStates: 50 }).checks.some((check) => check.findings.some((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE'))) {
+    throw new Error('a set on the cycle keeps the value at a constant, so the reachable set is finite')
   }
 
   console.log('PASS bounded-search')

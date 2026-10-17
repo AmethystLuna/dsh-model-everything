@@ -1778,14 +1778,14 @@ function S4_determinism(model: LogicModelV1): CheckResult {
  * graph:
  *
  *   - a variable is MONOTONE over a cycle when every update to it on that cycle moves the same way
- *     (`inc`, or `inc` + `set` to a larger constant). An unrelated update to another variable does
- *     not break it;
- *   - if such a cycle is reachable from the initial state, and the variable has no declared bound
- *     in that direction, then repeating the cycle yields a distinct runtime state every time. The
- *     reachable set is infinite, so NO bound decides the question - not a larger one, not a
- *     smaller one;
- *   - bounded in the direction of travel means the walk stops at the bound, which the ordinary
- *     exploration already handles.
+ *     (`inc`, or `dec`). An unrelated update to another variable does not break it;
+ *   - if such a cycle is reachable from the initial state and nothing on it stops the climb, then
+ *     repeating the cycle yields a distinct runtime state every time. The reachable set is infinite,
+ *     so NO bound decides the question - not a larger one, not a smaller one;
+ *   - two things stop a climb, and both are read from the model: a `set` on the cycle pins the value
+ *     to a constant, and a guard that fails as the value moves that way disables the cycle. A declared
+ *     `min`/`max` does not stop it - `inc`/`dec` are never clamped to the declaration, so a counter can
+ *     walk past its own range (which S7 then reports);
  *
  * One direction is enough to make the space infinite, and any monotone direction counts, so this
  * reports the variable rather than trying to be exhaustive about which check suffers.
@@ -1857,11 +1857,14 @@ function unboundedDomainFindings(model: LogicModelV1): Finding[] {
           const analysis = monotoneOverCycle(model, cycleSteps, variable)
           if (analysis === undefined) continue
           reported.add(variable.name)
+          const advice = analysis.direction === 'inc'
+            ? 'a guard that pins it from above (`{ "variable": "' + variable.name + '", "op": "<", "value": 4 }`)'
+            : 'a guard that pins it from below (`{ "variable": "' + variable.name + '", "op": ">", "value": 0 }`)'
           findings.push({
             code: 'S6_UNBOUNDED_VARIABLE',
             severity: 'error',
-            message: 'the reachable state space is infinite: ' + variable.name + ' is only ever ' + analysis.word + ' around the cycle ' + cycleSteps.map((step) => step.from + ' -> ' + step.to).join(' -> ') + ', and the declaration gives it no ' + analysis.bound + '.',
-            detail: 'Repeating this cycle produces a distinct runtime state every time, so no search bound decides any question about this model: a larger bound walks further without deciding, and a smaller one reports truncation sooner. Declare the ' + analysis.bound + ' to make the model decidable, or remove the cycle. Checks that walk the state space report themselves truncated until then.',
+            message: 'the reachable state space is infinite: ' + variable.name + ' is only ever ' + analysis.word + ' around the cycle ' + cycleSteps.map((step) => step.from + ' -> ' + step.to).join(' -> ') + ', and nothing on that cycle stops it.',
+            detail: 'Repeating this cycle produces a distinct runtime state every time, so no search bound decides any question about this model: a larger bound walks further without deciding, and a smaller one reports truncation sooner. Declare ' + advice + ', or a `set` that resets it on the cycle, to make the model decidable. A declared min/max does not bound it: inc/dec are never clamped.',
             evidence: { variable: variable.name, direction: analysis.direction, events: cycleSteps.map((step) => step.event) },
           })
         }
@@ -1876,33 +1879,84 @@ function unboundedDomainFindings(model: LogicModelV1): Finding[] {
   return findings
 }
 
+const NEGATED_OP: Record<GuardOp, GuardOp> = { '<': '>=', '<=': '>', '>': '<=', '>=': '<', '==': '!=', '!=': '==' }
+
+/** Whether `op` is a comparison that stops holding once the value moves far enough in `direction`. */
+function pinningComparison(op: GuardOp, direction: 'inc' | 'dec'): boolean {
+  if (op === '==') return true
+  return direction === 'inc' ? op === '<' || op === '<=' : op === '>' || op === '>='
+}
+
 /**
- * Whether one variable moves one way along the whole cycle, and which declared bound is missing.
+ * Whether a guard pins `variable` against a climb in `direction`, i.e. eventually disables the transition.
  *
- * `inc` + `set` to a larger constant counts as monotone: the variable still only ever climbs. A
- * `dec` or a `set` to a smaller constant on the same cycle means it does not, and `undefined` says
- * so.
+ * Only shapes that certainly fail count, because the finding this feeds accuses the model of an infinite
+ * reachable set, and a guess in that direction is a false accusation:
+ *
+ *   - `all` is a conjunction, so one pinning clause is enough; `any` is a disjunction, so every branch has to pin;
+ *   - a negation is read through De Morgan rather than skipped, so `not { n >= 40 }` counts as `n < 40`;
+ *   - a guard on another variable says nothing about this one.
  */
-function monotoneOverCycle(model: LogicModelV1, steps: PathStep[], variable: VariableSpec): { direction: 'inc' | 'dec'; bound: 'min' | 'max'; word: string } | undefined {
+function guardPinsVariable(guard: GuardNode, variable: string, direction: 'inc' | 'dec', negated = false): boolean {
+  if (isStateGuard(guard)) return false
+  if ('all' in guard) {
+    return negated
+      ? guard.all.every((part) => guardPinsVariable(part, variable, direction, true))
+      : guard.all.some((part) => guardPinsVariable(part, variable, direction, false))
+  }
+  if ('any' in guard) {
+    return negated
+      ? guard.any.some((part) => guardPinsVariable(part, variable, direction, true))
+      : guard.any.every((part) => guardPinsVariable(part, variable, direction, false))
+  }
+  if ('not' in guard) return guardPinsVariable(guard.not, variable, direction, !negated)
+  if (guard.variable !== variable) return false
+  return pinningComparison(negated ? NEGATED_OP[guard.op] : guard.op, direction)
+}
+
+/**
+ * Whether one variable climbs one way along the whole cycle and nothing stops it.
+ *
+ * Three things stop a climb, and the analysis has to read all three because it reports "the reachable state
+ * space is infinite":
+ *
+ *   - a `set` anywhere on the cycle pins the value to a constant, so lap after lap cannot climb (the constant's
+ *     own value does not matter);
+ *   - a guard that fails as the value moves that way disables the cycle, which is how the schema reference tells
+ *     a modeller to bound a counter;
+ *   - a declared `min`/`max` does NOT stop it: `inc`/`dec` are never clamped to the declaration, so a model that
+ *     declares `max: 5` and increments unguarded climbs past 5. S7 reports the range violation that proves it,
+ *     and reading the declaration as a bound here made the two checks disagree about the same model.
+ *
+ * A `dec` on the same cycle means it does not climb after all, and `undefined` says so.
+ */
+function monotoneOverCycle(model: LogicModelV1, steps: PathStep[], variable: VariableSpec): { direction: 'inc' | 'dec'; word: string } | undefined {
   let direction: 'inc' | 'dec' | undefined
+  const moving: Array<{ op: 'inc' | 'dec'; climbers: TransitionSpec[] }> = []
   for (const step of steps) {
-    for (const transition of model.transitions) {
-      if (transition.from !== step.from || transition.event !== step.event || transition.to !== step.to) continue
+    const matching = model.transitions.filter((transition) => transition.from === step.from && transition.event === step.event && transition.to === step.to)
+    // Only the transitions that actually move the variable matter: a branch of the same event that leaves it alone
+    // neither climbs nor stops a climb, and counting it as an unpinned climber would accuse a bounded model.
+    const climbers = matching.filter((transition) => (transition.updates ?? []).some((update) => update.variable === variable.name && update.op !== 'set'))
+    for (const transition of matching) {
       for (const update of transition.updates ?? []) {
         if (update.variable !== variable.name) continue
-        if (update.op === 'set') {
-          // A `set` fixes the value, so it cannot contribute to an unbounded climb on its own. It
-          // neither proves monotonicity nor breaks it.
-          continue
-        }
+        // A `set` fixes the value at a constant, so no lap sequence climbs without bound.
+        if (update.op === 'set') return undefined
         if (direction === undefined) direction = update.op
         else if (direction !== update.op) return undefined
       }
     }
+    if (climbers.length > 0) moving.push({ op: direction as 'inc' | 'dec', climbers })
   }
   if (direction === undefined) return undefined
-  if (direction === 'inc') return variable.max === undefined ? { direction, bound: 'max', word: 'incremented' } : undefined
-  return variable.min === undefined ? { direction, bound: 'min', word: 'decremented' } : undefined
+  // One pinned edge is enough: the cycle cannot complete once that edge is disabled, whichever other edges
+  // still allow a move.
+  const pinned = moving
+    .filter((edge) => edge.op === direction)
+    .some((edge) => edge.climbers.every((transition) => transition.guard !== undefined && guardPinsVariable(transition.guard, variable.name, direction as 'inc' | 'dec')))
+  if (pinned) return undefined
+  return { direction, word: direction === 'inc' ? 'incremented' : 'decremented' }
 }
 
 function S6_guardCompleteness(model: LogicModelV1): CheckResult {
@@ -1913,7 +1967,7 @@ function S6_guardCompleteness(model: LogicModelV1): CheckResult {
   const dead = analysis.completeness.filter((finding) => finding.code === 'S6_DEAD_GUARD').length
   const unbounded = findings.filter((finding) => finding.code === 'S6_UNBOUNDED_VARIABLE').length
   const detail = unbounded > 0
-    ? 'The reachable state space is infinite: ' + String(unbounded) + ' variable(s) climb without a declared bound'
+    ? 'The reachable state space is infinite: ' + String(unbounded) + ' variable(s) climb around a reachable cycle that nothing stops'
     : findings.length === 0
       ? 'All guard branches defined'
       : dead === analysis.completeness.length ? 'Dead guard branches: ' + String(dead) : 'Guard findings: ' + String(findings.length)
