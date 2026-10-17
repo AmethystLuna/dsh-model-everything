@@ -112,6 +112,10 @@ metadata:
 
 **结构性原因**：契约快照覆盖的行星不全——没有 compose、`uml_parse`、`uml_render`、export 工具层的用例。上面 3、4、5、7 能活下来，都是因为不在快照里。
 
-**2026-10-17 收尾**：本表十行全部结案。仍未补的是这条结构性缺口本身——快照 runner 是**同步**的，而 `uml_parse`/`uml_render`/`model_export` 的用例要调工具的 `execute`（async，且需 devDependencies）。`model_compose_verify` 是例外：`runCompositionVerification` 是同步引擎函数，可以直接进快照，下次补它最便宜。
+**2026-10-17 收尾**：本表十行全部结案。结构性缺口本身也补了一半（`9a4d7c9`）：快照 runner 现在 `await` 用例构造器，因此可以调工具的 `execute`；新增四条用例——两条 compose（可解析的 rendezvous / 名字无人声明的 rendezvous）、一条 `uml_parse`（正文带 `PARSE`/`MODEL`）、一条 `model_export` 的 `EXPORT_TOO_LARGE` 拒绝；`errorCode` 进了投影，因为读者就是靠它路由拒绝。工具模块按 `tests/uml` 的方式动态载入，没有 devDependencies 时打印 SKIP 而不是让整个套件失败。
+
+新用例当场抓到一处自相矛盾：`C2_RENDEZVOUS_UNRESOLVED` 是 `warning`，而同一份报告 `verdict=fail`、`summary.errors=1` —— 组合的计数把每条 finding 都当 error，于是正文说 `warn C2` / `[warning/…]`，上一行说 `1 error finding(s)`。现在 finding 是 error（调用方点名要查的握手没查成，不是通过），计数也只数自己带的 severity。
+
+仍未进快照的：`uml_render` 的输出、`uml_review` 的各族用例、`design`/`structure`/`granularity` 的工具层。它们都还是引擎级用例。
 
 **这一批的教训（对第 2 行那类「报告说得比它知道的多」的缺口）**：判据不是「这个 walk 会不会停」，而是**停下来之后返回的是什么**。凡是 `undefined` 既表示「找过了，没有」又表示「没找完」的地方，报告就必然在两者之间选一个说法，而它选的总是更乐观的那个。修的时候先看 walk 的返回类型：`InvariantViolation` 自带 `undecided`，填上即可；`findBudgetViolation` 没有这个字段，才需要加 `'undecided'` 这一态。判据落错层两次都发生在这一步（引擎 vs 工具层、`uml_explain_labels` vs `uml_review`）。
