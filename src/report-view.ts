@@ -297,6 +297,7 @@ function renderFindingsReport(report: Record_, options: Required<ReportViewOptio
   for (const finding of findings) byCode.set(finding.code, (byCode.get(finding.code) ?? 0) + 1)
   const lines = [
     ...headerLines(report, options),
+    ...parseBodyLines(report),
     // An empty roster says so in one word. `0 total (0 error, 0 warning):` with a dangling colon read like a
     // line that had lost its content.
     findings.length === 0
@@ -306,6 +307,25 @@ function renderFindingsReport(report: Record_, options: Required<ReportViewOptio
   const body = findingLines(findings, options, new Set<string>())
   if (body.length > 0) lines.push('', ...body)
   return [...lines, ...wrapFooter(report)]
+}
+
+/**
+ * A report that carries a model rather than findings about one (`uml_parse`).
+ *
+ * The reader asked to read the diagram into a model, and the body printed neither the model nor how the text was
+ * read, so the one reader who only has the body got `FINDINGS none` as the entire answer. The model is printed as
+ * compact JSON on one line: it is data the caller feeds to `model_verify`, not prose.
+ */
+function parseBodyLines(report: Record_): string[] {
+  // Only a parse report: a review report carries a model too, but the caller already has it and the review is about
+  // what the diagram says. Printing it there would be the same body for two different questions.
+  if (text(report.action) !== 'parse') return []
+  const model = record(report.model)
+  if (model === undefined) return []
+  const where = ['notation', 'kind', 'family']
+    .map((key) => (text(report[key]) === undefined ? undefined : `${key}=${String(text(report[key]))}`))
+    .filter((part): part is string => part !== undefined)
+  return [...(where.length === 0 ? [] : [`PARSE  ${where.join('  ')}`]), `MODEL  ${JSON.stringify(model)}`]
 }
 
 /** A baseline diff report: what a change added, removed or changed. */

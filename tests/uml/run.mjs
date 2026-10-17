@@ -2216,5 +2216,41 @@ test('round trip: rendering twice is a fixed point', () => {
   }
 })
 
+// The parse body is what a model reads after `uml_parse`, and it used to carry neither the model nor the
+// parser's own notes: the report said `FINDINGS none` over a report whose subject was the parsed machine.
+if (uml !== undefined) {
+  const { renderReportText } = await import('../../lib/report-view.js')
+  try {
+    const cleanText = ['stateDiagram-v2', '  [*] --> Idle', '  Idle --> Running : go', '  Running --> [*]'].join('\n')
+    const clean = renderReportText(await uml.umlParseTool.execute({ diagram: cleanText, notation: 'mermaid' }))
+    const parseLine = clean.split('\n').find((line) => line.startsWith('PARSE '))
+    if (parseLine === undefined) throw new Error('the body must say how the text was read:\n' + clean)
+    if (!parseLine.includes('notation=mermaid') || !parseLine.includes('kind=state')) throw new Error('and name the notation and the kind it read: ' + parseLine)
+    const modelLine = clean.split('\n').find((line) => line.startsWith('MODEL '))
+    if (modelLine === undefined) throw new Error('the body must carry the parsed model:\n' + clean)
+    const parsedModel = JSON.parse(modelLine.slice('MODEL '.length))
+    if (!Array.isArray(parsedModel.states) || parsedModel.states.length === 0) throw new Error('the model line must carry the model itself: ' + modelLine.slice(0, 80))
+    if (!/Idle/.test(modelLine)) throw new Error('and the state ids a reader can act on: ' + modelLine.slice(0, 120))
+
+    // The verdict counted `result.warnings` while `findings` did not carry them, so a report could say
+    // "1 warning finding(s)" and "FINDINGS none - nothing was reported" on the next line.
+    const notedText = ['stateDiagram-v2', '  [*] --> BUSY', '  BUSY --> IDLE', '  BUSY --> [*]'].join('\n')
+    const noted = await uml.umlParseTool.execute({ diagram: notedText, notation: 'mermaid' })
+    const body = renderReportText(noted)
+    if (!noted.findings.some((finding) => finding.code === 'UML_PARSE_SYNTHETIC_EVENT')) {
+      throw new Error('an unlabelled arrow must reach `findings`, got ' + JSON.stringify(noted.findings.map((finding) => finding.code)))
+    }
+    if (/FINDINGS  none/.test(body)) throw new Error('the roster must list the note the verdict counted:\n' + body)
+    if (!/UML_PARSE_SYNTHETIC_EVENT/.test(body)) throw new Error('and the body must name it:\n' + body)
+    const findingsLine = body.split('\n').find((line) => line.startsWith('FINDINGS '))
+    const counted = Number(/FINDINGS  (\d+) total/.exec(String(findingsLine))?.[1] ?? '0')
+    if (counted !== noted.findings.length) throw new Error('the header and the roster must count the same findings: ' + String(findingsLine))
+    console.log('PASS parse body: the model is printed and its notes are findings')
+  } catch (error) {
+    failures += 1
+    console.log('FAIL parse body:', error instanceof Error ? error.message : String(error))
+  }
+}
+
 if (failures > 0) { console.log('uml tests failed:', failures); process.exit(1) }
 console.log('all uml tests passed')
