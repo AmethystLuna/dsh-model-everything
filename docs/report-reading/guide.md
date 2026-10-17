@@ -64,6 +64,11 @@ meaningful.
 so a reader who only has the text still learns that the numbers came from a different bound than
 the one they asked for, and that a field they wrote was treated as annotation.
 
+A report can also carry notes beside its findings — `warnings` holds what a notation or a parser
+could not carry. They count towards the verdict, so the body prints them under `WARNING`, and the
+`FINDINGS` line says how many there are when the roster itself is empty. A body that shouted
+"nothing was reported" over a note the verdict had already counted was the defect this line fixes.
+
 ## Where the findings are
 
 This is the part that varies, and it is worth knowing before you go looking:

@@ -1551,7 +1551,7 @@
       "A profile diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
       "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
     ],
-    "body": "model-everything/uml/review/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  states=0 transitions=0 errors=0 warnings=1\nFINDINGS  2 total (0 error, 2 warning): UML018_FIDELITY_UNCHECKED x1 | UML052_PROFILE_EXTENSION_MISSING x1\n\n  [info/UML018_FIDELITY_UNCHECKED] the diagram was drawn from the model, but a profile diagram cannot be read back out of plantuml, so nothing here proves the drawing still says what the model says.\n  [warning/UML052_PROFILE_EXTENSION_MISSING] metaclass Class is declared but no stereotype extends it, so the profile does not change it.\n\nNEXT  When the question is where the dependencies point, run uml_structure_verify on the same text: it audits the graph against a dependency matrix.\nNEXT  A profile diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    "body": "model-everything/uml/review/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  states=0 transitions=0 errors=0 warnings=1\nFINDINGS  2 total (0 error, 2 warning): UML018_FIDELITY_UNCHECKED x1 | UML052_PROFILE_EXTENSION_MISSING x1\n\n  [info/UML018_FIDELITY_UNCHECKED] the diagram was drawn from the model, but a profile diagram cannot be read back out of plantuml, so nothing here proves the drawing still says what the model says.\n  [warning/UML052_PROFILE_EXTENSION_MISSING] metaclass Class is declared but no stereotype extends it, so the profile does not change it.\n\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no profile element, so the profile package itself is not drawn; stereotypes and metaclasses are drawn as a class diagram draws them, and an extension and a generalization are both a --|> arrow.\n\nNEXT  When the question is where the dependencies point, run uml_structure_verify on the same text: it audits the graph against a dependency matrix.\nNEXT  A profile diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
   },
   "uml: a state diagram read back": {
     "ok": true,
@@ -2228,15 +2228,173 @@
     "verdictReason": "no error findings; 1 warning finding(s)",
     "schema": "model-everything/uml/parse/v1",
     "modelHash": "f19e2d58863665b7734df8119ed0f420b48f2e391e4cbdf49e67658949748a8d",
+    "findings": [],
+    "family": "state",
+    "body": "model-everything/uml/parse/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  modelHash=f19e2d588636… hashSpec=v1\nPARSE  notation=mermaid  kind=state  family=state\nMODEL  {\"schemaVersion\":1,\"init\":\"Idle\",\"states\":[{\"id\":\"Idle\"},{\"id\":\"BUSY\",\"terminal\":true}],\"transitions\":[{\"from\":\"Idle\",\"event\":\"go\",\"to\":\"BUSY\"},{\"from\":\"BUSY\",\"event\":\"t_BUSY_Idle\",\"to\":\"Idle\"}]}\nFINDINGS  none — 1 note(s) under WARNING say what could not be carried\n\nWARNING  UML_PARSE_SYNTHETIC_EVENT: arrow BUSY -> Idle carries no label; it was named \"t_BUSY_Idle\". Label the arrow as `event [guard] / actions` so the model keeps the real event name."
+  },
+  "uml render: a state machine to mermaid": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/uml/render/v1",
+    "findings": [],
+    "body": "model-everything/uml/render/v1  verdict=pass  no error or warning findings  ok=true\n\n%%dsh-model-everything:uml v1 notation=mermaid diagram=state\n%%dsh-model-everything:init INIT\n%%dsh-model-everything:terminal FATAL\n%%dsh-model-everything:variable retry integer\nstateDiagram-v2\n  [*] --> INIT\n  state \"INIT\" as INIT\n  state \"STARTING\" as STARTING\n  state \"ACTIVE\" as ACTIVE\n  state \"ERROR\" as ERROR\n  state \"FATAL\" as FATAL\n  INIT --> STARTING : power_ready\n  STARTING --> ACTIVE : ack\n  STARTING --> ERROR : timeout [retry < 3] / retry := retry + 1\n  STARTING --> FATAL : timeout [retry >= 3]\n  ACTIVE --> FATAL : stop\n  ERROR --> STARTING : cooldown\n  FATAL --> [*]"
+  },
+  "uml render: a family the notation only approximates": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "no error findings; 2 warning finding(s)",
+    "schema": "model-everything/uml/render/v1",
+    "findings": [],
+    "body": "model-everything/uml/render/v1  verdict=pass_with_findings  no error findings; 2 warning finding(s)  ok=true\n\n@startuml\n'dsh-model-everything:uml v1 notation=plantuml family=communication\nobject \":Customer:\" as C\nobject \":Order:\" as O\nC -- O\nC --> O : 1: create\n@enduml\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type - the page is a 404 and the navigation lists none - but this build draws one with the object diagram's vocabulary: objects for the lifelines, arrows for the links, and the sequence number in the arrow's label, `C --> O : 1: create`. Lifelines, links and the numbers read back; the nesting a dotted number like `1.1` suggests is a claim about the design, so the model keeps the number as written and says nothing about the tree.\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type; this is an object-diagram drawing of one. Lifelines, links and the sequence numbers are carried; the nesting a dotted number like 1.1 suggests is not drawn and not claimed."
+  },
+  "uml review: a communication model through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/uml/review/v1",
+    "modelHash": "257d05b4a30116d7a8138ee9ff9af43bd78ae71752567675659b5c9cb0a0a425",
+    "summary": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 0,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
+    "findings": [],
+    "family": "communication",
+    "source": "model",
+    "roundTrip": {
+      "ok": true,
+      "diffs": []
+    },
+    "nextSteps": [
+      "A communication diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=pass  no error or warning findings  ok=true  modelHash=257d05b4a301… hashSpec=v1 states=0 transitions=0 errors=0 warnings=0\nFINDINGS  none — 1 note(s) under WARNING say what could not be carried\n\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type; this is an object-diagram drawing of one. Lifelines, links and the sequence numbers are carried; the nesting a dotted number like 1.1 suggests is not drawn and not claimed.\n\nNEXT  A communication diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "uml review: a model from another family": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first error: UML041_MODEL_FAMILY_MISMATCH)",
+    "schema": "model-everything/uml/review/v1",
+    "summary": {
+      "errors": 1,
+      "warnings": 0,
+      "info": 0,
+      "states": 0,
+      "events": 0,
+      "transitions": 0,
+      "terminalStates": 0,
+      "reachableStates": 0,
+      "documentedStates": 0
+    },
     "findings": [
       {
-        "code": "UML_PARSE_SYNTHETIC_EVENT",
-        "severity": "warning",
-        "message": "arrow BUSY -> Idle carries no label; it was named \"t_BUSY_Idle\". Label the arrow as `event [guard] / actions` so the model keeps the real event name."
+        "code": "UML041_MODEL_FAMILY_MISMATCH",
+        "severity": "error",
+        "message": "the model supplied is not a communication diagram, so it cannot be compared with this diagram: this is not a communication model: a communication diagram is lifelines, links and numbered messages, and this model declares none of them (it declares architecture). Pass the lifelines/links/messages model, or review it as the family it belongs to.",
+        "detail": "Review the model with the family it belongs to, or pass a communication diagram model alongside this diagram."
       }
     ],
-    "family": "state",
-    "body": "model-everything/uml/parse/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  modelHash=f19e2d588636… hashSpec=v1\nPARSE  notation=mermaid  kind=state  family=state\nMODEL  {\"schemaVersion\":1,\"init\":\"Idle\",\"states\":[{\"id\":\"Idle\"},{\"id\":\"BUSY\",\"terminal\":true}],\"transitions\":[{\"from\":\"Idle\",\"event\":\"go\",\"to\":\"BUSY\"},{\"from\":\"BUSY\",\"event\":\"t_BUSY_Idle\",\"to\":\"Idle\"}]}\nFINDINGS  1 total (0 error, 1 warning): UML_PARSE_SYNTHETIC_EVENT x1\n\n  [warning/UML_PARSE_SYNTHETIC_EVENT] arrow BUSY -> Idle carries no label; it was named \"t_BUSY_Idle\". Label the arrow as `event [guard] / actions` so the model keeps the real event name."
+    "family": "communication",
+    "source": "model",
+    "nextSteps": [
+      "Resolve the error findings first: a diagram that disagrees with itself misleads every later reader.",
+      "A communication diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.",
+      "A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+    ],
+    "body": "model-everything/uml/review/v1  verdict=fail  1 error finding(s) (first error: UML041_MODEL_FAMILY_MISMATCH)  ok=true  states=0 transitions=0 errors=1 warnings=0\nFINDINGS  1 total (1 error, 0 warning): UML041_MODEL_FAMILY_MISMATCH x1\n\n  [error/UML041_MODEL_FAMILY_MISMATCH] the model supplied is not a communication diagram, so it cannot be compared with this diagram: this is not a communication model: a communication diagram is lifelines, links and numbered messages, and this model declares none of them (it declares architecture). Pass the lifelines/links/messages model, or review it as the family it belongs to.\n\nNEXT  Resolve the error findings first: a diagram that disagrees with itself misleads every later reader.\nNEXT  A communication diagram describes structure or intent, not behaviour: model the flow as a state or activity diagram and let model_verify check that one.\nNEXT  A diagram is not evidence: cite the code or the requirement behind each element before presenting it as checked."
+  },
+  "structure: a component diagram through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first error: UML022_CYCLE)",
+    "schema": "model-everything/structure/v1",
+    "summary": {
+      "nodes": 3,
+      "edges": 2,
+      "containers": 0,
+      "isolated": 1,
+      "dangling": 0,
+      "cycles": 1,
+      "disallowedEdges": 0,
+      "layerViolations": 0,
+      "missingExpectedEdges": 0,
+      "errors": 1,
+      "warnings": 1,
+      "rules": 0
+    },
+    "findings": [
+      {
+        "code": "UML020_ISOLATED_NODE",
+        "severity": "warning",
+        "message": "1 node(s) have no edge at all: Island. Either they are dead entries or the diagram is missing their dependencies."
+      },
+      {
+        "code": "UML022_CYCLE",
+        "severity": "error",
+        "message": "the dependency graph has a directed cycle: UI → Core → UI. A cycle means no build order and no layering can hold."
+      }
+    ],
+    "nextSteps": [
+      "Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.",
+      "Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.",
+      "Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.",
+      "State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+    ],
+    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML022_CYCLE)  ok=true  errors=1 warnings=1\nFINDINGS  2 total (1 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: Island. Either they are dead entries or the diagram is missing their dependencies.\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: UI → Core → UI. A cycle means no build order and no layering can hold. evidence={\"cycle\":[\"UI\",\"Core\",\"UI\"]}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+  },
+  "structure: two levels through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "2 error finding(s) (first error: UML022_CYCLE)",
+    "schema": "model-everything/granularity/v1",
+    "summary": {
+      "diagrams": 2,
+      "roots": 1,
+      "pairs": 1,
+      "nodes": 6,
+      "edges": 4,
+      "inventedEdges": 0,
+      "missingEdges": 0,
+      "expandedEdges": 0,
+      "errors": 2,
+      "warnings": 1
+    },
+    "findings": [
+      {
+        "code": "UML020_ISOLATED_NODE",
+        "severity": "warning",
+        "message": "1 node(s) have no edge at all: Island. Either they are dead entries or the diagram is missing their dependencies."
+      },
+      {
+        "code": "UML022_CYCLE",
+        "severity": "error",
+        "message": "the dependency graph has a directed cycle: UI → Core → UI. A cycle means no build order and no layering can hold."
+      },
+      {
+        "code": "UML021_DANGLING_REFERENCE",
+        "severity": "error",
+        "message": "1 arrow endpoint(s) are used without ever being declared: UI. In a component diagram this is how a dependency on a component that does not exist stays invisible."
+      }
+    ],
+    "nextSteps": [
+      "Fix the refinement violations first: a level that invents or drops a parent-level dependency makes the hierarchy unusable as a rule source.",
+      "Reconcile the levels with the source-side scan: the diagram pair is consistent or not, and neither says anything about the code until it is scanned."
+    ],
+    "body": "model-everything/granularity/v1  verdict=fail  2 error finding(s) (first error: UML022_CYCLE)  ok=true  errors=2 warnings=1\nFINDINGS  3 total (2 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1 | UML021_DANGLING_REFERENCE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: Island. Either they are dead entries or the diagram is missing their dependencies. (system)\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: UI → Core → UI. A cycle means no build order and no layering can hold. (system) evidence={\"cycle\":[\"UI\",\"Core\",\"UI\"]}\n  [error/UML021_DANGLING_REFERENCE] 1 arrow endpoint(s) are used without ever being declared: UI. In a component diagram this is how a dependency on a component that does not exist stays invisible. (core) evidence={\"nodes\":[{\"id\":\"UI\",\"line\":5}]}\n\nNEXT  Fix the refinement violations first: a level that invents or drops a parent-level dependency makes the hierarchy unusable as a rule source.\nNEXT  Reconcile the levels with the source-side scan: the diagram pair is consistent or not, and neither says anything about the code until it is scanned."
   },
   "export: a model too large for the prism encoding": {
     "ok": false,

@@ -120,14 +120,14 @@ export const umlParseTool = defineTool({
       checkUmlIntent(args.intent as UmlIntent | undefined, 'parse')
       const result = parseUml(args.diagram, (args.notation ?? 'auto') as UmlNotation | 'auto')
       // The parser notes are the parse verdict: an ignored line is information the model does not carry, so
-      // ok: true only ever means the parser ran. They are findings, not only a separate `warnings` list, because
-      // the verdict counts them and the roster is where a reader looks: counting them in one place and listing
-      // them in none produced a report that said "1 warning finding(s)" above "FINDINGS none".
-      const findings = [...parseFindings(result), ...noteFindings(result)]
+      // ok: true only ever means the parser ran. They stay in `warnings` - the channel the schema reference names and
+      // the render side uses - and the body prints them, which is where the old contradiction lived: the verdict
+      // counted them while the roster said `FINDINGS none`.
+      const findings = parseFindings(result)
       return {
         ok: true,
         ran: true,
-        ...parseVerdict(findings),
+        ...parseVerdict(result, findings),
         schema: REPORT_SCHEMAS.umlParse,
         action: 'parse',
         notation: result.notation,
@@ -209,26 +209,10 @@ export const umlExplainLabelsTool = defineTool({
   },
 })
 
-/**
- * The parser's own notes, as findings.
- *
- * Each note is written `CODE: sentence` by the engine, so the split keeps the code a reader routes on and the
- * sentence a reader acts on. A note with no prefix still becomes a finding: an unsplit note is better than a
- * counted one that appears nowhere.
- */
-function noteFindings(result: UmlParseResult): UmlFinding[] {
-  return result.warnings.map((warning) => {
-    const match = /^([A-Z][A-Z0-9_]*):\s*([\s\S]*)$/.exec(warning)
-    const code = match?.[1] ?? 'UML_PARSE_NOTE'
-    const message = match?.[2] ?? warning
-    return { code, severity: 'warning' as const, message }
-  })
-}
-
-/** The parse verdict counts parser notes as findings: an ignored line is information the model does not carry. */
-function parseVerdict(findings: UmlFinding[]): VerdictSummary {
+/** The parse verdict counts parser notes as warnings: an ignored line is information the model does not carry. */
+function parseVerdict(result: UmlParseResult, findings: UmlFinding[]): VerdictSummary {
   const errors = findings.filter((finding) => finding.severity === 'error').length
-  const warnings = findings.filter((finding) => finding.severity === 'warning').length
+  const warnings = findings.filter((finding) => finding.severity === 'warning').length + result.warnings.length
   const firstCode = findings.find((finding) => finding.severity === 'error')?.code ?? findings.find((finding) => finding.severity === 'warning')?.code
   return verdictOf(errors, warnings, firstCode)
 }
