@@ -27,8 +27,9 @@ metadata:
 dsh 的 `readPluginMeta(specifier, parentURL)` 拿**完整说明符（含子路径）**去解析 `<specifier>/package.json` 与 `<specifier>/locale/en.json`，所以：
 
 - **插件的卡片名**在 `locale/{en,zh}.json` 的 `meta.title`；`package.json` 的 `dsh.displayName` **dsh 不读**（留着无害，别指望它）。本轮决定：中英都叫 **`dsh-model-everything`**。
-- **组件自己的卡片名**需要它自己的清单与文案：`gate/package.json`（只有 `name` / `description` / `type`，其中 `name` 是给人看的标题）+ `gate/locale/{en,zh}.json`，并在 `exports` 里导出 `./gate/package.json` 与 `./gate/locale/*.json`，`files` 里加上 `gate`。本轮决定：中文名 **「提示词注入增强」**，英文 "Prompt injection enhancement"（直译；"prompt injection" 在安全语境里另有含义，若日后撞车，英文侧改成 "Injected routing prompt"）。
-- `tests/gate` 钉住这三件事：插件卡片中英标题都是包名、组件清单与两份 locale 都在且被导出、中文标题就是「提示词注入增强」。
+- **组件自己的卡片名**需要它自己的清单与文案：`gate/package.json`（只有 `name` / `description` / `type`，其中 `name` 是给人看的标题）+ `gate/locale/{en,zh}.json`，并在 `exports` 里导出 `./gate/package.json` 与 `./gate/locale/*.json`，`files` 里加上 `gate`。本轮决定：中文名 **「提示词注入增强」**，英文 **"Injected routing prompt"**。
+  英文**不是**直译：直译 "Prompt injection enhancement" 里的 "prompt injection" 在这个领域指**提示注入攻击**，一个安全威胁。所以英文卡片说的是它注入的是什么（routing prompt），而不是"提示注入"。
+- `tests/gate` 钉住这几件事：插件卡片中英标题都是包名、组件清单与两份 locale 都在且被导出、两个卡片名各自就是决定的那两个字符串（改名字会让测试红，因为名字是决定，不是默认值）。
 
 ## 为什么要它
 
