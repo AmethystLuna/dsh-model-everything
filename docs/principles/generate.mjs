@@ -36,6 +36,7 @@ const PRINCIPLES = [
     title: 'What mathematics can prevent, do not wait to discover by hitting it',
     source: '.github/memory/design/robustness-audit.md',
     quote: '能用数学挡住的异常，就不要靠撞上才发现；而「异常处理」本身也是建模的审查结果。',
+    gloss: "An anomaly that mathematics can prevent should not be discovered by running into it, and handling an anomaly is itself a review result about the model.",
     because: 'Three layers, in the order they apply: a closed shape (malformed input becomes a coded report), algebraic degeneracy (valid JSON with invalid logic is refused with its reason), and decidability (whether the model can be decided at all is computed, not discovered by running out of budget). Handling an anomaly is itself a review result about the model, which is why `S6_UNBOUNDED_VARIABLE` is an accusation against the model and not a note about the search.',
     enforced: 'tests/engine, tests/tool-boundary, tests/baseline',
   },
@@ -44,6 +45,7 @@ const PRINCIPLES = [
     title: 'A mathematical criterion\'s false positive costs more than its false negative',
     source: '.github/memory/design/robustness-audit.md',
     quote: '数学判据的假阳性比假阴性更伤，因为它指控一个正确的模型。',
+    gloss: "A mathematical criterion false positive costs more than its false negative, because it accuses a model that is correct.",
     because: 'The first decidability criterion reported monotone cycles on unreachable islands - defects the analysis invented rather than found. So the criterion is narrowed on purpose: only `inc`/`dec` monotonicity, `set` neither proves nor breaks, only cycles reachable from the initial state.',
     enforced: 'tests/engine',
   },
@@ -52,6 +54,7 @@ const PRINCIPLES = [
     title: 'An answer comes from the model, not from a budget that ran out',
     source: '.github/memory/design/robustness-audit.md',
     quote: '是**模型的性质，不是预算的性质**',
+    gloss: "It is a property of the model, not of the budget.",
     because: 'Raising a limit is not a fix. An unbounded reachable set makes every limit undeciding, so the defect is reported as the model property it is.',
     enforced: 'tests/engine (`S6_UNBOUNDED_VARIABLE`)',
   },
@@ -100,6 +103,7 @@ const PRINCIPLES = [
     title: 'A document is written from a mind map, not beside one',
     source: '.github/memory/history/open-work.md',
     quote: '所有文档类内容的更新，都必须先有思维导图作为行文结构的指导',
+    gloss: "Every documentation update must first have a mind map to guide its structure, and only then be written.",
     because: 'A user instruction, and it earned its place: the maps changed what was written rather than restating it, and twice they exposed a number the prose had wrong.',
     enforced: 'the five generated maps under docs/',
   },
@@ -171,7 +175,8 @@ const PRINCIPLES = [
     id: 'translate-prose-not-identifiers',
     title: 'Translate the prose, never the identifiers',
     source: 'docs/README.md',
-    quote: '标识符',
+    quote: '散文用中文，标识符逐字保持英文。',
+    gloss: 'Prose in Chinese; identifiers stay English, character for character.',
     because: 'A translated field name or code names nothing, so the document stops pointing at the thing it describes.',
     enforced: 'tests/translation',
   },
@@ -180,6 +185,7 @@ const PRINCIPLES = [
     title: 'Who reads a document decides its language',
     source: 'docs/README.md',
     quote: '语言按**读者**定',
+    gloss: "The language is decided by the reader.",
     because: 'The skills are English because a model reads them and the catalog truncates at 500 characters; `docs/` is Chinese because a person reads it. This was drift before it was a decision.',
     enforced: 'tests/translation, tests/documentation',
   },
@@ -188,6 +194,7 @@ const PRINCIPLES = [
     title: 'The surface a model routes on is the truncated one; the one it acts through is not',
     source: 'docs/usage/guide.md',
     quote: '被截断的那一面，正是模型用来路由的那一面',
+    gloss: "The surface that is truncated is the one the model routes on.",
     because: 'A trigger word added to a catalog row pushes another one out of the visible 500 characters, while a tool description has no ceiling. Where a sentence goes is a mechanism question, not a style one.',
     enforced: 'tests/usage',
   },
@@ -195,11 +202,25 @@ const PRINCIPLES = [
 
 // ------------------------------------------------------------------ verify before writing --
 
+/**
+ * A source's text with markdown emphasis removed.
+ *
+ * A quote may carry `**` because the sentence it comes from does, and the source may bold a different part
+ * of it. Comparing the raw strings reported three principles as unbacked when they were backed exactly -
+ * the check was wrong, not the citations.
+ */
+const plain = (value) => value.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim()
+
 const problems = []
 for (const principle of PRINCIPLES) {
   if (!existsSync(repo + principle.source)) { problems.push(principle.id + ': ' + principle.source + ' does not exist'); continue }
-  const text = readFileSync(repo + principle.source, 'utf8')
-  if (!text.includes(principle.quote)) problems.push(principle.id + ': the source does not contain ' + JSON.stringify(principle.quote))
+  const text = plain(readFileSync(repo + principle.source, 'utf8'))
+  if (!text.includes(plain(principle.quote))) problems.push(principle.id + ': the source does not contain ' + JSON.stringify(principle.quote))
+  // A Chinese quote inside an English document needs its meaning beside it, or a reader hits a wall. The
+  // quote stays verbatim - that is the discipline of this file - and the gloss carries the sense.
+  if (/[\u4e00-\u9fff]/.test(principle.quote) && principle.gloss === undefined) {
+    problems.push(principle.id + ': the quote is Chinese and carries no English gloss')
+  }
   // `enforced` is a sentence, so every suite name inside it is checked rather than the whole string:
   // a principle can be held by several suites, and one of them going missing is what this catches.
   for (const suite of new Set([...String(principle.enforced ?? '').matchAll(/tests\/([a-z-]+)/g)].map((match) => match[1]))) {
@@ -228,6 +249,11 @@ lines.push('')
 lines.push('Read it when a change feels like a judgement call. Most of these cost this repository a real defect')
 lines.push('first, and the cost is recorded with the rule.')
 lines.push('')
+lines.push('Some sources are written in Chinese, so some quotes are: a quote is verbatim or it is not a quote.')
+lines.push('Each of those carries an English gloss underneath. The gloss gives the sense rather than a literal')
+lines.push('rendering, because its job is to keep a reader of this document from being stopped by a sentence')
+lines.push('they cannot read.')
+lines.push('')
 lines.push('## Every one of them')
 lines.push('')
 lines.push('| Principle | Stated in | Kept honest by |')
@@ -245,7 +271,13 @@ lines.push('')
 for (const principle of PRINCIPLES) {
   lines.push('### ' + principle.title)
   lines.push('')
+  // The quote is verbatim, in whatever language the source uses; the gloss follows it so a reader of this
+  // English document is not stopped by a Chinese sentence in the middle of one.
   lines.push('> ' + principle.quote)
+  if (principle.gloss !== undefined) {
+    lines.push('>')
+    lines.push('> ' + principle.gloss)
+  }
   lines.push('>')
   lines.push('> — [`' + principle.source + '`](../' + principle.source + ')')
   lines.push('')

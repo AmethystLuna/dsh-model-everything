@@ -8,6 +8,11 @@ matching the file it came from.
 Read it when a change feels like a judgement call. Most of these cost this repository a real defect
 first, and the cost is recorded with the rule.
 
+Some sources are written in Chinese, so some quotes are: a quote is verbatim or it is not a quote.
+Each of those carries an English gloss underneath. The gloss gives the sense rather than a literal
+rendering, because its job is to keep a reader of this document from being stopped by a sentence
+they cannot read.
+
 ## Every one of them
 
 | Principle | Stated in | Kept honest by |
@@ -64,6 +69,8 @@ Kept honest by `tests/engine`.
 
 > 能用数学挡住的异常，就不要靠撞上才发现；而「异常处理」本身也是建模的审查结果。
 >
+> An anomaly that mathematics can prevent should not be discovered by running into it, and handling an anomaly is itself a review result about the model.
+>
 > — [`.github/memory/design/robustness-audit.md`](../.github/memory/design/robustness-audit.md)
 
 Three layers, in the order they apply: a closed shape (malformed input becomes a coded report), algebraic degeneracy (valid JSON with invalid logic is refused with its reason), and decidability (whether the model can be decided at all is computed, not discovered by running out of budget). Handling an anomaly is itself a review result about the model, which is why `S6_UNBOUNDED_VARIABLE` is an accusation against the model and not a note about the search.
@@ -74,6 +81,8 @@ Kept honest by `tests/engine, tests/tool-boundary, tests/baseline`.
 
 > 数学判据的假阳性比假阴性更伤，因为它指控一个正确的模型。
 >
+> A mathematical criterion false positive costs more than its false negative, because it accuses a model that is correct.
+>
 > — [`.github/memory/design/robustness-audit.md`](../.github/memory/design/robustness-audit.md)
 
 The first decidability criterion reported monotone cycles on unreachable islands - defects the analysis invented rather than found. So the criterion is narrowed on purpose: only `inc`/`dec` monotonicity, `set` neither proves nor breaks, only cycles reachable from the initial state.
@@ -83,6 +92,8 @@ Kept honest by `tests/engine`.
 ### An answer comes from the model, not from a budget that ran out
 
 > 是**模型的性质，不是预算的性质**
+>
+> It is a property of the model, not of the budget.
 >
 > — [`.github/memory/design/robustness-audit.md`](../.github/memory/design/robustness-audit.md)
 
@@ -143,6 +154,8 @@ Kept honest by `tests/routing-map, tests/report-reading, tests/usage, tests/feat
 ### A document is written from a mind map, not beside one
 
 > 所有文档类内容的更新，都必须先有思维导图作为行文结构的指导
+>
+> Every documentation update must first have a mind map to guide its structure, and only then be written.
 >
 > — [`.github/memory/history/open-work.md`](../.github/memory/history/open-work.md)
 
@@ -232,7 +245,9 @@ Kept honest by `tests/skills`.
 
 ### Translate the prose, never the identifiers
 
-> 标识符
+> 散文用中文，标识符逐字保持英文。
+>
+> Prose in Chinese; identifiers stay English, character for character.
 >
 > — [`docs/README.md`](../docs/README.md)
 
@@ -244,6 +259,8 @@ Kept honest by `tests/translation`.
 
 > 语言按**读者**定
 >
+> The language is decided by the reader.
+>
 > — [`docs/README.md`](../docs/README.md)
 
 The skills are English because a model reads them and the catalog truncates at 500 characters; `docs/` is Chinese because a person reads it. This was drift before it was a decision.
@@ -253,6 +270,8 @@ Kept honest by `tests/translation, tests/documentation`.
 ### The surface a model routes on is the truncated one; the one it acts through is not
 
 > 被截断的那一面，正是模型用来路由的那一面
+>
+> The surface that is truncated is the one the model routes on.
 >
 > — [`docs/usage/guide.md`](../docs/usage/guide.md)
 

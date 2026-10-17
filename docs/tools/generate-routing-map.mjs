@@ -94,25 +94,27 @@ lines.push('## The decision the model makes, and what it can see')
 lines.push('')
 lines.push('```mermaid')
 lines.push('mindmap')
-lines.push('  root(("a question arrives"))')
-lines.push('    gate1["GATE 1 - which skill answers this?"]')
-lines.push('      sees1["sees: 6 skill rows"]')
-lines.push('      budget["each row = description only, cut at 500 chars"]')
-lines.push('      blind1["cannot see: whenToUse, the body, the tool table"]')
-lines.push('    gate2["GATE 2 - which tool does it?"]')
-lines.push('      sees2["sees: every registered tool schema"]')
-lines.push('      whole["description and parameters come through whole"]')
-lines.push('      blind2["cannot see: why the description says what it says"]')
-lines.push('    gate3["GATE 3 - what do I put in the model?"]')
-lines.push('      schema["sees: the parameter schema, field by field"]')
-lines.push('      closed["closed schema: an unknown key is refused, not ignored"]')
-lines.push('      story["the body it just loaded is where the field semantics live"]')
+lines.push('  root((a question arrives))')
+lines.push('    GATE 1 - which skill answers this?')
+lines.push('      sees: 6 skill rows')
+lines.push('      each row = description only, cut at 500 chars')
+lines.push('      cannot see: whenToUse, the body, the tool table')
+lines.push('    GATE 2 - which tool does it?')
+lines.push('      sees: every registered tool schema')
+lines.push('      description and parameters come through whole')
+lines.push('      cannot see: why the description says what it says')
+lines.push('    GATE 3 - what do I put in the model?')
+lines.push('      sees: the parameter schema, field by field')
+lines.push('      closed schema: an unknown key is refused, not ignored')
+lines.push('      the body it just loaded is where the field semantics live')
 for (const skill of skills) {
   const label = skill.name.replace('model-everything', 'me')
-  lines.push('    ' + label + '["' + label + ' - ' + String(skill.triggers.length) + ' corpus trigger(s)"]')
-  lines.push('      len["row: ' + String(skill.length) + ' of ' + String(SKILL_BUDGET) + ' chars"]')
-  for (const tool of TOOL_OWNER[skill.name] ?? []) lines.push('      ' + tool + '["tool: ' + tool + '"]')
-  for (const [destination, count] of skill.sends) lines.push('      ' + destination.replaceAll('-', '_') + '["near miss x' + String(count) + ' -> ' + destination.replace('model-everything', 'me') + '"]')
+  // A mindmap node's label IS the line. `id["label"]` is flowchart syntax: written that way, sixty-seven
+  // nodes render as one crowded blob. Backticks only where the label carries parser-significant characters.
+  lines.push('    `' + label + ' - ' + String(skill.triggers.length) + ' corpus trigger(s)`')
+  lines.push('      `row: ' + String(skill.length) + ' of ' + String(SKILL_BUDGET) + ' chars`')
+  for (const tool of TOOL_OWNER[skill.name] ?? []) lines.push('      tool: ' + tool)
+  for (const [destination, count] of skill.sends) lines.push('      `near miss x' + String(count) + ' -> ' + destination.replace('model-everything', 'me') + '`')
 }
 lines.push('```')
 lines.push('')
@@ -177,8 +179,13 @@ lines.push('')
 
 // The map is read by a renderer, so a malformed node is a broken deliverable rather than a
 // cosmetic problem. Refuse to emit one.
+//
+// The accepted shape is the mindmap one: an indent and a label, a bare `root((...))` for the root, and a
+// backtick span where a label carries syntax characters. The earlier pattern required `id["label"]`, so it
+// was enforcing the flowchart form that renders badly - a validator is a specification, and this one
+// specified the bug.
 const mermaid = lines.slice(lines.indexOf('```mermaid') + 1, lines.lastIndexOf('```'))
-const nodeLine = /^[A-Za-z0-9_-]+(\[".*"\]|\(\(".*"\)\))$/
+const nodeLine = /^(root\(\(.+\)\)|`[^`]+`|[^[\]{}()>]+)$/
 const malformed = mermaid.filter((line) => line.trim() !== '' && line.trim() !== 'mindmap' && !nodeLine.test(line.trim()))
 if (malformed.length > 0) throw new Error('malformed mermaid node(s): ' + malformed.slice(0, 3).join(' | '))
 const text = lines.join('\n')

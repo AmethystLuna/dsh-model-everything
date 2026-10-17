@@ -183,7 +183,7 @@ And the gates around it:
 | `translation` | 7 | every guide with a translation has the same headings |
 | `documentation` | 7 | both READMEs mention everything that must be reachable |
 | `contributing` | 8 | the contribution mind map is the one the repository produces now |
-| `routing-map` | 3 | the routing map is the one the catalog produces now |
+| `routing-map` | 4 | the routing map is the one the catalog produces now |
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 26 | parse: declarations, aliases, labels, containers and nesting |
 | `baseline` | 10 | self-baseline: the same report adds nothing and removes nothing |

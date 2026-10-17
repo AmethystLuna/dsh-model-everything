@@ -8,74 +8,74 @@ or the map starts describing a routing contract that no longer exists.
 
 ```mermaid
 mindmap
-  root(("a question arrives"))
-    gate1["GATE 1 - which skill answers this?"]
-      sees1["sees: 6 skill rows"]
-      budget["each row = description only, cut at 500 chars"]
-      blind1["cannot see: whenToUse, the body, the tool table"]
-    gate2["GATE 2 - which tool does it?"]
-      sees2["sees: every registered tool schema"]
-      whole["description and parameters come through whole"]
-      blind2["cannot see: why the description says what it says"]
-    gate3["GATE 3 - what do I put in the model?"]
-      schema["sees: the parameter schema, field by field"]
-      closed["closed schema: an unknown key is refused, not ignored"]
-      story["the body it just loaded is where the field semantics live"]
-    me["me - 7 corpus trigger(s)"]
-      len["row: 497 of 500 chars"]
-      model_verify["tool: model_verify"]
-      model_compose_verify["tool: model_compose_verify"]
-      model_export["tool: model_export"]
-      report_diff["tool: report_diff"]
-      model_everything_concurrency["near miss x2 -> me-concurrency"]
-      model_everything_datamodel["near miss x2 -> me-datamodel"]
-      model_everything_structure["near miss x2 -> me-structure"]
-      model_everything_uml["near miss x2 -> me-uml"]
-    me-concurrency["me-concurrency - 5 corpus trigger(s)"]
-      len["row: 341 of 500 chars"]
-      model_concurrency_scan["tool: model_concurrency_scan"]
-      model_everything["near miss x1 -> me"]
-      model_everything_datamodel["near miss x1 -> me-datamodel"]
-      model_everything_uml["near miss x1 -> me-uml"]
-      model_everything_structure["near miss x1 -> me-structure"]
-    me-datamodel["me-datamodel - 8 corpus trigger(s)"]
-      len["row: 483 of 500 chars"]
-      model_datamodel_verify["tool: model_datamodel_verify"]
-      model_everything_uml["near miss x2 -> me-uml"]
-      model_everything_concurrency["near miss x2 -> me-concurrency"]
-      model_everything["near miss x2 -> me"]
-      model_everything_structure["near miss x2 -> me-structure"]
-    me-design["me-design - 6 corpus trigger(s)"]
-      len["row: 478 of 500 chars"]
-      model_design_review["tool: model_design_review"]
-      model_everything_structure["near miss x2 -> me-structure"]
-      model_everything_uml["near miss x1 -> me-uml"]
-      model_everything_concurrency["near miss x1 -> me-concurrency"]
-    me-report-reading["me-report-reading - 6 corpus trigger(s)"]
-      len["row: 420 of 500 chars"]
-      model_everything["near miss x1 -> me"]
-      model_everything_concurrency["near miss x1 -> me-concurrency"]
-      model_everything_datamodel["near miss x1 -> me-datamodel"]
-      model_everything_structure["near miss x1 -> me-structure"]
-      model_everything_uml["near miss x1 -> me-uml"]
-    me-structure["me-structure - 7 corpus trigger(s)"]
-      len["row: 476 of 500 chars"]
-      uml_structure_verify["tool: uml_structure_verify"]
-      model_everything_uml["near miss x2 -> me-uml"]
-      model_everything_concurrency["near miss x2 -> me-concurrency"]
-      model_everything["near miss x2 -> me"]
-      model_everything_datamodel["near miss x1 -> me-datamodel"]
-      model_everything_design["near miss x1 -> me-design"]
-      model_everything_report_reading["near miss x1 -> me-report-reading"]
-    me-uml["me-uml - 9 corpus trigger(s)"]
-      len["row: 428 of 500 chars"]
-      uml_render["tool: uml_render"]
-      uml_parse["tool: uml_parse"]
-      uml_review["tool: uml_review"]
-      uml_explain_labels["tool: uml_explain_labels"]
-      model_everything_structure["near miss x3 -> me-structure"]
-      model_everything["near miss x2 -> me"]
-      model_everything_datamodel["near miss x2 -> me-datamodel"]
+  root((a question arrives))
+    GATE 1 - which skill answers this?
+      sees: 6 skill rows
+      each row = description only, cut at 500 chars
+      cannot see: whenToUse, the body, the tool table
+    GATE 2 - which tool does it?
+      sees: every registered tool schema
+      description and parameters come through whole
+      cannot see: why the description says what it says
+    GATE 3 - what do I put in the model?
+      sees: the parameter schema, field by field
+      closed schema: an unknown key is refused, not ignored
+      the body it just loaded is where the field semantics live
+    `me - 7 corpus trigger(s)`
+      `row: 497 of 500 chars`
+      tool: model_verify
+      tool: model_compose_verify
+      tool: model_export
+      tool: report_diff
+      `near miss x2 -> me-concurrency`
+      `near miss x2 -> me-datamodel`
+      `near miss x2 -> me-structure`
+      `near miss x2 -> me-uml`
+    `me-concurrency - 5 corpus trigger(s)`
+      `row: 341 of 500 chars`
+      tool: model_concurrency_scan
+      `near miss x1 -> me`
+      `near miss x1 -> me-datamodel`
+      `near miss x1 -> me-uml`
+      `near miss x1 -> me-structure`
+    `me-datamodel - 8 corpus trigger(s)`
+      `row: 483 of 500 chars`
+      tool: model_datamodel_verify
+      `near miss x2 -> me-uml`
+      `near miss x2 -> me-concurrency`
+      `near miss x2 -> me`
+      `near miss x2 -> me-structure`
+    `me-design - 6 corpus trigger(s)`
+      `row: 478 of 500 chars`
+      tool: model_design_review
+      `near miss x2 -> me-structure`
+      `near miss x1 -> me-uml`
+      `near miss x1 -> me-concurrency`
+    `me-report-reading - 6 corpus trigger(s)`
+      `row: 420 of 500 chars`
+      `near miss x1 -> me`
+      `near miss x1 -> me-concurrency`
+      `near miss x1 -> me-datamodel`
+      `near miss x1 -> me-structure`
+      `near miss x1 -> me-uml`
+    `me-structure - 7 corpus trigger(s)`
+      `row: 476 of 500 chars`
+      tool: uml_structure_verify
+      `near miss x2 -> me-uml`
+      `near miss x2 -> me-concurrency`
+      `near miss x2 -> me`
+      `near miss x1 -> me-datamodel`
+      `near miss x1 -> me-design`
+      `near miss x1 -> me-report-reading`
+    `me-uml - 9 corpus trigger(s)`
+      `row: 428 of 500 chars`
+      tool: uml_render
+      tool: uml_parse
+      tool: uml_review
+      tool: uml_explain_labels
+      `near miss x3 -> me-structure`
+      `near miss x2 -> me`
+      `near miss x2 -> me-datamodel`
 ```
 
 ## Who owns which question (from the corpus)

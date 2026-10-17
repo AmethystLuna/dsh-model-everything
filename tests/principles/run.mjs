@@ -28,10 +28,13 @@ test('the principles index is the one the repository produces now', () => {
 
 test('every quoted source exists and really contains the quote', () => {
   const index = readFileSync(repo + 'docs/principles.md', 'utf8')
-  // Each section carries its quote as a blockquote followed by the file it came from.
-  const sections = [...index.matchAll(/^> (.+)\n>\n> — \[`([^`]+)`\]/gm)]
+  // A principle renders as a blockquote, an optional English gloss, then the file. Only the FIRST
+  // blockquote line is the quotation: the gloss is this document's own translation, and checking it against
+  // the source reported eight principles as unbacked when the citations were right.
+  const sections = [...index.matchAll(/^> (.+)\n(?:>\n> (.+)\n)?>\n> — \[`([^`]+)`\]/gm)]
   if (sections.length === 0) throw new Error('the index carries no quoted principle; this check would pass vacuously')
-  for (const [, quote, source] of sections) {
+  let glossed = 0
+  for (const [, quote, gloss, source] of sections) {
     const path = source.replace(/^\.\.\//, '')
     if (!existsSync(repo + path)) throw new Error('a principle quotes ' + path + ', which does not exist')
     const text = readFileSync(repo + path, 'utf8')
@@ -40,7 +43,14 @@ test('every quoted source exists and really contains the quote', () => {
     if (!normalised(text).includes(normalised(quote))) {
       throw new Error(path + ' no longer contains the quoted words: ' + quote.slice(0, 60))
     }
+    // A Chinese quote has to carry its gloss, or an English document stops a reader mid-sentence.
+    if (/[\u4e00-\u9fff]/.test(quote)) {
+      glossed += 1
+      if (gloss === undefined) throw new Error('a Chinese quote carries no English gloss: ' + quote.slice(0, 40))
+      if (/[\u4e00-\u9fff]/.test(gloss)) throw new Error('the gloss is not in English: ' + gloss.slice(0, 40))
+    }
   }
+  if (glossed === 0) throw new Error('no Chinese quote was found, so the gloss check would pass vacuously')
 })
 
 test('the index is reachable from where a reader starts', () => {
