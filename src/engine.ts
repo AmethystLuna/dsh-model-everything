@@ -1412,6 +1412,11 @@ function nothingToExamine(id: string, model: LogicModelV1): string | undefined {
   const invariantsOfKind = (kind: string) => (model.invariants ?? []).filter((invariant) => invariant.kind === kind).length
   switch (id) {
     case 'S7':
+      // S7 decides state predicates. A roster of path-property invariants alone leaves it nothing to decide,
+      // and "All invariants hold" over that roster is a pass over nothing: the verdict belongs to A9-A13.
+      return (model.invariants ?? []).filter((invariant) => !isPathPropertyInvariant(invariant)).length === 0
+        ? 'no never-states or var-in-range invariant was declared'
+        : undefined
     case 'A7':
       return (model.invariants ?? []).length === 0 ? 'no invariants were declared' : undefined
     case 'A2':
@@ -1947,6 +1952,15 @@ interface InvariantViolation {
   undecided?: boolean
 }
 
+/**
+ * Why a walk that stopped at its budget reports undecided rather than a verdict. One phrasing for
+ * every invariant walk: a reader who sees two different sentences for the same situation starts
+ * looking for a difference between them.
+ */
+function invariantCapReason(options: NormalizedOptions): string {
+  return 'the walk stopped at the ' + String(options.maxStates) + ' state budget before it finished'
+}
+
 /** Whether a `var-in-range` `when` scope selects this runtime state. */
 function whenScopeHolds(when: InvariantWhen, runtime: RuntimeState): boolean {
   return isStateGuard(when) ? when.state === runtime.state : evalGuard(when, runtime.vars)
@@ -1978,9 +1992,12 @@ function shortestViolationForInvariant(model: LogicModelV1, options: NormalizedO
   const visited = new Set<string>([runtimeKey(init)])
   const queue: Array<{ runtime: RuntimeState; path: PathStep[] }> = [{ runtime: init, path: [] }]
   let steps = 0
+  // Whether the walk stopped on its budget rather than on an exhausted space. The two used to share the
+  // `undefined` return, so S7 answered "All invariants hold" for a search that never finished.
+  let capped = false
   while (queue.length > 0) {
     const entry = queue.shift()!
-    if (++steps > options.maxStates) break
+    if (++steps > options.maxStates) { capped = true; break }
     for (const event of allEvents(model)) {
       for (const next of stepRuntime(model, entry.runtime, event)) {
         const key = runtimeKey(next)
@@ -1994,6 +2011,7 @@ function shortestViolationForInvariant(model: LogicModelV1, options: NormalizedO
       }
     }
   }
+  if (capped) return { invariant, path: [], reason: invariantCapReason(options), undecided: true }
   return undefined
 }
 
@@ -2106,9 +2124,10 @@ function shortestEventBeforeStateViolation(model: LogicModelV1, options: Normali
   const visited = new Set<string>([key(init, false)])
   const queue: Array<{ runtime: RuntimeState; seen: boolean; path: PathStep[] }> = [{ runtime: init, seen: false, path: [] }]
   let steps = 0
+  let capped = false
   while (queue.length > 0) {
     const entry = queue.shift()!
-    if (++steps > options.maxStates) break
+    if (++steps > options.maxStates) { capped = true; break }
     for (const event of allEvents(model)) {
       for (const next of stepRuntime(model, entry.runtime, event)) {
         const seen = entry.seen || event === invariant.event
@@ -2123,13 +2142,21 @@ function shortestEventBeforeStateViolation(model: LogicModelV1, options: Normali
       }
     }
   }
+  // Same cap, same answer: this walk is S7's too, so an unfinished search here must not read as a pass.
+  if (capped) return { invariant, path: [], reason: invariantCapReason(options), undecided: true }
   return undefined
 }
 
 function runInvariants(model: LogicModelV1, options: NormalizedOptions, includePathProperties = false): InvariantViolation[] {
   const violations: InvariantViolation[] = []
   for (const invariant of model.invariants ?? []) {
-    const violation = includePathProperties && isPathPropertyInvariant(invariant)
+    // A path property is not a predicate of one runtime state, so without `includePathProperties` this loop
+    // has nothing to say about it. Walking the space anyway was harmless only while a cap read as a pass: the
+    // walk can never find a violation (the predicate holds for these kinds by construction), so once it
+    // reports its budget honestly it reports undecided about a question it was never asked. S7's roster is
+    // the state kinds; A9-A13 and D2 decide the rest.
+    if (!includePathProperties && isPathPropertyInvariant(invariant)) continue
+    const violation = isPathPropertyInvariant(invariant)
       ? pathPropertyViolation(model, options, invariant)
       : shortestViolationForInvariant(model, options, invariant)
     if (violation !== undefined) violations.push(violation)
