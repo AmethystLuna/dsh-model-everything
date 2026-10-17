@@ -94,6 +94,28 @@ metadata:
 - 自报是弱证据：第 48 条（`"our README claims the CLI is backwards compatible with v1 flags"`）的回答是完整的方法论，但**只有补问一次才拿到 `SKILLS LOADED` 行**。少一次补问，它就变成"未报告"，而不是"对"。
 - 样本由规则推出，因此**不含**我们最关心的那条修复用例（`"draw the class hierarchy as a diagram"` 不在 13 条里），所以文本修复另做了一次单点回归（见下）。
 
+## 注入开关的 A/B：四条配对用例（2026-10-17 夜）
+
+同一个 prompt 跑两次，唯一差别是门禁的 `enabled`。开关不是手点的：装了一个**只做 row-id 覆盖**的小 bundle（`id: dsh-model-everything-gate` + `config.enabled: true`）把它打开，测完卸载回到默认。注入**真的发生了**——那条 `<EXTREMELY_IMPORTANT>` 出现在我自己的会话里，`status` 从 false 变 true 再变回 false。
+
+| 用例 | 期望技能 | 开：技能 / 工具 | 关：技能 / 工具 |
+|---|---|---|---|
+| 状态机：RFC 正文说 DONE 是终态，图上却有 `DONE --> DONE : retry` | model-everything | model-everything + uml / `uml_parse` + `model_verify` | **none** / `model_verify` |
+| 部署图：只有 db 能直接碰 postgres | structure | structure / `uml_structure_verify` | structure / `uml_structure_verify` |
+| 迁移：4M 行的表加一个 `NOT NULL` 列 | datamodel | **none** / none | **none** / none |
+| 并发：lock-free 环形缓冲 + ISR 里的原子自增 | concurrency | concurrency / `model_concurrency_scan` | concurrency / `model_concurrency_scan` |
+
+**工具 3/4 vs 3/4，技能 3/4 vs 2/4。**差的那一条是状态机。
+
+要分两层读：
+
+- **工具那一层没有被改变。**工具描述本来就在每一轮的上下文里，所以两种条件下模型都会去调 `model_verify`、`uml_structure_verify`、`model_concurrency_scan`。**门禁不是让插件变得可用的东西。**
+- **技能那一层只差一条，而且两个答案都抓到了同一个矛盾。**开的那次先 `uml_parse` 读图、按图建模：结论是"照这么画，DONE 会一直 retry"；关的那次按正文把 DONE 当终态：结论是"终态不该有出边，图和正文矛盾"。两条都对，角度不同——这正是教义（照着物料建、不照着散文建）起作用的那一条，但它只值一条。
+
+**所以：这份样本没有证明注入带来路由收益，反而削弱了"注入不可避免"的说法。** n=4/组、只跑一次；最能考验门禁的那条（迁移：既没加载技能也没用工具，而门禁文本明确列了 datamodel）**没有任何变化**。要判断它有没有用，需要更大的样本和更难的题——比如没有物料、只有一句话的请求（干净对照里那种会被正确拒绝的）。
+
+**读法**：这是**配对观察**，不是显著性检验。别把 3/4 与 2/4 说成"提升 25 个百分点"。
+
 ## 单点回归：那条翻转的用例，改完文本之后
 
 对着修过的那一行，再发一次同一条请求（`"draw the class hierarchy as a diagram"`，期望 `model-everything-uml`）：
