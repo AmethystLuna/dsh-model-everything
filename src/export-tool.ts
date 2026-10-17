@@ -1,7 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { REPORT_SCHEMAS, DEFAULT_HASH_SPEC, modelHash, refusalVerdict, validateModel, verdictOf } from './engine.js'
-import { exportModel, type ExportFormat } from './exporters.js'
+import { ExportError, exportModel, type ExportFormat } from './exporters.js'
 import { renderReportText } from './report-view.js'
 
 /** The model hash of an export's input, when the input validates (the success path always does). */
@@ -73,7 +73,9 @@ export const modelExportTool = defineTool({
       } as unknown as JsonValue
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      return { ok: false, ran: false, ...refusalVerdict(message), schema: REPORT_SCHEMAS.export, errorCode: 'MODEL_INVALID', error: message } as unknown as JsonValue
+      // The exporter's own refusals carry their code: a limit of the encoding is not a defect in the model.
+      const errorCode = error instanceof ExportError ? error.code : 'MODEL_INVALID'
+      return { ok: false, ran: false, ...refusalVerdict(message), schema: REPORT_SCHEMAS.export, errorCode, error: message } as unknown as JsonValue
     }
   },
 })

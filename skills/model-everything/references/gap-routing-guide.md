@@ -34,5 +34,9 @@ as outside this engine and points at tooling that can handle it.
 - Generators: `model_export` emit
   native inputs for UPPAAL (.xta + queries), TLA+ (TLC spec + safety), PRISM (.pm + .pctl),
   and SPIN (Promela + ltl) from a LogicModelV1. It translates the core machine (guards,
-  updates, weights; booleans as integers) and return unrepresentable invariants as explicit
-  warnings.
+  updates, weights; booleans as integers) and returns unrepresentable invariants as explicit
+  warnings. A field the target has no place for is reported the same way (`EXPORT_FIELD_DROPPED`
+  names `cost` and `maxTicks`), and a model too large for the PRISM enumeration is refused as
+  `EXPORT_TOO_LARGE` rather than as an invalid model. The UPPAAL export is one template, so its
+  transitions carry the event name as a comment rather than as a rendezvous: `e!` waits for a
+  partner this file does not contain.
