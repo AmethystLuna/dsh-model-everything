@@ -2809,6 +2809,52 @@ async function runRendezvousTests() {
 await runRendezvousTests()
 
 
+// ------------------------------------------- a check that hit its cap must not report a verdict --
+
+async function runCapTests() {
+  // A14 walks the deadline state space under the same budget as everything else. When the budget ran out the
+  // walk returned "no violation", and the check answered "All deadlines respected" - a verdict about a search
+  // that did not finish. The schema reference promises the opposite: a cap that bites is reported.
+  const model = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B' },
+      { from: 'B', event: 'tick', to: 'B' },
+      { from: 'B', event: 'stop', to: 'C' },
+    ],
+    tickEvents: ['tick'],
+    states_: undefined,
+  }
+  // One state declares a deadline, so A14 has something to examine; the tick loop makes the space large
+  // enough that a budget of one popped entry cannot finish it.
+  model.states = [{ id: 'A', maxTicks: 5 }, { id: 'B', maxTicks: 5 }, { id: 'C', terminal: true }]
+  delete model.states_
+
+  const capped = runVerification(model, { maxStates: 1 })
+  const a14 = capped.checks.find((check) => check.id === 'A14')
+  if (a14 === undefined) throw new Error('A14 is missing')
+  const undecided = a14.findings.filter((finding) => finding.code === 'A14_UNDECIDED')
+  if (undecided.length === 0) throw new Error('a capped deadline walk must say it did not finish, got ' + JSON.stringify(a14.findings.map((finding) => finding.code)))
+  if (a14.status === 'pass') throw new Error('and the check must not report a pass over an unfinished search')
+  if (/All deadlines respected/.test(String(a14.detail))) throw new Error('the detail must not claim what the search did not establish: ' + String(a14.detail))
+  console.log('PASS cap: a deadline walk that hit its budget is undecided, not clean')
+
+  // The near miss: with a budget that finishes, A14 decides, and says so without an undecided finding.
+  const decided = runVerification(model, { maxStates: 10000 })
+  const decidedA14 = decided.checks.find((check) => check.id === 'A14')
+  if (decidedA14.findings.some((finding) => finding.code === 'A14_UNDECIDED')) {
+    throw new Error('a search that finished must not claim to be undecided: ' + JSON.stringify(decidedA14.findings.map((finding) => finding.code)))
+  }
+  console.log('PASS cap: the same model with a budget that finishes is decided')
+
+  console.log('PASS check-cap')
+}
+
+await runCapTests()
+
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)
