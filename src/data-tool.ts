@@ -1,6 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runDataVerification, DATA_ENGINE_SCHEMA_VERSION } from './data-engine.js'
+import { optionRefusal, requireArrayOption, requireObjectOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
 
 export const DATAMODEL_VERIFY_TOOL_NAME = 'model_datamodel_verify'
@@ -59,13 +60,23 @@ export const modelDataModelVerifyTool = defineTool({
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
-    return runDataVerification(args.model, {
-      beforeModel: args.beforeModel,
-      fieldMapping: args.fieldMapping as Record<string, string> | undefined,
-      copyPairs: args.copyPairs as Array<{ id: string; sourceEntity: string; targetEntity: string; mapping: Record<string, string> }> | undefined,
-      migrationMappings: args.migrationMappings as Array<{ from: string; to: string; transform?: 'copy' | 'rename' | 'split' | 'merge' | 'drop' | 'manual'; note?: string }> | undefined,
-      backupPairs: args.backupPairs as Array<{ id: string; sourceEntity: string; targetEntity: string; mapping: Record<string, string> }> | undefined,
-    }) as unknown as JsonValue
+    try {
+      // The options are declared `json`, so the shape has to be checked here: the engine reads each one as
+      // the list or map it needs, and a string arrived as a raw TypeError with no code and no option name.
+      requireObjectOption(args.fieldMapping, 'fieldMapping', 'DATA_OPTION_INVALID')
+      requireArrayOption(args.copyPairs, 'copyPairs', 'DATA_OPTION_INVALID')
+      requireArrayOption(args.migrationMappings, 'migrationMappings', 'DATA_OPTION_INVALID')
+      requireArrayOption(args.backupPairs, 'backupPairs', 'DATA_OPTION_INVALID')
+      return runDataVerification(args.model, {
+        beforeModel: args.beforeModel,
+        fieldMapping: args.fieldMapping as Record<string, string> | undefined,
+        copyPairs: args.copyPairs as Array<{ id: string; sourceEntity: string; targetEntity: string; mapping: Record<string, string> }> | undefined,
+        migrationMappings: args.migrationMappings as Array<{ from: string; to: string; transform?: 'copy' | 'rename' | 'split' | 'merge' | 'drop' | 'manual'; note?: string }> | undefined,
+        backupPairs: args.backupPairs as Array<{ id: string; sourceEntity: string; targetEntity: string; mapping: Record<string, string> }> | undefined,
+      }) as unknown as JsonValue
+    } catch (error) {
+      return optionRefusal(error, 'DATA_OPTION_INVALID') as unknown as JsonValue
+    }
   },
 })
 
