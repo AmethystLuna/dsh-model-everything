@@ -116,6 +116,8 @@ metadata:
 
 新用例当场抓到一处自相矛盾：`C2_RENDEZVOUS_UNRESOLVED` 是 `warning`，而同一份报告 `verdict=fail`、`summary.errors=1` —— 组合的计数把每条 finding 都当 error，于是正文说 `warn C2` / `[warning/…]`，上一行说 `1 error finding(s)`。现在 finding 是 error（调用方点名要查的握手没查成，不是通过），计数也只数自己带的 severity。
 
-仍未进快照的：`uml_render` 的输出、`uml_review` 的各族用例、`design`/`structure`/`granularity` 的工具层。它们都还是引擎级用例。
+仍未进快照的：`model_verify`/`model_compose_verify`/`model_datamodel_verify`/`model_design_review`/`model_concurrency_scan`/`report_diff` 的**工具层**（引擎级都有用例；`model_verify` 的选项守卫在 `tests/tool-boundary` 里）。快照现在共 33 条，工具层 7 条：`uml_parse` 1、`uml_render` 2、`uml_review` 2、`uml_structure_verify` 2、`model_export` 1。
+
+冻结这些工具层用例时又抓到一处自相矛盾（`e40230c`）：`uml_parse` 把解析器注记放进 `warnings`、计进 verdict，却哪里都不印 —— 正文说「1 warning finding(s)」而下一行说「FINDINGS none — nothing was reported」。上一版的修法是把注记塞进 `findings`，但那与参考文档的说法（「a `UML_RENDER_APPROXIMATE_VIEW` warning」）冲突，还让每条注记在两个字段里重复。现在注记留在文档命名的通道上，由正文印出来（`WARNING` 行 + 空名册时说明「有几条注记在下面」）。
 
 **这一批的教训（对第 2 行那类「报告说得比它知道的多」的缺口）**：判据不是「这个 walk 会不会停」，而是**停下来之后返回的是什么**。凡是 `undefined` 既表示「找过了，没有」又表示「没找完」的地方，报告就必然在两者之间选一个说法，而它选的总是更乐观的那个。修的时候先看 walk 的返回类型：`InvariantViolation` 自带 `undecided`，填上即可；`findBudgetViolation` 没有这个字段，才需要加 `'undecided'` 这一态。判据落错层两次都发生在这一步（引擎 vs 工具层、`uml_explain_labels` vs `uml_review`）。
