@@ -1,0 +1,241 @@
+/**
+ * The gate: one optional routing message, injected once per session.
+ *
+ * Why it exists. Routing works through text: the measured result is that a session asked
+ * to check something loads the skill whose catalog line matches. What that measurement
+ * also showed is the limit - a session that never decides to load anything is never routed,
+ * and the catalog line is cut at 500 characters, so the tail of a long line is invisible at
+ * the moment of choosing. This component carries the routing in a message instead of in the
+ * line, for a deployment that wants the decision made for it.
+ *
+ * Why it is a separate row. The plugin's doctrine is that a capability is discoverable
+ * through its own tool description or skill text. Injection departs from that, so it is
+ * opt-in and mounted as its own component: install it, disable it, or never enable it,
+ * without touching the tools or the skills. `enabled` is a live switch, so the Web Plugins
+ * page flips it inside a running host.
+ *
+ * Why it is off by default. It costs tokens in every session that turns it on, to fix a
+ * problem text-only routing was measured not to have once the session engages. A deployment
+ * that wants it says so; the default pays nothing.
+ *
+ * What it does not do. It routes; it checks nothing. It cannot make a skill load, and it
+ * does not restate the doctrine - the skill bodies carry that, and duplicating them here
+ * would spend the session's context on a second copy.
+ *
+ * @module dsh-model-everything-gate
+ */
+
+import type { Context, Volatile } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+import type { HostCordisInspectProviderRegistration } from '@deepseek-ai/dsh-cordis-host-runner'
+import type { Session, UserMessage } from '@deepseek-ai/dsh-session'
+
+// DSH 0.1.7-alpha.1 (session format v4) retires the shared `{ kind: 'plugin', plugin }`
+// wrapper, so the producer-owned kind is declared here. The history guard below matches on
+// it, which is what keeps the gate to one copy per session.
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'plugin:dsh-model-everything-gate': { kind: 'plugin:dsh-model-everything-gate' } & ContextFormed
+  }
+}
+
+export const name = 'dsh-model-everything-gate'
+
+/** Producer-owned message source kind declared in `MessageSourceMap` above. */
+const GATE_SOURCE_KIND: 'plugin:dsh-model-everything-gate' = 'plugin:dsh-model-everything-gate'
+
+/**
+ * The default text. It names every skill the package ships, because its job is the routing
+ * the catalog line cannot carry once the line is long; `tests/gate` fails when a skill is
+ * added and this list is not, which is the only thing keeping the two in step.
+ */
+export const DEFAULT_GATE_TEXT = `<EXTREMELY_IMPORTANT>
+Plugin dsh-model-everything is installed. A claim about code is decided by one of its tools, not by reasoning it out: an API name, a path, an enum, "always/never", a timing or protocol guarantee, a schema or a migration, a diagram, a concurrency promise. Before answering one, load the skill whose "Use when" matches.
+
+- model-everything: claims against code, state machines, protocols
+- model-everything-uml: drawing a diagram, or reading one someone else drew
+- model-everything-structure: an architecture or dependency drawing
+- model-everything-design: layering, responsibilities, substitutability, interface width
+- model-everything-datamodel: a schema, a migration, a data guarantee
+- model-everything-concurrency: thread-safe, lock-free, ISR, shared state
+- model-everything-report-reading: reading a report this plugin returned
+
+This message routes only. It checks nothing, and a skill that never loads decides nothing.
+</EXTREMELY_IMPORTANT>`
+
+/**
+ * A live switch, when this host's schemastery supports one.
+ *
+ * The settings service projects ONLY fields under a `.volatile()` node, so a plain boolean
+ * cannot be flipped from the Web Plugins page without remounting the row. The returned
+ * schema keeps the field's static type; {@link Config} carries the union the host actually
+ * hands over, and {@link injectionEnabled} accepts both shapes - a host that predates
+ * `.volatile()` simply gets a switch that needs a restart.
+ */
+interface LiveField {
+  volatile?: () => unknown
+}
+function live<T>(field: T): T {
+  const probe = field as T & LiveField
+  return typeof probe.volatile === 'function' ? (probe.volatile() as T) : field
+}
+
+export interface Config {
+  /** Whether the gate may be injected. Read through {@link injectionEnabled}. */
+  enabled: Volatile<boolean> | boolean
+  /** The text to inject. Override in the profile's `cordis.patch.yml` row, not in a GUI form. */
+  gateContent: string
+}
+
+export const Config = z.object({
+  // Off by default: see the module comment. Live so enabling it does not need a restart.
+  enabled: live(z.boolean().default(false)),
+  // Not volatile on purpose: the settings projection feeds a GUI form, and a kilobyte of
+  // prose does not belong in one.
+  gateContent: z.string().default(DEFAULT_GATE_TEXT),
+})
+
+/**
+ * Read the switch as a boolean, whichever shape this host produced.
+ * @param config - the resolved plugin configuration.
+ * @returns whether the gate may be injected.
+ */
+function injectionEnabled(config: Config): boolean {
+  const value = config.enabled
+  return typeof value === 'boolean' ? value : value.get()
+}
+
+function gateMessage(text: string): UserMessage {
+  return createUserMessage({
+    content: [{ type: 'text', text }],
+    source: { kind: GATE_SOURCE_KIND },
+  })
+}
+
+interface SessionEventLike {
+  type: string
+  data?: Record<string, unknown>
+}
+
+/**
+ * Minimum session-store surface this plugin reads. DSH 0.1.2-alpha.4 replaced the
+ * `Session.events` getter with on-demand reads; releases up to 0.1.2-alpha.3 expose the log
+ * as a snapshot. Read through a structural union so one build serves every declared release.
+ */
+interface SessionEventSource {
+  events?: readonly SessionEventLike[]
+  snapshotEvents?: () => readonly SessionEventLike[]
+}
+
+function readSessionEvents(session: Session): readonly SessionEventLike[] {
+  const source = session as unknown as SessionEventSource
+  if (typeof source.snapshotEvents === 'function') {
+    const snapshot = source.snapshotEvents()
+    if (Array.isArray(snapshot)) return snapshot
+  }
+  if (Array.isArray(source.events)) return source.events
+  return []
+}
+
+/**
+ * Whether the gate already entered this session's durable history. The pre-step listener
+ * re-appends the gate until it does; once a step committed it, every later step - and a
+ * resume of a session that kept it - skips the injection. A gate dropped before any step
+ * ran simply re-injects on the first step that does.
+ * @param session - the agent's session.
+ * @returns whether a gate message is already in the log.
+ */
+function gateInHistory(session: Session): boolean {
+  return readSessionEvents(session).some((event) => {
+    if (event.type !== 'user/message') return false
+    const source = event.data?.source as { kind?: string } | undefined
+    return source?.kind === GATE_SOURCE_KIND
+  })
+}
+
+/**
+ * Model-visible status, so "is the gate on" is answered by inspection rather than by reading
+ * a session transcript. A separate provider id from the main row: these are two components,
+ * and one of them being mounted says nothing about the other.
+ * @param config - the resolved plugin configuration.
+ * @returns the inspect provider registration.
+ */
+function inspectProvider(config: Config): HostCordisInspectProviderRegistration {
+  return {
+    manifest: {
+      id: 'dsh-model-everything-gate',
+      description: 'The optional session-start routing message of dsh-model-everything: whether it is injected, and how much text it costs. It routes a request to a skill; it checks nothing.',
+      methods: [
+        {
+          name: 'status',
+          description: 'Read the gate status: whether injection is enabled and how long the injected text is.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+          outputSchema: {
+            type: 'object',
+            description: 'Gate status.',
+            properties: {
+              enabled: { type: 'boolean', description: 'Whether the gate is injected into new sessions.' },
+              gateContentLength: { type: 'integer', description: 'Length in characters of the injected text.' },
+            },
+            additionalProperties: false,
+          },
+        },
+      ],
+    },
+    query: async (method: string) => {
+      if (method === 'status') {
+        return {
+          enabled: injectionEnabled(config),
+          gateContentLength: config.gateContent.length,
+        }
+      }
+      return null
+    },
+  }
+}
+
+/**
+ * Mount the gate.
+ *
+ * The listener is registered whether or not the switch is on: the switch is volatile, so
+ * `apply` runs once and the value behind it can turn on later from the Plugins page.
+ * Returning early here would freeze the decision for the lifetime of the mount.
+ *
+ * @param ctx - the plugin context.
+ * @param config - the resolved plugin configuration.
+ */
+export function apply(ctx: Context, config: Config): void {
+  // Catalog visibility is optional and the registry may be mounted after this row applies,
+  // so registration is retried on each step until it lands.
+  let providerRegistered = false
+  const registerProvider = (): void => {
+    if (providerRegistered) return
+    const inspect = ctx.get('cordisInspect')
+    if (inspect === undefined) return
+    try {
+      ctx.effect(() => inspect.register(inspectProvider(config)), 'dsh-model-everything-gate: inspect provider')
+      providerRegistered = true
+    } catch (error) {
+      console.warn('[dsh-model-everything-gate] inspect provider registration failed', error)
+    }
+  }
+  registerProvider()
+
+  // Inject on the FIRST model step that runs, instead of at session start: a session-start
+  // message lands in the inbox, which a blank-session preset switch can clear before the
+  // first step. The pre-step decision is durable - the message enters history with the step,
+  // and the guard below stops it from being added a second time.
+  ctx.on('agent/pre-step', async ({ agent }, next) => {
+    const decision = await next()
+    if (decision.kind === 'reject') return decision
+    registerProvider()
+    if (!injectionEnabled(config)) return decision
+    if (gateInHistory(agent.session)) return decision
+    return {
+      kind: 'enter',
+      messages: [...decision.messages, gateMessage(config.gateContent)],
+    }
+  })
+}

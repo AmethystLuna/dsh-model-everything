@@ -134,6 +134,7 @@ node tests/uml/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
+node tests/gate/run.mjs
 node tests/skill-routing/run.mjs
 node tests/toolset/run.mjs
 node tests/principles/run.mjs
@@ -175,6 +176,7 @@ And the gates around it:
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 7 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
+| `gate` | 11 | the package exposes the gate as its own entry point |
 | `skill-routing` | 6 | every case names a skill that ships |
 | `toolset` | 12 | every tool description names at least one sibling |
 | `principles` | 4 | the principles index is the one the repository produces now |

@@ -208,6 +208,17 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 
 技能走 DSH 标准的 filesystem skill provider 注册，工具挂在 `ctx.tools` 上。另有一条模型可见的状态目录条目，可查注册状态与引擎接受的 schema 版本。
 
+### 两个组件，两行 loader
+
+| 行 id | 装什么 | 默认 |
+|---|---|---|
+| `dsh-model-everything` | 全部工具与技能 | 开 |
+| `dsh-model-everything-gate` | 会话开头注入的一条路由提示 | **关** |
+
+第二行是可选的，单独开关。它补的是路由的短板：路由靠技能描述文字，而目录行截断在 500 字符；更要紧的是，一次会话如果压根没决定加载技能，就没有任何东西把它路由过去。打开后它在每个会话的**第一条模型步**注入一条短消息（约 1.1k 字符），点名每个技能各自管什么。它只路由——不检查任何东西，也不会让技能自己加载。
+
+默认关，是因为实测里「只要会话参与了，路由就是对的」，而这条消息要为「压根没参与」的那些会话付上下文。打开它：改配置，或翻 Plugins 页上的开关（`enabled` 是 live 字段，运行中的 host 就能翻，不必重启）。
+
 ## 配置
 
 | 键 | 类型 | 默认值 | 说明 |
@@ -223,6 +234,13 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
       config:
         enabled: false
 ```
+
+路由提示那一行有它自己的两个键：
+
+| 键 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `enabled` | boolean | `false` | 是否注入。live 字段，可在运行中的 host 上翻转。 |
+| `gateContent` | string | 内置文本 | 注入的全文。替换它等于自己写路由规则；`tests/gate` 仍会要求它点名每个已发布的技能。 |
 
 ## 边界
 
