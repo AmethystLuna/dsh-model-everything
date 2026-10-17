@@ -2873,6 +2873,19 @@ async function runRendezvousTests() {
   }
   if (typo.verdict === 'pass') throw new Error('a check that examined nothing must not leave a clean verdict: ' + typo.verdict)
   if (/can fire/.test(String(typoC2.detail))) throw new Error('the detail must not claim what it did not establish: ' + String(typoC2.detail))
+  // The severity the finding carries is the one the summary counts. It was a warning in a report whose verdict said
+  // `fail` with `errors: 1`, because the counts treated every finding as an error - two halves of one report
+  // disagreeing about how bad it was. An unresolved handshake is what the caller asked to have checked and did not
+  // get, so it is an error.
+  const typoFinding = typoC2.findings.find((finding) => finding.code === 'C2_RENDEZVOUS_UNRESOLVED')
+  if (typoFinding.severity !== 'error') throw new Error('an unchecked handshake is not a warning: ' + typoFinding.severity)
+  const counted = typo.checks.flatMap((check) => check.findings)
+  if (typo.summary.errors !== counted.filter((finding) => finding.severity === 'error').length) {
+    throw new Error('the summary must count the severities it carries: ' + JSON.stringify(typo.summary))
+  }
+  if (typo.summary.warnings !== counted.filter((finding) => finding.severity === 'warning').length) {
+    throw new Error('and the warnings the same way: ' + JSON.stringify(typo.summary))
+  }
   console.log('PASS compose: an unresolved rendezvous becomes a finding, not silence')
 
   // Two names, one of them real: the real one still resolves, and the report says how many did not.

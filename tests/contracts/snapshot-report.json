@@ -910,6 +910,99 @@
     ],
     "body": "model-everything/verify/v1  verdict=fail  4 error finding(s) (first error: MODEL_INVALID)  ok=false  states=0 transitions=0 errors=4 warnings=0 checksRun=0\nCHECKS  fail MODEL\n\nFAIL MODEL Model Validation — Model schema validation failed: 4 errors (4 finding(s))\n  [error/MODEL_INVALID] schemaVersion: must be 1\n  [error/MODEL_INVALID] init: must be a non-empty string\n  [error/MODEL_INVALID] states: must be a non-empty array\n  [error/MODEL_INVALID] transitions: must be an array\n\nNEXT  Resolve the failing checks first: Model Validation (MODEL).\nNEXT  Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side."
   },
+  "compose: two machines that rendezvous": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no error or warning findings",
+    "schema": "model-everything/compose/v1",
+    "summary": {
+      "machineCount": 2,
+      "machines": [
+        {
+          "modelHash": "96bdcac57564b3f484bdc0e0fd09f262a36f55bcacd4cdf4dc48411e9a66fbed",
+          "states": 2,
+          "transitions": 1
+        },
+        {
+          "modelHash": "781b06f10c981d974fbb4af0239bc557f91ee645c4d6f99e1af7eb67ff34a4c5",
+          "states": 2,
+          "transitions": 1
+        }
+      ],
+      "compositeStates": 2,
+      "errors": 0,
+      "warnings": 0,
+      "truncated": false
+    },
+    "checks": [
+      {
+        "id": "C1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C2",
+        "status": "pass",
+        "findings": []
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+    ],
+    "body": "model-everything/compose/v1  verdict=pass  no error or warning findings  ok=true  errors=0 warnings=0\nCHECKS  pass C1 C2\n\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+  },
+  "compose: a rendezvous name nothing declares": {
+    "ok": false,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 error finding(s) (first error: C2_RENDEZVOUS_UNRESOLVED)",
+    "schema": "model-everything/compose/v1",
+    "summary": {
+      "machineCount": 2,
+      "machines": [
+        {
+          "modelHash": "96bdcac57564b3f484bdc0e0fd09f262a36f55bcacd4cdf4dc48411e9a66fbed",
+          "states": 2,
+          "transitions": 1
+        },
+        {
+          "modelHash": "781b06f10c981d974fbb4af0239bc557f91ee645c4d6f99e1af7eb67ff34a4c5",
+          "states": 2,
+          "transitions": 1
+        }
+      ],
+      "compositeStates": 2,
+      "errors": 1,
+      "warnings": 0,
+      "truncated": false
+    },
+    "checks": [
+      {
+        "id": "C1",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C2",
+        "status": "fail",
+        "findings": [
+          {
+            "code": "C2_RENDEZVOUS_UNRESOLVED",
+            "severity": "error",
+            "message": "Rendezvous event \"typo\" is declared nowhere: no machine has a transition or action on it, so this handshake was not checked. Name an event the machines declare, or remove it from `rendezvous`."
+          }
+        ]
+      }
+    ],
+    "findings": [],
+    "nextSteps": [
+      "Resolve the error findings first: a rendezvous event can never fire, so the composition cannot advance through that handshake.",
+      "Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+    ],
+    "body": "model-everything/compose/v1  verdict=fail  1 error finding(s) (first error: C2_RENDEZVOUS_UNRESOLVED)  ok=false  errors=1 warnings=0\nCHECKS  pass C1 | fail C2\n\nFAIL C2 Rendezvous Sync — 1 rendezvous name(s) resolved to no event, so that handshake was not checked (1 errors) (1 finding(s))\n  [error/C2_RENDEZVOUS_UNRESOLVED] Rendezvous event \"typo\" is declared nowhere: no machine has a transition or action on it, so this handshake was not checked. Name an event the machines declare, or remove it from `rendezvous`. evidence={\"event\":\"typo\",\"declared\":[\"go\"]}\n\nNEXT  Resolve the error findings first: a rendezvous event can never fire, so the composition cannot advance through that handshake.\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+  },
   "datamodel: a valid model": {
     "ok": true,
     "ran": true,
@@ -2127,5 +2220,32 @@
       "Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
     ],
     "body": "model-everything/design/v1  verdict=fail  1 error finding(s) (first error: DESIGN_INVALID)  ok=false  errors=1 warnings=0 checksRun=0\nCHECKS  fail DESIGN\n\nFAIL DESIGN Design Model Validation — the model was rejected before any check ran (1 finding(s))\n  [error/DESIGN_INVALID] architecture.wibble: unknown field (the schema is closed; a typo would silently change the design under review)\n\nNEXT  Fix the reported field(s) and run the review again: the schema is closed, so an unknown key is a typo that would change the design under review."
+  },
+  "uml parse: a hand-drawn state diagram": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass_with_findings",
+    "verdictReason": "no error findings; 1 warning finding(s)",
+    "schema": "model-everything/uml/parse/v1",
+    "modelHash": "f19e2d58863665b7734df8119ed0f420b48f2e391e4cbdf49e67658949748a8d",
+    "findings": [
+      {
+        "code": "UML_PARSE_SYNTHETIC_EVENT",
+        "severity": "warning",
+        "message": "arrow BUSY -> Idle carries no label; it was named \"t_BUSY_Idle\". Label the arrow as `event [guard] / actions` so the model keeps the real event name."
+      }
+    ],
+    "family": "state",
+    "body": "model-everything/uml/parse/v1  verdict=pass_with_findings  no error findings; 1 warning finding(s)  ok=true  modelHash=f19e2d588636… hashSpec=v1\nPARSE  notation=mermaid  kind=state  family=state\nMODEL  {\"schemaVersion\":1,\"init\":\"Idle\",\"states\":[{\"id\":\"Idle\"},{\"id\":\"BUSY\",\"terminal\":true}],\"transitions\":[{\"from\":\"Idle\",\"event\":\"go\",\"to\":\"BUSY\"},{\"from\":\"BUSY\",\"event\":\"t_BUSY_Idle\",\"to\":\"Idle\"}]}\nFINDINGS  1 total (0 error, 1 warning): UML_PARSE_SYNTHETIC_EVENT x1\n\n  [warning/UML_PARSE_SYNTHETIC_EVENT] arrow BUSY -> Idle carries no label; it was named \"t_BUSY_Idle\". Label the arrow as `event [guard] / actions` so the model keeps the real event name."
+  },
+  "export: a model too large for the prism encoding": {
+    "ok": false,
+    "ran": false,
+    "errorCode": "EXPORT_TOO_LARGE",
+    "verdict": "fail",
+    "verdictReason": "the tool did not run: the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM.",
+    "schema": "model-everything/export/v1",
+    "findings": [],
+    "body": "model-everything/export/v1  verdict=fail  the tool did not run: the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM.  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\nERROR  the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM. [EXPORT_TOO_LARGE]\n\n{\"ok\":false,\"ran\":false,\"verdict\":\"fail\",\"verdictReason\":\"the tool did not run: the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM.\",\"schema\":\"model-everything/export/v1\"}"
   }
 }
