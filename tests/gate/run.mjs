@@ -138,9 +138,10 @@ await check('the default text stays inside its cost ceiling', () => {
   // A cost ceiling, not a catalogue count: the message lands in every session that enables
   // the gate, so its growth is a per-session price. Raising the ceiling is a decision, which
   // is why the number is written down here rather than derived. It carries the routing, the
-  // tool inventory with what each does not prove, and how to read a report - the same four
-  // parts the sibling plugin's gate carries.
-  const limit = 2800
+  // tool inventory with what each does not prove, how to read a report - the same four parts
+  // the sibling plugin's gate carries - and the rule stated at both ends, which is what the
+  // three-arm comparison found worth its 403 characters.
+  const limit = 3200
   const length = gate.DEFAULT_GATE_TEXT.length
   if (length > limit) throw new Error('the gate text is ' + String(length) + ' characters, over the ' + String(limit) + ' ceiling')
 })
