@@ -14,6 +14,8 @@
       "types": "./lib/types/gate.d.ts",
       "default": "./lib/gate.js"
     },
+    "./gate/package.json": "./gate/package.json",
+    "./gate/locale/*.json": "./gate/locale/*.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
@@ -24,6 +26,7 @@
     "skills",
     "cordis.patch.yml",
     "examples",
+    "gate",
     "locale"
   ],
   "dsh": {
@@ -31,7 +34,7 @@
       "dsh": ">=0.1.7-alpha.2"
     },
     "category": "tools/dev",
-    "displayName": "设计与代码的建模/自动化审查",
+    "displayName": "dsh-model-everything",
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

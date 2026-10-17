@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "设计与代码的建模/自动化审查",
+    "title": "dsh-model-everything",
     "description": "自动化审查替代反复试错——省下的 token，留给设计。文档与源码交叉验证；行为与流程建模核查。"
   }
 }
