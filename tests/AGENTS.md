@@ -121,26 +121,41 @@ node tests/skill-routing/run.mjs --decisions answer.json # score {"0": "<skill>"
 
 - **The printed prompt** hands the model the catalog text and asks it to route. It measures
   the descriptions and nothing else: cheap, reproducible, unaffected by the system prompt.
-- **A live session** is given the utterance alone and nothing about routing. It measures what
-  the user actually experiences - the catalog, the system prompt and the model together. It
+- **A live session** is given the utterance and nothing about routing. It measures what the
+  user actually experiences - the catalog, the system prompt and the model together. It
   costs a session per case, so run a sample: one request per domain skill, plus the near
   misses where a domain skill could swallow a request that belongs elsewhere.
 
-A live session has to be asked to report what it loaded, because the transcript is not the
-result: end the prompt with a single line `SKILLS LOADED: <names, or none>`. That is a
-self-report, and it is the weakest part of this method - it can be answered from what the
-session remembers doing, not from what it did. Read it with that in mind, and prefer the
-printed prompt where a description-level answer is enough.
+Two things about that method were learned by running it, and the second one decides how to
+read any number it produces:
+
+- **The observation channel is a hint.** Asking for `SKILLS LOADED: <names, or none>` puts
+  the word "skill" in the prompt, and asking "what would you do first, naming the tool or
+  method" asks for a method statement. Both raise the chance of a load. Ask afterwards
+  instead - a question asked after the answer cannot change the answer.
+- **A request with nothing to work on gets refused, not routed.** Removing both hints and
+  running three cases: the two "draw X" requests replied `none` and declined to invent a
+  diagram, while the one request that could be acted on without the artifact (a migration
+  shape review) loaded the expected skill. So a live run measures *given that the session
+  engages*, which method it picks. To measure a real request, give it something it can act
+  on; otherwise what you measured is the refusal.
+
+A live session still has to be asked what it loaded, because the transcript is not the result
+- but ask in a **follow-up message**, after the answer: `SKILLS LOADED: <names, or none>`.
+That is a self-report, and it is the weakest part of this method - it can be answered from
+what the session remembers doing, not from what it did. Read it with that in mind, and prefer
+the printed prompt where a description-level answer is enough.
 
 A live result is scored by one rule: **the expected skill is among the skills the session
-loaded.** Two consequences, both learned by running it:
+loaded, when the session engaged.** Two consequences, both learned by running it:
 
 - Every domain line ends "Doctrine: the model-everything skill", so a session that loads a
   domain skill commonly loads the doctrine skill too. That second load is the design working,
   not a misroute - score the case on the expected skill being present, not on it being alone.
-- `none` is a miss for every case, the entry skill included. A session that used no skill was
-  not routed anywhere, and counting that as a quiet success would let an empty catalog score
-  perfectly.
+- **A refusal is not a miss.** `none` from a session that had nothing to work on means the
+  case was never measured: it declined to invent, which is the correct answer and says
+  nothing about routing. `none` from a session that did engage is a miss - the entry skill
+  included, since a session that used no skill was not routed anywhere.
 
 A misroute is a corpus or a description defect, not a model defect: fix whichever of the two
 the answer exposes, then re-run.
