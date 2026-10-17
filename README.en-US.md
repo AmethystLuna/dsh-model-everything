@@ -215,7 +215,7 @@ It registers its skills through the standard DSH filesystem skill provider and i
 | `dsh-model-everything` | every tool and skill | on |
 | `dsh-model-everything-gate` | one routing message at the start of a session | **off** |
 
-The second row is optional and switched separately. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything. Turned on, it injects a short message (about 1.1k characters) into the **first model step** of each session, naming what each skill answers. It routes only - it checks nothing, and it cannot make a skill load.
+The second row is optional and switched separately. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything. Turned on, it injects a message (about 2.5k characters) into the **first model step** of each session, in four parts: which skill to load when it is unclear whether a check applies, what each skill answers, what each tool does **and what it does not prove**, and how to read a report (`verdict`, never `ok`; `skip` is not `pass`). It routes only - it checks nothing, and it cannot make a skill load.
 
 It is off by default because the measurement says routing is right once a session engages, while this message is paid for by the sessions that never engage. There are two ways to turn it on: edit the profile's `cordis.patch.yml` (below), or - **on a host that mounts a settings service** - flip the switch on the Plugins page, which needs no restart. A profile without one has only the loader row, so it takes a config edit and a restart.
 
