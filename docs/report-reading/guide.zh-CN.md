@@ -60,6 +60,15 @@ English: [guide.md](guide.md)
 挂在检查下的发现归属于某个检查，而检查自己也带状态：`pass`、`fail` 或 `skip`。顶层发现没有检查
 可归属，所以那些族改报一个 `summary`。
 
+这个状态**故意是粗的**：`fail` 的意思是「这个检查有发现」，不是「发现很严重」。只含 warning 的检查
+和含 error 的检查一样是 `fail`，所以**单看 `status` 判断不了判定有没有动**——那要看发现自己的
+severity。**渲染出来的正文把两者分开了**，因为那是给人读的：正文里的 `fail` 表示至少一条 error，
+`warn` 表示只有 warning。当正文把某个检查列在 `warn` 下、而 JSON 给同一个检查写
+`"status": "fail"` 时，**两者都对**，它们回答的是不同的问题。
+
+`summary.checksRun` 数的是**真正检查过模型的**那些，所以只要有跳过，它就小于检查对象总数。
+`summary.checksSkipped` 点名被跳过的那些；一个都没跳过时这个字段不出现。
+
 `report_diff` 还有第二处不同：它没有发现，因为它的对象是**另两份报告之间的差异**。`verdict` 描述
 增量，`currentVerdict` 描述当前这次运行**自身**的判定。两者恰好在「运行不干净但增量为空」时分岔
 ——把一份失败报告与它自己比较，得到 `verdict: "pass", currentVerdict: "fail"`，而两句都成立：

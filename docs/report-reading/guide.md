@@ -66,6 +66,17 @@ A check-carried finding is attributed to a check, and the check also carries a s
 `pass`, `fail`, or `skip`. A top-level finding has no check to attribute it to, which is why those
 families report a `summary` instead.
 
+The status is coarse on purpose: `fail` means the check has a finding, not that the finding is severe.
+A check holding only warnings is `fail` just as a check holding errors is, so `status` alone cannot tell
+you whether the verdict moved - the finding's own severity does that. The rendered body separates them,
+because a human reads it: `fail` there means at least one error, and `warn` means warnings only. When
+the body lists a check under `warn` and the JSON gives that same check `"status": "fail"`, both are
+correct and they answer different questions.
+
+`summary.checksRun` counts the checks that examined the model, so it is smaller than the number of check
+objects whenever something was skipped. `summary.checksSkipped` names those, and it is absent when
+nothing was skipped.
+
 `report_diff` is the exception in a second way: it has no findings because its subject is the
 difference between two other reports. `verdict` describes the delta, and `currentVerdict` describes
 the current run on its own terms. The two differ exactly when the run is not clean but the delta is

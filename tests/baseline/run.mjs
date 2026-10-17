@@ -146,5 +146,40 @@ test('modelHash stays the run identity while findings drive the diff', () => {
   if (diff.summary.baseline !== diff.summary.current) throw new Error('a self-diff has equal counts')
 })
 
+// Two things that are not reports flatten to two empty finding lists, and the delta then reads as
+// agreement between things that were never compared. Running the installed plugin showed the shape of
+// that: `report_diff` with two 'junk' strings answered `verdict: pass`. So the guard requires an OBJECT,
+// not merely a present value - and a partial report, the kind a caller assembles by hand, stays accepted.
+test('a side that is not a report is refused, and the message says why', () => {
+  const notReports = ['junk', 5, true, [], [1, 2]]
+  for (const value of notReports) {
+    let threw = false
+    try {
+      diffReports(value, runVerification(clean))
+    } catch (error) {
+      threw = true
+      const message = error instanceof Error ? error.message : String(error)
+      // The message names the role and what arrived, so a caller can fix the call rather than the callee.
+      if (!message.startsWith('baseline is')) throw new Error('the refusal must name the bad side: ' + message)
+      if (!/not a report/.test(message)) throw new Error('the refusal must say what was expected: ' + message)
+    }
+    if (!threw) throw new Error('a ' + typeof value + ' baseline must be refused, not compared: ' + JSON.stringify(value))
+  }
+  for (const value of [null, undefined]) {
+    let threw = false
+    try { diffReports(value, runVerification(clean)) } catch { threw = true }
+    if (!threw) throw new Error('an absent baseline must be refused: ' + String(value))
+  }
+})
+
+test('a partial report is still accepted, which is the line the guard has to stay on', () => {
+  // No schema, no verdict, findings only: the tests build reports like this, and so does a caller who
+  // assembles one side by hand. Requiring `schema` would refuse them, and that is a different guard.
+  const partial = { findings: [{ check: 'S2', code: 'S2_NO_TRANSITIONS', severity: 'error', message: 'no transitions' }] }
+  const diff = diffReports({ findings: [] }, partial)
+  if (diff.added.length !== 1) throw new Error('a partial report must still contribute its findings: ' + JSON.stringify(diff.summary))
+  if (diff.added[0].code !== 'S2_NO_TRANSITIONS') throw new Error('added: ' + JSON.stringify(diff.added.map((finding) => finding.code)))
+})
+
 if (failures > 0) { console.log('baseline tests failed:', failures); process.exit(1) }
 console.log('all baseline tests passed')

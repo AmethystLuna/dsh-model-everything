@@ -287,6 +287,12 @@ function verificationNextSteps(checks: CheckResult[], coverage: NarrativeCoverag
   const failed = checks.filter((check) => check.status === 'fail').map((check) => check.name + ' (' + check.id + ')')
   const warningCodes = [...new Set(checks.flatMap((check) => check.findings).filter((finding) => finding.severity === 'warning').map((finding) => finding.code))].sort()
   if (failed.length > 0) steps.push('Resolve the failing checks first: ' + failed.join(', ') + '.')
+  // A check that had nothing to examine is named here, because a reader who is not told will assume every
+  // named check looked at the model. A list of failures does not say that, and neither does `pass`.
+  const skipped = checks.filter((check) => check.status === 'skip').map((check) => check.name + ' (' + check.id + ')')
+  if (skipped.length > 0) {
+    steps.push('These examined nothing, so their silence is not a result: ' + skipped.join(', ') + '. Declare what each one would need, or accept that the model is unverified on those points.')
+  }
   // Named checks above, bare codes here. That is deliberate: each warning is a different kind of thing,
   // so there is no single name to give the set, and the sentence points at where each one IS explained
   // rather than leaving a reader to guess what the codes stand for.
@@ -1379,6 +1385,60 @@ function isTerminal(model: LogicModelV1, state: string): boolean {
 
 function uniqueTargets(transitions: TransitionSpec[]): string[] {
   return [...new Set(transitions.map((transition) => transition.to))]
+}
+
+/**
+ * What a check would have needed in order to examine anything, or `undefined` if it had it.
+ *
+ * The verification family had no way to say "I did not look": a check whose vocabulary was empty
+ * returned `pass` with a detail like "No budget invariants declared", and `summary.checksRun` counted
+ * it as run. The design family has always reported `skip` for the same situation, and this file's own
+ * doctrine says a check with nothing to run on "is a `skip`, and stays one" - so `pass` here was the
+ * false green the repository forbids, not a stylistic difference.
+ *
+ * The table is one place on purpose. Eleven return sites across eleven functions would each have to
+ * remember, and the twelfth would be the one that forgot. A check that produced a finding is never
+ * turned into a skip: the finding is evidence that something was examined, and a name that resolved to
+ * nothing is exactly the case where the check cannot run but must still fail loudly.
+ */
+function nothingToExamine(id: string, model: LogicModelV1): string | undefined {
+  const invariantsOfKind = (kind: string) => (model.invariants ?? []).filter((invariant) => invariant.kind === kind).length
+  switch (id) {
+    case 'S7':
+    case 'A7':
+      return (model.invariants ?? []).length === 0 ? 'no invariants were declared' : undefined
+    case 'A2':
+    case 'A4':
+      return (model.concurrentPairs ?? []).length === 0 ? 'no concurrent pairs were declared' : undefined
+    case 'A3': {
+      const events = new Set(model.transitions.map((transition) => transition.event))
+      return events.size < 2 ? 'fewer than two distinct events to permute' : undefined
+    }
+    case 'A5':
+      return (model.boundaryChecks ?? []).length === 0 ? 'no boundary checks were declared' : undefined
+    case 'A6':
+      return (model.resourcePairs ?? []).length === 0 ? 'no resource pairs were declared' : undefined
+    case 'A8':
+      return (model.idempotentEvents ?? []).length === 0 ? 'no idempotent events were declared' : undefined
+    case 'S8':
+      return (model.variables ?? []).length === 0 ? 'no variables were declared' : undefined
+    case 'S6':
+      return model.transitions.some((transition) => transition.guard !== undefined) ? undefined : 'no transition declares a guard'
+    case 'A9':
+      return invariantsOfKind('leads-to') === 0 ? 'no leads-to invariant was declared' : undefined
+    case 'A10':
+      return invariantsOfKind('sequence') === 0 ? 'no sequence invariant was declared' : undefined
+    case 'A11':
+      return invariantsOfKind('atomicity') === 0 ? 'no atomicity invariant was declared' : undefined
+    case 'A12':
+      return invariantsOfKind('budget') === 0 ? 'no budget invariant was declared' : undefined
+    case 'A13':
+      return invariantsOfKind('probability') === 0 ? 'no probability invariant was declared' : undefined
+    case 'A14':
+      return model.states.some((state) => state.maxTicks !== undefined) ? undefined : 'no state declares maxTicks'
+    default:
+      return undefined
+  }
 }
 
 function checkResult(id: string, name: string, findings: Finding[], detail: string): CheckResult {
@@ -3714,6 +3774,15 @@ export function runVerification(input: unknown, options: VerificationOptions = {
     )
     comparison = buildComparisonSummary(before, model, mapping)
   }
+  // A check whose vocabulary the model never declared examined nothing, and says so. It has to happen
+  // before the summary and `nextSteps` are derived, or both keep counting it as a run.
+  for (const check of checks) {
+    if (check.status !== 'pass') continue
+    const why = nothingToExamine(check.id, model)
+    if (why === undefined) continue
+    check.status = 'skip'
+    check.detail = 'skipped: ' + why
+  }
   const errors = checks.reduce((sum, check) => sum + check.findings.filter((finding) => finding.severity === 'error').length, 0)
   const warnings = checks.reduce((sum, check) => sum + check.findings.filter((finding) => finding.severity === 'warning').length, 0)
   const coverageNotes = computeCoverageNotes(model)
@@ -3748,7 +3817,13 @@ export function runVerification(input: unknown, options: VerificationOptions = {
       transitions: model.transitions.length,
       errors,
       warnings,
-      checksRun: checks.length,
+      // `checksRun` counts the checks that examined the model, which is what the name promises. It used to
+      // count every check object, so a model that declared nothing still read as "22 checks ran".
+      checksRun: checks.filter((check) => check.status !== 'skip').length,
+      ...(() => {
+        const skipped = checks.filter((check) => check.status === 'skip').map((check) => check.id)
+        return skipped.length === 0 ? {} : { checksSkipped: skipped }
+      })(),
       truncated: exploration.truncated || hasUndecidedFinding(checks),
       ...(boundNotes.length === 0 ? {} : { boundNotes }),
     },
