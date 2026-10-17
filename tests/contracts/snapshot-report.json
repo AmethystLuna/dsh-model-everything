@@ -2405,5 +2405,70 @@
     "schema": "model-everything/export/v1",
     "findings": [],
     "body": "model-everything/export/v1  verdict=fail  the tool did not run: the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM.  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\nERROR  the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM. [EXPORT_TOO_LARGE]\n\n{\"ok\":false,\"ran\":false,\"verdict\":\"fail\",\"verdictReason\":\"the tool did not run: the PRISM encoding enumerates states x variable valuations and this model needs 2 x 40401 = 80802 of them, over the 20000 this exporter writes. The model is valid; the flat enumeration is what does not fit. Narrow the variable domains, or verify the model with `model_verify` and export only the machine for the properties that need PRISM.\",\"schema\":\"model-everything/export/v1\"}"
+  },
+  "verify: a stateMapping the tool refuses": {
+    "ok": false,
+    "ran": false,
+    "errorCode": "VERIFY_OPTION_INVALID",
+    "verdict": "fail",
+    "verdictReason": "the tool did not run: stateMapping is a string, not an object. This option is read as a map from one name to another.",
+    "findings": [],
+    "body": "model-everything/report  verdict=fail  the tool did not run: stateMapping is a string, not an object. This option is read as a map from one name to another.  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\nERROR  stateMapping is a string, not an object. This option is read as a map from one name to another. [VERIFY_OPTION_INVALID]\n\n{\"ok\":false,\"ran\":false,\"verdict\":\"fail\",\"verdictReason\":\"the tool did not run: stateMapping is a string, not an object. This option is read as a map from one name to another.\"}"
+  },
+  "report diff: a clean delta through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "pass",
+    "verdictReason": "no new findings, nothing resolved",
+    "schema": "model-everything/baseline/v1",
+    "summary": {
+      "baseline": 31,
+      "current": 31,
+      "added": 0,
+      "removed": 0,
+      "changed": 0,
+      "addedErrors": 0,
+      "addedWarnings": 0
+    },
+    "findings": [],
+    "nextSteps": [
+      "No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
+    ],
+    "delta": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "body": "model-everything/baseline/v1  verdict=pass  no new findings, nothing resolved  ok=true\nCURRENT  verdict=pass_with_findings\n\nNEXT  No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
+  },
+  "report diff: an escalation through the tool": {
+    "ok": true,
+    "ran": true,
+    "verdict": "fail",
+    "verdictReason": "1 finding(s) escalated to error (1 error) (first error: S5_UNHANDLED_EVENT)",
+    "schema": "model-everything/baseline/v1",
+    "summary": {
+      "baseline": 1,
+      "current": 1,
+      "added": 0,
+      "removed": 0,
+      "changed": 1,
+      "addedErrors": 0,
+      "addedWarnings": 0
+    },
+    "findings": [],
+    "nextSteps": [
+      "A finding moved from warning to error (1): the slice added nothing but still made the report worse, so the baseline is less strict than the run.",
+      "Review the 1 changed finding(s): the same locator now reports something different, which usually means the fix moved the problem.",
+      "The current report still fails on its own terms, and the delta already says the slice made it worse: settle both before accepting it."
+    ],
+    "delta": {
+      "added": [],
+      "removed": [],
+      "changed": [
+        "S5_UNHANDLED_EVENT"
+      ]
+    },
+    "body": "model-everything/baseline/v1  verdict=fail  1 finding(s) escalated to error (1 error) (first error: S5_UNHANDLED_EVENT)  ok=true\n\nCHANGED (1)\n  S5_UNHANDLED_EVENT  severity warning → error\nCURRENT  verdict=fail\n\nNEXT  A finding moved from warning to error (1): the slice added nothing but still made the report worse, so the baseline is less strict than the run.\nNEXT  Review the 1 changed finding(s): the same locator now reports something different, which usually means the fix moved the problem.\nNEXT  The current report still fails on its own terms, and the delta already says the slice made it worse: settle both before accepting it."
   }
 }

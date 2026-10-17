@@ -181,7 +181,10 @@ function projection(report) {
 // `@deepseek-ai/dsh-tools` (a devDependency) - loaded the way tests/uml loads it, with a visible skip.
 let toolCases = {}
 try {
-  const [umlTool, exportTool, structureTool] = await Promise.all([import('../../lib/uml-tool.js'), import('../../lib/export-tool.js'), import('../../lib/structure-tool.js')])
+  const [umlTool, exportTool, structureTool, verifyTool, diffTool] = await Promise.all([
+    import('../../lib/uml-tool.js'), import('../../lib/export-tool.js'), import('../../lib/structure-tool.js'),
+    import('../../lib/tool.js'), import('../../lib/report-diff-tool.js'),
+  ])
   toolCases = {
     'uml parse: a hand-drawn state diagram': () => umlTool.umlParseTool.execute({ diagram: stateDiagramText, notation: 'mermaid' }),
     // The output side: `uml_render` is the only tool that returns a payload nobody has frozen, and its warnings are
@@ -195,6 +198,13 @@ try {
     'structure: a component diagram through the tool': () => structureTool.umlStructureTool.execute({ diagram: structureDiagram }),
     'structure: two levels through the tool': () => structureTool.umlStructureTool.execute({ diagrams: [{ name: 'system', diagram: structureDiagram }, { name: 'core', parent: 'system', diagram: coreDiagram }] }),
     'export: a model too large for the prism encoding': () => exportTool.modelExportTool.execute({ model: wideVariables, format: 'prism' }),
+    // A refusal at the tool boundary: the option is declared `json`, so the tool is the only layer that can refuse a
+    // shape the engine would silently read as identity. `errorCode` is in the projection for exactly this.
+    'verify: a stateMapping the tool refuses': () => verifyTool.modelVerifyTool.execute({ model: stateMachine, beforeModel: stateMachine, stateMapping: 'INIT=STARTING' }),
+    // `report_diff` is a tool with no engine of its own: it reads two reports and renders a delta, and both halves of
+    // that were wrong until this session.
+    'report diff: a clean delta through the tool': () => diffTool.reportDiffTool.execute({ baseline: runVerification(stateMachine), current: runVerification(stateMachine) }),
+    'report diff: an escalation through the tool': () => diffTool.reportDiffTool.execute({ baseline: escalatingBaseline, current: escalatingCurrent }),
   }
 } catch (error) {
   console.log('SKIP tool-layer contract cases: the dsh tool modules did not load (' + (error instanceof Error ? error.message : String(error)) + ')')
@@ -204,6 +214,22 @@ try {
 // nothing declares, which is the C2 finding the engine started reporting when the option stopped being ignored.
 const leftMachine = { schemaVersion: 1, init: 'IDLE', states: [{ id: 'IDLE' }, { id: 'RUNNING', terminal: true }], transitions: [{ from: 'IDLE', event: 'go', to: 'RUNNING' }] }
 const rightMachine = { schemaVersion: 1, init: 'WAIT', states: [{ id: 'WAIT' }, { id: 'DONE', terminal: true }], transitions: [{ from: 'WAIT', event: 'go', to: 'DONE' }] }
+// Two reports that differ in one thing: a finding that keeps its evidence and moves from warning to error.
+const escalatingBaseline = {
+  schema: 'model-everything/verify/v1',
+  ran: true,
+  ok: true,
+  verdict: 'pass_with_findings',
+  verdictReason: 'no error findings; 1 warning finding(s)',
+  summary: { checksRun: 1 },
+  checks: [{ id: 'S5', name: 'Event Completeness', status: 'fail', detail: '', findings: [{ code: 'S5_UNHANDLED_EVENT', severity: 'warning', message: 'A silently ignores event stop', evidence: { state: 'A', event: 'stop' } }] }],
+}
+const escalatingCurrent = {
+  ...escalatingBaseline,
+  verdict: 'fail',
+  verdictReason: '1 error finding(s)',
+  checks: [{ id: 'S5', name: 'Event Completeness', status: 'fail', detail: '', findings: [{ code: 'S5_UNHANDLED_EVENT', severity: 'error', message: 'A silently ignores event stop', evidence: { state: 'A', event: 'stop' } }] }],
+}
 const communicationModel = {
   schemaVersion: 1,
   lifelines: [{ id: 'C', classifier: 'Customer' }, { id: 'O', classifier: 'Order' }],
