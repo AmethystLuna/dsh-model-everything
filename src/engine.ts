@@ -3584,9 +3584,12 @@ function A14_deadline(model: LogicModelV1, options: NormalizedOptions): CheckRes
   const queue: Array<{ runtime: RuntimeState; ticks: number; path: PathStep[] }> = [{ runtime: init, ticks: 0, path: [] }]
   const seen = new Set<string>()
   let steps = 0
+  // Whether the walk stopped because the budget ran out rather than because the space was exhausted. A
+  // search that did not finish cannot answer "all deadlines hold", so the check has to say which it was.
+  let capped = false
   while (queue.length > 0) {
     const entry = queue.shift()!
-    if (++steps > options.maxStates) break
+    if (++steps > options.maxStates) { capped = true; break }
     const key = runtimeKey(entry.runtime) + '|' + entry.ticks
     if (seen.has(key)) continue
     seen.add(key)
@@ -3624,7 +3627,17 @@ function A14_deadline(model: LogicModelV1, options: NormalizedOptions): CheckRes
       }
     }
   }
-  return checkResult('A14', 'Deadline', withUnresolved(model, 'A14', findings), findings.length === 0 ? 'All deadlines respected' : 'Deadline findings: ' + findings.length)
+  // A capped walk decided nothing about the part it never reached. `_UNDECIDED` is the vocabulary the schema
+  // reference names for exactly this, and `UNDECIDED_CODES` carries it into `summary.truncated`.
+  if (capped) {
+    findings.push({
+      code: 'A14_UNDECIDED',
+      severity: 'warning',
+      message: 'The deadline walk stopped at the ' + String(options.maxStates) + ' state budget before it finished, so deadline compliance is undecided rather than proven. Raise maxStates, or narrow the model.',
+      evidence: { maxStates: options.maxStates, steps },
+    })
+  }
+  return checkResult('A14', 'Deadline', withUnresolved(model, 'A14', findings), capped ? 'Deadline walk stopped at the state budget: undecided' : findings.length === 0 ? 'All deadlines respected' : 'Deadline findings: ' + findings.length)
 }
 
 // ---------------------------------------------------------------------------
