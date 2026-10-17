@@ -85,8 +85,11 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
   as a passing test.
 - **a SKIP also reads as a pass.** Some suites import a tool module dynamically and print `SKIP` when
   `@deepseek-ai/dsh-tools` does not resolve. A scratch copy without a `node_modules` junction hit exactly that, and two
-  mutations came back "not caught" for a case that never ran. Read the mutated suite's output for `SKIP` before
-  believing a green result - or give the copy the repository's `node_modules` (a junction is enough).
+  mutations came back "not caught" for a case that never ran.
+- **so run the pristine copy first.** The order that works: copy `lib/` and the suite, run it and require a green
+  result with no `SKIP`, and only then apply the mutation. A red or skipping baseline means the mutation cannot be
+  judged - report that, not "missed". The same `node_modules` junction that makes a tool-loading suite work belongs in
+  the copy before that first run.
 
 ## Routing, where the user meets the plugin
 

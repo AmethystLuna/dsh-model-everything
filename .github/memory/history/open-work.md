@@ -116,7 +116,7 @@ metadata:
 
 新用例当场抓到一处自相矛盾：`C2_RENDEZVOUS_UNRESOLVED` 是 `warning`，而同一份报告 `verdict=fail`、`summary.errors=1` —— 组合的计数把每条 finding 都当 error，于是正文说 `warn C2` / `[warning/…]`，上一行说 `1 error finding(s)`。现在 finding 是 error（调用方点名要查的握手没查成，不是通过），计数也只数自己带的 severity。
 
-**工具层现在全覆盖**（`3c12bde`）：`model_verify`、`model_compose_verify`、`model_datamodel_verify`、`model_design_review`、`model_concurrency_scan`、`report_diff`、`model_export`、`uml_parse`、`uml_render`、`uml_review`、`uml_structure_verify` 都有用例了 —— 十一个工具，一条不缺。快照共 40 条，其中工具层 14 条。`errorCode` 在投影里，所以拒绝形状也被冻结。
+**工具层现在全覆盖**（`3c12bde`）：`model_verify`、`model_compose_verify`、`model_datamodel_verify`、`model_design_review`、`model_concurrency_scan`、`report_diff`、`model_export`、`uml_parse`、`uml_render`、`uml_review`、`uml_structure_verify` 都有用例了 —— 十一个工具，一条不缺。快照共 41 条，其中工具层 15 条。`errorCode` 在投影里，所以拒绝形状也被冻结。
 
 冻结这些工具层用例时又抓到一处自相矛盾（`e40230c`）：`uml_parse` 把解析器注记放进 `warnings`、计进 verdict，却哪里都不印 —— 正文说「1 warning finding(s)」而下一行说「FINDINGS none — nothing was reported」。上一版的修法是把注记塞进 `findings`，但那与参考文档的说法（「a `UML_RENDER_APPROXIMATE_VIEW` warning」）冲突，还让每条注记在两个字段里重复。现在注记留在文档命名的通道上，由正文印出来（`WARNING` 行 + 空名册时说明「有几条注记在下面」）。
 
