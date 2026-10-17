@@ -4,17 +4,17 @@
     {
       "skill": "model-everything",
       "chars": 497,
-      "body": 36515
+      "body": 36033
     },
     {
       "skill": "model-everything-concurrency",
       "chars": 341,
-      "body": 4112
+      "body": 4067
     },
     {
       "skill": "model-everything-datamodel",
       "chars": 483,
-      "body": 6193
+      "body": 6063
     },
     {
       "skill": "model-everything-design",
@@ -29,12 +29,12 @@
     {
       "skill": "model-everything-structure",
       "chars": 476,
-      "body": 8786
+      "body": 8690
     },
     {
       "skill": "model-everything-uml",
       "chars": 466,
-      "body": 8263
+      "body": 8203
     }
   ],
   "toolChars": 10885,

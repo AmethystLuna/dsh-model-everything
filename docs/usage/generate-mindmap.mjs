@@ -46,14 +46,15 @@ let references = 0
 let referenceFiles = 0
 for (const skill of skills) {
   const dir = repo + 'skills/' + skill
-  const body = readFileSync(dir + '/SKILL.md', 'utf8')
+  // Line endings are a checkout setting, not a property of the shipped text.
+  const body = readFileSync(dir + '/SKILL.md', 'utf8').replaceAll('\r\n', '\n')
   bodies += body.length
   const match = /^description:\s*"([\s\S]*?)"\s*$/m.exec(body)
   const description = match === null ? '' : match[1]
   catalog += (description.length <= 500 ? description.length : 500) + skill.length
   if (!existsSync(dir + '/references')) continue
   for (const name of readdirSync(dir + '/references').filter((entry) => entry.endsWith('.md'))) {
-    references += readFileSync(dir + '/references/' + name, 'utf8').length
+    references += readFileSync(dir + '/references/' + name, 'utf8').replaceAll('\r\n', '\n').length
     referenceFiles += 1
   }
 }
