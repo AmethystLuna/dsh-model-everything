@@ -2900,6 +2900,31 @@ async function runBudgetCapTests() {
   }
   console.log('PASS cap: the budget walk still decides when it finishes, and still fails a real overrun')
 
+  // A7 re-decides the same invariant through `pathPropertyViolation`, which used to swallow the third outcome:
+  // the budget walk said "undecided" and A7 answered "All invariants hold for all reachable paths". A cheap
+  // re-expansion is what makes this walk outlast the exploration - the same shape the truncated-flag case uses.
+  const arrivals = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'D' }],
+    transitions: [
+      { from: 'A', event: 'e1', to: 'B', cost: 5 },
+      { from: 'A', event: 'e2', to: 'D', cost: 2 },
+      { from: 'D', event: 'e3', to: 'B', cost: 1 },
+    ],
+    invariants: [{ id: 'cap', description: 'stays under budget', kind: 'budget', budget: 100 }],
+  }
+  const cappedA7 = runVerification(arrivals, { maxStates: 3 })
+  const a7 = cappedA7.checks.find((check) => check.id === 'A7')
+  if (!a7.findings.some((finding) => finding.code === 'A7_UNDECIDED')) {
+    throw new Error('A7 decides the budget kind through the same walk, so it must report undecided too, got ' + JSON.stringify(a7.findings.map((finding) => finding.code)))
+  }
+  if (/All invariants hold/.test(String(a7.detail))) throw new Error('and must not claim every invariant holds: ' + String(a7.detail))
+  const decidedA7 = runVerification(arrivals, { maxStates: 4 }).checks.find((check) => check.id === 'A7')
+  if (decidedA7.findings.length !== 0) throw new Error('one pop more decides the same walk, got ' + JSON.stringify(decidedA7.findings.map((finding) => finding.code)))
+  if (!/All invariants hold for all reachable paths/.test(String(decidedA7.detail))) throw new Error('and it must say every invariant holds: ' + String(decidedA7.detail))
+  console.log('PASS cap: A7 reports the budget walk it cannot finish, and decides once it can')
+
   console.log('PASS budget-cap')
 }
 

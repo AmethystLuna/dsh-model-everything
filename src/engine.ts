@@ -2088,10 +2088,10 @@ function pathPropertyViolation(model: LogicModelV1, options: NormalizedOptions, 
   if (invariant.kind === 'atomicity') return findAtomicityViolation(model, options, invariant)
   if (invariant.kind === 'budget') {
     const violation = findBudgetViolation(model, options, invariant)
-    // This walk can also stop early. Its undecided state is reported by A12; here it means no witness was
-    // found, which is what this caller already did with the old `undefined`. Tracking it per-walk here is the
-    // same fix applied to the remaining probes, and is deliberately not claimed by this change.
-    if (violation === 'undecided') return undefined
+    // The walk can also stop early, and that is the third outcome: no witness was found, and the walk did not
+    // finish looking. Folding it into `undefined` made A7 (and D2) report "every invariant holds" about a search
+    // that decided nothing - the same defect the other walks had, in the one caller that reads this function.
+    if (violation === 'undecided') return { invariant, path: [], reason: invariantCapReason(options), undecided: true }
     if (violation === undefined) return undefined
     return {
       invariant,
@@ -2564,7 +2564,10 @@ function A7_shortestViolations(model: LogicModelV1, options: NormalizedOptions):
       evidence: { invariant: violation.invariant.id },
     }
   })
-  return checkResult('A7', 'Minimal Counter-Example', findings, violations.length === 0 ? 'All invariants hold for all reachable paths' : 'Violated invariants: ' + findings.length)
+  const undecided = findings.some((finding) => finding.code === 'A7_UNDECIDED')
+  return checkResult('A7', 'Minimal Counter-Example', findings, violations.length === 0
+    ? 'All invariants hold for all reachable paths'
+    : undecided && findings.every((finding) => finding.code === 'A7_UNDECIDED') ? 'Invariant walks stopped at the state budget: undecided' : 'Violated invariants: ' + findings.length)
 }
 
 function mapStateId(mapping: Record<string, string>, state: string): string {
