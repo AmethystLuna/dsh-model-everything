@@ -1756,7 +1756,11 @@ export function reviewUml(options: UmlReviewOptions): UmlReviewReport {
       const message = error instanceof Error ? error.message : String(error)
       const unreadable: UmlFinding = { code: 'UML001_DIAGRAM_UNREADABLE', severity: 'error', message, detail: 'The diagram could not be read as a Mermaid/PlantUML state or activity diagram.' }
       return {
-        ok: false,
+        // `ok: true`, because this IS a review: it ran, it examined the text, and it reported that the text
+        // cannot be read. `ok: false` is for a refusal - no report at all - and a reader keying on it was told
+        // "nothing happened" about the one answer that says exactly what is wrong. Every other family sets
+        // `ok: true` for a failing review; this was the only report that did not.
+        ok: true,
         ran: true,
         ...verdictOfFindings([unreadable]),
         schema: REPORT_SCHEMAS.umlReview,
