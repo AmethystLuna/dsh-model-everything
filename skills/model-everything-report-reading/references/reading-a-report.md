@@ -11,12 +11,19 @@ than drawn. A hand-drawn map drifts; this one cannot claim a shape the engines d
 
 ### 1. Did it run?
 
-Read `ran` before `verdict`. A refusal is not a review: when a tool refuses its input there is no
-verdict to route on, and the fields below `ran` describe the refusal rather than a model.
+`ran` separates a tool that refused from one that ran, but it answers that question for one kind of
+refusal only. A call refused at the boundary — an argument in the wrong shape, a format that does not
+exist, a notation that is not one — comes back with `ran: false`, an `errorCode`, and a
+`verdictReason` beginning "the tool did not run". There is no verdict to route on, so fix the call.
 
-A refusal carries `errorCode` — an argument that arrived in the wrong shape, a format that does not
-exist, a notation that is not one. A review that ran and failed carries findings. The two need
-different responses, so tell them apart before reading anything else.
+An input the engine's own schema rejects is a different shape, and it matters more because it looks
+like a review: `ran: true` (the engine did run), `ok: false`, `verdict: fail`, no `errorCode`, and one
+finding under a check whose id is `MODEL`, `DATA_MODEL` or `DESIGN`. Its `summary.checksRun` is `0`.
+Read it as "the input is the problem, not the design" — a model that was actually reviewed examined
+something, so a non-zero `checksRun` is what separates a defective model from a malformed one.
+
+So a refusal and a failing review need different responses, and `ran` alone does not tell them apart:
+the test is `ran: false`, or `checksRun: 0` beside a check named after the validation.
 
 ### 2. What did it decide?
 

@@ -5,6 +5,7 @@
 import { diffReports, findingIdentity, flattenReportFindings } from '../../lib/baseline.js'
 import { runVerification, runCompositionVerification, modelHash } from '../../lib/engine.js'
 import { reviewStructure } from '../../lib/structure.js'
+import { runDataVerification } from '../../lib/data-engine.js'
 
 let failures = 0
 function test(name, fn) {
@@ -179,6 +180,83 @@ test('a partial report is still accepted, which is the line the guard has to sta
   const diff = diffReports({ findings: [] }, partial)
   if (diff.added.length !== 1) throw new Error('a partial report must still contribute its findings: ' + JSON.stringify(diff.summary))
   if (diff.added[0].code !== 'S2_NO_TRANSITIONS') throw new Error('added: ' + JSON.stringify(diff.added.map((finding) => finding.code)))
+})
+
+function mustRefuse(baseline, current, expected, label) {
+  try {
+    diffReports(baseline, current)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!expected.test(message)) throw new Error(label + ': the refusal must say what was wrong, got ' + message)
+    return
+  }
+  throw new Error(label + ' must be refused, not compared')
+}
+
+test('the two sides have to be the same family, and a schema mismatch says which is which', () => {
+  // The defect this closes: a verify report against a datamodel report answered `verdict: pass` with
+  // "6 finding(s) resolved" - six findings that were never fixed, only absent from the other roster.
+  // `schema` is on both reports and is the family, so the comparison can decide and refuse.
+  const broken = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }, { from: 'B', event: 'back', to: 'A' }],
+  }
+  const verify = runVerification(broken)
+  const datamodel = runDataVerification({
+    schemaVersion: 1,
+    entities: [{ name: 'U', fields: [{ name: 'id', type: 'uuid' }], primaryKey: ['id'] }],
+  })
+  // Precondition: the baseline really carries findings, or "resolved" would have meant nothing either way.
+  if (verify.summary.errors + verify.summary.warnings === 0) throw new Error('the fixture must carry findings')
+  mustRefuse(verify, datamodel, /verify\/v1.*datamodel\/v1/, 'a verify report against a datamodel report')
+  mustRefuse(datamodel, verify, /datamodel\/v1.*verify\/v1/, 'the same mismatch, reversed')
+})
+
+test('a refusal is not a report, and neither is a report about an invalid input', () => {
+  // Two shapes wear the name. A tool-boundary refusal never ran; an invalid-input report ran but examined
+  // nothing (`checksRun: 0`, one check named MODEL). Comparing either one's empty finding list against a
+  // real report would call every finding in it resolved.
+  const real = runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] })
+  const boundaryRefusal = { ok: false, ran: false, verdict: 'fail', verdictReason: 'the tool did not run: bad input', errorCode: 'REPORT_INVALID', error: 'bad input' }
+  mustRefuse(real, boundaryRefusal, /current is a refusal/, 'a boundary refusal as the current side')
+  mustRefuse(boundaryRefusal, real, /baseline is a refusal/, 'a boundary refusal as the baseline')
+
+  const invalidInput = runVerification('this is not a model')
+  if (invalidInput.summary.checksRun !== 0) throw new Error('the fixture must be the examined-nothing shape: ' + String(invalidInput.summary.checksRun))
+  mustRefuse(real, invalidInput, /examined nothing/, 'a report about an invalid input as the current side')
+})
+
+test('an object with no report fields is not a report', () => {
+  // The guard used to require only "an object", so the hole it closed for a string reopened for `{}`:
+  // two empty objects have two empty finding lists, and the delta read as agreement.
+  const real = runVerification({ schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] })
+  mustRefuse({}, {}, /no report fields/, 'two empty objects')
+  mustRefuse({}, real, /no report fields/, 'an empty object as the baseline')
+  mustRefuse(real, {}, /no report fields/, 'an empty object as the current side')
+  mustRefuse({ config: true }, real, /no report fields/, 'an object that is configuration rather than a report')
+})
+
+test('the near miss: comparable reports still compare', () => {
+  // A guard that refuses everything is not a guard. Each of these is a comparison the tool is for.
+  const machine = (extraState) => ({
+    schemaVersion: 1,
+    init: 'A',
+    states: extraState ? [{ id: 'A' }, { id: 'B' }, { id: 'C' }] : [{ id: 'A' }, { id: 'B' }, { id: 'C', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }, { from: 'B', event: 'stop', to: 'C' }],
+  })
+  // A refactor: before and after, same family.
+  const beforeAfter = diffReports(runVerification(machine(false)), runVerification(machine(true)))
+  if (typeof beforeAfter.verdict !== 'string') throw new Error('a before/after comparison must produce a verdict')
+  // Two structure reviews.
+  const diagram = (extra) => ['@startuml', 'component [A] as A', 'component [B] as B', ...(extra ? ['component [C] as C'] : []), 'A --> B', '@enduml'].join('\n')
+  const structureDelta = diffReports(reviewStructure({ diagram: diagram(false) }), reviewStructure({ diagram: diagram(true) }))
+  if (typeof structureDelta.verdict !== 'string') throw new Error('two structure reviews must compare')
+  // A partial report on one side only: without a schema on both sides the family cannot be known, and the
+  // guard must not invent one.
+  const partialAgainstReal = diffReports({ findings: [] }, runVerification(machine(false)))
+  if (typeof partialAgainstReal.verdict !== 'string') throw new Error('a partial side must still compare')
 })
 
 if (failures > 0) { console.log('baseline tests failed:', failures); process.exit(1) }

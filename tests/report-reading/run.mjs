@@ -78,7 +78,7 @@ test('the guide names only fields the reports carry', () => {
     'hashes', 'modelHash', 'hashSpec', 'schemaVersion', 'currentVerdict', 'added', 'changed', 'removed',
     'findings', 'checks', 'violations', 'signals', 'facts', 'graph', 'notation', 'roundTrip', 'primary',
     'source', 'warnings', 'summary', 'errorCode', 'severity', 'code', 'message', 'detail', 'evidence',
-    'status', 'truncated', 'boundNotes', 'layerViolations', 'checksSkipped',
+    'status', 'truncated', 'boundNotes', 'layerViolations', 'checksSkipped', 'checksRun',
     // Members of the design review's `facts` measurement object.
     'density', 'ranks', 'articulationPoints', 'feedbackArcs', 'largestCycle', 'nodes', 'edges',
   ]) known.add(extra)

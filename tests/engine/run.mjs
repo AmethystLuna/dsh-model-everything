@@ -2660,7 +2660,9 @@ async function runEntryShapeTests() {
     ['export: a number as a format', () => exportModel(machine, 42), 'format'],
     ['export: a cased format', () => exportModel(machine, 'SPIN'), 'format'],
     ['diff: no baseline at all', () => diffReports(null, null), 'baseline'],
-    ['diff: no current at all', () => diffReports(machine, undefined), 'current'],
+    // The valid side has to be a REPORT: a model object is now refused as a baseline in its own right,
+    // which would name the wrong side and hide what this case is about.
+    ['diff: no current at all', () => diffReports(runVerification(machine), undefined), 'current'],
     ['uml: a notation that does not exist', () => reviewUml({ model: machine, notation: 'graphviz' }), 'notation'],
     ['uml: a number as a notation', () => reviewUml({ model: machine, notation: 42 }), 'notation'],
     ['uml: a cased notation', () => reviewUml({ model: machine, notation: 'Mermaid' }), 'notation'],
