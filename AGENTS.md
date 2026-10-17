@@ -60,6 +60,27 @@ npm run bump -- --audit  # no stale version references
 Before committing: `npm run build` then `git diff --exit-code -- lib`. A change to
 `src/` that is not reflected in `lib/` fails CI.
 
+## Trying a build in a real profile
+
+The suites decide whether the engine is right. Only a mounted profile decides whether the
+plugin is **reachable**, and that path has two traps, both met while testing this plugin:
+
+- **A re-install over an existing `file:` dependency does nothing.** pnpm treats the
+  directory as already satisfied and re-links it without re-copying, so the profile keeps the
+  previous build while the command reports success. Remove the bundle, then install it:
+  `plugin_manager` with `action: remove_bundle` on the package name, then `install_bundle`
+  with the `file:` spec.
+- **The running process keeps the module it already imported.** Node's ESM cache cannot be
+  invalidated in-process, so a re-mounted plugin continues to serve the old code - the loader
+  row is live, the files on disk are new, and the tools answer from the previous build. A
+  profile restart is what makes it take effect. The two are worth telling apart before
+  debugging anything: `import` the installed `lib/` path from a fresh `node` process and call
+  the tool's `execute`. If the fresh process and the running tool disagree, the process is
+  stale and nothing about the code is wrong.
+
+A re-install also prints a `Packages:` line that reports removals as it prunes; the plugin and
+its neighbours survive it, but that line is not a signal that the copy was refreshed.
+
 ## Writing rules
 
 These apply to every file this repository ships or publishes.
