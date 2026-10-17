@@ -1973,6 +1973,30 @@ test('communication: mermaid has no communication diagram', () => {
   if (refusal.code !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('refusal code: ' + refusal.code)
 })
 
+test('communication: a model from another family is refused by name, not drawn as an empty page', () => {
+  // Every list this family reads defaults to empty, so a structure model used to validate cleanly: the render
+  // produced an empty `@startuml … @enduml` page with a warning claiming it had drawn objects and arrows, and the
+  // review threw a TypeError on `lifelines.length` - a crash where a review belongs.
+  const foreign = { schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } }
+  const refusal = refusalOf(() => renderUml(foreign, 'plantuml', 'communication'))
+  if (refusal.code !== 'UML041_MODEL_FAMILY_MISMATCH') throw new Error('refusal code: ' + refusal.code)
+  if (!refusal.message.includes('lifelines')) throw new Error('the refusal must name what the family needs: ' + refusal.message)
+  if (!refusal.message.includes('architecture')) throw new Error('and what the model declared instead: ' + refusal.message)
+  // The review reports the same thing as a finding: a mismatch is a result, not an exception.
+  const review = reviewUml({ model: foreign, diagramKind: 'communication' })
+  const mismatch = review.findings.filter((finding) => finding.code === 'UML041_MODEL_FAMILY_MISMATCH')
+  if (mismatch.length !== 1) throw new Error('the review must report it once, got ' + JSON.stringify(review.findings.map((finding) => finding.code)))
+  if (mismatch[0].severity !== 'error') throw new Error('and as an error: ' + mismatch[0].severity)
+  // The near miss: a model that declares nothing at all is an EMPTY communication model, not a foreign one. The
+  // family already reports that as UML063, and a refusal here would hide it.
+  const empty = renderUml({ schemaVersion: 1 }, 'plantuml', 'communication')
+  if (!/@startuml[\s\S]*@enduml/.test(empty.primary)) throw new Error('an empty model still draws an empty page: ' + empty.primary)
+  const emptyReview = reviewUml({ model: { schemaVersion: 1 }, diagramKind: 'communication' })
+  if (!emptyReview.findings.some((finding) => finding.code === 'UML063_COMMUNICATION_NO_LIFELINES')) {
+    throw new Error('and the family says it has no lifelines: ' + JSON.stringify(emptyReview.findings.map((finding) => finding.code)))
+  }
+})
+
 test('communication: every code the family declares is produced by its own case', () => {
   const cases = [
     ['UML063_COMMUNICATION_NO_LIFELINES', { lifelines: [], links: [], messages: [] }],
