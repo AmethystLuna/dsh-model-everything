@@ -2551,14 +2551,14 @@ async function runCheckCodeCoverageTests() {
       codes: [['S6', 'S6_UNBOUNDED_DOMAIN']],
     },
     {
-      // S7 cannot reach this code through the public API. Its own runInvariants() call leaves
-      // includePathProperties at false, so a leads-to, sequence, atomicity, budget or
-      // probability invariant is decided by the single-runtime predicate, which holds for
-      // every one of those kinds by construction. The only producer of `undecided: true` is
-      // the leads-to branch of pathPropertyViolation, which only A7 and D2 call. This case
-      // pins that: the same model makes A9 and A7 report the exhausted walk, while S7 stays
-      // silent instead of claiming to have decided a path property.
-      name: 'S7_UNDECIDED (unreachable: S7 decides no path property)',
+      // S7 decides state predicates. A leads-to invariant is a property of whole runs, decided by A9, and
+      // A7 owns every kind. So this model hands S7 a roster it can decide nothing from, and the honest
+      // answer is a skip - it used to report "All invariants hold" over that empty roster.
+      //
+      // S7_UNDECIDED is reachable now, but only from a state-kind walk that hit its cap; that has its own
+      // case in `runInvariantCapTests` below. What stays true here is that S7 never reports a path-property
+      // invariant: it neither passes nor fails one, it says it examined none.
+      name: 'S7 skips a roster of path properties only',
       run: () => runVerification({
         schemaVersion: 1,
         init: 'A',
@@ -2569,11 +2569,11 @@ async function runCheckCodeCoverageTests() {
       }, { maxStates: 10 }),
       codes: [['A9', 'A9_LEADS_TO_UNDECIDED'], ['A7', 'A7_UNDECIDED']],
       assert(report) {
-        const s7 = codesIn(report, 'S7')
-        if (s7.includes('S7_UNDECIDED')) {
-          throw new Error('S7_UNDECIDED became reachable: S7 now decides a path property, so rewrite this case to assert it')
+        const s7 = report.checks.find((check) => check.id === 'S7')
+        if (s7.status !== 'skip') {
+          throw new Error('S7 decides no path property, so it must skip rather than answer: ' + s7.status + ' / ' + String(s7.detail))
         }
-        if (s7.length !== 0) throw new Error('S7 must not decide a path-property invariant at all, got ' + JSON.stringify(s7))
+        if (s7.findings.length !== 0) throw new Error('a skipped check carries no finding, got ' + JSON.stringify(s7.findings.map((finding) => finding.code)))
       },
     },
     {
@@ -2982,6 +2982,68 @@ async function runTruncatedFlagTests() {
 }
 
 await runTruncatedFlagTests()
+
+
+// --------------------- S7: its own walk, and a roster it decides nothing from ---
+
+async function runInvariantCapTests() {
+  // S7's walk over runtime states stops at maxStates like every other walk, and it used to answer
+  // "All invariants hold" for the part it never reached. The variable is bounded by the guard, so the space
+  // is finite - this is a cap, not an infinite-domain model, and S6 has nothing to object to.
+  const guarded = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }],
+    variables: [{ name: 'x', kind: 'integer', init: 0 }],
+    transitions: [{ from: 'A', event: 'tick', to: 'A', guard: { variable: 'x', op: '<', value: 100 }, updates: [{ variable: 'x', op: 'inc', value: 1 }] }],
+  }
+  const wide = { ...guarded, invariants: [{ id: 'range', description: 'x stays at or below 1000', kind: 'var-in-range', variable: 'x', max: 1000 }] }
+  const capped = runVerification(wide, { maxStates: 40 })
+  const s7 = capped.checks.find((check) => check.id === 'S7')
+  if (!s7.findings.some((finding) => finding.code === 'S7_UNDECIDED')) {
+    throw new Error('a capped invariant walk must say it did not finish, got ' + JSON.stringify(s7.findings.map((finding) => finding.code)))
+  }
+  if (/All invariants hold/.test(String(s7.detail))) throw new Error('and must not claim they hold: ' + String(s7.detail))
+  if (capped.summary.truncated !== true) throw new Error('an S7 undecided finding must set summary.truncated')
+  console.log('PASS cap: an invariant walk that hit its cap is undecided, not clean')
+
+  // The near miss: the same model with a budget that finishes decides, and says the invariant holds.
+  const decided = runVerification(wide, { maxStates: 10000 })
+  const decidedS7 = decided.checks.find((check) => check.id === 'S7')
+  if (decidedS7.findings.some((finding) => finding.code === 'S7_UNDECIDED')) throw new Error('a finished walk must not claim undecided')
+  if (!/All invariants hold/.test(String(decidedS7.detail))) throw new Error('and it must say the invariant holds: ' + String(decidedS7.detail))
+
+  // The other direction: a real violation is still decided when the walk reaches it. Without this, a check
+  // that reported undecided unconditionally would satisfy everything above.
+  const tight = runVerification({ ...guarded, invariants: [{ id: 'range', description: 'x stays at or below 50', kind: 'var-in-range', variable: 'x', max: 50 }] }, { maxStates: 10000 })
+  const tightS7 = tight.checks.find((check) => check.id === 'S7')
+  if (!tightS7.findings.some((finding) => finding.code === 'S7_INVARIANT_VIOLATION')) {
+    throw new Error('a violated invariant must still be reported, got ' + JSON.stringify(tightS7.findings.map((finding) => finding.code)))
+  }
+  console.log('PASS cap: a finished invariant walk still decides, holds or violated')
+
+  // And the roster half: S7 decides state predicates only, so a model that declares nothing else gives it
+  // nothing to examine - a skip, not "All invariants hold" over an empty roster. The near miss is a roster
+  // it can decide.
+  const predicateOnly = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+    invariants: [{ id: 'never-b', description: 'B is never entered', kind: 'never-states', states: ['B'] }],
+  }
+  const withPredicate = runVerification(predicateOnly)
+  const predicateS7 = withPredicate.checks.find((check) => check.id === 'S7')
+  if (predicateS7.status === 'skip') throw new Error('S7 has a state predicate to decide here, so it must not skip: ' + String(predicateS7.detail))
+  if (!predicateS7.findings.some((finding) => finding.code === 'S7_INVARIANT_VIOLATION')) {
+    throw new Error('and it must report the violation it can see, got ' + JSON.stringify(predicateS7.findings.map((finding) => finding.code)))
+  }
+  console.log('PASS roster: a state predicate keeps S7 in the run')
+
+  console.log('PASS invariant-cap')
+}
+
+await runInvariantCapTests()
 
 
 if (failures > 0) {
