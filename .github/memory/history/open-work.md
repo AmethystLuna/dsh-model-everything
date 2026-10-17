@@ -90,3 +90,24 @@ metadata:
 
 - 技能触发评估：旧仓库那份针对另一个宿主 CLI 的触发 harness 已随历史重建删除。要为 dsh 做触发评估就按 dsh 的技能目录行重写；五个提示词夹具可从历史备份包取回。
 - **技能文档双语**：技能文档目前是英文单语，只有 README 成对。若要双语，是一次成规模补写（六个 `SKILL.md` 加各自的 `references/*.md`），动手前先定样例再铺开。
+
+## 5. 部署面实测后剩下的缺口（2026-10-17，装进 desktop profile 实跑 + 一次只读复审）
+
+前一批二十处已修（见 git `a4c3084`…`7f8550a`）。下表是**还没修的**，按伤害排序。标「已实测」的是我执行验证过的；其余来自只读代码复审（**未执行**，动手前先复现）。
+
+| # | 缺口 | 状态 | 判据落点 |
+|---|---|---|---|
+| 1 | `model_compose_verify` 的 `rendezvous` 从不解析：拼错的名字、甚至传字符串 `"go"`，都静默跳过 C2，报告仍 `verdict=pass` + 「All rendezvous events can fire」 | **已实测** | `lib/engine.js` 的 `new Set(options.rendezvous ?? [])` 与 `if (!allEventsSet.has(event)) continue`；工具只校验了 `machines` |
+| 2 | 检查内的搜索上限：`maxStates` 用尽后 A12 等仍报 `pass` + 「All budget invariants hold」，且没有 `*_UNDECIDED`，`summary.truncated` 虽然为 `true` | **已实测** | `shortestViolationForInvariant` / `findBudgetViolation` 等 `break` 分支；`dsh-model-schema.md` 承诺 cap 会以 `_UNDECIDED` 报告 |
+| 3 | `uml_parse` 默认正文不显示模型与告警，且自相矛盾：header 说「1 warning finding(s)」、下一行 `FINDINGS none` | 未实测 | `uml-tool.js` 的 `parseVerdict` 把 warnings 计入 verdict；`report-view.js` 的 `renderFindingsReport` 只印 findings |
+| 4 | 默认正文从不显示 `truncated` / `boundNotes` / `hashSpec` / `metadataKeys`；`narrativeCoverage` 的渲染分支用 `count()` 收数字，而引擎给的是 `"5/5"` 字符串 → 那行永远不出现 | 未实测 | `report-view.js` 的 `headerLines` |
+| 5 | `report_diff` 空 delta 走未知形状兜底，把整份 JSON 打出来；非空时 `changed` 被 `toViewFinding` 编造成 `severity: warning`，before/after 丢失 | 未实测 | `report-view.js` 的 `isDelta` 与 `renderDeltaReport` |
+| 6 | `report_diff` 判定只看 `added`：warning→error 升级不让 delta fail | 未实测 | `baseline.js` 的 `diffOf` |
+| 7 | `communication` 族：接受结构族形状的模型，渲染出空文档，并发出描述「已画对象和箭头」的告警 | **已实测** | 该族模型应为 `lifelines/links/messages`；渲染器不校验形状 |
+| 8 | `design` 的 `checksRun` 把 skip 计进去（verify/datamodel 已改为排除） | 未实测 | `design-engine.js` 的 `checksRun: checks.length` |
+| 9 | `stateMapping` 形状不校验：字符串/数组被当成 identity 映射，静默产出假 D1 错误 | 未实测 | `tool.js` 的 `stateMapping` 参数无校验；`engine.js` 的 `mapping[state] ?? state` |
+| 10 | 导出族：UPPAAL 的 sync label 没有对应 `chan` 声明；PRISM 枚举超限被压成 `MODEL_INVALID`（合法模型被说成非法）；cost/maxTicks 等构造静默丢弃 | 未实测 | `exporters.js`；`export-tool.js` 的错误映射 |
+
+**分类原则（决定拒绝怎么写）**：先分清是**输入意图本身出问题**（名字/记号不存在 → `UML_INPUT` / `UML_VIEW_UNREPRESENTABLE`），还是**模型与意图不符**（模型属于别的族 → 需要新码 `UML_MODEL_MISMATCH`，消息同时点名两边），还是**模型自身残缺**（缺字段/版本旧 → `UML_INPUT`）。第 7 条属于第二类，现在被吞成「成功但空」。
+
+**结构性原因**：契约快照覆盖的行星不全——没有 compose、`uml_parse`、`uml_render`、export 工具层的用例。上面 3、4、5、7 能活下来，都是因为不在快照里。
