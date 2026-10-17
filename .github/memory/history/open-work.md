@@ -97,8 +97,8 @@ metadata:
 
 | # | 缺口 | 状态 | 判据落点 |
 |---|---|---|---|
-| 1 | `model_compose_verify` 的 `rendezvous` 从不解析：拼错的名字、甚至传字符串 `"go"`，都静默跳过 C2，报告仍 `verdict=pass` + 「All rendezvous events can fire」 | **已实测** | `lib/engine.js` 的 `new Set(options.rendezvous ?? [])` 与 `if (!allEventsSet.has(event)) continue`；工具只校验了 `machines` |
-| 2 | 检查内的搜索上限：`maxStates` 用尽后仍报「All … hold」，且没有 `*_UNDECIDED` | **部分修复**：`A14`（`b72a0fb`，walk 在函数体内，加标志即可）与 `A12`（`7b0eab1`，walk 在辅助函数里，必须把 `undefined` 拆成第三态 `'undecided'`）已完成；**`A10`、`A11`、`S7`、`A7` 仍是旧行为** | 逐个看 walk 在哪：函数体内 → 加 `capped` 标志；独立函数 → 改返回类型为 `T \| 'undecided' \| undefined`。`A7` 走的那条 `findBudgetViolation` 调用点在 `7b0eab1` 里显式保留旧行为 |
+| 1 | `model_compose_verify` 的 `rendezvous` 从不解析：拼错的名字、甚至传字符串 `"go"`，都静默跳过 C2，报告仍 `verdict=pass` + 「All rendezvous events can fire」 | **已修**（`91d53a1`）：未解析的名字出 `C2_RENDEZVOUS_UNRESOLVED`；字符串传参在工具层被 `COMPOSE_OPTION_INVALID` 拒绝 | `lib/engine.js` 的 `new Set(options.rendezvous ?? [])` 与 `if (!allEventsSet.has(event)) continue`；工具只校验了 `machines` |
+| 2 | 检查内的搜索上限：`maxStates` 用尽后仍报「All … hold」，且没有 `*_UNDECIDED` | **已修**：五条 walk 都有第三态——`A14`（`b72a0fb`，walk 在函数体内，加标志）、`A12`（`7b0eab1`，辅助函数返回 `'undecided'`）、`S7`（`4384160`）、`A10`（`b088bf7`）、`A11`（`50e2703`）、`A7`（`4bb7a28`）。附带发现：`summary.truncated` 之前靠手写码表判定，`A12`/`A14` 的码不在表里 → finding 在而 `truncated=false`，已改为按 `_UNDECIDED` 后缀判定（`3d4cef3`） | 判据：walk 在函数体内 → 加 `capped` 标志；独立函数 → 三态返回。`InvariantViolation` 本来就带 `undecided` 字段，所以这几条**不需要**改签名，只需要把它填上 |
 | 3 | `uml_parse` 默认正文不显示模型与告警，且自相矛盾：header 说「1 warning finding(s)」、下一行 `FINDINGS none` | 未实测 | `uml-tool.js` 的 `parseVerdict` 把 warnings 计入 verdict；`report-view.js` 的 `renderFindingsReport` 只印 findings |
 | 4 | 默认正文从不显示 `truncated` / `boundNotes` / `hashSpec` / `metadataKeys`；`narrativeCoverage` 的渲染分支用 `count()` 收数字，而引擎给的是 `"5/5"` 字符串 → 那行永远不出现 | 未实测 | `report-view.js` 的 `headerLines` |
 | 5 | `report_diff` 空 delta 走未知形状兜底，把整份 JSON 打出来；非空时 `changed` 被 `toViewFinding` 编造成 `severity: warning`，before/after 丢失 | 未实测 | `report-view.js` 的 `isDelta` 与 `renderDeltaReport` |
@@ -111,3 +111,5 @@ metadata:
 **分类原则（决定拒绝怎么写）**：先分清是**输入意图本身出问题**（名字/记号不存在 → `UML_INPUT` / `UML_VIEW_UNREPRESENTABLE`），还是**模型与意图不符**（模型属于别的族 → 需要新码 `UML_MODEL_MISMATCH`，消息同时点名两边），还是**模型自身残缺**（缺字段/版本旧 → `UML_INPUT`）。第 7 条属于第二类，现在被吞成「成功但空」。
 
 **结构性原因**：契约快照覆盖的行星不全——没有 compose、`uml_parse`、`uml_render`、export 工具层的用例。上面 3、4、5、7 能活下来，都是因为不在快照里。
+
+**这一批的教训（对第 2 行那类「报告说得比它知道的多」的缺口）**：判据不是「这个 walk 会不会停」，而是**停下来之后返回的是什么**。凡是 `undefined` 既表示「找过了，没有」又表示「没找完」的地方，报告就必然在两者之间选一个说法，而它选的总是更乐观的那个。修的时候先看 walk 的返回类型：`InvariantViolation` 自带 `undecided`，填上即可；`findBudgetViolation` 没有这个字段，才需要加 `'undecided'` 这一态。判据落错层两次都发生在这一步（引擎 vs 工具层、`uml_explain_labels` vs `uml_review`）。
