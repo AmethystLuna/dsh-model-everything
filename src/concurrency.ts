@@ -1,4 +1,4 @@
-import { REPORT_SCHEMAS, verdictOfFindings, type ReportSchema, type Verdict } from './engine.js'
+import { REPORT_SCHEMAS, refusalVerdict, verdictOfFindings, type ReportSchema, type Verdict } from './engine.js'
 export interface ConcurrencyFinding {
   code: 'CONCURRENCY_KEYWORD' | 'CONCURRENCY_ABSOLUTE_CLAIM'
   severity: 'warning' | 'error'
@@ -27,6 +27,9 @@ export interface ConcurrencyScanReport {
   }
   /** This scan hashes no model; the field is present so every report has the same shape. */
   hashes: Record<string, string>
+  /** Present only on a refusal: the code a caller routes on, and the message behind it. */
+  errorCode?: string
+  error?: string
   /** What to do next, derived from the findings — never empty. */
   nextSteps: string[]
 }
@@ -70,6 +73,29 @@ const KEYWORD_RULES: KeywordRule[] = [
   { pattern: /\bdisable_irq\b/i, label: 'disable_irq', absolute: false },
   { pattern: /\benable_irq\b/i, label: 'enable_irq', absolute: false },
   { pattern: /\bspin_lock_irqsave\b/i, label: 'spin_lock_irqsave', absolute: false },
+  // Chinese terms. The vocabulary was English-only, so a Chinese document about the same subject mined
+  // nothing and landed in the no-claim path - a blind spot that read as a clean scan. A negated form is an
+  // absolute claim, and the lookbehind keeps the bare term from firing on the same line as well.
+  { pattern: /线程安全/, label: '线程安全 (thread-safe)', absolute: true },
+  { pattern: /无数据竞争/, label: '无数据竞争 (no data race)', absolute: true },
+  { pattern: /(?<!无)数据竞争/, label: '数据竞争 (data race)', absolute: false },
+  { pattern: /无竞态/, label: '无竞态 (race-free)', absolute: true },
+  { pattern: /(?:无锁|免锁)/, label: '无锁 (lock-free)', absolute: true },
+  { pattern: /(?:中断安全|ISR安全)/, label: '中断安全 (interrupt-safe)', absolute: true },
+  { pattern: /竞态条件/, label: '竞态条件 (race condition)', absolute: false },
+  { pattern: /并发/, label: '并发 (concurrent)', absolute: false },
+  { pattern: /并行/, label: '并行 (parallel)', absolute: false },
+  { pattern: /多线程/, label: '多线程 (multi-threaded)', absolute: false },
+  { pattern: /原子/, label: '原子 (atomic)', absolute: false },
+  { pattern: /互斥/, label: '互斥 (mutex)', absolute: false },
+  { pattern: /信号量/, label: '信号量 (semaphore)', absolute: false },
+  { pattern: /自旋锁/, label: '自旋锁 (spinlock)', absolute: false },
+  { pattern: /共享变量/, label: '共享变量 (shared variable)', absolute: false },
+  { pattern: /共享内存/, label: '共享内存 (shared memory)', absolute: false },
+  { pattern: /全局状态/, label: '全局状态 (global state)', absolute: false },
+  { pattern: /可重入/, label: '可重入 (reentrant)', absolute: false },
+  { pattern: /临界区/, label: '临界区 (critical section)', absolute: false },
+  { pattern: /关中断/, label: '关中断 (disable interrupt)', absolute: false },
 ]
 
 /**
@@ -134,6 +160,27 @@ export function runConcurrencyScan(text: unknown): ConcurrencyScanReport {
     nextSteps.push('Review each flagged keyword: a plan that names shared state, a mutex or an interrupt without a synchronization argument is incomplete, not merely verbose.')
   }
   nextSteps.push('This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions.')
+  if (findings.length === 0) {
+    // Nothing was mined, so nothing was examined. Reporting `pass` here said "no concurrency problem"
+    // about a text this scan could not see: the same false green as a check that examined nothing, and the
+    // common case, because a plan that is not about concurrency at all lands here too.
+    const reason = 'the text contains no concurrency claim this scan can mine, so there is nothing to scan. It is either not about concurrency, or it is written in a vocabulary this scan does not match: it reads English terms such as mutex, atomic and thread-safe, and Chinese ones such as 互斥, 原子 and 线程安全'
+    return {
+      ok: false,
+      ran: false,
+      ...refusalVerdict(reason),
+      schema: REPORT_SCHEMAS.concurrency,
+      errorCode: 'CONCURRENCY_NO_CLAIM',
+      error: reason,
+      findings: [],
+      summary: { lines: lines.length, keywords: 0, absoluteClaims: 0, warnings: 0, errors: 0 },
+      hashes: {},
+      nextSteps: [
+        'If the text does discuss concurrency, name the claim explicitly — the resource, the guard, and what it protects — and scan it again.',
+        'This scan mines claims; it does not prove concurrency safety — route each one to the tool named in its suggestions.',
+      ],
+    }
+  }
   return {
     ok: true,
     ran: true,

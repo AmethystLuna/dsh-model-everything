@@ -758,11 +758,16 @@ await test('model_concurrency_scan: an absolute claim fails the review but not t
   expectEq(value.summary.absoluteClaims, 1, 'the summary counts it once')
 })
 
-await test('model_concurrency_scan: the nearest case — the same subject without the claim passes', async () => {
+await test('model_concurrency_scan: a text with no claim is refused, not passed', async () => {
+  // It used to answer `verdict: pass` with `keywords: 0`, which said "no concurrency problem" about a text
+  // the scan could not see. "Found nothing to examine" and "examined it and it holds" are different
+  // answers, and the tool now says which one it is.
   const value = expectReport(await call('model_concurrency_scan', { text: SCAN_TEXT_PLAIN }), 'a sequential sentence')
-  expectEq(value.verdict, 'pass', 'nothing was claimed, so nothing failed')
+  expectEq(value.ok, false, 'a scan that mined nothing did not succeed')
+  expectEq(value.ran, false, 'and it says so rather than reporting a scan')
+  expectEq(value.errorCode, 'CONCURRENCY_NO_CLAIM', 'with a code to route on')
   expectEq(value.findings.length, 0, 'no finding is invented')
-  expectEq(value.summary.absoluteClaims, 0, 'no absolute claim was counted')
+  expect(/no concurrency claim/.test(String(value.verdictReason)), `the reason names what it looked for — got ${show(value.verdictReason)}`)
 })
 
 await test('model_concurrency_scan: a hedged keyword lands between the two, as pass_with_findings', async () => {

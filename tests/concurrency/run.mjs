@@ -32,10 +32,53 @@ test('flags absolute concurrency claims and risk keywords', () => {
   assertNoUndefinedValues(report)
 })
 
-test('plain text has no concurrency findings', () => {
+test('text with no claim is refused, not reported as clean', () => {
+  // It used to answer `verdict: pass` with `keywords: 0`. "I found no claim to examine" and "I examined
+  // the claims and they hold" then read the same, and the first is the common case for a paragraph that
+  // is not about concurrency at all.
   const report = runConcurrencyScan('The migration copies users from source to target.')
   if (report.findings.length !== 0) throw new Error('expected no findings, got ' + JSON.stringify(report.findings))
+  if (report.ran !== false) throw new Error('a scan that mined nothing did not do its work: ran=' + String(report.ran))
+  if (report.ok !== false) throw new Error('and it must not report success: ok=' + String(report.ok))
+  if (report.errorCode !== 'CONCURRENCY_NO_CLAIM') throw new Error('the refusal carries a code, got ' + String(report.errorCode))
+  if (!/no concurrency claim/.test(String(report.verdictReason))) throw new Error('and says what it looked for: ' + String(report.verdictReason))
   assertNoUndefinedValues(report)
+})
+
+test('the near miss: one claim is enough to scan', () => {
+  // The refusal must be about the input, not about the scanner being timid: a single mined claim turns the
+  // same call into a report.
+  const report = runConcurrencyScan('The queue is guarded by a mutex.')
+  if (report.ran !== true || report.ok !== true) throw new Error('one claim must be enough: ran=' + String(report.ran) + ' ok=' + String(report.ok))
+  if (report.findings.length === 0) throw new Error('and the claim must be mined')
+})
+
+test('Chinese claims are mined, not silently passed over', () => {
+  // The vocabulary was English-only (`\bthread-safe\b`, `\bmutex\b`), so a Chinese document about the same
+  // subject mined nothing and landed in the no-claim path - a blind spot that read as a clean scan.
+  //
+  // One term per case, because a sentence that carries several of them stays green when any one rule is
+  // deleted. The mutation check found that: dropping the thread-safety rule changed nothing as long as the
+  // sentence also said 无数据竞争, which is exactly what "one positive case per code" is for.
+  const absolute = ['线程安全', '无数据竞争', '无竞态', '无锁', '中断安全']
+  for (const term of absolute) {
+    const report = runConcurrencyScan('结论：' + term + '。')
+    const codes = report.findings.map((finding) => finding.code)
+    if (!codes.includes('CONCURRENCY_ABSOLUTE_CLAIM')) throw new Error(term + ' is an absolute claim, got ' + JSON.stringify(codes))
+    if (codes.includes('CONCURRENCY_KEYWORD')) throw new Error(term + ' must not also fire as a bare term, got ' + JSON.stringify(report.findings.map((finding) => finding.keyword)))
+  }
+  const plain = ['数据竞争', '竞态条件', '并发', '并行', '多线程', '原子', '互斥', '信号量', '自旋锁', '共享变量', '共享内存', '全局状态', '可重入', '临界区', '关中断']
+  for (const term of plain) {
+    const report = runConcurrencyScan('结论：' + term + '。')
+    const codes = report.findings.map((finding) => finding.code)
+    if (!codes.includes('CONCURRENCY_KEYWORD')) throw new Error(term + ' must be mined as a keyword, got ' + JSON.stringify(codes))
+    if (codes.includes('CONCURRENCY_ABSOLUTE_CLAIM')) throw new Error(term + ' is not an absolute claim, got ' + JSON.stringify(report.findings.map((finding) => finding.keyword)))
+  }
+  // A negated form is one absolute claim, not an absolute claim plus its bare term.
+  const negated = runConcurrencyScan('无数据竞争。')
+  const codes = negated.findings.map((finding) => finding.code)
+  if (codes.filter((code) => code === 'CONCURRENCY_ABSOLUTE_CLAIM').length !== 1) throw new Error('no-data-race is one absolute claim: ' + JSON.stringify(codes))
+  if (codes.includes('CONCURRENCY_KEYWORD')) throw new Error('and not also its bare term: ' + JSON.stringify(negated.findings.map((finding) => finding.keyword)))
 })
 
 test('flags interrupt safety claims and IRQ keywords', () => {

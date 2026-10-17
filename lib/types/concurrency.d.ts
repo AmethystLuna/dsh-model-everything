@@ -26,6 +26,9 @@ export interface ConcurrencyScanReport {
     };
     /** This scan hashes no model; the field is present so every report has the same shape. */
     hashes: Record<string, string>;
+    /** Present only on a refusal: the code a caller routes on, and the message behind it. */
+    errorCode?: string;
+    error?: string;
     /** What to do next, derived from the findings — never empty. */
     nextSteps: string[];
 }

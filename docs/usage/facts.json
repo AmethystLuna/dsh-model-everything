@@ -6,10 +6,10 @@
   },
   "surfaces": {
     "catalog": 3293,
-    "bodies": 79399,
+    "bodies": 79531,
     "references": 153654,
     "referenceFiles": 10,
-    "toolChars": 10597,
+    "toolChars": 10885,
     "toolCount": 12
   },
   "toolsWithWhen": 0,
@@ -28,7 +28,7 @@
     },
     {
       "name": "model_concurrency_scan",
-      "chars": 1004
+      "chars": 1292
     },
     {
       "name": "model_datamodel_verify",
