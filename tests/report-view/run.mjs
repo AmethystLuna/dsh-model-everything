@@ -250,6 +250,68 @@ test('the body costs a fraction of the pretty JSON it replaces', () => {
   assert(body.length < pretty.length * 0.8, `body ${body.length} should be well under pretty ${pretty.length}`)
 })
 
+// ---------------------------------------------------------------------------
+// The fields the body used to drop, and why each one matters
+// ---------------------------------------------------------------------------
+
+test('a truncated report says so, and a complete one stays quiet', () => {
+  // `summary.truncated` is the flag that says a search stopped at its budget. The object carried it and the
+  // body never printed it, so the one reader who only sees the body - the model - read an unfinished search as
+  // a complete one. The model here is the cheapest way to produce the flag: a climb with no guard or set.
+  const climbing = {
+    schemaVersion: 1, init: 'A',
+    states: [{ id: 'A' }],
+    transitions: [{ from: 'A', event: 'tick', to: 'A', updates: [{ variable: 'n', op: 'inc' }] }],
+    variables: [{ name: 'n', kind: 'integer', init: 0 }],
+  }
+  const capped = runVerification(climbing, { maxStates: 5 })
+  assert(capped.summary.truncated === true, 'the fixture must actually be truncated')
+  const cappedText = renderReportText(capped)
+  assert(/^LIMIT /m.test(cappedText), 'a truncated body must carry a LIMIT line:\n' + cappedText.split('\n').slice(0, 4).join('\n'))
+  assert(/undecided/i.test(cappedText.split('\n').find((line) => line.startsWith('LIMIT '))), 'and say what truncated means for the reader')
+  // The near miss: a report that decided everything must not carry the line, or it becomes noise every reader
+  // learns to skip - which is the same as not having it.
+  assert(report.summary.truncated === undefined || report.summary.truncated === false, 'fixture precondition')
+  assert(!/^LIMIT /m.test(body), 'a complete report must not claim its searches stopped')
+})
+
+test('a replaced or clamped bound is stated in the body', () => {
+  // `summary.boundNotes` explains that the budget the caller asked for is not the one that ran. It reached the
+  // object and never the body, so the numbers in the header read as the ones that were requested.
+  const replaced = { ...report, summary: { ...report.summary, boundNotes: ['maxStates was replaced with the default 10000: NaN cannot bound a search'] } }
+  const text = renderReportText(replaced)
+  assert(/^BOUND /m.test(text), 'the note about the bound must reach the body')
+  assert(/NaN cannot bound a search/.test(text), 'and carry its own words, not a summary of them')
+  assert(!/^BOUND /m.test(body), 'a report whose bound was taken as given says nothing about it')
+})
+
+test('hashSpec is named where the hash is, so two hashes can be compared', () => {
+  // A hash with no spec is a hex string: it cannot be reproduced or compared across report versions. The field
+  // is on the object; the header printed the digest and dropped the scheme that produced it.
+  assert(report.hashSpec === 'v1', 'fixture precondition')
+  assert(/modelHash=[0-9a-f]+…\s+hashSpec=v1/.test(body), 'the header must name the hash scheme beside the hash:\n' + body.split('\n')[0])
+})
+
+test('echoed metadata keys are named, so the ignored fields are auditable', () => {
+  // `_`-prefixed keys are annotation metadata: the schema ignores them and the report echoes their paths. The
+  // body dropped them, which made "the schema ignored your field" invisible - the opposite of auditable.
+  const annotated = { ...report, metadataKeys: ['_source', 'states[0]._note'] }
+  const text = renderReportText(annotated)
+  assert(/^METADATA /m.test(text), 'the echoed keys must be named')
+  assert(text.includes('_source') && text.includes('states[0]._note'), 'and named exactly')
+  assert(!/^METADATA /m.test(body), 'a report with no metadata keys has nothing to echo')
+})
+
+test('narrative coverage is rendered as the strings the engine produces', () => {
+  // The engine reports coverage as "described/total" strings. The renderer only accepted numbers, so the line
+  // never appeared - a filter that silently rejected every value the producer could send.
+  const covered = { ...report, narrativeCoverage: { states: '2/3', events: '1/1', scenarios: '0/2' } }
+  const text = renderReportText(covered)
+  const line = text.split('\n').find((entry) => entry.startsWith('NARRATIVE '))
+  assert(line !== undefined, 'a report with narrative coverage must say how much is documented')
+  assert(line.includes('2/3') && line.includes('1/1') && line.includes('0/2'), 'and print the ratios it was given: ' + String(line))
+})
+
 if (failures > 0) {
   console.error(`\n${failures} report-view test(s) failed`)
   process.exit(1)

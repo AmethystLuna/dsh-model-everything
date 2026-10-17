@@ -17,7 +17,10 @@ const { reviewUml } = await import(base + 'uml.js')
 const { runConcurrencyScan } = await import(base + 'concurrency.js')
 const { diffReports } = await import(base + 'baseline.js')
 
-const machine = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
+// One `_`-prefixed key on purpose: the schema ignores it as annotation metadata and the report echoes its path in
+// `metadataKeys`. Without a sample that carries one, that field belongs to no measured family and the guide cannot
+// name it - which is how it stayed unrendered for so long.
+const machine = { schemaVersion: 1, _source: 'report-reading sample', init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
 const second = { schemaVersion: 1, init: 'P', states: [{ id: 'P', terminal: true }], transitions: [] }
 
 /** Where each family keeps its findings, measured rather than assumed. */

@@ -25,7 +25,8 @@
   },
   "extras": {
     "verify": [
-      "checks"
+      "checks",
+      "metadataKeys"
     ],
     "compose": [
       "checks"
@@ -47,6 +48,7 @@
     ],
     "uml": [
       "findings",
+      "metadataKeys",
       "primary",
       "roundTrip",
       "source",
