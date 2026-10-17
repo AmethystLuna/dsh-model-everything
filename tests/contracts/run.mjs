@@ -12,7 +12,7 @@
 // deliberately, once per change, rather than never.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { runVerification } from '../../lib/engine.js'
+import { runVerification, runCompositionVerification } from '../../lib/engine.js'
 import { runDataVerification } from '../../lib/data-engine.js'
 import { renderUml, reviewUml, parseUml } from '../../lib/uml.js'
 import { runDesignReview } from '../../lib/design-engine.js'
@@ -149,6 +149,8 @@ function projection(report) {
   return {
     ok: report.ok,
     ran: report.ran,
+    // A refusal's code is the field a caller acts on.
+    ...(report.errorCode === undefined ? {} : { errorCode: report.errorCode }),
     verdict: report.verdict,
     verdictReason: report.verdictReason,
     schema: report.schema,
@@ -174,11 +176,43 @@ function projection(report) {
   }
 }
 
+// The tool layer is where four defects lived: the bodies, the refusals and the shapes a caller reads. A contract
+// snapshot that only freezes the engines cannot see them. These cases call the tools' own `execute`, so they need
+// `@deepseek-ai/dsh-tools` (a devDependency) - loaded the way tests/uml loads it, with a visible skip.
+let toolCases = {}
+try {
+  const [umlTool, exportTool] = await Promise.all([import('../../lib/uml-tool.js'), import('../../lib/export-tool.js')])
+  toolCases = {
+    'uml parse: a hand-drawn state diagram': () => umlTool.umlParseTool.execute({ diagram: stateDiagramText, notation: 'mermaid' }),
+    'export: a model too large for the prism encoding': () => exportTool.modelExportTool.execute({ model: wideVariables, format: 'prism' }),
+  }
+} catch (error) {
+  console.log('SKIP tool-layer contract cases: the dsh tool modules did not load (' + (error instanceof Error ? error.message : String(error)) + ')')
+}
+
+// Two machines that are both ready for `go`: the composition cases need a rendezvous that can fire, and a name
+// nothing declares, which is the C2 finding the engine started reporting when the option stopped being ignored.
+const leftMachine = { schemaVersion: 1, init: 'IDLE', states: [{ id: 'IDLE' }, { id: 'RUNNING', terminal: true }], transitions: [{ from: 'IDLE', event: 'go', to: 'RUNNING' }] }
+const rightMachine = { schemaVersion: 1, init: 'WAIT', states: [{ id: 'WAIT' }, { id: 'DONE', terminal: true }], transitions: [{ from: 'WAIT', event: 'go', to: 'DONE' }] }
+const stateDiagramText = ['stateDiagram-v2', '  [*] --> Idle', '  Idle --> BUSY : go', '  BUSY --> Idle', '  BUSY --> [*]'].join('\n')
+const wideVariables = {
+  schemaVersion: 1,
+  init: 'A',
+  states: [{ id: 'A' }, { id: 'B', terminal: true }],
+  transitions: [{ from: 'A', event: 'go', to: 'B' }],
+  variables: [
+    { name: 'x', kind: 'integer', init: 0, min: 0, max: 200 },
+    { name: 'y', kind: 'integer', init: 0, min: 0, max: 200 },
+  ],
+}
+
 const cases = {
   'verify: a machine with a narrative': () => runVerification(narratedMachine, {}),
   'verify: a machine with one defect of each kind': () => runVerification(defectiveMachine, {}),
   'verify: the same machine after a refactor, with regression': () => runVerification(stateMachine, { beforeModel: narratedMachine, stateMapping: { INIT: 'INIT', STARTING: 'STARTING', ACTIVE: 'ACTIVE', ERROR: 'ERROR', FATAL: 'FATAL' } }),
   'verify: a model the schema refuses': () => runVerification({ schemaVersion: 9 }, {}),
+  'compose: two machines that rendezvous': () => runCompositionVerification([leftMachine, rightMachine], { rendezvous: ['go'] }),
+  'compose: a rendezvous name nothing declares': () => runCompositionVerification([leftMachine, rightMachine], { rendezvous: ['go', 'typo'] }),
   'datamodel: a valid model': () => runDataVerification(dataModel),
   'datamodel: a migration with no mapping': () => runDataVerification(
     { ...dataModel, entities: [{ name: 'User', fields: [{ name: 'id', type: 'uuid', required: true }, { name: 'fullName', type: 'string', required: true }], primaryKey: ['id'] }] },
@@ -212,13 +246,14 @@ const cases = {
   'design: a design that contradicts its declarations': () => runDesignReview(defectiveDesign),
   'design: a design that declares nothing but a graph': () => runDesignReview(bareDesign),
   'design: a model the schema refuses': () => runDesignReview(refusedDesign),
+  ...toolCases,
 }
 
 const current = {}
 for (const [name, build] of Object.entries(cases)) {
   let report
   try {
-    report = build()
+    report = await build()
   } catch (error) {
     report = { ok: false, ran: false, verdict: 'fail', verdictReason: 'threw: ' + (error instanceof Error ? error.message : String(error)), schema: 'none', summary: {}, findings: [], nextSteps: [] }
   }
