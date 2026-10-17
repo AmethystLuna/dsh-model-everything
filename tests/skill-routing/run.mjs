@@ -100,24 +100,68 @@ check('a trigger case never expects the group it is filed under to lose', () => 
   if (wrong.length > 0) throw new Error('trigger cases expecting another skill: ' + wrong.map((testCase) => testCase.utterance).join(' | '))
 })
 
-// The one that makes the corpus mean something: a case can only be answered from the words
-// the catalog actually shows. This is where an over-long description is caught - and it is
-// the failure that already happened once in this repository's history.
-check('every case can be decided from the visible catalog', () => {
-  const undecidable = []
+/** The skill that answers a request naming no domain: it is the route by elimination. */
+const ENTRY_SKILL = 'model-everything'
+
+/**
+ * Words that name no domain, in two groups:
+ *
+ *  - grammar and function words, which say nothing about what is being asked;
+ *  - the verbs a request uses to ask for work rather than to name what is worked on. Each of
+ *    these opens at least one catalog line ("Use when reviewing ...", "Use when drawing ..."),
+ *    so any request phrased as a request matches on the verb alone.
+ *
+ * Without this list the check below is vacuous, which it was: it required one substring hit,
+ * and `"review"` inside `"Use when reviewing ..."` satisfied any request that asked for a
+ * review - so a description that had lost its decisive word still passed.
+ */
+const NON_DOMAIN_WORDS = new Set(
+  (
+    'a an and the this that these those of to in on for with by as at from or if then than so but not no nor per via about against above below after before between during through into over under up down out off again further once now new old one two three four five six seven eight nine ten ' +
+    'is are was were be been being it its have has had do does did done can could should would will may might must there here what which who whom when where why how all any some each every both more most other such only own same very just also our we us my me you your i yours theirs they them ' +
+    'review reviews reviewing reviewed draw draws drawing drawn render renders rendering rendered write writes writing written check checks checking checked verify verifies verifying verified look looks looking see sees show shows showing tell tells telling give gives giving audit audits auditing audited describe describes describing list lists listing confirm confirms confirming use uses using need needs want wants think knows know say says said claim claims claimed promise promises promised find finds finding spot spots spotting'
+  ).split(' ').filter(Boolean),
+)
+
+/** The words of a request that name something, so a catalog line could plausibly answer one. */
+function domainWords(utterance) {
+  const words = utterance.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []
+  return [...new Set(words)].filter((word) => !NON_DOMAIN_WORDS.has(word))
+}
+
+/**
+ * A five-letter stem: long enough to tell two words apart, short enough to survive an ending.
+ * Whole words only, so `"plan"` is not satisfied by `"PlantUML"`.
+ */
+function stem(word) {
+  return word.length >= 5 ? word.slice(0, 5) : word
+}
+
+// The one that makes the corpus mean something: a request that expects a domain skill has to
+// name something that skill's catalog line names, or the catalog has nothing to route on.
+//
+// The entry skill is exempt, and the reason is not convenience: it is the route by elimination.
+// "the plan promises the retry is idempotent" names no domain, which is exactly why the core
+// skill is the answer, and a catalog line that named every such word would name everything.
+check("a domain-skill case names a word that skill's catalog line names", () => {
+  const unrouteable = []
+  const seen = new Set()
   for (const testCase of flat) {
+    if (testCase.expected === ENTRY_SKILL) continue
+    // One utterance can be filed as a trigger and as another group's near miss: it is one
+    // question, and it is reported once.
+    const key = testCase.utterance + '|' + testCase.expected
+    if (seen.has(key)) continue
+    seen.add(key)
     const target = byName.get(testCase.expected)
-    if (target === undefined) continue
-    // The whole utterance cannot be expected verbatim; what has to be visible is enough of
-    // its content words for a reader to choose. Require a third of the meaningful words.
-    const words = testCase.utterance.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []
-    const visible = target.visible.toLowerCase()
-    const hits = words.filter((word) => visible.includes(word))
-    if (hits.length === 0) {
-      undecidable.push('"' + testCase.utterance + '" has no content word in ' + testCase.expected + "'s visible description")
+    if (target === undefined) continue // the missing-skill check owns that case
+    const named = new Set((target.visible.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []).map(stem))
+    const words = domainWords(testCase.utterance)
+    if (!words.some((word) => named.has(stem(word)))) {
+      unrouteable.push('"' + testCase.utterance + '" names nothing in ' + testCase.expected + "'s catalog line (looked for: " + words.join(', ') + ')')
     }
   }
-  if (undecidable.length > 0) throw new Error(undecidable.join(' | '))
+  if (unrouteable.length > 0) throw new Error(unrouteable.join(' | '))
 })
 
 check('no description is cut off in the catalog', () => {
