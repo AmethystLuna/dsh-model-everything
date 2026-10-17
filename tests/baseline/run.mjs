@@ -274,6 +274,15 @@ test('a warning that escalated to an error fails the delta', () => {
   if (escalated.summary.changed !== 1) throw new Error('the case has to land in `changed`, not added: ' + JSON.stringify(escalated.summary))
   if (escalated.verdict !== 'fail') throw new Error('an escalation is worse than nothing changed; got ' + escalated.verdict + ' / ' + escalated.verdictReason)
   if (!/escalat/.test(escalated.verdictReason)) throw new Error('and the reason must say what happened: ' + escalated.verdictReason)
+  // The step beside a failing run has to describe the delta it sits beside. It said "the delta being clean does not
+  // make the run clean" even when the delta had just failed - a sentence contradicting the line above it.
+  if (!escalated.nextSteps.some((step) => /already says the slice made it worse/.test(step))) {
+    throw new Error('a failing delta needs its own sentence, got ' + JSON.stringify(escalated.nextSteps))
+  }
+  const cleanOverFailing = diffReports(shaped('error', 'A ignores stop'), shaped('error', 'A ignores stop'))
+  if (!cleanOverFailing.nextSteps.some((step) => /delta being clean does not make the run clean/.test(step))) {
+    throw new Error('a clean delta over a failing run keeps the other sentence, got ' + JSON.stringify(cleanOverFailing.nextSteps))
+  }
   // The near miss: a reworded message at the same severity is a change, not a regression.
   const reworded = diffReports(shaped('warning', 'A ignores stop'), shaped('warning', 'A silently ignores stop'))
   if (reworded.verdict !== 'pass') throw new Error('a reworded warning must not fail the delta: ' + reworded.verdictReason)
