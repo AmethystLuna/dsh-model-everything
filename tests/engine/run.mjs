@@ -3103,6 +3103,61 @@ async function runSequenceCapTests() {
 await runSequenceCapTests()
 
 
+// ----------------------- A11: an atomicity walk that ran out of budget ---
+
+async function runAtomicityCapTests() {
+  // The atomicity walk keys on the runtime plus whether the group has started and whether it has closed, so it
+  // outlasts the exploration by that factor. The group can only be left through commit, so the model declares no
+  // path from a started state to anything else and the walk has nothing to report except how far it got.
+  const model = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'D', terminal: true }],
+    variables: [{ name: 'y', kind: 'integer', init: 0 }],
+    transitions: [
+      { from: 'A', event: 'tick', guard: { variable: 'y', op: '<', value: 40 }, to: 'A', updates: [{ variable: 'y', op: 'inc', value: 1 }] },
+      { from: 'A', event: 'lock', to: 'B' },
+      { from: 'B', event: 'unlock', to: 'A' },
+      { from: 'A', event: 'done', guard: { variable: 'y', op: '>=', value: 39 }, to: 'D' },
+    ],
+    invariants: [{ id: 'lock-unlock', description: 'lock is closed by unlock', kind: 'atomicity', events: ['lock'], commit: 'unlock' }],
+  }
+  const capped = runVerification(model, { maxStates: 100 })
+  const s1 = capped.checks.find((check) => check.id === 'S1')
+  // D needs thirty-nine ticks, so "all states reachable" is evidence that the exploration finished and the
+  // finding can only come from the atomicity walk.
+  if (String(s1.detail) !== 'All states reachable') throw new Error('this case needs a finished exploration, got S1: ' + String(s1.detail))
+  const a11 = capped.checks.find((check) => check.id === 'A11')
+  if (!a11.findings.some((finding) => finding.code === 'A11_UNDECIDED')) {
+    throw new Error('a capped atomicity walk must say it did not finish, got ' + JSON.stringify(a11.findings.map((finding) => finding.code)))
+  }
+  if (/All atomicity invariants hold/.test(String(a11.detail))) throw new Error('and must not claim they hold: ' + String(a11.detail))
+  console.log('PASS cap: an atomicity walk that hit its budget is undecided, not clean')
+
+  // Near miss, both directions: the same model with a budget that finishes decides, and an atomic group left
+  // through a non-commit event is still a violation.
+  const decided = runVerification(model, { maxStates: 10000 })
+  const decidedA11 = decided.checks.find((check) => check.id === 'A11')
+  if (decidedA11.findings.some((finding) => finding.code === 'A11_UNDECIDED')) throw new Error('a finished atomicity walk must not claim undecided')
+  if (!/All atomicity invariants hold/.test(String(decidedA11.detail))) throw new Error('and it must say the groups close: ' + String(decidedA11.detail))
+  // `abandon` leaves the started group without commit or rollback.
+  const leaking = {
+    ...model,
+    transitions: [...model.transitions, { from: 'B', event: 'abandon', to: 'A' }],
+  }
+  const violated = runVerification(leaking, { maxStates: 10000 })
+  const violatedA11 = violated.checks.find((check) => check.id === 'A11')
+  if (!violatedA11.findings.some((finding) => finding.code === 'A11_ATOMICITY_VIOLATION')) {
+    throw new Error('leaving the scope without commit must still be reported, got ' + JSON.stringify(violatedA11.findings.map((finding) => finding.code)))
+  }
+  console.log('PASS cap: a finished atomicity walk still decides, holds or violated')
+
+  console.log('PASS atomicity-cap')
+}
+
+await runAtomicityCapTests()
+
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)

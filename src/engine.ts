@@ -3233,9 +3233,12 @@ function findAtomicityViolation(model: LogicModelV1, options: NormalizedOptions,
   const visited = new Set<string>([key(init, false, false)])
   const queue: Array<{ runtime: RuntimeState; started: boolean; closed: boolean; path: PathStep[] }> = [{ runtime: init, started: false, closed: false, path: [] }]
   let steps = 0
+  // Same third outcome as the other walks: this one keys on the runtime plus the two flags of the atomic group,
+  // so it can outlast the exploration, and "no leak" is not the same answer as "not finished".
+  let capped = false
   while (queue.length > 0) {
     const entry = queue.shift()!
-    if (++steps > options.maxStates) break
+    if (++steps > options.maxStates) { capped = true; break }
     for (const event of allEvents(model)) {
       for (const next of stepRuntime(model, entry.runtime, event)) {
         const started = entry.started || atomic.has(event)
@@ -3255,6 +3258,7 @@ function findAtomicityViolation(model: LogicModelV1, options: NormalizedOptions,
       }
     }
   }
+  if (capped) return { invariant, path: [], reason: invariantCapReason(options), undecided: true }
   return undefined
 }
 
@@ -3263,17 +3267,28 @@ function A11_atomicity(model: LogicModelV1, options: NormalizedOptions): CheckRe
   for (const invariant of model.invariants ?? []) {
     if (invariant.kind !== 'atomicity') continue
     const violation = findAtomicityViolation(model, options, invariant)
-    if (violation !== undefined) {
+    if (violation === undefined) continue
+    if (violation.undecided) {
       findings.push({
-        code: 'A11_ATOMICITY_VIOLATION',
-        severity: 'error',
-        message: 'Atomicity invariant "' + invariant.id + '" violated: ' + violation.reason,
-        path: violation.path,
-        evidence: { invariant },
+        code: 'A11_UNDECIDED',
+        severity: 'warning',
+        message: 'Atomicity invariant "' + invariant.id + '" (' + invariant.description + ') could not be decided: ' + violation.reason + '. Absence of a violation is not proven.',
+        evidence: { invariant, maxStates: options.maxStates },
       })
+      continue
     }
+    findings.push({
+      code: 'A11_ATOMICITY_VIOLATION',
+      severity: 'error',
+      message: 'Atomicity invariant "' + invariant.id + '" violated: ' + violation.reason,
+      path: violation.path,
+      evidence: { invariant },
+    })
   }
-  return checkResult('A11', 'Atomicity', findings, findings.length === 0 ? 'All atomicity invariants hold' : 'Atomicity findings: ' + findings.length)
+  const undecided = findings.some((finding) => finding.code === 'A11_UNDECIDED')
+  return checkResult('A11', 'Atomicity', findings, findings.length === 0
+    ? 'All atomicity invariants hold'
+    : undecided && findings.every((finding) => finding.code === 'A11_UNDECIDED') ? 'Atomicity walk stopped at the state budget: undecided' : 'Atomicity findings: ' + findings.length)
 }
 
 // ---------------------------------------------------------------------------
