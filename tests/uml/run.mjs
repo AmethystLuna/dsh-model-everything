@@ -451,7 +451,10 @@ test('review: a diagram-only review reads the diagram as the model and says fide
 
 test('review: an unreadable diagram is an error report, not a crash', () => {
   const report = reviewUml({ diagram: 'this is not a diagram' })
-  if (report.ok) throw new Error('an unreadable diagram must not report ok')
+  // It ran and reported the defect: that is a review, not a refusal. ok was false here and true for every
+  // other failing review in the plugin; a reader keying on it was told nothing happened.
+  if (report.ok !== true || report.ran !== true) throw new Error('an unreadable diagram is a review that ran: ok=' + String(report.ok) + ' ran=' + String(report.ran))
+  if (report.verdict !== 'fail') throw new Error('and it fails, because the diagram cannot be read')
   if (findFinding(report, 'UML001_DIAGRAM_UNREADABLE').length === 0) throw new Error('expected UML001, got ' + JSON.stringify(codes(report)))
   assertNoUndefinedValues(report)
 })
@@ -554,7 +557,8 @@ test('parse: a Mermaid class diagram is the class family, and a foreign header i
 
 test('review: an unreadable family is an error report with a failing verdict', () => {
   const report = reviewUml({ diagram: ['erDiagram', '  USER ||--o{ ORDER : places'].join('\n') })
-  if (report.ok !== false || report.verdict !== 'fail') throw new Error('expected ok:false and verdict fail')
+  // ok: true and a failing verdict: the review ran and found that the family cannot be read.
+  if (report.ok !== true || report.ran !== true || report.verdict !== 'fail') throw new Error('expected ok:true, ran:true and verdict fail')
   if (findFinding(report, 'UML001_DIAGRAM_UNREADABLE').length !== 1) throw new Error('expected UML001')
   if (!report.findings[0].message.includes('erDiagram')) throw new Error('the message must name the family: ' + report.findings[0].message)
 })
