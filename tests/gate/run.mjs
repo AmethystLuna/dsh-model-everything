@@ -92,9 +92,11 @@ await check('the gate has a card of its own: manifest, two locales, all shipped 
   if (manifest.type !== 'module') throw new Error('the component manifest must declare "type": "module"')
   const zh = JSON.parse(readFileSync(new URL('../../gate/locale/zh.json', import.meta.url), 'utf8')).meta
   const en = JSON.parse(readFileSync(new URL('../../gate/locale/en.json', import.meta.url), 'utf8')).meta
-  // The Chinese name is a decision, not a default: it is what the component is called.
+  // Both names are decisions, not defaults: they are what the component is called.
   if (zh.title !== '提示词注入增强') throw new Error('the Chinese card title moved to ' + JSON.stringify(zh.title))
-  if (typeof en.title !== 'string' || en.title.length === 0) throw new Error('the English card has no title')
+  // The English name is not a translation of the Chinese one. "Prompt injection" is the name of
+  // an attack in this context, so the English card says what it injects instead.
+  if (en.title !== 'Injected routing prompt') throw new Error('the English card title moved to ' + JSON.stringify(en.title))
   for (const [language, meta] of [['zh', zh], ['en', en]]) {
     if (typeof meta.description !== 'string' || meta.description.length === 0) throw new Error(language + ' card has no description')
   }
