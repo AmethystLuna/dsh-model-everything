@@ -66,9 +66,9 @@ const flat = corpus.cases.flatMap((group) => [
 ])
 
 let failures = 0
-/** `--print-prompt` emits a prompt for another program, so the checks narrate on stderr instead:
- *  a reader that piped them would hand the model six PASS lines before the question. */
-const emit = process.argv.includes('--print-prompt') ? console.error : console.log
+/** `--print-prompt` and `--live-sample` emit data for another program, so the checks narrate on
+ *  stderr instead: a reader that piped them would hand the model six PASS lines first. */
+const emit = process.argv.includes('--print-prompt') || process.argv.includes('--live-sample') ? console.error : console.log
 function check(name, fn) {
   try {
     fn()
@@ -230,7 +230,59 @@ function printPrompt() {
   console.log(lines.join('\n'))
 }
 
+/**
+ * The live-session sample: a session per case is expensive, so this picks the cases worth one.
+ *
+ * Two rules, both derived rather than chosen by hand, so two runs are comparable:
+ *
+ *   1. one request per domain skill, the first in corpus order, so every skill is reached;
+ *   2. every case whose words point at the wrong skill - some other domain skill matches more
+ *      of the request's words than the expected one does. Those are the cases where the
+ *      catalog can only get it right from what the words mean, not from what they match.
+ *
+ * The expected skill is printed for the operator, who needs an answer key. Do not paste it
+ * into the prompt: the session has to answer from the catalog.
+ */
+function liveSample() {
+  const stems = new Map(entries.map((entry) => [entry.name, new Set((entry.visible.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []).map(stem))]))
+  const score = (utterance, skill) => domainWords(utterance).filter((word) => stems.get(skill)?.has(stem(word))).length
+  const distinct = []
+  const seen = new Set()
+  flat.forEach((testCase, index) => {
+    const key = testCase.utterance + '|' + testCase.expected
+    if (seen.has(key)) return
+    seen.add(key)
+    distinct.push({ ...testCase, index })
+  })
+  const picked = []
+  const taken = new Set()
+  const pick = (testCase, why) => {
+    if (taken.has(testCase.utterance)) return
+    taken.add(testCase.utterance)
+    picked.push({ ...testCase, why })
+  }
+  for (const skill of [...shipped].sort()) {
+    if (skill === ENTRY_SKILL) continue
+    const first = distinct.find((testCase) => testCase.expected === skill)
+    if (first !== undefined) pick(first, 'reaches ' + skill)
+  }
+  const fallback = distinct.find((testCase) => testCase.expected === ENTRY_SKILL)
+  if (fallback !== undefined) pick(fallback, 'reaches ' + ENTRY_SKILL)
+  for (const testCase of distinct) {
+    const own = score(testCase.utterance, testCase.expected)
+    const rivals = [...shipped].filter((skill) => skill !== testCase.expected && score(testCase.utterance, skill) > own)
+    if (rivals.length > 0) pick(testCase, 'its words point at ' + rivals.join(', '))
+  }
+  return picked.sort((left, right) => left.index - right.index)
+}
+
 const decisionsFlag = process.argv.indexOf('--decisions')
+if (process.argv.includes('--live-sample')) {
+  for (const testCase of liveSample()) {
+    console.log(String(testCase.index) + '\t' + testCase.expected + '\t' + testCase.utterance)
+  }
+  process.exit(failures > 0 ? 1 : 0)
+}
 if (process.argv.includes('--print-prompt')) {
   printPrompt()
   // The prompt is the whole of stdout: the summary below would be the last line of the
