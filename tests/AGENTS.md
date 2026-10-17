@@ -140,8 +140,8 @@ read any number it produces:
   engages*, which method it picks. To measure a real request, give it something it can act
   on; otherwise what you measured is the refusal.
 
-A live session still has to be asked what it loaded, because the transcript is not the result
-- but ask in a **follow-up message**, after the answer: `SKILLS LOADED: <names, or none>`.
+A live session still has to be asked what it loaded, because the transcript is not the result.
+Ask in a **follow-up message**, after the answer: `SKILLS LOADED: <names, or none>`.
 That is a self-report, and it is the weakest part of this method - it can be answered from
 what the session remembers doing, not from what it did. Read it with that in mind, and prefer
 the printed prompt where a description-level answer is enough.
