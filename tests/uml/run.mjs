@@ -2256,20 +2256,22 @@ if (uml !== undefined) {
     if (!Array.isArray(parsedModel.states) || parsedModel.states.length === 0) throw new Error('the model line must carry the model itself: ' + modelLine.slice(0, 80))
     if (!/Idle/.test(modelLine)) throw new Error('and the state ids a reader can act on: ' + modelLine.slice(0, 120))
 
-    // The verdict counted `result.warnings` while `findings` did not carry them, so a report could say
-    // "1 warning finding(s)" and "FINDINGS none - nothing was reported" on the next line.
+    // The verdict counts the parser's notes and they live in `warnings` - the channel the reference names. The body
+    // printed neither, so the same report said "1 warning finding(s)" above "FINDINGS none - nothing was reported".
     const notedText = ['stateDiagram-v2', '  [*] --> BUSY', '  BUSY --> IDLE', '  BUSY --> [*]'].join('\n')
     const noted = await uml.umlParseTool.execute({ diagram: notedText, notation: 'mermaid' })
     const body = renderReportText(noted)
-    if (!noted.findings.some((finding) => finding.code === 'UML_PARSE_SYNTHETIC_EVENT')) {
-      throw new Error('an unlabelled arrow must reach `findings`, got ' + JSON.stringify(noted.findings.map((finding) => finding.code)))
+    if (!noted.warnings.some((warning) => warning.includes('UML_PARSE_SYNTHETIC_EVENT'))) {
+      throw new Error('an unlabelled arrow must be a note the verdict counts, got ' + JSON.stringify(noted.warnings))
     }
-    if (/FINDINGS  none/.test(body)) throw new Error('the roster must list the note the verdict counted:\n' + body)
-    if (!/UML_PARSE_SYNTHETIC_EVENT/.test(body)) throw new Error('and the body must name it:\n' + body)
+    if (!/UML_PARSE_SYNTHETIC_EVENT/.test(body)) throw new Error('the body must print the note the verdict counted:\n' + body)
     const findingsLine = body.split('\n').find((line) => line.startsWith('FINDINGS '))
-    const counted = Number(/FINDINGS  (\d+) total/.exec(String(findingsLine))?.[1] ?? '0')
-    if (counted !== noted.findings.length) throw new Error('the header and the roster must count the same findings: ' + String(findingsLine))
-    console.log('PASS parse body: the model is printed and its notes are findings')
+    if (/nothing was reported/.test(String(findingsLine))) {
+      throw new Error('a report with a note must not claim nothing was reported: ' + String(findingsLine))
+    }
+    const warned = (body.match(/^WARNING  /gm) ?? []).length
+    if (warned !== noted.warnings.length) throw new Error('one WARNING line per note: ' + String(warned) + ' of ' + String(noted.warnings.length))
+    console.log('PASS parse body: the model is printed and the parser notes are shown')
   } catch (error) {
     failures += 1
     console.log('FAIL parse body:', error instanceof Error ? error.message : String(error))

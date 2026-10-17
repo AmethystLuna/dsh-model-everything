@@ -181,9 +181,19 @@ function projection(report) {
 // `@deepseek-ai/dsh-tools` (a devDependency) - loaded the way tests/uml loads it, with a visible skip.
 let toolCases = {}
 try {
-  const [umlTool, exportTool] = await Promise.all([import('../../lib/uml-tool.js'), import('../../lib/export-tool.js')])
+  const [umlTool, exportTool, structureTool] = await Promise.all([import('../../lib/uml-tool.js'), import('../../lib/export-tool.js'), import('../../lib/structure-tool.js')])
   toolCases = {
     'uml parse: a hand-drawn state diagram': () => umlTool.umlParseTool.execute({ diagram: stateDiagramText, notation: 'mermaid' }),
+    // The output side: `uml_render` is the only tool that returns a payload nobody has frozen, and its warnings are
+    // what tell a reader the drawing is an approximation.
+    'uml render: a state machine to mermaid': () => umlTool.umlRenderTool.execute({ model: stateMachine, kind: 'state', notation: 'mermaid' }),
+    'uml render: a family the notation only approximates': () => umlTool.umlRenderTool.execute({ model: communicationModel, kind: 'communication', notation: 'plantuml' }),
+    // The tool's parameter is `kind`; the engine option is `diagramKind`. A snapshot of the tool layer is the only
+    // thing that can tell those apart, which is how this session's own `diagramKind` mistake went unnoticed.
+    'uml review: a communication model through the tool': () => umlTool.umlReviewTool.execute({ model: communicationModel, kind: 'communication' }),
+    'uml review: a model from another family': () => umlTool.umlReviewTool.execute({ model: { schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } }, kind: 'communication' }),
+    'structure: a component diagram through the tool': () => structureTool.umlStructureTool.execute({ diagram: structureDiagram }),
+    'structure: two levels through the tool': () => structureTool.umlStructureTool.execute({ diagrams: [{ name: 'system', diagram: structureDiagram }, { name: 'core', parent: 'system', diagram: coreDiagram }] }),
     'export: a model too large for the prism encoding': () => exportTool.modelExportTool.execute({ model: wideVariables, format: 'prism' }),
   }
 } catch (error) {
@@ -194,6 +204,14 @@ try {
 // nothing declares, which is the C2 finding the engine started reporting when the option stopped being ignored.
 const leftMachine = { schemaVersion: 1, init: 'IDLE', states: [{ id: 'IDLE' }, { id: 'RUNNING', terminal: true }], transitions: [{ from: 'IDLE', event: 'go', to: 'RUNNING' }] }
 const rightMachine = { schemaVersion: 1, init: 'WAIT', states: [{ id: 'WAIT' }, { id: 'DONE', terminal: true }], transitions: [{ from: 'WAIT', event: 'go', to: 'DONE' }] }
+const communicationModel = {
+  schemaVersion: 1,
+  lifelines: [{ id: 'C', classifier: 'Customer' }, { id: 'O', classifier: 'Order' }],
+  links: [{ from: 'C', to: 'O' }],
+  messages: [{ sequence: '1', from: 'C', to: 'O', label: 'create' }],
+}
+const structureDiagram = ['@startuml', 'component [UI] as UI', 'component [Core] as Core', 'component [Island] as Island', 'UI --> Core', 'Core --> UI', '@enduml'].join('\n')
+const coreDiagram = ['@startuml', 'component [Cache] as Cache', 'component [Store] as Store', 'Cache --> Store', 'Cache --> UI', '@enduml'].join('\n')
 const stateDiagramText = ['stateDiagram-v2', '  [*] --> Idle', '  Idle --> BUSY : go', '  BUSY --> Idle', '  BUSY --> [*]'].join('\n')
 const wideVariables = {
   schemaVersion: 1,
