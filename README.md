@@ -238,33 +238,25 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 
 ## 配置
 
-**主行没有开关。** 关掉它等于关掉那一行——loader 的 `disabled`，或者用插件管理器卸掉——工具与技能会一起消失。这里刻意不做「工具关、技能留」的键：技能正文里写着这些工具的名字，工具没了，技能就只剩一句指向不存在的东西的话，比没有技能更糟。
-
-（这一行原先有个 `enabled`，README 说它「是否注册本插件的工具」——**它什么都不拦**：工具、技能、inspect 条目全都无条件注册，那个值只被状态接口读出来报告自己。已经删掉。）
-
-行里只剩一个键：
+注入组件（默认开）有三个键：
 
 | 键 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `interaction` | `ask` \| `auto` \| `follow-approval` | `follow-approval` | 提议调用工具时怎么处置。前两个固定，`follow-approval` 每次读会话的审批策略。 |
+| `enabled` | boolean | `true` | 是否注入。live 字段：插件页翻开关对运行中的 host 立刻生效，不用重启。 |
+| `gateContent` | string | 内置文本 | 注入的全文。替换它等于自己写路由规则；`tests/gate` 仍会要求它点名每个已发布的技能。 |
+| `extraGuidance` | string | `""` | 追加在消息最后的一段话，留给部署写自己的规则。 |
 
-在 profile 的 `cordis.patch.yml` 里按 row id 覆盖：
+主行只有一个 `interaction`（提议调用工具时怎么处置，默认 `follow-approval`）；关掉主行是关掉那一行本身，不是改配置。
+
+按 row id 写进 profile 的 `cordis.patch.yml`：
 
 ```yaml
 - insert:
-    - id: dsh-model-everything
-      name: 'dsh-model-everything'
-      disabled: false        # 要关掉整行就写 true
+    - id: dsh-model-everything-gate
+      name: 'dsh-model-everything/gate'
       config:
-        interaction: ask
+        enabled: false        # 关掉注入
 ```
-
-路由提示那一行有它自己的两个键（它可以被单独开关，因为它是**独立组件**）：
-
-| 键 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `enabled` | boolean | `false` | 是否注入。live 字段，可在运行中的 host 上翻转。 |
-| `gateContent` | string | 内置文本 | 注入的全文。替换它等于自己写路由规则；`tests/gate` 仍会要求它点名每个已发布的技能。 |
 
 ## 边界
 

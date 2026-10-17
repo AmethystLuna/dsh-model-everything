@@ -238,33 +238,25 @@ How it works, in four sentences:
 
 ## Configuration
 
-**The main row has no switch.** Turning it off means turning the row off - the loader's `disabled`, or the plugin manager - and the tools and the skills go together. There is deliberately no "tools off, skills on" key: the skill text names these tools, so with the tools gone a skill is a paragraph pointing at something that is not there, which is worse than having no skill.
-
-(This row used to carry an `enabled` that this README described as "whether this plugin registers its tools". It gated nothing: tools, skills and the inspect entry all registered unconditionally, and the value was read only by the status reply, where it reported itself. It has been removed.)
-
-One key is left:
+The routing component (on by default) has three keys:
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `interaction` | `ask` \| `auto` \| `follow-approval` | `follow-approval` | What happens when a tool call is offered. The first two are fixed; `follow-approval` reads the session's approval policy per call. |
+| `enabled` | boolean | `true` | Whether to inject. A live field: the Plugins-page toggle reaches a running host without a restart. |
+| `gateContent` | string | the built-in text | The text to inject. Replacing it means writing your own routing rules; `tests/gate` still requires it to name every shipped skill. |
+| `extraGuidance` | string | `""` | A sentence appended to the end of the message, for a deployment's own rule. |
 
-Override it by row id in the profile's `cordis.patch.yml`:
+The main row has one key, `interaction` (what happens when a tool call is offered; default `follow-approval`). Turning that row off is turning the row off, not a setting.
+
+Write it into the profile's `cordis.patch.yml` by row id:
 
 ```yaml
 - insert:
-    - id: dsh-model-everything
-      name: 'dsh-model-everything'
-      disabled: false        # true turns the whole row off
+    - id: dsh-model-everything-gate
+      name: 'dsh-model-everything/gate'
       config:
-        interaction: ask
+        enabled: false        # turn the injection off
 ```
-
-The routing row has two keys of its own, and keeps them because it is a separate component:
-
-| Key | Type | Default | Meaning |
-|---|---|---|---|
-| `enabled` | boolean | `false` | Whether to inject. A live field: it can be flipped on a running host. |
-| `gateContent` | string | the built-in text | The text to inject. Replacing it means writing your own routing rules; `tests/gate` still requires it to name every shipped skill. |
 
 ## Boundaries
 

@@ -1,5 +1,5 @@
 {
   "name": "Injected routing prompt",
-  "description": "Injects a routing message into the first model step of a session: which skill to load, what each tool does and what it does not prove, and how to read a report. Off by default.",
+  "description": "Injects a routing message into the first model step of a session: which skill to load, what each tool does and what it does not prove, and how to read a report. On by default.",
   "type": "module"
 }
