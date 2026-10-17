@@ -1,6 +1,6 @@
 ---
 name: model-everything
-description: "Use when a document claims something checkable about code: API names, paths, enums, feasibility, protocol behaviour, timing, 'always/never'. It enumerates the claims, verifies each against the code with file:line evidence, then builds an executable model when behaviour, safety or deadlock is at stake. Diagrams: model-everything-uml; design principles: model-everything-design; concurrency: model-everything-concurrency; data: model-everything-datamodel; dependencies: model-everything-structure."
+description: "Use when a document claims something checkable about code: API names, paths, enums, feasibility, protocol behaviour, timing, 'always/never'. It enumerates the claims, verifies each against the code with file:line evidence, then builds an executable model when behaviour, safety or deadlock is at stake. Diagrams: model-everything-uml; design principles: model-everything-design; concurrency: model-everything-interleaving; data: model-everything-datamodel; dependencies: model-everything-structure."
 ---
 
 # Model Everything
@@ -447,7 +447,7 @@ This skill owns behavioural claims. Three neighbouring domains have their own sk
 |---|---|
 | Drawing a code flow as UML, or auditing a diagram somebody drew (render / parse / review / explain-labels, round-trip fidelity, component and class diagrams refused) | `model-everything-uml` |
 | Reviewing architecture, module structure or a dependency diagram (isolated nodes, dangling endpoints, cycles, allowed-dependency and layer violations, missing required edges) | `model-everything-structure` |
-| Concurrency, synchrony and async claims — "thread-safe", "lock-free", "no data race", "ISR-safe", "non-blocking", `async`/`await` — mined and routed to TSan/Helgrind/CBMC/TLA+/UPPAAL, never proven here; a shared-location update is decided here by `model_compose_verify` (C5) | `model-everything-concurrency` |
+| Concurrency, synchrony and async claims — "thread-safe", "lock-free", "no data race", "ISR-safe", "non-blocking", `async`/`await` — mined and routed to TSan/Helgrind/CBMC/TLA+/UPPAAL, never proven here; a shared-location update is decided here by `model_compose_verify` (C5) | `model-everything-interleaving` |
 | Entities, fields, relationships, data invariants, schema migrations (DS1-DS4, DA1-DA12, DD1-DD4) | `model-everything-datamodel` |
 
 ---
@@ -476,7 +476,7 @@ If you catch yourself thinking any of these, stop:
 5. **For behavioral claims: verify with code, not reasoning.** If a plan says "always", "never", or "guaranteed", generate and run a model. One counter-example is enough to refute a universal claim.
 6. **Confirm the model before running it** — unless the user has already told you to proceed without confirmation in this session. Extraction errors are the dominant failure mode of formal verification. In auto mode, substitute evidence-cited extraction + round-trip validation and mark the report `UNCONFIRMED`.
 7. **Don't verify what the code already checks.** If the existing codebase has compile-time assertions, static analysis, or runtime checks for a property, cite those — don't re-verify in a model.
-8. **Hand a neighbouring domain to its own skill.** A diagram is a model, not evidence: modelling or auditing one belongs to `model-everything-uml`. A concurrency claim is mined and routed, never proven here: that is `model-everything-concurrency`. Schema, data invariants and migrations are `model-everything-datamodel`. This skill keeps the doctrine and the behavioural checks.
+8. **Hand a neighbouring domain to its own skill.** A diagram is a model, not evidence: modelling or auditing one belongs to `model-everything-uml`. A concurrency claim is mined and routed, never proven here: that is `model-everything-interleaving`. Schema, data invariants and migrations are `model-everything-datamodel`. This skill keeps the doctrine and the behavioural checks.
 9. **Say what this does not prove.** For dimensions this toolbox does not verify — hard real time (deadlines, periods), preemptive concurrency, hybrid-control stability, probabilistic reliability, execution-cost budgets — route to the dedicated tool named in `references/gap-routing-guide.md`. `model_verify` reports carry the same routing as informational `coverageNotes` on matching models.
 10. **A declared range is a property, not a bound, and a capped search is not a pass.** `inc`/`dec` are never clamped to `min`/`max`; only a guard that pins the value bounds it. When a report is `truncated` or a check is `_UNDECIDED`, say the property is undecided and narrow the model — never report it as verified.
 11. **Write-site analysis is out of scope, and stays there.** "Only the ISR writes this flag", "one owner per register" — this toolbox verifies models and diagrams, not *who writes what in the source*. That claim needs a source-side AST/rule check or a static analyzer; this plugin's contribution is to flag the claim as unverified and route it (`model_interleaving_scan` does exactly that). Do not imply the diagram or the model settled it.

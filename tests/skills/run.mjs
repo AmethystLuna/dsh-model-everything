@@ -20,9 +20,9 @@ const CATALOG_DESCRIPTION_MAX_LENGTH = 500
 /** Trigger words that must survive inside the catalog budget: the use cases the skill exists for. */
 const REQUIRED_TRIGGERS = {
   // The entry point: broad intent, the doctrine, and the route to each domain skill.
-  'dsh-model-everything': ['Use when', 'verify', 'file:line', 'S1-S8', 'model-everything-uml', 'model-everything-concurrency', 'model-everything-datamodel'],
+  'dsh-model-everything': ['Use when', 'verify', 'file:line', 'S1-S8', 'model-everything-uml', 'model-everything-interleaving', 'model-everything-datamodel'],
   'model-everything-uml': ['Use when', 'diagram', 'round-trip', 'refused', 'model-everything skill'],
-  'model-everything-concurrency': ['Use when', 'thread-safe', 'ISR-safe', 'does not prove', 'model-everything skill'],
+  'model-everything-interleaving': ['Use when', 'thread-safe', 'ISR-safe', 'does not prove', 'model-everything skill'],
   'model-everything-datamodel': ['Use when', 'migration', 'data invariants', 'rollback', 'model-everything-uml'],
   // The architecture/dependency domain: the intent ("review this architecture") must
   // reach this skill, and the description must not promise more than the checks do.

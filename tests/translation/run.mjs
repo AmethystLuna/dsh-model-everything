@@ -24,7 +24,7 @@ const PAIRS = [
   // A skill's Chinese sibling is for a HUMAN reader of the repository. The model loads `SKILL.md`
   // and only `SKILL.md`, so the English half is the one that has to stay good at the moment of
   // choosing; the Chinese half exists so the method can be read without spending a model's budget.
-  { source: 'skills/model-everything-concurrency/SKILL.md', translated: 'skills/model-everything-concurrency/SKILL.zh-CN.md' },
+  { source: 'skills/model-everything-interleaving/SKILL.md', translated: 'skills/model-everything-interleaving/SKILL.zh-CN.md' },
   // The issue templates are forms a contributor writes IN rather than documents a maintainer reads, so
   // they ship in both languages: the same requests, in the language the reporter thinks in.
   { source: '.github/ISSUE_TEMPLATE/problem-while-running.md', translated: '.github/ISSUE_TEMPLATE/problem-while-running.zh-CN.md' },

@@ -36,15 +36,15 @@
       "hasProvenance": true
     },
     {
-      "path": "model-everything-concurrency/references/concurrency-risk-guide.md",
-      "hasProvenance": false
-    },
-    {
       "path": "model-everything-datamodel/references/data-model-guide.md",
       "hasProvenance": true
     },
     {
       "path": "model-everything-datamodel/references/data-model-schema.md",
+      "hasProvenance": false
+    },
+    {
+      "path": "model-everything-interleaving/references/concurrency-risk-guide.md",
       "hasProvenance": false
     },
     {

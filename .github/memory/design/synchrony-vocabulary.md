@@ -41,6 +41,8 @@ metadata:
 - `CONCURRENCY_KEYWORD` / `CONCURRENCY_ABSOLUTE_CLAIM` / `CONCURRENCY_NO_CLAIM` 与 `model-everything/concurrency/v1` 是**契约**，改它们要重冻快照、改 report-reading 指南，而收益只是让名字对齐；
 - 工具名与族名本来就不必相同：`model_verify` 返回 `S*` 码，`model_design_review` 返回 `DES*` 码，`uml_structure_verify` 返回 `UML*` 码。工具名说**动作**，族名说**报告属于哪一族**。
 
-技能名保留 `model-everything-concurrency`：它是这一类的教义入口，catalog 行已经写明"concurrency, synchrony or async"，改名只会让所有引用它的地方（闸门文本按名字逐条列出）跟着动，而路由不会因此变好。
+技能名同步改为 `model-everything-interleaving`（目录、frontmatter、闸门文本、README、路由表、用例语料一起改）。第一版只改了工具名并保留技能名，理由是"改名只会让引用它的地方跟着动"——实测下来这个理由站不住：工具说 interleaving、技能说 concurrency，读者要在两套词汇之间翻译一次，而技能名正是模型在 catalog 里看到的第一行。既已决定用"交错"命名这一类，就两边一致。
+
+**族名仍然是 concurrency**，这条没变：契约（`CONCURRENCY_*`、`model-everything/concurrency/v1`）不因命名口味而改，而工具名/技能名说"找什么"，族名说"报告属于哪一族"。
 
 改名在**发布前**做，所以没有外部调用者会受影响；发布之后再改就是破坏性变更。

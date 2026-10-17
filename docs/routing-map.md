@@ -22,27 +22,20 @@ mindmap
       closed schema: an unknown key is refused, not ignored
       the body it just loaded is where the field semantics live
     me - 7 corpus triggers
-      row: 497 of 500 chars
+      row: 498 of 500 chars
       tool: model_verify
       tool: model_compose_verify
       tool: model_export
       tool: report_diff
-      near miss x2 → me-concurrency
+      near miss x2 → me-interleaving
       near miss x2 → me-datamodel
       near miss x2 → me-structure
       near miss x2 → me-uml
-    me-concurrency - 5 corpus triggers
-      row: 389 of 500 chars
-      tool: model_interleaving_scan
-      near miss x1 → me
-      near miss x1 → me-datamodel
-      near miss x1 → me-uml
-      near miss x1 → me-structure
     me-datamodel - 8 corpus triggers
       row: 483 of 500 chars
       tool: model_datamodel_verify
       near miss x2 → me-uml
-      near miss x2 → me-concurrency
+      near miss x2 → me-interleaving
       near miss x2 → me
       near miss x2 → me-structure
     me-design - 6 corpus triggers
@@ -50,11 +43,18 @@ mindmap
       tool: model_design_review
       near miss x2 → me-structure
       near miss x1 → me-uml
-      near miss x1 → me-concurrency
+      near miss x1 → me-interleaving
+    me-interleaving - 5 corpus triggers
+      row: 389 of 500 chars
+      tool: model_interleaving_scan
+      near miss x1 → me
+      near miss x1 → me-datamodel
+      near miss x1 → me-uml
+      near miss x1 → me-structure
     me-report-reading - 6 corpus triggers
       row: 420 of 500 chars
       near miss x1 → me
-      near miss x1 → me-concurrency
+      near miss x1 → me-interleaving
       near miss x1 → me-datamodel
       near miss x1 → me-structure
       near miss x1 → me-uml
@@ -62,7 +62,7 @@ mindmap
       row: 476 of 500 chars
       tool: uml_structure_verify
       near miss x2 → me-uml
-      near miss x2 → me-concurrency
+      near miss x2 → me-interleaving
       near miss x2 → me
       near miss x1 → me-datamodel
       near miss x1 → me-design
@@ -82,12 +82,12 @@ mindmap
 
 | Skill | Row length | Owns these questions | Sends the near miss to |
 |---|---|---|---|
-| `model-everything` | 497/500 | "the README says the API accepts a batch of 100, check that"<br>"verify the claims in this design doc against the code"<br>"this spec says a job can never be both queued and running - is that enforced?" | me-concurrency x2, me-datamodel x2, me-structure x2, me-uml x2 |
-| `model-everything-concurrency` | 389/500 | "this design claims the queue is thread-safe and lock-free"<br>"is this counter monotonic under concurrent writers?"<br>"the doc says the ISR-safe path touches no shared memory" | me x1, me-datamodel x1, me-uml x1, me-structure x1 |
-| `model-everything-datamodel` | 483/500 | "review this migration: the orders table gains a required column"<br>"does the migration preserve every required field?"<br>"our schema says ids are unique and no row may be orphaned - check the model" | me-uml x2, me-concurrency x2, me x2, me-structure x2 |
-| `model-everything-design` | 478/500 | "does this design keep its layering, or does something reach across a boundary"<br>"tag each module with its responsibilities and check the split"<br>"this interface forces callers to depend on methods they never call" | me-structure x2, me-uml x1, me-concurrency x1 |
-| `model-everything-report-reading` | 420/500 | "the verify tool gave me a report - what does this verdict mean?"<br>"why did the review come out pass_with_findings instead of pass?"<br>"which findings should I act on in this report?" | me x1, me-concurrency x1, me-datamodel x1, me-structure x1, me-uml x1 |
-| `model-everything-structure` | 476/500 | "here is our component diagram, check for dependency cycles"<br>"the deployment diagram has a service calling the database directly, which our layers forbid"<br>"audit the module structure: which packages depend on which?" | me-uml x2, me-concurrency x2, me x2, me-datamodel x1, me-design x1, me-report-reading x1 |
+| `model-everything` | 498/500 | "the README says the API accepts a batch of 100, check that"<br>"verify the claims in this design doc against the code"<br>"this spec says a job can never be both queued and running - is that enforced?" | me-interleaving x2, me-datamodel x2, me-structure x2, me-uml x2 |
+| `model-everything-datamodel` | 483/500 | "review this migration: the orders table gains a required column"<br>"does the migration preserve every required field?"<br>"our schema says ids are unique and no row may be orphaned - check the model" | me-uml x2, me-interleaving x2, me x2, me-structure x2 |
+| `model-everything-design` | 478/500 | "does this design keep its layering, or does something reach across a boundary"<br>"tag each module with its responsibilities and check the split"<br>"this interface forces callers to depend on methods they never call" | me-structure x2, me-uml x1, me-interleaving x1 |
+| `model-everything-interleaving` | 389/500 | "this design claims the queue is thread-safe and lock-free"<br>"is this counter monotonic under concurrent writers?"<br>"the doc says the ISR-safe path touches no shared memory" | me x1, me-datamodel x1, me-uml x1, me-structure x1 |
+| `model-everything-report-reading` | 420/500 | "the verify tool gave me a report - what does this verdict mean?"<br>"why did the review come out pass_with_findings instead of pass?"<br>"which findings should I act on in this report?" | me x1, me-interleaving x1, me-datamodel x1, me-structure x1, me-uml x1 |
+| `model-everything-structure` | 476/500 | "here is our component diagram, check for dependency cycles"<br>"the deployment diagram has a service calling the database directly, which our layers forbid"<br>"audit the module structure: which packages depend on which?" | me-uml x2, me-interleaving x2, me x2, me-datamodel x1, me-design x1, me-report-reading x1 |
 | `model-everything-uml` | 466/500 | "draw this retry flow as a state diagram"<br>"turn this model into PlantUML"<br>"someone drew this activity diagram - does it match the code?" | me-structure x3, me x2, me-datamodel x2 |
 
 ## The overlap that has to be resolved in words
@@ -122,7 +122,7 @@ nothing else at that moment.
 | `model_datamodel_verify` | `model-everything-datamodel` | "Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression." |
 | `model_design_review` | `model-everything-design` | "Hold a design to the contracts it declares about itself: layering, responsibility ownership, substitutability, interface width." |
 | `model_export` | `model-everything` | "Translate a LogicModelV1 into the input language of an external checker - UPPAAL, TLA+, PRISM or SPIN - for a property this plugin does not decide its" |
-| `model_interleaving_scan` | `model-everything-concurrency` | "Scan a document or plan text for claims about how work is executed: threads, synchronization, async tasks, interrupts, shared state." |
+| `model_interleaving_scan` | `model-everything-interleaving` | "Scan a document or plan text for claims about how work is executed: threads, synchronization, async tasks, interrupts, shared state." |
 | `model_verify` | `model-everything` | "Verify one state machine: does this LogicModelV1 reach a state it must not, deadlock, livelock, or leave an invariant undecided." |
 | `report_diff` | `model-everything` | "Compare two reports of the same family, to accept a change by what it added rather than by reading two reports: `baseline` (earlier) against `current`" |
 | `uml_explain_labels` | `model-everything-uml` | "Print the label and comment conventions the UML parser accepts, for one notation: the accepted label spellings, the form the renderer writes, the dire" |

@@ -1,5 +1,5 @@
 ---
-name: model-everything-concurrency
+name: model-everything-interleaving
 description: "Use when a design or plan claims concurrency, synchrony or async safety, or names concurrent writers, mutexes, interrupts, async tasks, promises or an event loop. It mines the claims (thread-safe, lock-free, no data race, ISR-safe, non-blocking) and routes each to dedicated verification (TSan, Helgrind, CBMC, TLA+, UPPAAL); it does not prove safety. Doctrine: the model-everything skill."
 ---
 

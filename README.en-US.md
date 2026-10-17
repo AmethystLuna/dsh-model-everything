@@ -186,7 +186,7 @@ The skills carry how to use the tools and what counts as evidence, split by doma
 | `model-everything-structure` | Architecture and dependencies: writing the matrix, what each structural check means |
 | `model-everything-datamodel` | Data models and migrations: invariants, coverage, rollback |
 | `model-everything-design` | A design against its own declarations: layering, responsibilities against the dependencies they own, substitutability, interface width |
-| `model-everything-concurrency` | Concurrency, synchrony and async claims: which can be proven, with which tool, and what only a runtime can see |
+| `model-everything-interleaving` | Concurrency, synchrony and async claims: which can be proven, with which tool, and what only a runtime can see |
 | `model-everything-report-reading` | Reading a report: the reading order, where the findings are, the two easy misreadings |
 
 The descriptions are themselves the routing signal, and how much of one the model can see is capped: a catalog row is **truncated at 500 characters**, and the rest is never shown. Who owns which question, and what each row has to carry, is recorded in a generated map: [`docs/routing-map.md`](docs/routing-map.md), from `docs/tools/generate-routing-map.mjs`, with `tests/routing-map` failing when it drifts from the catalog.

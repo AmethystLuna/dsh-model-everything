@@ -1,15 +1,10 @@
 {
-  "catalogChars": 3393,
+  "catalogChars": 3395,
   "catalogRows": [
     {
       "skill": "model-everything",
-      "chars": 497,
-      "body": 36739
-    },
-    {
-      "skill": "model-everything-concurrency",
-      "chars": 389,
-      "body": 6861
+      "chars": 498,
+      "body": 36742
     },
     {
       "skill": "model-everything-datamodel",
@@ -20,6 +15,11 @@
       "skill": "model-everything-design",
       "chars": 478,
       "body": 8525
+    },
+    {
+      "skill": "model-everything-interleaving",
+      "chars": 389,
+      "body": 6862
     },
     {
       "skill": "model-everything-report-reading",
@@ -89,8 +89,8 @@
     }
   ],
   "perTurn": {
-    "chars": 15349,
-    "tokens": 3837
+    "chars": 15351,
+    "tokens": 3838
   },
   "routing": {
     "rowsWithSibling": 7,

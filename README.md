@@ -186,7 +186,7 @@ model_verify model=examples/control-dispatcher.json
 | `model-everything-structure` | 架构与依赖：矩阵怎么写、各条结构检查意味着什么 |
 | `model-everything-datamodel` | 数据模型与迁移：不变式（任何时刻都必须成立的约束）、迁移覆盖、回滚对称 |
 | `model-everything-design` | 设计自洽：分层是否成立、职责与依赖是否匹配、子类型能否替父类型、接口是否宽于调用方 |
-| `model-everything-concurrency` | 并发、同步与异步声明：哪些能证明、用哪个工具证明、哪些只有运行时能看见 |
+| `model-everything-interleaving` | 并发、同步与异步声明：哪些能证明、用哪个工具证明、哪些只有运行时能看见 |
 | `model-everything-report-reading` | 读报告：阅读顺序、发现放在哪一层、容易读反的两处 |
 
 技能描述本身就是路由依据，而它们能写的长度有硬上限（目录行**截断在 500 字符**，之后的部分模型看不到）。谁负责哪个问题、每行必须携带什么，由一张生成的图记录：[`docs/routing-map.md`](docs/routing-map.md)，生成器是 `docs/tools/generate-routing-map.mjs`；`tests/routing-map` 会在图与目录不一致时失败。

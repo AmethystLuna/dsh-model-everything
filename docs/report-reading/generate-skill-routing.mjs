@@ -42,7 +42,7 @@ const questions = [
   { question: 'review this architecture', needle: 'architecture', owner: 'model-everything-structure' },
   { question: 'is this data guarantee sound', needle: 'data guarantee', owner: 'model-everything-datamodel' },
   { question: 'does this design keep its declarations', needle: 'declarations', owner: 'model-everything-design' },
-  { question: 'is this thread-safe', needle: 'thread-safe', owner: 'model-everything-concurrency' },
+  { question: 'is this thread-safe', needle: 'thread-safe', owner: 'model-everything-interleaving' },
   { question: 'draw this flow as UML', needle: 'UML', owner: 'model-everything-uml' },
 ]
 

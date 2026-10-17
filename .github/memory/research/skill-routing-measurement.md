@@ -16,7 +16,7 @@ metadata:
 | 族 | 得分 | 该族当时是否已测过 |
 |---|---|---|
 | `model-everything` | 15/15 | 是（旧语料） |
-| `model-everything-concurrency` | 9/9 | 是 |
+| `model-everything-interleaving` | 9/9 | 是 |
 | `model-everything-datamodel` | 16/16 | 是 |
 | `model-everything-uml` | 16/16 | 是 |
 | `model-everything-structure` | 16/16 | 是 |
