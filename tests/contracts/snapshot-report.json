@@ -2466,10 +2466,19 @@
       "added": [],
       "removed": [],
       "changed": [
-        "S5_UNHANDLED_EVENT"
+        "warning→error:S5_UNHANDLED_EVENT"
       ]
     },
     "body": "model-everything/baseline/v1  verdict=fail  1 finding(s) escalated to error (1 error) (first error: S5_UNHANDLED_EVENT)  ok=true\n\nCHANGED (1)\n  S5_UNHANDLED_EVENT  severity warning → error\nCURRENT  verdict=fail\n\nNEXT  A finding moved from warning to error (1): the slice added nothing but still made the report worse, so the baseline is less strict than the run.\nNEXT  Review the 1 changed finding(s): the same locator now reports something different, which usually means the fix moved the problem.\nNEXT  The current report still fails on its own terms, and the delta already says the slice made it worse: settle both before accepting it."
+  },
+  "report diff: two families through the tool": {
+    "ok": false,
+    "ran": false,
+    "errorCode": "REPORT_INVALID",
+    "verdict": "fail",
+    "verdictReason": "the tool did not run: cannot compare a model-everything/verify/v1 report with a model-everything/structure/v1 report: they do not share a finding vocabulary, so every finding on one side would read as resolved or added on the other. Compare two runs of the same tool.",
+    "findings": [],
+    "body": "model-everything/report  verdict=fail  the tool did not run: cannot compare a model-everything/verify/v1 report with a model-everything/structure/v1 report: they do not share a finding vocabulary, so every finding on one side would read as resolved or added on the other. Compare two runs of the same tool.  ok=false\nnote: the tool did not run (the engine refused the input) — the fields below describe the refusal.\nERROR  cannot compare a model-everything/verify/v1 report with a model-everything/structure/v1 report: they do not share a finding vocabulary, so every finding on one side would read as resolved or added on the other. Compare two runs of the same tool. [REPORT_INVALID]\n\n{\"ok\":false,\"ran\":false,\"verdict\":\"fail\",\"verdictReason\":\"the tool did not run: cannot compare a model-everything/verify/v1 report with a model-everything/structure/v1 report: they do not share a finding vocabulary, so every finding on one side would read as resolved or added on the other. Compare two runs of the same tool.\"}"
   },
   "compose: two machines through the tool": {
     "ok": true,
