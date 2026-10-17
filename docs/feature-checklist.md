@@ -190,7 +190,7 @@ And the gates around it:
 | `granularity` | 9 | a proper refinement passes and reports the expansion per pair |
 | `exporters` | 9 | source model still verifies (sanity) |
 | `report-view` | 22 | the report object is not mutated by rendering |
-| `contracts` | 3 | every frozen case still exists |
+| `contracts` | 4 | every frozen case still exists |
 | `tool-boundary` | 0 | (read the file) |
 | `negatives` | 0 | (read the file) |
 | `external` | 2 | spin: never-states violated (A is initial) |

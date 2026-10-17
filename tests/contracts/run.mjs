@@ -164,11 +164,15 @@ function projection(report) {
     // The domains that answer with their own shape: an export carries its payload, a
     // report diff carries the delta. Freeze what a caller acts on there too.
     ...(report.format === undefined ? {} : { format: report.format, payloadLength: (report.primary ?? '').length }),
+    // A delta's verdict is decided by the severities in these three lists - a new warning does not fail it, a new
+    // error does, and so does a warning that escalated. Freezing codes alone lost the half that decides.
     ...(report.summary?.added === undefined && report.added === undefined ? {} : {
       delta: {
-        added: (report.added ?? report.summary?.added ?? []).map((entry) => entry.code ?? entry),
-        removed: (report.removed ?? report.summary?.removed ?? []).map((entry) => entry.code ?? entry),
-        changed: (report.changed ?? report.summary?.changed ?? []).map((entry) => entry.code ?? entry),
+        added: (report.added ?? report.summary?.added ?? []).map((entry) => (entry !== null && typeof entry === 'object' ? String(entry.severity) + ':' + String(entry.code) : String(entry))),
+        removed: (report.removed ?? report.summary?.removed ?? []).map((entry) => (entry !== null && typeof entry === 'object' ? String(entry.severity) + ':' + String(entry.code) : String(entry))),
+        changed: (report.changed ?? report.summary?.changed ?? []).map((entry) => (entry !== null && typeof entry === 'object' && entry.before !== undefined
+          ? String(entry.before.severity) + '→' + String(entry.after.severity) + ':' + String(entry.code)
+          : String(entry))),
       },
     }),
     // The rendered body is part of the contract a caller reads.
@@ -206,6 +210,7 @@ try {
     // that were wrong until this session.
     'report diff: a clean delta through the tool': () => diffTool.reportDiffTool.execute({ baseline: runVerification(stateMachine), current: runVerification(stateMachine) }),
     'report diff: an escalation through the tool': () => diffTool.reportDiffTool.execute({ baseline: escalatingBaseline, current: escalatingCurrent }),
+    'report diff: two families through the tool': () => diffTool.reportDiffTool.execute({ baseline: runVerification(stateMachine), current: reviewStructure({ diagram: structureDiagram }) }),
     'compose: two machines through the tool': () => composeTool.modelComposeTool.execute({ machines: [leftMachine, rightMachine], rendezvous: ['go'] }),
     'datamodel: a valid model through the tool': () => dataTool.modelDataModelVerifyTool.execute({ model: dataModel }),
     'design: a layered design through the tool': () => designTool.designTool.execute({ model: declaredDesign }),
@@ -345,6 +350,37 @@ test('report contract: the projection drops nothing a reader acts on', () => {
   const keys = new Set(Object.keys(current['verify: a machine with a narrative']))
   for (const required of ['ok', 'ran', 'verdict', 'verdictReason', 'schema', 'modelHash', 'summary', 'findings', 'nextSteps', 'body']) {
     if (!keys.has(required)) throw new Error('the projection is missing ' + required)
+  }
+})
+
+test('report contract: every verdict agrees with the severities it carries', () => {
+  // The defect this catches, twice over: a composition whose finding was a warning inside a verdict of `fail`, and a
+  // file whose warning was counted as an error in the summary. Both halves of one report have to say the same thing,
+  // and the rendered body reads severities while the verdict reads counts.
+  for (const [name, report] of Object.entries(current)) {
+    // A refusal is a `fail` with no finding to count: `errorCode` says why, and the code is what a caller routes on.
+    if (report.ran === false) continue
+    // A delta has no findings: its verdict is decided by the severities of what moved - a new error, or a warning that
+    // became one. A removal is an improvement and never fails it.
+    if (report.delta !== undefined) {
+      const worse = report.delta.added.some((entry) => entry.startsWith('error:'))
+        || report.delta.changed.some((entry) => /→error:/.test(entry) && !entry.startsWith('error→'))
+      if (report.verdict === 'fail' && !worse) {
+        throw new Error(name + ': a delta that fails must say what got worse (' + JSON.stringify(report.delta) + ')')
+      }
+      if (report.verdict !== 'fail' && worse) {
+        throw new Error(name + ': a delta that carries a new error must fail (' + JSON.stringify(report.delta) + ')')
+      }
+      continue
+    }
+    const findings = [...(report.findings ?? []), ...((report.checks ?? []).flatMap((check) => check.findings ?? []))]
+    const errors = findings.filter((finding) => finding.severity === 'error').length
+    if (report.verdict === 'fail' && errors === 0) {
+      throw new Error(name + ': verdict fail with no error finding (' + JSON.stringify(findings.map((finding) => finding.severity + ':' + finding.code)) + ')')
+    }
+    if (report.verdict !== 'fail' && errors > 0) {
+      throw new Error(name + ': verdict ' + String(report.verdict) + ' carries ' + String(errors) + ' error finding(s)')
+    }
   }
 })
 
