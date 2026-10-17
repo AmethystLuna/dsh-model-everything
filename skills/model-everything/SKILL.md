@@ -187,7 +187,7 @@ not a bound on the search.
 | `model_verify` | S1-S8 structural + A1-A14 adversarial, including A12 budget / worst-case path cost, A13 probabilistic reachability over a DTMC, and A14 discrete-tick deadlines. `beforeModel` + `stateMapping` add the D1-D4 before/after regression. |
 | `model_datamodel_verify` | Data models and schema migrations: DS/DA checks plus the DD1-DD4 data regression. See the `model-everything-datamodel` skill. |
 | `model_compose_verify` | Two or more machines checked together (rendezvous handshake semantics): C1 composition deadlock, C2 rendezvous never fires. |
-| `model_concurrency_scan` | Mines concurrency claims (thread-safe, lock-free, race condition, mutex, ISR-safe) and routes them to dedicated verification. It does not prove concurrency safety. |
+| `model_concurrency_scan` | Mines concurrency claims (thread-safe, lock-free, race condition, mutex, ISR-safe, and their Chinese counterparts) and routes them to dedicated verification. It does not prove concurrency safety, and it refuses text it can mine nothing from (`CONCURRENCY_NO_CLAIM`) rather than calling it clean. |
 | `model_export` | Emits external-checker input from a verified model: UPPAAL, TLA+, PRISM, SPIN. |
 | `uml_render` | model → Mermaid/PlantUML source, for any family the notation can draw; a view it cannot draw is refused with the reason. |
 | `uml_parse` | diagram text → the model of the family it declares, so a hand-drawn diagram can be checked. |

@@ -170,7 +170,7 @@ And the gates around it:
 | `design-engine` | 13 | design: a cycle reports the fewest edges that break it, and says the count is a minimum |
 | `catalog` | 8 | catalog: every skill row fits the budget, so nothing it needs is cut off |
 | `data-engine` | 15 | valid data model passes |
-| `concurrency` | 4 | flags absolute concurrency claims and risk keywords |
+| `concurrency` | 6 | flags absolute concurrency claims and risk keywords |
 | `uml` | 93 | render: mermaid state diagram carries directives, guards and terminal marks |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 7 | the memory root, its indexes and at least one topic exist |
