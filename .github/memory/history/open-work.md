@@ -98,7 +98,7 @@ metadata:
 | # | 缺口 | 状态 | 判据落点 |
 |---|---|---|---|
 | 1 | `model_compose_verify` 的 `rendezvous` 从不解析：拼错的名字、甚至传字符串 `"go"`，都静默跳过 C2，报告仍 `verdict=pass` + 「All rendezvous events can fire」 | **已实测** | `lib/engine.js` 的 `new Set(options.rendezvous ?? [])` 与 `if (!allEventsSet.has(event)) continue`；工具只校验了 `machines` |
-| 2 | 检查内的搜索上限：`maxStates` 用尽后 A12 等仍报 `pass` + 「All budget invariants hold」，且没有 `*_UNDECIDED`，`summary.truncated` 虽然为 `true` | **已实测** | `shortestViolationForInvariant` / `findBudgetViolation` 等 `break` 分支；`dsh-model-schema.md` 承诺 cap 会以 `_UNDECIDED` 报告 |
+| 2 | 检查内的搜索上限：`maxStates` 用尽后仍报「All … hold」，且没有 `*_UNDECIDED` | **部分修复**：`A14`（`b72a0fb`，walk 在函数体内，加标志即可）与 `A12`（`7b0eab1`，walk 在辅助函数里，必须把 `undefined` 拆成第三态 `'undecided'`）已完成；**`A10`、`A11`、`S7`、`A7` 仍是旧行为** | 逐个看 walk 在哪：函数体内 → 加 `capped` 标志；独立函数 → 改返回类型为 `T \| 'undecided' \| undefined`。`A7` 走的那条 `findBudgetViolation` 调用点在 `7b0eab1` 里显式保留旧行为 |
 | 3 | `uml_parse` 默认正文不显示模型与告警，且自相矛盾：header 说「1 warning finding(s)」、下一行 `FINDINGS none` | 未实测 | `uml-tool.js` 的 `parseVerdict` 把 warnings 计入 verdict；`report-view.js` 的 `renderFindingsReport` 只印 findings |
 | 4 | 默认正文从不显示 `truncated` / `boundNotes` / `hashSpec` / `metadataKeys`；`narrativeCoverage` 的渲染分支用 `count()` 收数字，而引擎给的是 `"5/5"` 字符串 → 那行永远不出现 | 未实测 | `report-view.js` 的 `headerLines` |
 | 5 | `report_diff` 空 delta 走未知形状兜底，把整份 JSON 打出来；非空时 `changed` 被 `toViewFinding` 编造成 `severity: warning`，before/after 丢失 | 未实测 | `report-view.js` 的 `isDelta` 与 `renderDeltaReport` |
