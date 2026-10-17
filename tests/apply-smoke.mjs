@@ -1,5 +1,4 @@
 import { Context } from '@deepseek-ai/cordis'
-import { createVolatile, updateVolatile } from '@deepseek-ai/cosmokit'
 import { Config } from '../lib/index.js'
 
 const ctx = new Context()
@@ -13,12 +12,8 @@ ctx.provide('systemPrompt', { context(contribution) { promptContext = contributi
 ctx.provide('cordisInspect', { register(provider) { inspectProvider = provider; return () => {} } })
 
 const mod = await import('../lib/index.js')
-// Built through the real schema, as the Loader builds it: `enabled` is declared
-// `.volatile()`, so `apply` receives a live reference, not a copied boolean.
-const config = new Config({ enabled: true, interaction: 'follow-approval' })
-if (typeof config.enabled?.get !== 'function') {
-  throw new Error('enabled is not a volatile reference; the Plugins page switch would have no field to edit')
-}
+// Built through the real schema, as the Loader builds it.
+const config = new Config({ interaction: 'follow-approval' })
 mod.apply(ctx, config)
 
 // The registrations are compared with the tool modules themselves rather than with a number:
@@ -58,15 +53,12 @@ if (status.umlToolsRegistered !== true) throw new Error('inspect status umlTools
 if (status.engineSchemaVersion !== 1) throw new Error('inspect status engineSchemaVersion should be 1')
 if (status.dataEngineSchemaVersion !== 1) throw new Error('inspect status dataEngineSchemaVersion should be 1')
 if (status.interaction !== 'follow-approval') throw new Error('inspect status interaction mismatch')
-if (status.enabled !== true) throw new Error('inspect status enabled should read the live switch')
 
-// The Plugins page writes through the settings service, which updates the
-// volatile reference in place. The plugin must observe the new value without
-// being remounted, which is what makes the switch live inside a session.
-const before = registered.length
-updateVolatile(config.enabled, createVolatile(false))
-const toggled = await inspectProvider.query('status')
-if (toggled.enabled !== false) throw new Error('the live switch did not reach the plugin')
-if (registered.length !== before) throw new Error('toggling the switch must not disturb the registered tools')
+// There is deliberately no on/off key in this row's config. A switch that only reported itself -
+// which is what the previous `enabled` did, while every tool registered unconditionally - is worse
+// than no switch: the README promised a reader that setting it false would stop the tools, and
+// nothing in the plugin read it except the status reply it appeared in. Switching this row off is
+// the loader row's job, and the loader removes the tools and the skills together.
+if ('enabled' in status) throw new Error('the status still reports an enabled switch that does not switch anything')
 
-console.log('PASS apply smoke: tool and inspect registrations, and the live enable switch')
+console.log('PASS apply smoke: tool and inspect registrations, and no self-reporting switch')

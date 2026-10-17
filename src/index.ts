@@ -22,7 +22,7 @@
  */
 
 import { fileURLToPath } from 'node:url'
-import type { Context, Volatile } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
@@ -64,53 +64,22 @@ const SKILLS_DIR = fileURLToPath(new URL('../skills', import.meta.url))
 export type InteractionMode = 'ask' | 'auto' | 'follow-approval'
 
 
-/** A schemastery field that may or may not carry `.volatile()`. */
-interface LiveField {
-  volatile?: () => unknown
-}
-
-/**
- * Declare a field as live where this host's schemastery can — `.volatile()`
- * arrived in 3.18.3 — and leave it an ordinary field where it cannot.
- *
- * The fallback is load-bearing, not defensive padding. `Config` below is built
- * while this module is still being evaluated, so an unconditional `.volatile()`
- * on a host whose schemastery predates it throws during import; the loader entry
- * then fails and takes the WHOLE plugin tree — and the host's boot — down with it.
- * Degrading costs only the live settings projection, because a settings service
- * projects nothing but fields under a `.volatile()` node; skills, tools and report
- * handling are untouched. The returned schema keeps the plain field's static type;
- * `Config` interface below carries the union the host actually hands over.
- */
-function live<T>(field: T): T {
-  const probe = field as T & LiveField
-  return typeof probe.volatile === 'function' ? (probe.volatile() as T) : field
-}
-
 export interface Config {
   /**
-   * The injection switch the Web client's Plugins page edits live: a `Volatile`
-   * reference on a host whose schemastery supports one, an ordinary boolean on a
-   * which accepts both shapes.
+   * How an offer to run a tool resolves: `ask` and `auto` are fixed, while `follow-approval`
+   * reads the session's approval policy per call. `resolveInteraction` is its only reader.
+   *
+   * There is deliberately no on/off key here. A row is switched off by the loader row that
+   * mounts it (`disabled`, or the plugin manager), which removes the tools and the skills
+   * together; a key that turned the tools off while the skills stayed would leave every skill
+   * naming a tool that is not there, which is worse than having no skill at all.
    */
-  enabled: Volatile<boolean> | boolean
   interaction: InteractionMode
 }
 
 export const Config = z.object({
-  // Live so a deployment can flip the plugin on and off inside a running session without
-  // remounting the row. Nothing is injected either way: this switch only decides whether
-  // the tools register.
-  // what lets a toggle take effect without remounting the row.
-  enabled: live(z.boolean().default(true)),
   interaction: z.union(['ask', 'auto', 'follow-approval']).default('follow-approval'),
 })
-
-/**
- * Read the injection switch as a boolean, whichever shape this host produced.
- * @param config - the resolved plugin configuration.
- * @returns whether the gate may be injected.
- */
 
 
 interface SessionEventLike {
@@ -197,7 +166,6 @@ function inspectProvider(config: Config, isToolRegistered: () => boolean, isData
             type: 'object',
             description: 'Plugin status: registration state and the schema versions the bundled engines accept.',
             properties: {
-              enabled: { type: 'boolean', description: 'Whether this plugin registers its tools in this deployment.' },
               interaction: { type: 'string', enum: ['ask', 'auto', 'follow-approval'], description: 'Configured interaction mode. follow-approval resolves per session from approval/policy.' },
               toolRegistered: { type: 'boolean', description: 'Whether the model_verify tool is registered on ctx.tools.' },
               dataToolRegistered: { type: 'boolean', description: 'Whether the model_datamodel_verify tool is registered on ctx.tools.' },
@@ -218,7 +186,6 @@ function inspectProvider(config: Config, isToolRegistered: () => boolean, isData
     query: async (method) => {
       if (method === 'status') {
         return {
-          enabled: typeof config.enabled === 'boolean' ? config.enabled : config.enabled.get(),
           interaction: config.interaction,
           toolRegistered: isToolRegistered(),
           dataToolRegistered: isDataToolRegistered(),
@@ -309,39 +276,14 @@ export function apply(ctx: Context, config: Config): void {
       customSkillDirs: [SKILLS_DIR],
     })
   })
-  // Injection listens unconditionally, including while the switch is off: the
-  // switch is volatile, so `apply` runs once and the value behind it can turn on
-  // later from the Web Plugins page. Returning early on a false value here would
-  // freeze that decision for the lifetime of the mount, and turning the switch
-  // back on could never take effect without a profile restart.
-  //
-  // Inject the gate once per session on the FIRST model step that runs,
-  // instead of at session-start: session-start injection lands in the agent's
-  // inbox, which a blank-session preset switch (agentPreset.select ->
-  // recompose) can clear before the first step - the gate would then be lost
-  // for the whole session. The pre-step decision is the durable path a
-  // first-step injection takes: the gate is appended to the first step's
-  // decision and enters session history there, so every later step (and a
-  // resume) skips it. Anchored/bootstrap presets that strip first-step
-  // injected reminders (skill catalog, AGENTS.md, gate plugins) simply defer
-  // this message to the first step after their promotion - the history guard
-  // re-injects it there, so the gate still lands exactly once per session.
   // Optional services register opportunistically and a base-bundle row can mount after
   // this one applies, so registration is retried on the first model step - the point by
   // which the app is fully booted. Nothing is appended to the step: the tools and the
-  // skill text are the guide, not an injected reminder.
+  // skill text are the guide, not an injected reminder. Session-start routing, if a
+  // deployment wants it, is the separate gate component in `gate.ts`, not this row.
   ctx.on('agent/pre-step', async (_payload, next) => {
     const decision = await next()
     registerIntegrations()
     return decision
   })
 }
-
-/**
- * Whether the gate already entered this session's durable history. The
- * pre-step listener re-appends the gate until it does; once a step committed
- * it, every later step (and a resume of a session that kept it) skips the
- * injection. A session whose gate was dropped before any step ran (e.g. an
- * inbox cleared by a blank-session preset switch) simply re-injects on the
- * first step that runs.
- */

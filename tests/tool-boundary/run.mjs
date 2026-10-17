@@ -313,7 +313,7 @@ await test('every tool the plugin registers on ctx.tools is exercised by this su
   applyCtx.provide('tools', { register(definition) { registered.push(definition.name); return () => {} } })
   applyCtx.provide('cordisInspect', { register() { return () => {} } })
   const plugin = await import('../../lib/index.js')
-  plugin.apply(applyCtx, { enabled: true, interaction: 'follow-approval' })
+  plugin.apply(applyCtx, { interaction: 'follow-approval' })
   const exercised = new Set(TOOL_DEFINITIONS.map((definition) => definition.name))
   const missing = registered.filter((name) => !exercised.has(name))
   expect(missing.length === 0, `the plugin registers ${missing.join(', ')}; this suite never calls ${missing.length === 1 ? 'it' : 'them'}`)

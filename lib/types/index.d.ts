@@ -20,33 +20,26 @@
  *
  * @module dsh-model-everything
  */
-import type { Context, Volatile } from '@deepseek-ai/cordis';
+import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 export declare const name = "dsh-model-everything";
 export declare const inject: string[];
 export type InteractionMode = 'ask' | 'auto' | 'follow-approval';
 export interface Config {
     /**
-     * The injection switch the Web client's Plugins page edits live: a `Volatile`
-     * reference on a host whose schemastery supports one, an ordinary boolean on a
-     * which accepts both shapes.
+     * How an offer to run a tool resolves: `ask` and `auto` are fixed, while `follow-approval`
+     * reads the session's approval policy per call. `resolveInteraction` is its only reader.
+     *
+     * There is deliberately no on/off key here. A row is switched off by the loader row that
+     * mounts it (`disabled`, or the plugin manager), which removes the tools and the skills
+     * together; a key that turned the tools off while the skills stayed would leave every skill
+     * naming a tool that is not there, which is worse than having no skill at all.
      */
-    enabled: Volatile<boolean> | boolean;
     interaction: InteractionMode;
 }
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
-    enabled: z<boolean, boolean, "defined">;
     interaction: z<"ask" | "auto" | "follow-approval", "ask" | "auto" | "follow-approval", "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
-    enabled: z<boolean, boolean, "defined">;
     interaction: z<"ask" | "auto" | "follow-approval", "ask" | "auto" | "follow-approval", "defined">;
 }>>, "plain">;
 export declare function apply(ctx: Context, config: Config): void;
-/**
- * Whether the gate already entered this session's durable history. The
- * pre-step listener re-appends the gate until it does; once a step committed
- * it, every later step (and a resume of a session that kept it) skips the
- * injection. A session whose gate was dropped before any step ran (e.g. an
- * inbox cleared by a blank-session preset switch) simply re-injects on the
- * first step that runs.
- */

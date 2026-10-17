@@ -13,8 +13,6 @@
 - insert:
     - id: dsh-model-everything
       name: 'dsh-model-everything'
-      config:
-        enabled: true
     - id: dsh-model-everything-gate
       name: 'dsh-model-everything/gate'
       config:

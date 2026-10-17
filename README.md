@@ -232,9 +232,15 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 
 ## 配置
 
+**主行没有开关。** 关掉它等于关掉那一行——loader 的 `disabled`，或者用插件管理器卸掉——工具与技能会一起消失。这里刻意不做「工具关、技能留」的键：技能正文里写着这些工具的名字，工具没了，技能就只剩一句指向不存在的东西的话，比没有技能更糟。
+
+（这一行原先有个 `enabled`，README 说它「是否注册本插件的工具」——**它什么都不拦**：工具、技能、inspect 条目全都无条件注册，那个值只被状态接口读出来报告自己。已经删掉。）
+
+行里只剩一个键：
+
 | 键 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `enabled` | boolean | `true` | 是否注册本插件的工具。 |
+| `interaction` | `ask` \| `auto` \| `follow-approval` | `follow-approval` | 提议调用工具时怎么处置。前两个固定，`follow-approval` 每次读会话的审批策略。 |
 
 在 profile 的 `cordis.patch.yml` 里按 row id 覆盖：
 
@@ -242,11 +248,12 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 - insert:
     - id: dsh-model-everything
       name: 'dsh-model-everything'
+      disabled: false        # 要关掉整行就写 true
       config:
-        enabled: false
+        interaction: ask
 ```
 
-路由提示那一行有它自己的两个键：
+路由提示那一行有它自己的两个键（它可以被单独开关，因为它是**独立组件**）：
 
 | 键 | 类型 | 默认值 | 说明 |
 |---|---|---|---|

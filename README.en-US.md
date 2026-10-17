@@ -232,9 +232,15 @@ How it works, in four sentences:
 
 ## Configuration
 
+**The main row has no switch.** Turning it off means turning the row off - the loader's `disabled`, or the plugin manager - and the tools and the skills go together. There is deliberately no "tools off, skills on" key: the skill text names these tools, so with the tools gone a skill is a paragraph pointing at something that is not there, which is worse than having no skill.
+
+(This row used to carry an `enabled` that this README described as "whether this plugin registers its tools". It gated nothing: tools, skills and the inspect entry all registered unconditionally, and the value was read only by the status reply, where it reported itself. It has been removed.)
+
+One key is left:
+
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `enabled` | boolean | `true` | Whether this plugin registers its tools. |
+| `interaction` | `ask` \| `auto` \| `follow-approval` | `follow-approval` | What happens when a tool call is offered. The first two are fixed; `follow-approval` reads the session's approval policy per call. |
 
 Override it by row id in the profile's `cordis.patch.yml`:
 
@@ -242,11 +248,12 @@ Override it by row id in the profile's `cordis.patch.yml`:
 - insert:
     - id: dsh-model-everything
       name: 'dsh-model-everything'
+      disabled: false        # true turns the whole row off
       config:
-        enabled: false
+        interaction: ask
 ```
 
-The routing row has two keys of its own:
+The routing row has two keys of its own, and keeps them because it is a separate component:
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
