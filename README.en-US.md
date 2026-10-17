@@ -208,16 +208,18 @@ Restart the profile afterwards; `dsh --profile <profile> --dump-config` should l
 
 It registers its skills through the standard DSH filesystem skill provider and its tools on `ctx.tools`, plus one model-visible status entry that reports registration state and the model schema versions the bundled engines accept.
 
-### Two components, two rows
+### Two components
 
-| Row id | Carries | Default |
-|---|---|---|
-| `dsh-model-everything` | every tool and skill | on |
-| `dsh-model-everything-gate` | one routing message at the start of a session | **off** |
+| Component | Row id | Carries | Default |
+|---|---|---|---|
+| `dsh-model-everything` | `dsh-model-everything` | every tool and skill | on |
+| Prompt injection enhancement | `dsh-model-everything-gate` | one routing message in the first model step of a session | **off** |
 
-The second row is optional and switched separately. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything. Turned on, it injects a message (about 2.5k characters) into the **first model step** of each session, in four parts: which skill to load when it is unclear whether a check applies, what each skill answers, what each tool does **and what it does not prove**, and how to read a report (`verdict`, never `ok`; `skip` is not `pass`). It routes only - it checks nothing, and it cannot make a skill load.
+**Prompt injection enhancement** is the optional second component, switched on its own. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything. Turned on, it injects a message (about 2.5k characters) into the **first model step** of each session, in four parts: which skill to load when it is unclear whether a check applies, what each skill answers, what each tool does **and what it does not prove**, and how to read a report (`verdict`, never `ok`; `skip` is not `pass`). It routes only - it checks nothing, and it cannot make a skill load.
 
-It is off by default because the measurement says routing is right once a session engages, while this message is paid for by the sessions that never engage. There are two ways to turn it on: edit the profile's `cordis.patch.yml` (below), or - **on a host that mounts a settings service** - flip the switch on the Plugins page, which needs no restart. A profile without one has only the loader row, so it takes a config edit and a restart.
+**The switch**: `enabled` is a live field, so the toggle on the Plugins page takes effect on a running host without a restart; to pin a value, write it into the profile's `cordis.patch.yml` (below). It is off by default because it is paid for by every session that enables it, and the measurement says routing is right once a session engages - so **keep it for a comparison**: the same request with the gate off and on, to see whether the message changes which skill is loaded. That is its only use today; do not leave it on as a repair for routing.
+
+`gateContent` can be replaced wholesale to try different wording; `tests/gate` still requires it to name every shipped skill.
 
 ## Configuration
 

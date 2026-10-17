@@ -16,7 +16,19 @@ metadata:
 | `dsh-model-everything` | 全部工具与技能 | 开 |
 | `dsh-model-everything-gate` | 会话第一条模型步注入的一条路由消息 | **关** |
 
-`enabled` 是 live 字段（schemastery `.volatile()`）：**宿主挂了设置服务时**，Plugins 页翻开关不用重启；老 host 没有 `.volatile()` 时退化成普通布尔，要重启。**本项目自己的 `desktop` profile 实测没挂设置服务**（`Config.listConfigs` 里 `include:settings` 与 `include:config-editor` 都是 `absent`），所以在那里「打开」的可行路径是改行配置 + 重启，或由插件管理器把这一行 `enabled` 掉/开起来——那管的是行，不是行内 config。写文档时别把「有 live 开关」当成所有部署的既有条件：它是有条件的。`gateContent` 故意不是 live——设置面板是表单，一千多字的散文不适合放进表单，要在 profile 的 `cordis.patch.yml` 里覆盖。
+`enabled` 是 live 字段（schemastery `.volatile()`）：**插件页（Plugins）上的开关对运行中的 host 立刻生效，不用重启**。这条是实测过的，而且证据在配置投影里——`Config.listConfigs` 查 `include:dsh-model-everything-gate`，返回的 schema 里有 `"enabled": { "x-cordis": { "volatile": true } }`，说明设置服务确实投影了它；`plugin_manager list_plugins` 里 `include:settings` 与 `include:config-editor` 都是 `enabled: true` / `fiberPhase: active`。
+
+> **一条踩过的错**：我先前用 `Config.listConfigs` 目录里的 `status: "absent"` 判定「这个 profile 没挂设置服务」，据此把 README 和这里都改成了「只能改配置 + 重启」。**错的**：那个 `status` 是**该行有没有 Config schema 可投影**，`absent` 不等于没挂载。判断挂载/启用要看 `plugin_manager list_plugins` 的 `enabled` 与 `fiberPhase`；判断某个字段能不能被面板改，要看投影 schema 里有没有 `x-cordis.volatile`。两个都是"看起来在说同一件事"的状态字段，混用就会写出与实际相反的文档。
+
+`gateContent` 故意不是 live——设置面板是表单，一千多字的散文不适合放进表单，要在 profile 的 `cordis.patch.yml` 里覆盖。
+
+## 名字：卡片标题走 locale，不走 `dsh.displayName`
+
+dsh 的 `readPluginMeta(specifier, parentURL)` 拿**完整说明符（含子路径）**去解析 `<specifier>/package.json` 与 `<specifier>/locale/en.json`，所以：
+
+- **插件的卡片名**在 `locale/{en,zh}.json` 的 `meta.title`；`package.json` 的 `dsh.displayName` **dsh 不读**（留着无害，别指望它）。本轮决定：中英都叫 **`dsh-model-everything`**。
+- **组件自己的卡片名**需要它自己的清单与文案：`gate/package.json`（只有 `name` / `description` / `type`，其中 `name` 是给人看的标题）+ `gate/locale/{en,zh}.json`，并在 `exports` 里导出 `./gate/package.json` 与 `./gate/locale/*.json`，`files` 里加上 `gate`。本轮决定：中文名 **「提示词注入增强」**，英文 "Prompt injection enhancement"（直译；"prompt injection" 在安全语境里另有含义，若日后撞车，英文侧改成 "Injected routing prompt"）。
+- `tests/gate` 钉住这三件事：插件卡片中英标题都是包名、组件清单与两份 locale 都在且被导出、中文标题就是「提示词注入增强」。
 
 ## 为什么要它
 

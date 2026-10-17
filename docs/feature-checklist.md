@@ -176,7 +176,7 @@ And the gates around it:
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 7 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
-| `gate` | 11 | the package exposes the gate as its own entry point |
+| `gate` | 13 | the package exposes the gate as its own entry point |
 | `skill-routing` | 6 | every case names a skill that ships |
 | `toolset` | 12 | every tool description names at least one sibling |
 | `principles` | 4 | the principles index is the one the repository produces now |

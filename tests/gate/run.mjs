@@ -71,6 +71,35 @@ await check('the package exposes the gate as its own entry point', () => {
   if (entry.default !== './lib/gate.js') throw new Error('./gate points at ' + String(entry.default))
 })
 
+// The cards' names live in locale files, not in `dsh.displayName` - dsh does not read that
+// field. A card title is resolved from `<specifier>/locale/en.json`, so a component's own name
+// needs its own manifest and locale under a directory the exports map can reach.
+await check('the package card is named by its locale, in both languages', () => {
+  for (const language of ['en', 'zh']) {
+    const meta = JSON.parse(readFileSync(new URL('../../locale/' + language + '.json', import.meta.url), 'utf8')).meta
+    if (meta.title !== 'dsh-model-everything') throw new Error(language + ' card title is ' + JSON.stringify(meta.title))
+    if (typeof meta.description !== 'string' || meta.description.length === 0) throw new Error(language + ' card has no description')
+  }
+})
+
+await check('the gate has a card of its own: manifest, two locales, all shipped and exported', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
+  for (const subpath of ['./gate/package.json', './gate/locale/*.json']) {
+    if (pkg.exports?.[subpath] === undefined) throw new Error('package.json does not export ' + subpath)
+  }
+  if (!pkg.files.includes('gate')) throw new Error('the gate directory would not ship; files is ' + pkg.files.join(', '))
+  const manifest = JSON.parse(readFileSync(new URL('../../gate/package.json', import.meta.url), 'utf8'))
+  if (manifest.type !== 'module') throw new Error('the component manifest must declare "type": "module"')
+  const zh = JSON.parse(readFileSync(new URL('../../gate/locale/zh.json', import.meta.url), 'utf8')).meta
+  const en = JSON.parse(readFileSync(new URL('../../gate/locale/en.json', import.meta.url), 'utf8')).meta
+  // The Chinese name is a decision, not a default: it is what the component is called.
+  if (zh.title !== '提示词注入增强') throw new Error('the Chinese card title moved to ' + JSON.stringify(zh.title))
+  if (typeof en.title !== 'string' || en.title.length === 0) throw new Error('the English card has no title')
+  for (const [language, meta] of [['zh', zh], ['en', en]]) {
+    if (typeof meta.description !== 'string' || meta.description.length === 0) throw new Error(language + ' card has no description')
+  }
+})
+
 await check('the loader patch mounts the gate as a separate row, switched off', () => {
   const patch = readFileSync(new URL('../../cordis.patch.yml', import.meta.url), 'utf8')
   const rows = [...patch.matchAll(/^ {4}- id: (.+)$/gm)].map((match) => match[1].trim())
