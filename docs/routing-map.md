@@ -68,7 +68,7 @@ mindmap
       near miss x1 → me-design
       near miss x1 → me-report-reading
     me-uml - 9 corpus triggers
-      row: 428 of 500 chars
+      row: 466 of 500 chars
       tool: uml_render
       tool: uml_parse
       tool: uml_review
@@ -88,7 +88,7 @@ mindmap
 | `model-everything-design` | 478/500 | "does this design keep its layering, or does something reach across a boundary"<br>"tag each module with its responsibilities and check the split"<br>"this interface forces callers to depend on methods they never call" | me-structure x2, me-uml x1, me-concurrency x1 |
 | `model-everything-report-reading` | 420/500 | "the verify tool gave me a report - what does this verdict mean?"<br>"why did the review come out pass_with_findings instead of pass?"<br>"which findings should I act on in this report?" | me x1, me-concurrency x1, me-datamodel x1, me-structure x1, me-uml x1 |
 | `model-everything-structure` | 476/500 | "here is our component diagram, check for dependency cycles"<br>"the deployment diagram has a service calling the database directly, which our layers forbid"<br>"audit the module structure: which packages depend on which?" | me-uml x2, me-concurrency x2, me x2, me-datamodel x1, me-design x1, me-report-reading x1 |
-| `model-everything-uml` | 428/500 | "draw this retry flow as a state diagram"<br>"turn this model into PlantUML"<br>"someone drew this activity diagram - does it match the code?" | me-structure x3, me x2, me-datamodel x2 |
+| `model-everything-uml` | 466/500 | "draw this retry flow as a state diagram"<br>"turn this model into PlantUML"<br>"someone drew this activity diagram - does it match the code?" | me-structure x3, me x2, me-datamodel x2 |
 
 ## The overlap that has to be resolved in words
 

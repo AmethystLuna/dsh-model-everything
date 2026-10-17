@@ -1,5 +1,5 @@
 {
-  "catalogChars": 3307,
+  "catalogChars": 3345,
   "catalogRows": [
     {
       "skill": "model-everything",
@@ -33,8 +33,8 @@
     },
     {
       "skill": "model-everything-uml",
-      "chars": 428,
-      "body": 8225
+      "chars": 466,
+      "body": 8263
     }
   ],
   "toolChars": 10885,
@@ -89,8 +89,8 @@
     }
   ],
   "perTurn": {
-    "chars": 14192,
-    "tokens": 3548
+    "chars": 14230,
+    "tokens": 3558
   },
   "routing": {
     "rowsWithSibling": 7,
