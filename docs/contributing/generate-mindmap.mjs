@@ -9,8 +9,12 @@
 // about a method and has to cite one; a bug report is a claim about behaviour and has to be
 // reproducible. The shared branch is what both have to pass.
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const repo = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to
+// carry was the only thing in the repository that described one particular machine, and it
+// made the generator unrunnable anywhere else.
+const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
 const pkg = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
 /** The gates, read from the scripts and the workflow rather than recalled. */

@@ -5,8 +5,13 @@
 // numbers are measured here and written into both the map and facts.json, so the prose that follows the
 // map can quote them instead of recalling them.
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { join } from 'node:path'
 
-const repo = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to carry
+// was the only thing in the repository that described one particular machine.
+const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
+const libUrl = pathToFileURL(join(repo, 'lib')).href + '/'
 const tokens = (text) => {
   const cjk = (text.match(/[\u4e00-\u9fff]/g) ?? []).length
   return Math.round(cjk + (text.length - cjk) / 4)
@@ -28,7 +33,7 @@ const catalogChars = rows.reduce((sum, row) => sum + row.chars + row.skill.lengt
 const modules = ['compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js']
 const tools = []
 for (const file of modules) {
-  const mod = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/' + file)
+  const mod = await import(libUrl + file)
   for (const value of Object.values(mod)) {
     if (value === null || typeof value !== 'object') continue
     if (typeof value.name !== 'string' || typeof value.description !== 'string' || value.parameters === undefined) continue
@@ -54,11 +59,11 @@ const toolsWithoutSibling = tools.filter((tool) => !toolsWithSibling.includes(to
 
 // ----------------------------------------------------- the fifth surface, from real reports --
 
-const { runVerification, runCompositionVerification } = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/engine.js')
-const { runDataVerification } = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/data-engine.js')
-const { runDesignReview } = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/design-engine.js')
-const { reviewStructure } = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/structure.js')
-const { reviewUml } = await import('file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/uml.js')
+const { runVerification, runCompositionVerification } = await import(libUrl + 'engine.js')
+const { runDataVerification } = await import(libUrl + 'data-engine.js')
+const { runDesignReview } = await import(libUrl + 'design-engine.js')
+const { reviewStructure } = await import(libUrl + 'structure.js')
+const { reviewUml } = await import(libUrl + 'uml.js')
 
 const machine = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
 const other = { schemaVersion: 1, init: 'X', states: [{ id: 'X' }, { id: 'Y', terminal: true }], transitions: [{ from: 'X', event: 'ping', to: 'Y' }] }

@@ -7,8 +7,14 @@
 //
 // It also self-checks the Mermaid syntax before emitting, and refuses to write a malformed diagram.
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { join } from 'node:path'
 
-const base = 'file:///F:/workspace/dsh-plugins/dsh-model-everything/lib/'
+// Resolved from this file rather than a hardcoded checkout path. A generator that runs only on the
+// machine that wrote it is one nobody else can check - and the absolute path it carried was the one
+// thing in this repository that described that machine.
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
+const base = pathToFileURL(join(repoRoot, 'lib')).href + '/'
 const { runVerification, runCompositionVerification, REPORT_SCHEMAS } = await import(base + 'engine.js')
 const { runDataVerification } = await import(base + 'data-engine.js')
 const { runDesignReview } = await import(base + 'design-engine.js')
@@ -193,7 +199,7 @@ if (problems.length > 0) {
 }
 console.log('  ' + String(nodes.length) + ' nodes, no malformed line')
 
-const outDir = 'F:/workspace/dsh-plugins/dsh-model-everything/docs/report-reading'
+const outDir = join(repoRoot, 'docs/report-reading')
 mkdirSync(outDir, { recursive: true })
 writeFileSync(outDir + '/mindmap.mmd', map + '\n')
 

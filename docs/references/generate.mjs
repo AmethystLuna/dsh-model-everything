@@ -7,8 +7,12 @@
 //
 // The grouping is written here, because a bibliography is read by subject; the entries are not.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const repo = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to
+// carry was the only thing in the repository that described one particular machine, and it
+// made the generator unrunnable anywhere else.
+const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
 
 /** Where the citations live. Listed, because a new provenance table is a deliberate act. */
 const SOURCES = [

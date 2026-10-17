@@ -5,8 +5,12 @@
 // to exist, the suite is read from disk, the step is read from package.json - so no row can describe a
 // file that is not there or a check that does not run.
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const repo = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to
+// carry was the only thing in the repository that described one particular machine, and it
+// made the generator unrunnable anywhere else.
+const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
 const pkg = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
 /** The tests that actually run, in order, from the chain CI invokes. */

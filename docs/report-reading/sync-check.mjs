@@ -8,8 +8,12 @@
 // It also wires the generator to write the published artifacts directly, so there is one authoring
 // step rather than a copy somebody has to remember.
 import { readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const root = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to
+// carry was the only thing in the repository that described one particular machine, and it
+// made the generator unrunnable anywhere else.
+const root = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
 const pairs = [
   ['docs/report-reading/guide.md', 'skills/model-everything-report-reading/references/reading-a-report.md'],
   ['docs/report-reading/mindmap.mmd', 'skills/model-everything-report-reading/references/reading-a-report.mmd'],
