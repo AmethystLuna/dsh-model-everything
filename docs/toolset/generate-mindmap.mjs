@@ -22,7 +22,8 @@ const tokens = (text) => {
 const skills = readdirSync(repo + 'skills', { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
 const rows = []
 for (const skill of skills) {
-  const body = readFileSync(repo + 'skills/' + skill + '/SKILL.md', 'utf8')
+  // Line endings are a checkout setting, not a property of the shipped text.
+  const body = readFileSync(repo + 'skills/' + skill + '/SKILL.md', 'utf8').replaceAll('\r\n', '\n')
   const description = /^description:\s*"([\s\S]*?)"\s*$/m.exec(body)[1]
   rows.push({ skill, chars: description.length, body: body.length, description })
 }
