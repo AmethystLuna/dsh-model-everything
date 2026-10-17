@@ -132,6 +132,16 @@ self-report, and it is the weakest part of this method - it can be answered from
 session remembers doing, not from what it did. Read it with that in mind, and prefer the
 printed prompt where a description-level answer is enough.
 
+A live result is scored by one rule: **the expected skill is among the skills the session
+loaded.** Two consequences, both learned by running it:
+
+- Every domain line ends "Doctrine: the model-everything skill", so a session that loads a
+  domain skill commonly loads the doctrine skill too. That second load is the design working,
+  not a misroute - score the case on the expected skill being present, not on it being alone.
+- `none` is a miss for every case, the entry skill included. A session that used no skill was
+  not routed anywhere, and counting that as a quiet success would let an empty catalog score
+  perfectly.
+
 A misroute is a corpus or a description defect, not a model defect: fix whichever of the two
 the answer exposes, then re-run.
 
