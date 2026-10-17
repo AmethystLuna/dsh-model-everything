@@ -1,5 +1,5 @@
 ---
-name: 运行中遇到的问题 / A problem while running it
+name: 运行中遇到的问题
 about: 某个工具给出的答案你认为不对、拒绝了本该接受的输入、崩溃了，或者没有停下来。
 title: ''
 labels: bug

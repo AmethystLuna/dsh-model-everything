@@ -1,5 +1,5 @@
 ---
-name: 有出处的改进 / An improvement with a source
+name: 有出处的改进
 about: 你有一篇论文、一份规范或有文档的算法，说明某条检查应该换个算法；或者你发现某个判定的计算有缺陷。
 title: ''
 labels: enhancement
