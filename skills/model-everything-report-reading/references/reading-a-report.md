@@ -95,6 +95,11 @@ the current run on its own terms. The two differ exactly when the run is not cle
 empty — comparing a failing report against itself gives `verdict: "pass", currentVerdict: "fail"`,
 and both are true: nothing changed, and the run fails.
 
+A delta looks at three things, and only one of them is "new": `added`, `removed`, and `changed` — a
+finding that kept its identity and moved. A warning that became an error is in `changed`, not in
+`added`, and it still fails the delta: the slice added nothing and made the report worse. A change
+the other way, error to warning, is named too, and does not fail it.
+
 ## Read the severity before the code
 
 Within a finding, the severity decides whether it changed the verdict:

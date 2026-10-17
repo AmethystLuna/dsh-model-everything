@@ -259,5 +259,28 @@ test('the near miss: comparable reports still compare', () => {
   if (typeof partialAgainstReal.verdict !== 'string') throw new Error('a partial side must still compare')
 })
 
+test('a warning that escalated to an error fails the delta', () => {
+  // The delta verdict read `added` only. A finding that kept its identity and moved from warning to error is not
+  // added - it is `changed` - so the comparison answered pass over a change that made the report strictly worse.
+  const shaped = (severity, message) => ({
+    schema: 'model-everything/verify/v1',
+    ran: true,
+    ok: true,
+    verdict: severity === 'error' ? 'fail' : 'pass_with_findings',
+    summary: { checksRun: 1 },
+    checks: [{ id: 'S5', name: 'Event Completeness', status: 'fail', detail: '', findings: [{ code: 'S5_UNHANDLED_EVENT', severity, message, evidence: { state: 'A', event: 'stop' } }] }],
+  })
+  const escalated = diffReports(shaped('warning', 'A ignores stop'), shaped('error', 'A ignores stop'))
+  if (escalated.summary.changed !== 1) throw new Error('the case has to land in `changed`, not added: ' + JSON.stringify(escalated.summary))
+  if (escalated.verdict !== 'fail') throw new Error('an escalation is worse than nothing changed; got ' + escalated.verdict + ' / ' + escalated.verdictReason)
+  if (!/escalat/.test(escalated.verdictReason)) throw new Error('and the reason must say what happened: ' + escalated.verdictReason)
+  // The near miss: a reworded message at the same severity is a change, not a regression.
+  const reworded = diffReports(shaped('warning', 'A ignores stop'), shaped('warning', 'A silently ignores stop'))
+  if (reworded.verdict !== 'pass') throw new Error('a reworded warning must not fail the delta: ' + reworded.verdictReason)
+  // And a de-escalation is an improvement, not a failure.
+  const calmed = diffReports(shaped('error', 'A ignores stop'), shaped('warning', 'A ignores stop'))
+  if (calmed.verdict !== 'pass') throw new Error('an error that became a warning must not fail the delta: ' + calmed.verdictReason)
+})
+
 if (failures > 0) { console.log('baseline tests failed:', failures); process.exit(1) }
 console.log('all baseline tests passed')
