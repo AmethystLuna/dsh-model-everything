@@ -35,6 +35,7 @@ Mining a claim is not verifying it. Hand each one to a tool that can:
 | Interrupt/ISR races, critical sections | RTOS-aware interrupt analysis, or a TLA+ model of the ISR/task interleaving |
 | Protocol-level interleaving of discrete events | `model_verify` (S1-S8 / A1-A14) and `model_compose_verify` (C1/C2) |
 | Async task interleaving, lost wakeups, a handshake that never fires | TLA+ (export from `model_export`), or `model_compose_verify` for the two-task case |
+| A shared location two tasks both update (lost update, unordered write) | `model_compose_verify` with `shared` + `accesses`: C5 reports a read-modify-write pair the model does not make atomic, C4 an unordered write, C3 a declaration that names nothing. Two accesses naming one lock are excluded, and the report counts them |
 | Timeouts, deadlines, a callback that may never arrive | `model_verify` with `maxTicks` + `tickEvents`, or `model_export` -> UPPAAL for clocks |
 | A blocking call inside an async handler, a missing `await`, a promise nobody awaits | **Not decidable here.** A runtime or static check (blocked-event-loop detection, a lint/review of the call path) - name the check, never claim the design is clean |
 | Hard real time: deadlines, periods, preemption | Scheduling analysis (RMA/EDF) and a timing tool — not this toolbox |
@@ -48,7 +49,7 @@ Async defects live in what a model cannot express, so the report must say so rat
 
 1. **A blocking call inside an async handler.** The model has no clock and no runtime; it cannot tell a synchronous read from an awaited one. The claim "the handler is non-blocking" needs a runtime check (event-loop lag, a blocked-loop detector), not a scan.
 2. **A missing `await`.** This is an absent transition, and a model built from the plan will faithfully omit it. Static review of the call path is what catches it; the scan only tells you where to look.
-3. **A lock held across an `await`.** The scanner sees `mutex` and `await` on the same page and cannot see that they overlap. If the design does matter, model the guard as a state variable and let `model_verify` check that no interleaving releases it twice.
+3. **A lock held across an `await`.** The scanner sees `mutex` and `await` on the same page and cannot see that they overlap. If the location does matter, declare it in `shared` and both sides in `accesses`: `model_compose_verify` reports the pair as C5 when the model does not make it atomic, and counts the pairs a named lock excluded. Whether the lock is really held across the whole operation is still a single-machine question for `model_verify`.
 
 Each of these is a place where "no finding" and "no problem" differ. Say which one you checked, and with what.
 

@@ -945,13 +945,28 @@
         "id": "C2",
         "status": "pass",
         "findings": []
+      },
+      {
+        "id": "C3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C5",
+        "status": "pass",
+        "findings": []
       }
     ],
     "findings": [],
     "nextSteps": [
       "Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
     ],
-    "body": "model-everything/compose/v1  verdict=pass  no error or warning findings  ok=true  errors=0 warnings=0\nCHECKS  pass C1 C2\n\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+    "body": "model-everything/compose/v1  verdict=pass  no error or warning findings  ok=true  errors=0 warnings=0\nCHECKS  pass C1 C2 C3 C4 C5\n\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
   },
   "compose: a rendezvous name nothing declares": {
     "ok": false,
@@ -994,6 +1009,21 @@
             "message": "Rendezvous event \"typo\" is declared nowhere: no machine has a transition or action on it, so this handshake was not checked. Name an event the machines declare, or remove it from `rendezvous`."
           }
         ]
+      },
+      {
+        "id": "C3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C5",
+        "status": "pass",
+        "findings": []
       }
     ],
     "findings": [],
@@ -1001,7 +1031,7 @@
       "Resolve the error findings first: a rendezvous event can never fire, so the composition cannot advance through that handshake.",
       "Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
     ],
-    "body": "model-everything/compose/v1  verdict=fail  1 error finding(s) (first error: C2_RENDEZVOUS_UNRESOLVED)  ok=false  errors=1 warnings=0\nCHECKS  pass C1 | fail C2\n\nFAIL C2 Rendezvous Sync — 1 rendezvous name(s) resolved to no event, so that handshake was not checked (1 errors) (1 finding(s))\n  [error/C2_RENDEZVOUS_UNRESOLVED] Rendezvous event \"typo\" is declared nowhere: no machine has a transition or action on it, so this handshake was not checked. Name an event the machines declare, or remove it from `rendezvous`. evidence={\"event\":\"typo\",\"declared\":[\"go\"]}\n\nNEXT  Resolve the error findings first: a rendezvous event can never fire, so the composition cannot advance through that handshake.\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+    "body": "model-everything/compose/v1  verdict=fail  1 error finding(s) (first error: C2_RENDEZVOUS_UNRESOLVED)  ok=false  errors=1 warnings=0\nCHECKS  pass C1 C3 C4 C5 | fail C2\n\nFAIL C2 Rendezvous Sync — 1 rendezvous name(s) resolved to no event, so that handshake was not checked (1 errors) (1 finding(s))\n  [error/C2_RENDEZVOUS_UNRESOLVED] Rendezvous event \"typo\" is declared nowhere: no machine has a transition or action on it, so this handshake was not checked. Name an event the machines declare, or remove it from `rendezvous`. evidence={\"event\":\"typo\",\"declared\":[\"go\"]}\n\nNEXT  Resolve the error findings first: a rendezvous event can never fire, so the composition cannot advance through that handshake.\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
   },
   "datamodel: a valid model": {
     "ok": true,
@@ -2515,13 +2545,28 @@
         "id": "C2",
         "status": "pass",
         "findings": []
+      },
+      {
+        "id": "C3",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C4",
+        "status": "pass",
+        "findings": []
+      },
+      {
+        "id": "C5",
+        "status": "pass",
+        "findings": []
       }
     ],
     "findings": [],
     "nextSteps": [
       "Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
     ],
-    "body": "model-everything/compose/v1  verdict=pass  no error or warning findings  ok=true  errors=0 warnings=0\nCHECKS  pass C1 C2\n\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
+    "body": "model-everything/compose/v1  verdict=pass  no error or warning findings  ok=true  errors=0 warnings=0\nCHECKS  pass C1 C2 C3 C4 C5\n\nNEXT  Re-run the composition after the change; every machine must be able to advance, or explain why it is terminal. For one machine on its own - its unreachable states, its invariants, its cost against budget - use `model_verify`, then compare the two compositions with `report_diff`."
   },
   "datamodel: a valid model through the tool": {
     "ok": true,

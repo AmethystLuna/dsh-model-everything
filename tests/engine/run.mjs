@@ -1070,6 +1070,100 @@ async function runCompositionTests() {
 
 await runCompositionTests()
 
+async function runSharedAccessTests() {
+  // Two machines incrementing one counter: each event is a read-modify-write, and both are
+  // enabled in the initial composite state, so read(A), read(B), write(A), write(B) is an
+  // interleaving the model does not exclude. That is the lost update, decided by the product
+  // search rather than routed away by a keyword.
+  const counter = (name) => ({
+    schemaVersion: 1,
+    init: name + '-idle',
+    states: [{ id: name + '-idle' }, { id: name + '-done', terminal: true }],
+    transitions: [{ from: name + '-idle', event: 'inc', to: name + '-done' }],
+  })
+  const accesses = (extra = {}) => [
+    { machine: 0, event: 'inc', location: 'counter', kind: 'read-write', ...extra },
+    { machine: 1, event: 'inc', location: 'counter', kind: 'read-write', ...extra },
+  ]
+  const racy = runCompositionVerification([counter('a'), counter('b')], { shared: [{ id: 'counter', initial: 0 }], accesses: accesses() })
+  const c5 = racy.checks.find((check) => check.id === 'C5')
+  if (c5 === undefined) throw new Error('no C5 check in the report')
+  const lost = c5.findings.find((finding) => finding.code === 'C5_NON_ATOMIC_UPDATE')
+  if (lost === undefined) throw new Error('two read-modify-writes on one location must be reported: ' + JSON.stringify(c5))
+  if (lost.severity !== 'error') throw new Error('a lost update is an error, not a warning')
+  if (lost.evidence === undefined || lost.evidence.location !== 'counter') throw new Error('the finding must name the location: ' + JSON.stringify(lost.evidence))
+  if (lost.evidence.events.join(',') !== 'inc,inc') throw new Error('the finding must name both events: ' + JSON.stringify(lost.evidence.events))
+  if (racy.verdict !== 'fail') throw new Error('a lost update must fail the composition, got ' + racy.verdict)
+  assertNoUndefinedValues(racy)
+
+  // Same lock on both sides: excluded, and the report says how many pairs the lock excluded --
+  // "no finding" alone would not distinguish a clean design from one the check never looked at.
+  const locked = runCompositionVerification([counter('a'), counter('b')], {
+    shared: [{ id: 'counter', initial: 0 }, { id: 'mutex', initial: false }],
+    accesses: accesses({ protectedBy: 'mutex' }),
+  })
+  const lockedC5 = locked.checks.find((check) => check.id === 'C5')
+  if (lockedC5.findings.length !== 0) throw new Error('one lock on both sides must exclude the pair: ' + JSON.stringify(lockedC5.findings))
+  if (!/1 co-enabled access pair/.test(lockedC5.detail)) throw new Error('the exclusion has to be counted, got: ' + lockedC5.detail)
+  if (!locked.nextSteps.some((step) => step.includes('whether the lock is acquired and released'))) {
+    throw new Error('the report must say what the lock names do not prove')
+  }
+  if (locked.verdict !== 'pass') throw new Error('a properly guarded pair passes, got ' + locked.verdict)
+
+  // Two DIFFERENT locks: neither excludes the other, so the update is still non-atomic.
+  const twoLocks = runCompositionVerification([counter('a'), counter('b')], {
+    shared: [{ id: 'counter', initial: 0 }, { id: 'left', initial: false }, { id: 'right', initial: false }],
+    accesses: [
+      { machine: 0, event: 'inc', location: 'counter', kind: 'read-write', protectedBy: 'left' },
+      { machine: 1, event: 'inc', location: 'counter', kind: 'read-write', protectedBy: 'right' },
+    ],
+  })
+  const twoLockFinding = twoLocks.checks.find((check) => check.id === 'C5').findings[0]
+  if (twoLockFinding === undefined) throw new Error('different locks must not be read as exclusion')
+  if (!/different protecting locks/.test(twoLockFinding.detail)) throw new Error('the detail must name the two locks, got: ' + twoLockFinding.detail)
+
+  // Write against read: an unordered write, a warning, not a lost update.
+  const writeRace = runCompositionVerification([counter('a'), counter('b')], {
+    shared: [{ id: 'counter', initial: 0 }],
+    accesses: [
+      { machine: 0, event: 'inc', location: 'counter', kind: 'write' },
+      { machine: 1, event: 'inc', location: 'counter', kind: 'read' },
+    ],
+  })
+  if (writeRace.checks.find((check) => check.id === 'C5').findings.length !== 0) throw new Error('a single writer is not a lost update')
+  const c4 = writeRace.checks.find((check) => check.id === 'C4')
+  if (!c4.findings.some((finding) => finding.code === 'C4_SHARED_WRITE_RACE')) throw new Error('an unordered write must be a C4 warning')
+  if (c4.findings[0].severity !== 'warning') throw new Error('C4 is a warning: a last-writer-wins design is allowed to say so')
+
+  // Read against read: nothing to report.
+  const reads = runCompositionVerification([counter('a'), counter('b')], {
+    shared: [{ id: 'counter', initial: 0 }],
+    accesses: [
+      { machine: 0, event: 'inc', location: 'counter', kind: 'read' },
+      { machine: 1, event: 'inc', location: 'counter', kind: 'read' },
+    ],
+  })
+  if (reads.checks.find((check) => check.id === 'C4').findings.length !== 0) throw new Error('two readers are not a race')
+
+  // A declaration that names something absent is an error, and the detail says the access was
+  // never checked - otherwise the missing access would read as "no race found".
+  const bad = runCompositionVerification([counter('a'), counter('b')], {
+    shared: [{ id: 'counter', initial: 0 }],
+    accesses: [{ machine: 0, event: 'nope', location: 'counter', kind: 'read-write' }],
+  })
+  const c3 = bad.checks.find((check) => check.id === 'C3')
+  if (!c3.findings.some((finding) => finding.code === 'C3_SHARED_ACCESS_INVALID')) throw new Error('an unknown event must be refused')
+  if (!/not checked/.test(c3.detail)) throw new Error('C3 detail must say the access was not checked, got: ' + c3.detail)
+  if (bad.verdict !== 'fail') throw new Error('a broken sharing declaration fails the report')
+
+  // No sharing declared: the checks are present and say so, which is not the same as passing.
+  const plain = runCompositionVerification([counter('a'), counter('b')], {})
+  const plainC5 = plain.checks.find((check) => check.id === 'C5')
+  if (!/no shared access was declared/.test(plainC5.detail)) throw new Error('an undeclared sharing check must say it did not run: ' + plainC5.detail)
+}
+
+await runSharedAccessTests()
+
 // Textbook canon: named cases from the formal-methods / systems literature, each mapped
 // to the check it exercises. Expected outcomes are asserted per case.
 async function runTextbookCanonTests() {

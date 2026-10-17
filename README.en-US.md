@@ -133,7 +133,7 @@ The limit: it stores and compares **model and diagram source**; a rendered pictu
 | `uml_review` | Audits the modelling: structural defects, documentation gaps and render↔parse fidelity. Give it a model, a diagram, or both |
 | `uml_explain_labels` | Prints the label and comment contract the parser accepts; no diagram needed |
 | `model_verify` | Executable verification of state machines and protocols |
-| `model_compose_verify` | Two or more machines together: deadlock, and a rendezvous that never fires |
+| `model_compose_verify` | Two or more machines together: deadlock, a rendezvous that never fires, and - with `shared` and `accesses` declared - an unordered write (C4) or a non-atomic read-modify-write pair (C5) |
 | `model_datamodel_verify` | Data models and migrations |
 | `model_concurrency_scan` | Mines and routes concurrency, synchrony and async claims |
 | `model_export` | Exports to an external checker (UPPAAL, TLA+, PRISM, SPIN) |

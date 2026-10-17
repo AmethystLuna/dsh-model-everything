@@ -9,7 +9,7 @@
     {
       "skill": "model-everything-concurrency",
       "chars": 389,
-      "body": 6339
+      "body": 6859
     },
     {
       "skill": "model-everything-datamodel",
@@ -37,11 +37,11 @@
       "body": 8203
     }
   ],
-  "toolChars": 11427,
+  "toolChars": 11955,
   "tools": [
     {
       "name": "model_compose_verify",
-      "chars": 834
+      "chars": 1362
     },
     {
       "name": "model_concurrency_scan",
@@ -89,8 +89,8 @@
     }
   ],
   "perTurn": {
-    "chars": 14820,
-    "tokens": 3705
+    "chars": 15348,
+    "tokens": 3837
   },
   "routing": {
     "rowsWithSibling": 7,

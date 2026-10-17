@@ -3995,9 +3995,40 @@ export interface CompositionStep {
   machines: number[]
 }
 
+/** A location two machines can both touch. Without one, a composition shares nothing. */
+export interface SharedLocation {
+  id: string
+  /** Initial value, for the reader only: the checks below decide on declarations, not on values. */
+  initial?: string | number | boolean
+}
+
+/** How one machine event touches a shared location. */
+export interface SharedAccess {
+  /** Machine index, as given in the composition's `machines` array. */
+  machine: number
+  event: string
+  location: string
+  /**
+   * `read-write` is a read-modify-write: the value read is written back, so two of them that
+   * are not mutually exclusive lose an update.
+   */
+  kind: 'read' | 'write' | 'read-write'
+  /**
+   * The lock both sides name when the operation is guarded. Two accesses that name the SAME
+   * lock are treated as mutually exclusive. This checks that the two sides agree on the lock,
+   * not that the lock is held across the whole operation - that is a single-machine question,
+   * and `model_verify` is the tool that can answer it.
+   */
+  protectedBy?: string
+}
+
 export interface CompositionOptions {
   /** Events that require a synchronized multi-machine step (handshake). */
   rendezvous?: string[]
+  /** Locations both machines can touch. Declaring none means the composition shares nothing. */
+  shared?: SharedLocation[]
+  /** Which machine events touch which shared locations, and how. */
+  accesses?: SharedAccess[]
   maxStates?: number
   /** Hash specification used for the per-machine modelHash. Defaults to the current published spec (`v1`). */
   hashSpec?: HashSpec
@@ -4049,6 +4080,67 @@ interface CompositionMove {
   machines: number[]
 }
 
+interface SharingAnalysis {
+  findings: Finding[]
+  /** machine index -> event -> the accesses that event makes */
+  byMachine: Map<number, Map<string, SharedAccess[]>>
+  locations: Set<string>
+  accessCount: number
+}
+
+/**
+ * Check the sharing declarations before the search runs.
+ *
+ * A declaration that names a machine, an event or a location that does not exist would
+ * otherwise quietly exclude that access from every later check - the access simply would not
+ * be found, and the report would say "no race" about a pair it never looked at.
+ */
+function analyzeSharing(models: LogicModelV1[], machineEventSets: Set<string>[], options: CompositionOptions): SharingAnalysis {
+  const findings: Finding[] = []
+  const byMachine = new Map<number, Map<string, SharedAccess[]>>()
+  const locations = new Set<string>()
+  for (const location of options.shared ?? []) {
+    if (locations.has(location.id)) {
+      findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: 'shared location "' + location.id + '" is declared twice; one declaration per location' })
+      continue
+    }
+    locations.add(location.id)
+  }
+  const accesses = options.accesses ?? []
+  if (accesses.length > 0 && locations.size === 0) {
+    findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: 'accesses were declared but `shared` names no location, so no access can be checked' })
+  }
+  accesses.forEach((access, index) => {
+    const where = 'accesses[' + String(index) + ']'
+    if (!Number.isInteger(access.machine) || access.machine < 0 || access.machine >= models.length) {
+      findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: where + ' names machine ' + String(access.machine) + ', and this composition has ' + String(models.length) })
+      return
+    }
+    if (machineEventSets[access.machine]?.has(access.event) !== true) {
+      findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: where + ' names event "' + access.event + '", which machine ' + String(access.machine) + ' does not declare in any transition' })
+      return
+    }
+    if (!locations.has(access.location)) {
+      findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: where + ' names location "' + access.location + '", which `shared` does not declare' })
+      return
+    }
+    if (access.kind !== 'read' && access.kind !== 'write' && access.kind !== 'read-write') {
+      findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: where + ' has kind "' + String(access.kind) + '"; expected read, write or read-write' })
+      return
+    }
+    if (access.protectedBy !== undefined && !locations.has(access.protectedBy)) {
+      findings.push({ code: 'C3_SHARED_ACCESS_INVALID', severity: 'error', message: where + ' is protected by "' + access.protectedBy + '", which `shared` does not declare' })
+      return
+    }
+    const perMachine = byMachine.get(access.machine) ?? new Map<string, SharedAccess[]>()
+    const list = perMachine.get(access.event) ?? []
+    list.push(access)
+    perMachine.set(access.event, list)
+    byMachine.set(access.machine, perMachine)
+  })
+  return { findings, byMachine, locations, accessCount: accesses.length }
+}
+
 /**
  * N-machine composition semantics (documented in dsh-model-schema.md):
  * - a non-rendezvous event advances exactly ONE non-terminal machine that fires it;
@@ -4094,6 +4186,88 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
   const rendezvous = new Set(options.rendezvous ?? [])
   const maxStates = options.maxStates ?? DEFAULT_MAX_STATES
   const machineEventSets = models.map((model) => new Set(model.transitions.map((transition) => transition.event)))
+
+  // Sharing: which machine events touch which declared location, and how. The declarations are
+  // checked first (C3), because an access that names a machine or location that does not exist
+  // simply never enters the scan below - and the report would then say "no race" about a pair it
+  // never looked at.
+  const sharing = analyzeSharing(models, machineEventSets, options)
+  const c3Findings: Finding[] = [...sharing.findings]
+  const c4Findings: Finding[] = []
+  const c5Findings: Finding[] = []
+  const accessEventsByMachine = new Map<number, string[]>()
+  for (const [machine, perEvent] of sharing.byMachine) accessEventsByMachine.set(machine, [...perEvent.keys()])
+  const seenSharedPairs = new Set<string>()
+  let excludedPairs = 0
+  /** A cap, so a large model cannot turn this into a quadratic report: 64 witnesses is plenty. */
+  const MAX_SHARED_WITNESSES = 64
+
+  /**
+   * Look for two accesses on the same location that are both enabled in this composite state.
+   *
+   * Co-enabled means the model does not exclude the interleaving: with a read-modify-write on
+   * each side, read(A), read(B), write(A), write(B) is reachable and loses one update. Two
+   * accesses that name the SAME lock are treated as exclusive and counted, not reported; that
+   * the lock is actually held across the whole operation is a single-machine question and is
+   * not decided here.
+   */
+  const scanSharedAccesses = (node: CompositionNode): void => {
+    if (c4Findings.length + c5Findings.length >= MAX_SHARED_WITNESSES) return
+    const enabled: Array<{ machine: number; event: string; access: SharedAccess }> = []
+    for (const [machine, events] of accessEventsByMachine) {
+      if (machine >= models.length) continue
+      if (isTerminal(models[machine], node.runtimes[machine].state)) continue
+      for (const event of events) {
+        if (stepRuntime(models[machine], node.runtimes[machine], event).length === 0) continue
+        for (const access of sharing.byMachine.get(machine)?.get(event) ?? []) enabled.push({ machine, event, access })
+      }
+    }
+    for (let left = 0; left < enabled.length; left += 1) {
+      for (let right = left + 1; right < enabled.length; right += 1) {
+        const first = enabled[left]
+        const second = enabled[right]
+        if (first.machine === second.machine) continue
+        if (first.access.location !== second.access.location) continue
+        const bothRead = first.access.kind === 'read' && second.access.kind === 'read'
+        if (bothRead) continue
+        if (first.access.protectedBy !== undefined && first.access.protectedBy === second.access.protectedBy) {
+          excludedPairs += 1
+          continue
+        }
+        const pairKey = [first.access.location, String(first.machine) + ':' + first.event, String(second.machine) + ':' + second.event].join('|')
+        if (seenSharedPairs.has(pairKey)) continue
+        seenSharedPairs.add(pairKey)
+        if (c4Findings.length + c5Findings.length >= MAX_SHARED_WITNESSES) return
+        const nonAtomic = first.access.kind === 'read-write' && second.access.kind === 'read-write'
+        const where = 'machine ' + String(first.machine) + ' "' + first.event + '" (' + first.access.kind + ') and machine ' + String(second.machine) + ' "' + second.event + '" (' + second.access.kind + ')'
+        const guarding = first.access.protectedBy === undefined && second.access.protectedBy === undefined
+          ? 'Neither access names a protecting lock.'
+          : 'The two accesses name different protecting locks (' + (first.access.protectedBy ?? 'none') + ' / ' + (second.access.protectedBy ?? 'none') + '), so neither excludes the other.'
+        const at = node.runtimes.map((runtime) => runtime.state).join(', ')
+        const finding: Finding = {
+          code: nonAtomic ? 'C5_NON_ATOMIC_UPDATE' : 'C4_SHARED_WRITE_RACE',
+          severity: nonAtomic ? 'error' : 'warning',
+          message: nonAtomic
+            ? 'Non-atomic update of "' + first.access.location + '": ' + where + ' both declare read-modify-write and are both enabled at (' + at + ').'
+            : 'Shared write to "' + first.access.location + '" without exclusion: ' + where + ' are both enabled at (' + at + ') and at least one writes.',
+          detail: 'Shortest interleaving to the co-enabled state: ' + String(node.path.length) + ' step(s) from the initial state. ' + guarding + (nonAtomic
+            ? ' Read(A), read(B), write(A), write(B) is an interleaving this model does not exclude, and it loses one update. What makes it safe is outside the model: a single atomic step (compare-and-set, atomic increment), one owner, or a lock both sides name and hold across the whole operation.'
+            : ' Which write lands last is decided at runtime. If last-writer-wins is the design, say so; otherwise order the accesses with a lock both sides name, or with a rendezvous.'),
+          evidence: {
+            location: first.access.location,
+            machines: [first.machine, second.machine],
+            events: [first.event, second.event],
+            kinds: [first.access.kind, second.access.kind],
+            states: node.runtimes.map((runtime) => runtime.state),
+            depth: node.path.length,
+            path: node.path,
+          },
+        }
+        if (nonAtomic) c5Findings.push(finding)
+        else c4Findings.push(finding)
+      }
+    }
+  }
 
   const compositionMoves = (node: CompositionNode): CompositionMove[] => {
     const moves: CompositionMove[] = []
@@ -4169,6 +4343,7 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
       truncated = true
       break
     }
+    if (accessEventsByMachine.size > 0) scanSharedAccesses(node)
     const moves = compositionMoves(node)
     const allTerminal = node.runtimes.every((runtime, i) => isTerminal(models[i], runtime.state))
     // Enablement census for C2: which machines could fire each rendezvous here.
@@ -4295,7 +4470,7 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
   // C2 is an error, not a warning: a rendezvous that can never fire means the composition
   // cannot advance through that handshake — the same "stuck forever" outcome C1 reports,
   // so a gate that only reads `verdict` must be able to stop on it.
-  const allCompositionFindings = [...c1Findings, ...c2Findings]
+  const allCompositionFindings = [...c1Findings, ...c2Findings, ...c3Findings, ...c4Findings, ...c5Findings]
   const errors = allCompositionFindings.filter((finding) => finding.severity === 'error').length
   const warnings = allCompositionFindings.filter((finding) => finding.severity === 'warning').length
   const c1Detail = c1Findings.length > 0
@@ -4313,25 +4488,64 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
     : truncated
       ? 'All rendezvous events fired, but the search was truncated at ' + String(maxStates) + ' composite states'
       : 'All rendezvous events can fire'
+  // The sharing checks say what they established, not only how many findings they produced: a
+  // composition that declares nothing shares nothing, and that is a different statement from
+  // "the shared accesses were checked and they are exclusive".
+  const c3Detail = c3Findings.length > 0
+    ? 'Sharing declarations are inconsistent: ' + String(c3Findings.length) + ' declaration error(s); those accesses were not checked'
+    : sharing.accessCount === 0
+      ? 'No shared location is declared, so nothing is shared between the machines'
+      : 'Sharing declarations resolve: ' + String(sharing.locations.size) + ' location(s), ' + String(sharing.accessCount) + ' access(es)'
+  const sharedExclusion = excludedPairs === 0 ? '' : ' ' + String(excludedPairs) + ' co-enabled access pair(s) were excluded by a lock both sides name.'
+  const c4Detail = c4Findings.length > 0
+    ? 'Shared writes that the model does not order: ' + String(c4Findings.length) + '.' + sharedExclusion
+    : sharing.accessCount === 0
+      ? 'Not checked: no shared access was declared'
+      : truncated
+        ? 'No unordered shared write found, but the search was truncated at ' + String(maxStates) + ' composite states: absence is not proven'
+        : 'Every co-enabled shared write names one lock on both sides, or never overlaps.' + sharedExclusion
+  const c5Detail = c5Findings.length > 0
+    ? 'Read-modify-write pairs that are not atomic together: ' + String(c5Findings.length) + '.' + sharedExclusion
+    : sharing.accessCount === 0
+      ? 'Not checked: no shared access was declared'
+      : truncated
+        ? 'No non-atomic update found, but the search was truncated at ' + String(maxStates) + ' composite states: absence is not proven'
+        : 'No read-modify-write pair is left co-enabled without a shared lock.' + sharedExclusion
   const checks: CheckResult[] = [
     checkResult('C1', 'Composition Deadlock', c1Findings, c1Detail),
     checkResult('C2', 'Rendezvous Sync', c2Findings, c2Detail),
+    checkResult('C3', 'Shared Access Declarations', c3Findings, c3Detail),
+    checkResult('C4', 'Shared Write Order', c4Findings, c4Detail),
+    checkResult('C5', 'Atomic Shared Update', c5Findings, c5Detail),
   ]
   const nextSteps: string[] = []
   if (errors > 0) {
     const why = c1Findings.length > 0
       ? 'the composition deadlocks at a reachable state, so at least one machine is missing an exit or a handshake partner'
-      : 'a rendezvous event can never fire, so the composition cannot advance through that handshake'
+      : c5Findings.length > 0
+        ? 'two machines update one shared location without one atomic step between them, so an update can be lost'
+        : c3Findings.length > 0
+          ? 'a sharing declaration names something the composition does not have, so those accesses were never checked'
+          : 'a rendezvous event can never fire, so the composition cannot advance through that handshake'
     nextSteps.push('Resolve the error findings first: ' + why + '.')
   }
-  // Composition couples machines only through rendezvous: each machine's `variables` are
-  // private to it, so two machines cannot share one predicate. Name them when the input
-  // looks like it is trying to (two or more machines each declare variables).
+  if (c5Findings.length > 0) {
+    nextSteps.push('Make the update atomic: one machine owns the value, a compare-and-set or atomic increment replaces read-then-write, or both sides name one lock in `protectedBy` and hold it across the whole operation.')
+  }
+  if (c4Findings.length > 0) {
+    nextSteps.push('Decide what the overlapping write means: last-writer-wins by design (say so in the narrative), a lock both sides name in `protectedBy`, or a rendezvous that orders the two events.')
+  }
+  if (excludedPairs > 0) {
+    nextSteps.push('The lock names make ' + String(excludedPairs) + ' pair(s) exclusive, and that is all this checks: whether the lock is acquired and released around the whole operation is a single-machine question - model that machine and run `model_verify` on it.')
+  }
+  // Composition couples machines through rendezvous and, since the sharing declarations exist,
+  // through a location both declare. Each machine's `variables` are still private to it, so two
+  // machines cannot share a predicate. Name them when the input looks like it is trying to.
   const owners = models
     .map((entry, index) => ({ index, names: (entry.variables ?? []).map((variable) => variable.name) }))
     .filter((entry) => entry.names.length > 0)
   if (owners.length >= 2) {
-    nextSteps.push('Each machine\'s variables are private to it (' + owners.map((entry) => 'machine ' + String(entry.index) + ': ' + entry.names.join(', ')).join('; ') + '): composition couples machines only through rendezvous, so a value two machines must agree on has to be modelled as a handshake, or inside a single machine.')
+    nextSteps.push('Each machine\'s variables are private to it (' + owners.map((entry) => 'machine ' + String(entry.index) + ': ' + entry.names.join(', ')).join('; ') + '): a value two machines must agree on is either declared in `shared` with an `accesses` entry per side, or modelled as a handshake.' + (sharing.accessCount === 0 ? ' This composition declares no shared location, so nothing is shared between its machines.' : ''))
   }
   // A composition answers a question no single machine can, so the next step names the tool that answers
   // the other one. Without it a reader who wanted per-machine detail has nowhere to go from here.
@@ -4339,7 +4553,7 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
   return {
     ok: errors === 0,
     ran: true,
-    ...verdictOf(errors, warnings, c1Findings[0]?.code ?? c2Findings[0]?.code),
+    ...verdictOf(errors, warnings, [...c1Findings, ...c2Findings, ...c3Findings, ...c4Findings, ...c5Findings][0]?.code),
     schema: REPORT_SCHEMAS.compose,
     hashSpec,
     hashes: { hashSpec, machines: hashes },

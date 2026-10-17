@@ -404,9 +404,38 @@ export interface CompositionStep {
     /** Indices of the machines that advanced together on this step. */
     machines: number[];
 }
+/** A location two machines can both touch. Without one, a composition shares nothing. */
+export interface SharedLocation {
+    id: string;
+    /** Initial value, for the reader only: the checks below decide on declarations, not on values. */
+    initial?: string | number | boolean;
+}
+/** How one machine event touches a shared location. */
+export interface SharedAccess {
+    /** Machine index, as given in the composition's `machines` array. */
+    machine: number;
+    event: string;
+    location: string;
+    /**
+     * `read-write` is a read-modify-write: the value read is written back, so two of them that
+     * are not mutually exclusive lose an update.
+     */
+    kind: 'read' | 'write' | 'read-write';
+    /**
+     * The lock both sides name when the operation is guarded. Two accesses that name the SAME
+     * lock are treated as mutually exclusive. This checks that the two sides agree on the lock,
+     * not that the lock is held across the whole operation - that is a single-machine question,
+     * and `model_verify` is the tool that can answer it.
+     */
+    protectedBy?: string;
+}
 export interface CompositionOptions {
     /** Events that require a synchronized multi-machine step (handshake). */
     rendezvous?: string[];
+    /** Locations both machines can touch. Declaring none means the composition shares nothing. */
+    shared?: SharedLocation[];
+    /** Which machine events touch which shared locations, and how. */
+    accesses?: SharedAccess[];
     maxStates?: number;
     /** Hash specification used for the per-machine modelHash. Defaults to the current published spec (`v1`). */
     hashSpec?: HashSpec;

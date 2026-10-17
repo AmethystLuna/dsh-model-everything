@@ -8,7 +8,7 @@
 // The shape is a table: [what changed, input, code that must not appear]. When a code
 // disappears for the wrong reason the case still fails, because the check is "this code
 // is absent *and* the report is otherwise clean of it" - not "the report is empty".
-import { runVerification } from '../../lib/engine.js'
+import { runVerification, runCompositionVerification } from '../../lib/engine.js'
 import { runDataVerification } from '../../lib/data-engine.js'
 import { reviewUml } from '../../lib/uml.js'
 import { reviewStructure } from '../../lib/structure.js'
@@ -462,6 +462,39 @@ test('metamorphic: the same async design in Chinese mines the same families', ()
   if (left !== right) throw new Error('families differ: english=' + left + ' chinese=' + right)
   if (left === '') throw new Error('neither text mined a family; this case would pass vacuously')
 })
+
+// Shared locations: the counters, with the one condition that makes each code fire put right.
+const sharedCounter = (name) => ({
+  schemaVersion: 1,
+  init: name + '-idle',
+  states: [{ id: name + '-idle' }, { id: name + '-done', terminal: true }],
+  transitions: [{ from: name + '-idle', event: 'inc', to: name + '-done' }],
+})
+const sharedAccesses = (kind, extra = {}) => [
+  { machine: 0, event: 'inc', location: 'counter', kind, ...extra },
+  { machine: 1, event: 'inc', location: 'counter', kind, ...extra },
+]
+
+expectAbsent('two read-modify-writes under one lock', 'C5_NON_ATOMIC_UPDATE',
+  runCompositionVerification([sharedCounter('a'), sharedCounter('b')], {
+    shared: [{ id: 'counter', initial: 0 }, { id: 'mutex', initial: false }],
+    accesses: sharedAccesses('read-write', { protectedBy: 'mutex' }),
+  }))
+
+expectAbsent('a single writer and a reader', 'C5_NON_ATOMIC_UPDATE',
+  runCompositionVerification([sharedCounter('a'), sharedCounter('b')], {
+    shared: [{ id: 'counter', initial: 0 }],
+    accesses: [
+      { machine: 0, event: 'inc', location: 'counter', kind: 'write' },
+      { machine: 1, event: 'inc', location: 'counter', kind: 'read' },
+    ],
+  }))
+
+expectAbsent('two readers of one location', 'C4_SHARED_WRITE_RACE',
+  runCompositionVerification([sharedCounter('a'), sharedCounter('b')], {
+    shared: [{ id: 'counter', initial: 0 }],
+    accesses: sharedAccesses('read'),
+  }))
 
 // ------------------------------------------------------------------ design engine --
 // Eleven codes, each with the declaration put right. The near miss matters more here than in

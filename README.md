@@ -133,7 +133,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `uml_review` | 审查建模：结构缺陷、文档缺口、render↔parse 往返一致性；给模型、给图，或两者对照 |
 | `uml_explain_labels` | 打印解析器接受的标签与注释契约，不需要图 |
 | `model_verify` | 状态机 / 协议的可执行验证（结构检查、对抗性探测、预算、时限、前后回归） |
-| `model_compose_verify` | 两台及以上机器的组合检查（死锁、永不发生的会合） |
+| `model_compose_verify` | 两台及以上机器的组合检查（死锁、永不发生的会合；声明了共享位置后还有无序写 C4 与非原子更新 C5） |
 | `model_datamodel_verify` | 数据模型与迁移验证 |
 | `model_concurrency_scan` | 并发 / 同步 / 异步声明的挖掘与路由 |
 | `model_export` | 导出到外部检查器（UPPAAL / TLA+ / PRISM / SPIN） |
