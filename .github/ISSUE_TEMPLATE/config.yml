@@ -3,3 +3,10 @@ contact_links:
   - name: The contribution guide
     url: https://github.com/AmethystLuna/dsh-model-everything/blob/main/CONTRIBUTING.md
     about: What to send, in the two shapes it comes in, and the gates a change has to pass.
+  # The guide has a Chinese translation, and it is a separate document rather than a bilingual
+  # label: a Chinese label opening an English page would be a promise the click breaks. The
+  # "Report a security vulnerability" row below is GitHub's own - it appears because SECURITY.md
+  # exists, and config.yml cannot translate it.
+  - name: 贡献指南（中文）
+    url: https://github.com/AmethystLuna/dsh-model-everything/blob/main/docs/contributing/guide.zh-CN.md
+    about: 要交什么、两种来件形态各自长什么样、以及一次改动要过的门禁。
