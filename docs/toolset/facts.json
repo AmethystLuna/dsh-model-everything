@@ -24,7 +24,7 @@
     {
       "skill": "model-everything-report-reading",
       "chars": 420,
-      "body": 6647
+      "body": 7316
     },
     {
       "skill": "model-everything-structure",
@@ -37,7 +37,7 @@
       "body": 8009
     }
   ],
-  "toolChars": 10328,
+  "toolChars": 10597,
   "tools": [
     {
       "name": "model_compose_verify",
@@ -61,7 +61,7 @@
     },
     {
       "name": "report_diff",
-      "chars": 950
+      "chars": 1219
     },
     {
       "name": "uml_structure_verify",
@@ -89,8 +89,8 @@
     }
   ],
   "perTurn": {
-    "chars": 13635,
-    "tokens": 3409
+    "chars": 13904,
+    "tokens": 3476
   },
   "routing": {
     "rowsWithSibling": 7,

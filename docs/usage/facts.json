@@ -6,10 +6,10 @@
   },
   "surfaces": {
     "catalog": 3293,
-    "bodies": 78730,
-    "references": 153028,
+    "bodies": 79399,
+    "references": 153654,
     "referenceFiles": 10,
-    "toolChars": 10328,
+    "toolChars": 10597,
     "toolCount": 12
   },
   "toolsWithWhen": 0,
@@ -44,7 +44,7 @@
     },
     {
       "name": "report_diff",
-      "chars": 950
+      "chars": 1219
     },
     {
       "name": "uml_structure_verify",

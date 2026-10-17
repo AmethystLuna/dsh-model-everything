@@ -934,6 +934,32 @@ await test('report_diff: a non-report input is refused with a code, not read as 
   )
 })
 
+await test('report_diff: a report from another family is refused, not read as "resolved"', async () => {
+  // The live defect: a verify report with findings against a datamodel report answered
+  // `verdict: pass  no new findings; 6 finding(s) resolved` - six findings that were never fixed, only
+  // absent from the other roster. Both sides carry `schema`, so the tool can tell and must refuse.
+  const verify = await call('model_verify', { model: ORDERED_MACHINE })
+  const datamodel = await call('model_datamodel_verify', { model: DATA_MODEL })
+  const value = expectReport(await call('report_diff', { baseline: verify.value, current: datamodel.value }), 'a cross-family diff')
+  expectEq(value.ok, false, 'a cross-family comparison produces no delta')
+  expectEq(value.errorCode, 'REPORT_INVALID', 'and says why with a code')
+  expect(/do not share a finding vocabulary/.test(String(value.verdictReason)), `the refusal names the reason — got ${show(value.verdictReason)}`)
+  expect(/verify\/v1/.test(String(value.verdictReason)) && /datamodel\/v1/.test(String(value.verdictReason)), `and names both families — got ${show(value.verdictReason)}`)
+})
+
+await test('report_diff: a refusal or an object with no report fields is refused as a side', async () => {
+  const real = expectReport(await call('model_verify', { model: ORDERED_MACHINE }), 'a real report')
+  // A refusal from another tool, used as the current side: nothing was compared, so nothing is resolved.
+  const refusal = expectReport(await call('report_diff', { baseline: 'junk', current: 'junk' }), 'a refusal to reuse')
+  const withRefusal = expectReport(await call('report_diff', { baseline: real, current: refusal }), 'a refusal as a side')
+  expectEq(withRefusal.ok, false, 'a refusal is not a report to compare against')
+  expect(/is a refusal/.test(String(withRefusal.verdictReason)), `the message says the side refused — got ${show(withRefusal.verdictReason)}`)
+  // And an object with no report fields, which is what the guard narrowed to before this.
+  const withEmpty = expectReport(await call('report_diff', { baseline: {}, current: {} }), 'two empty objects')
+  expectEq(withEmpty.ok, false, 'an empty object is not a report')
+  expect(/no report fields/.test(String(withEmpty.verdictReason)), `the message says what was missing — got ${show(withEmpty.verdictReason)}`)
+})
+
 await test('report_diff: the nearest case still reports — a real baseline against a partial current report', async () => {
   // The guard must refuse non-reports without refusing partial ones. This is the line: an object with
   // findings and no schema is a report for the purpose of a diff, and the delta still describes it.

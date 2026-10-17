@@ -18,11 +18,19 @@ Three questions, in this order. Each one can make the next unnecessary.
 
 ### Did it run?
 
-Read `ran` before `verdict`. When a tool refuses its input there is no verdict to route on: the
-fields below `ran` describe the refusal, and a refusal carries `errorCode` — an argument in the
-wrong shape, a format that does not exist, a notation that is not one.
+`ran` separates a tool that refused from one that ran, but it answers that question for one kind of
+refusal only. A call refused at the boundary — an argument in the wrong shape, a format that does not
+exist, a notation that is not one — comes back with `ran: false`, an `errorCode`, and a
+`verdictReason` beginning "the tool did not run". Fix the call; there is no verdict to route on.
 
-A refusal and a failing review need different responses, so tell them apart first.
+An input the engine's own schema rejects is a different shape and looks like a review: `ran: true`,
+`ok: false`, `verdict: fail`, no `errorCode`, one finding under a check whose id is `MODEL`,
+`DATA_MODEL` or `DESIGN`, and `summary.checksRun: 0`. Read it as "the input is the problem, not the
+design". A model that was actually reviewed examined something, so a non-zero `checksRun` is what
+separates a defective model from a malformed one.
+
+A refusal and a failing review need different responses, and `ran` alone does not tell them apart:
+the test is `ran: false`, or `checksRun: 0` beside a check named after the validation.
 
 ### What did it decide?
 
