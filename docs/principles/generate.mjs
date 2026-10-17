@@ -5,8 +5,12 @@
 // already, but spread over fifteen files with no index. A reader asking "what does this repository
 // believe" had nowhere to start, and the answer they reconstructed would be their own.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const repo = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to
+// carry was the only thing in the repository that described one particular machine, and it
+// made the generator unrunnable anywhere else.
+const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
 
 /**
  * One principle: what it says, where it is stated, and why this repository holds it.

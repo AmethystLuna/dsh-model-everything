@@ -4,8 +4,12 @@
 // a claim about routing is a claim about what is on disk, and this one measures it. The catalog
 // budget matters here - a skill row is truncated at 500 characters, so the trigger has to fit.
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const root = 'F:/workspace/dsh-plugins/dsh-model-everything/'
+// Resolved from this file, never from a hardcoded checkout: the absolute path this used to
+// carry was the only thing in the repository that described one particular machine, and it
+// made the generator unrunnable anywhere else.
+const root = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
 const skills = readdirSync(root + 'skills', { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
 
 const rows = []
