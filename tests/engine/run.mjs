@@ -2906,6 +2906,84 @@ async function runBudgetCapTests() {
 await runBudgetCapTests()
 
 
+// ------------------------- an undecided finding reaches summary.truncated -----
+
+async function runTruncatedFlagTests() {
+  // The shipped schema reference promises two things at once: `summary.truncated` is set, AND the check that
+  // stopped carries a finding whose code ends in `_UNDECIDED`. The engine matched codes against a hand-written
+  // list instead, so A12 and A14 minted their own codes and never joined it: the finding was there and the flag
+  // stayed false. A caller reading only `truncated` saw a finished search.
+  const deadline = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A', maxTicks: 5 }, { id: 'B', maxTicks: 5 }, { id: 'C', terminal: true }],
+    transitions: [
+      { from: 'A', event: 'go', to: 'B' },
+      { from: 'B', event: 'tick', to: 'B' },
+      { from: 'B', event: 'stop', to: 'C' },
+    ],
+    tickEvents: ['tick'],
+  }
+  // A bound the exploration finishes on (three states, three pops) but the deadline walk does not: the walk
+  // keys on (runtime, ticks) while the exploration keys on the runtime alone, so the flag can only come from the
+  // finding here, not from a truncated exploration.
+  const capped = runVerification(deadline, { maxStates: 4 })
+  const s1 = capped.checks.find((check) => check.id === 'S1')
+  if (String(s1.detail) !== 'All states reachable') {
+    throw new Error('this case needs an exploration that finished, got S1: ' + String(s1.detail))
+  }
+  if (!capped.checks.some((check) => check.findings.some((finding) => finding.code === 'A14_UNDECIDED'))) {
+    throw new Error('this case needs the capped deadline walk')
+  }
+  if (capped.summary.truncated !== true) {
+    throw new Error('an undecided finding must set summary.truncated, got ' + String(capped.summary.truncated))
+  }
+  console.log('PASS truncated: a capped walk sets the flag even when the exploration finished')
+
+  // A12's walk keys on the runtime too, so a cap usually comes from the exploration first. It can still
+  // outlast the exploration: a cheaper arrival re-opens a runtime state it already expanded, which the
+  // exploration never does. The model below is two such arrivals, so pop 4 is a re-expansion at this bound.
+  const budget = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B' }, { id: 'D' }],
+    transitions: [
+      { from: 'A', event: 'e1', to: 'B', cost: 5 },
+      { from: 'A', event: 'e2', to: 'D', cost: 2 },
+      { from: 'D', event: 'e3', to: 'B', cost: 1 },
+    ],
+    invariants: [{ id: 'cap', description: 'stays under budget', kind: 'budget', budget: 100 }],
+  }
+  const cappedBudget = runVerification(budget, { maxStates: 3 })
+  const budgetS1 = cappedBudget.checks.find((check) => check.id === 'S1')
+  if (String(budgetS1.detail) !== 'All states reachable') {
+    throw new Error('this case needs an exploration that finished, got S1: ' + String(budgetS1.detail))
+  }
+  if (!cappedBudget.checks.some((check) => check.findings.some((finding) => finding.code === 'A12_UNDECIDED'))) {
+    throw new Error('this case needs a capped budget walk')
+  }
+  if (cappedBudget.summary.truncated !== true) throw new Error('A12_UNDECIDED must set summary.truncated too')
+  // One pop more and the same model is decided, so the flag belongs to the walk rather than to the model.
+  const decidedBudget = runVerification(budget, { maxStates: 4 })
+  if (decidedBudget.summary.truncated !== false) throw new Error('the decided budget walk must not be marked truncated')
+  const decidedBudgetA12 = decidedBudget.checks.find((check) => check.id === 'A12')
+  if (decidedBudgetA12.findings.length !== 0) throw new Error('and it must report no finding, got ' + JSON.stringify(decidedBudgetA12.findings.map((finding) => finding.code)))
+  console.log('PASS truncated: A12\'s undecided finding sets the flag, and one pop more decides it')
+
+  // The near miss: a report with nothing undecided must not mark itself truncated. A flag that is always true
+  // would satisfy every assertion above and mean nothing.
+  const decided = runVerification({ ...deadline, transitions: [{ from: 'A', event: 'go', to: 'B' }, { from: 'B', event: 'stop', to: 'C' }] }, { maxStates: 10000 })
+  if (decided.summary.truncated !== false) {
+    throw new Error('a finished report must not be marked truncated, got ' + String(decided.summary.truncated))
+  }
+  console.log('PASS truncated: a finished report stays untruncated')
+
+  console.log('PASS undecided-flag')
+}
+
+await runTruncatedFlagTests()
+
+
 if (failures > 0) {
   console.log('engine fixtures failed:', failures)
   process.exit(1)

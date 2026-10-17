@@ -563,14 +563,18 @@ export function verdictOfFindings(findings: Array<{ code: string; severity: stri
 }
 
 /**
- * Finding codes that mean "the search stopped before deciding", as opposed to "the
- * model is wrong". They must reach `summary.truncated`, or a caller reading only that
- * flag would take an unfinished search for a clean one.
+ * Whether a finding means "the search stopped before deciding", as opposed to "the model is wrong".
+ * Such a finding must reach `summary.truncated`, or a caller reading only that flag would take an
+ * unfinished search for a clean one.
+ *
+ * The shipped schema reference states the rule as a name: the check that stopped carries a finding
+ * whose code ends in `_UNDECIDED`, and the report sets `summary.truncated`. Read from the name, that
+ * is one rule in one place. It used to be a hand-written set of codes, and A12 and A14 minted their
+ * own codes without joining it: the report carried an undecided finding and `truncated` stayed
+ * false, so the two halves of that sentence disagreed.
  */
-const UNDECIDED_CODES = new Set(['S7_UNDECIDED', 'A7_UNDECIDED', 'A9_LEADS_TO_UNDECIDED', 'D2_UNDECIDED'])
-
 function hasUndecidedFinding(checks: CheckResult[]): boolean {
-  return checks.some((check) => check.findings.some((finding) => UNDECIDED_CODES.has(finding.code)))
+  return checks.some((check) => check.findings.some((finding) => finding.code.endsWith('_UNDECIDED')))
 }
 
 /**
@@ -3644,7 +3648,7 @@ function A14_deadline(model: LogicModelV1, options: NormalizedOptions): CheckRes
     }
   }
   // A capped walk decided nothing about the part it never reached. `_UNDECIDED` is the vocabulary the schema
-  // reference names for exactly this, and `UNDECIDED_CODES` carries it into `summary.truncated`.
+  // reference names for exactly this, and a code ending in `_UNDECIDED` carries it into `summary.truncated`.
   if (capped) {
     findings.push({
       code: 'A14_UNDECIDED',

@@ -425,7 +425,7 @@ List events that must be idempotent in `idempotentEvents`. For every reachable s
 ## Limits
 
 - Each breadth-first exploration caps at `maxStates` (default 10000). The leads-to walk caps at twenty times that, **shared across every start state of one check**: it is depth-first over run states, and an unbounded counter makes every one of them distinct, so it has no shorter bound available.
-- A cap that bites is **reported, never silently passed**. The report sets `summary.truncated`, and the check that stopped carries a finding whose code ends in `_UNDECIDED` — `S7_UNDECIDED`, `A7_UNDECIDED`, `A9_LEADS_TO_UNDECIDED`, `D2_UNDECIDED`. An undecided check has proven neither the violation nor its absence; read it as "not decided", never as a pass.
+- A cap that bites is **reported, never silently passed**. The report sets `summary.truncated`, and the check that stopped carries a finding whose code ends in `_UNDECIDED`. An undecided check has proven neither the violation nor its absence; read it as "not decided", never as a pass.
 - A3 samples the first `maxPermutationEvents` events (default 5).
 - The engine is a finite-state model checker. It cannot prove properties of the real implementation; follow with code-level review.
 - `cost` values are modeler-provided static labels — A12 verifies against them; real execution time/WCET needs binary-level timing analysis.
