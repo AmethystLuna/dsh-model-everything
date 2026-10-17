@@ -34,7 +34,7 @@ A refactor may change the implementation. It may not change the behaviour. Let a
 1. **Before**: extract a BEFORE model from the code as it stands (`uml_parse` reads an existing diagram, or write the model against the schema).
 2. **Refactor**.
 3. **After**: extract an AFTER model.
-4. **Regression**: `model_verify` with `beforeModel` and `stateMapping` runs D1-D4: behaviour preserved, invariants continuous, the state mapping consistent. On the data side, `model_datamodel_verify` runs DD1-DD4 from its `beforeModel`, `fieldMapping` and `migrationMappings`.
+4. **Regression**: `model_verify` with `beforeModel` and `stateMapping` runs the before/after regression: behaviour preserved, invariants continuous, the state mapping consistent. On the data side, `model_datamodel_verify` runs the same comparison over data, from its `beforeModel`, `fieldMapping` and `migrationMappings`.
 5. **Verdict and record**: `report_diff` compares against the baseline report. An added error finding is the reason not to accept the refactor. The hashes in the report let the conclusion be recomputed.
 
 It compares the **two models you give it**, not two versions of the code. Whether each model is faithful to its own source is what steps 1 and 3 are for, and it does not do that part for you. It does not read the diff, edit code or run your tests either. It answers "is the behaviour still the same", not "was this a good refactor".
@@ -60,6 +60,58 @@ Build the machine as an executable model and let an engine run it, instead of re
 4. **Reconcile with the source**: every error finding goes back to the code.
 
 It does not prove concurrency safety; those claims are routed to TSan, CBMC or TLA+. Hard real-time semantics - deadlines and periods - are outside its scope as well.
+
+### Auditing a dependency diagram
+
+A component diagram is a claim about which modules may depend on which. Read it as a graph, then ask whether the edges are allowed:
+
+1. **Give it the drawing**: PlantUML component, package, class or deployment source, or a Mermaid class diagram. `uml_structure_verify` parses it into nodes and edges.
+2. **Say what is allowed**, if you have a rule: a matrix of `layers` and `rules`, each rule naming a `source` with `allow` / `deny` / `require` and a `default` for everything else. Without a matrix it reports only structural defects.
+3. **Read the findings**: an isolated node, an endpoint never declared, a cycle with its shortest path, an edge that crosses a layer, a required edge that is missing, and - when no node is declared at all - that the input said nothing to audit.
+4. **Ask the same question about a code flow**, if the drawing is a state or activity diagram: that is `uml_review`, not this.
+
+It audits the drawing, not the code. A drawing that is internally consistent can still be wrong about the system, so pair it with a source-side scan. When a hand-drawn diagram reports label drift, `uml_explain_labels` prints the label forms the parser accepts for that notation.
+
+### Holding a design to its own declarations
+
+A design says things about itself: this layer sits above that one, this component owns that dependency, this interface is narrower than its callers. `model_design_review` decides whether the design keeps those promises:
+
+1. **Write the design as a model**: the architecture (nodes and edges), plus what it declares - layers, boundaries, allowed and required edges, types with responsibilities, operations, transitions, supertypes.
+2. **Run it**: `model_design_review` reports the places the design contradicts itself, and separately the shape of its graph - cycles and the fewest edges that break them, load-bearing elements, ranks, fan-in and fan-out.
+3. **Read the three lists**: `violations` decide the verdict; `signals` are worth a look and fail nothing; `facts` is a measurement, not a finding. `checksSkipped` says which principles went unchecked because nothing was declared to hold the design to.
+
+It never judges a design by an outside standard. It reports that the design contradicted **something it declared**, or a structural fact about its graph. Asking whether the design is *good* is a question for a reviewer, and this tool answers a different one: does it hold together on its own terms.
+
+### Two machines that have to agree
+
+One machine cannot deadlock *because of another one*. When two components hand-shake, the interesting failures live in the composition:
+
+1. **Model each machine** on its own, then pass them together: `model_compose_verify` takes an array of models.
+2. **Name the shared events** in `rendezvous` if a handshake is only legal when both sides are ready. An event not named there advances one machine, so a machine waiting on a handshake can take any number of its own steps first.
+3. **Read C1 and C2**: a reachable node where no machine can advance and one of them is not terminal, and a rendezvous that can never fire. Both name the reason per machine, and C1 gives the shortest counterexample.
+
+There is no rate ratio and no fairness bound in the model. For one machine on its own - unreachable states, invariants, cost against budget - that is `model_verify`.
+
+### Concurrency claims, mined and routed
+
+"Thread-safe", "lock-free", "ISR-safe" are claims that need a tool that can settle them, and the first job is finding them:
+
+1. **Scan the text**: `model_concurrency_scan` takes the document, plan or notes and reports the risk points - the claim, the shared state, the interrupt, the critical section.
+2. **Read what each absolute claim owes**: a claim like "no data race is possible" is reported as an error requiring dedicated verification, and each finding names the analysis that could settle it - TSan or Helgrind for a race, CBMC for a bounded proof, TLA+ for a protocol, RTOS-aware interrupt analysis for an ISR.
+3. **Run that analysis**: this plugin does not run it and proves nothing about concurrency itself.
+
+It reads text. It does not see your threads, and a clean scan is not a clean bill of health - it means no claim was found, which is a different statement.
+
+### A migration, before and after
+
+A migration is two models and a claim that the data survived. Give it both and the claim becomes checkable:
+
+1. **Two models**: the schema as it was, and the schema as it will be, each a data model with entities, fields, keys and relationships.
+2. **Say how fields move**: `fieldMapping` from the old path to the new one, plus `migrationMappings` for a field whose source is not simply its own old name.
+3. **Run the comparison**: `model_datamodel_verify` with `beforeModel` checks migration coverage, copy consistency, rollback symmetry and the before/after data regression.
+4. **Read the warning**: a field declared `required` in the new schema with nothing supplying it is reported as `DS2_REQUIRED_FIELD_UNSOURCED`. That is a warning, so the verdict stays `pass_with_findings` - it is a decision to make, not a failure the engine gets to declare.
+
+It compares the two models you give it. Whether either is faithful to the database it describes is the extraction step, and this tool does not do it.
 
 ### Importing and exporting diagrams: a frozen record, and a reference for the long run
 
@@ -114,7 +166,7 @@ The method behind reading one of these has a home of its own: [`skills/model-eve
 
 `examples/` holds sample models that run as they are, with [`examples/README.md`](examples/README.md) saying what each one shows and what to expect. They are documentation, not test fixtures — every suite reads its own `tests/<suite>/fixtures/`:
 
-- `examples/order-state-machine.before.json` and `examples/order-state-machine.after.json`: two versions of an order flow, for the D1-D4 regression.
+- `examples/order-state-machine.before.json` and `examples/order-state-machine.after.json`: two versions of an order flow, for the before/after regression.
 - `examples/control-dispatcher.json`: a dispatch machine with budgets and paired lock actions, expected to report no errors.
 - `examples/control-dispatcher.overbudget.json`: the same machine with a slower watchdog handler, expected to report one `A12_BUDGET_OVER` with the shortest over-budget path.
 - `examples/ecommerce-data-model.json`, plus `examples/user-migration.before.json` and `examples/user-migration.after.json`: a data model, and a migration before and after.
