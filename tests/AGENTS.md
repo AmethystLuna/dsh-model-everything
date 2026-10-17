@@ -99,6 +99,18 @@ checks that every case names a shipped skill, that every skill is a trigger some
 near miss somewhere else, and that the words a case relies on survive in the **visible**
 catalog budget (500 characters, the rest is truncated away at the moment the model decides).
 
+Two details of that last check are the whole of its value, and both were wrong once:
+
+- **A case expecting a domain skill must name a word that skill's catalog line names.** The
+  entry skill is exempt because it is the route by elimination: a request that names no
+  domain is answered there, so requiring its line to name the request's words would ask it to
+  name everything.
+- **The verbs a request is phrased with do not count as naming something.** Every catalog line
+  opens "Use when reviewing / drawing / auditing ...", so a rule that counted them was
+  satisfied by `"review"` alone and let a description lose the word that actually routed its
+  cases. That is the mutation to try on this suite: delete a decisive word from a description
+  and the check must go red. It did not, before.
+
 The scoring half is run by hand, because the plugin never calls a model:
 
 ```bash
