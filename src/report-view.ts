@@ -313,11 +313,34 @@ function renderDeltaReport(report: Record_, options: Required<ReportViewOptions>
   const lines = headerLines(report, options)
   const delta = record(report.delta) ?? report
   const section = (key: string): ViewFinding[] => array(delta[key]).map((finding) => toViewFinding(finding))
-  for (const key of ['added', 'removed', 'changed']) {
+  for (const key of ['added', 'removed']) {
     const findings = section(key)
     if (findings.length === 0) continue
     lines.push('', `${key.toUpperCase()} (${String(findings.length)})`)
     lines.push(...findingLines(findings, options, new Set<string>()))
+  }
+  // `changed` items are not findings: each carries the two sides of a finding that kept its identity and moved.
+  // Reading them with `toViewFinding` invented `severity: warning` for an item that has no severity, and dropped
+  // both messages - so a warning that escalated to an error rendered as `[warning/CODE] CODE`, which says the
+  // opposite of what happened.
+  const changes = array(delta.changed)
+  if (changes.length > 0) {
+    lines.push('', `CHANGED (${String(changes.length)})`)
+    for (const raw of changes) {
+      const change = record(raw) ?? {}
+      const before = record(change.before) ?? {}
+      const after = record(change.after) ?? {}
+      const beforeSeverity = text(before.severity)
+      const afterSeverity = text(after.severity)
+      const beforeMessage = text(before.message)
+      const afterMessage = text(after.message)
+      const parts: string[] = []
+      if (beforeSeverity !== afterSeverity) parts.push(`severity ${String(beforeSeverity)} → ${String(afterSeverity)}`)
+      if (beforeMessage !== afterMessage) {
+        parts.push(`message "${truncate(String(beforeMessage), options.maxEvidenceChars)}" → "${truncate(String(afterMessage), options.maxEvidenceChars)}"`)
+      }
+      lines.push(`  ${text(change.code) ?? '?'}  ${parts.length === 0 ? 'reported differently' : parts.join('; ')}`)
+    }
   }
   const current = text(report.currentVerdict) ?? text(record(report.current)?.verdict)
   if (current !== undefined) lines.push(`CURRENT  verdict=${current}`)
@@ -379,7 +402,10 @@ export function renderReportText(value: unknown, options: ReportViewOptions = {}
   // length sent a clean report to the unknown-shape fallback, which printed the whole JSON - so the default
   // view cost more than the `full` escape hatch it exists to be cheaper than.
   const hasFindings = Array.isArray(report.findings)
-  const isDelta = array(report.added).length + array(report.removed).length + array(report.changed).length > 0
+  // A delta is recognised by its shape, not by whether anything moved: a clean comparison is the case a baseline
+  // is used for most often, and requiring a non-empty list sent exactly that case to the unknown-shape fallback,
+  // which printed the whole object as JSON.
+  const isDelta = Array.isArray(report.added) || Array.isArray(report.removed) || Array.isArray(report.changed) || typeof report.currentVerdict === 'string'
   const isPayload = typeof report.diagram === 'string' || typeof report.primary === 'string'
   const lines = hasChecks
     ? renderChecksReport(report, resolved)

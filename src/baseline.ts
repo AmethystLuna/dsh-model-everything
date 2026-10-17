@@ -93,18 +93,37 @@ function verdictOfReport(report: unknown): Verdict {
   return value === 'pass' || value === 'pass_with_findings' || value === 'fail' ? value : 'fail'
 }
 
-function diffOf(added: number, removed: number, addedErrors: number, firstCode?: string): VerdictSummary {
-  if (addedErrors > 0) {
+/**
+ * The delta's verdict, from the four ways a comparison can get worse or better.
+ *
+ * `escalated` is the one that used to be missing: a finding that keeps its identity and moves from warning to
+ * error lives in `changed`, not in `added`, so folding severities into `addedErrors` only left the comparison
+ * answering `pass` over a change that made the report strictly worse. A de-escalation is not a regression: it is
+ * still a change, so it is named, and the verdict stays `pass`.
+ */
+function diffOf(added: number, removed: number, addedErrors: number, escalated: number, deescalated: number, firstCode?: string): VerdictSummary {
+  const errors = addedErrors + escalated
+  if (errors > 0) {
+    const bits: string[] = []
+    if (added > 0) bits.push(String(added) + ' new finding(s)')
+    if (escalated > 0) bits.push(String(escalated) + ' finding(s) escalated to error')
     return {
       verdict: 'fail',
-      verdictReason: String(added) + ' new finding(s) (' + String(addedErrors) + ' error)' + (firstCode === undefined ? '' : ' (first error: ' + firstCode + ')'),
+      // The count of errors is the sum: a reader must not have to add "new" and "escalated" in their head.
+      verdictReason: bits.join(', ') + ' (' + String(errors) + ' error)' + (firstCode === undefined ? '' : ' (first error: ' + firstCode + ')'),
     }
   }
   if (added > 0) {
-    return { verdict: 'pass_with_findings', verdictReason: String(added) + ' new warning finding(s), no new errors' }
+    return {
+      verdict: 'pass_with_findings',
+      verdictReason: String(added) + ' new warning finding(s), no new errors' + (deescalated > 0 ? '; ' + String(deescalated) + ' finding(s) moved to a lower severity' : ''),
+    }
   }
   if (removed > 0) {
     return { verdict: 'pass', verdictReason: 'no new findings; ' + String(removed) + ' finding(s) resolved' }
+  }
+  if (deescalated > 0) {
+    return { verdict: 'pass', verdictReason: 'no new findings; ' + String(deescalated) + ' finding(s) moved to a lower severity' }
   }
   return { verdict: 'pass', verdictReason: 'no new findings, nothing resolved' }
 }
@@ -217,11 +236,17 @@ export function diffReports(baseline: unknown, current: unknown): BaselineReport
   const removed = before.filter((finding) => !seen.has(findingIdentity(finding)))
   const addedErrors = added.filter((finding) => finding.severity === 'error')
   const addedWarnings = added.filter((finding) => finding.severity === 'warning')
-  const delta = diffOf(added.length, removed.length, addedErrors.length, addedErrors[0]?.code)
+  // Severity movement lives in `changed`. Counted here, because the verdict is about whether the slice got worse,
+  // and a warning that became an error did - even though nothing was added.
+  const escalated = changed.filter((change) => change.before.severity !== 'error' && change.after.severity === 'error')
+  const deescalated = changed.filter((change) => change.before.severity === 'error' && change.after.severity !== 'error')
+  const delta = diffOf(added.length, removed.length, addedErrors.length, escalated.length, deescalated.length, addedErrors[0]?.code ?? escalated[0]?.code)
 
   const nextSteps: string[] = []
   if (addedErrors.length > 0) {
     nextSteps.push('Fix or explicitly accept the ' + String(addedErrors.length) + ' new error finding(s) before calling this slice done: the baseline is what "not worse" is measured against.')
+  } else if (escalated.length > 0) {
+    nextSteps.push('A finding moved from warning to error (' + String(escalated.length) + '): the slice added nothing but still made the report worse, so the baseline is less strict than the run.')
   } else if (added.length > 0) {
     nextSteps.push('The new warnings are not failures, but they are new: decide per finding whether the change introduced them or the baseline was incomplete.')
   } else {

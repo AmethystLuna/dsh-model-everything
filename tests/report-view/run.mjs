@@ -312,6 +312,46 @@ test('narrative coverage is rendered as the strings the engine produces', () => 
   assert(line.includes('2/3') && line.includes('1/1') && line.includes('0/2'), 'and print the ratios it was given: ' + String(line))
 })
 
+// ---------------------------------------------------------------------------
+// report_diff: a delta is its own shape, and `changed` is not a finding
+// ---------------------------------------------------------------------------
+
+/** A report shaped like a verify run: enough for the diff, and nothing else. */
+const shaped = (findings) => ({
+  schema: 'model-everything/verify/v1',
+  ran: true,
+  ok: true,
+  verdict: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass_with_findings',
+  summary: { checksRun: 1, errors: 0, warnings: 0 },
+  checks: [{ id: 'S5', name: 'Event Completeness', status: 'fail', detail: '', findings }],
+})
+
+test('a clean delta renders as a delta, not as a JSON blob', () => {
+  // `isDelta` required at least one non-empty list, so the case a baseline is used for most often - nothing
+  // changed - fell through to the unknown-shape fallback, which prints the whole object as JSON.
+  const clean = diffReports(shaped([{ code: 'S5_UNHANDLED_EVENT', severity: 'warning', message: 'A ignores stop' }]), shaped([{ code: 'S5_UNHANDLED_EVENT', severity: 'warning', message: 'A ignores stop' }]))
+  const text = renderReportText(clean)
+  assert(!text.includes('{'), 'the body must not fall back to JSON:\n' + text.slice(0, 300))
+  assert(/no new findings/.test(text), 'an empty delta says so in words')
+  assert(/^CURRENT  verdict=/m.test(text), 'and still names the current verdict')
+})
+
+test('a changed finding shows both sides instead of inventing a severity', () => {
+  // `changed[]` carries `before`/`after`; `toViewFinding` read the item itself, which has neither a `severity` nor
+  // a `message`, so every change rendered as `[warning/CODE] CODE` - a fabrication, and the escalation a reader
+  // most needs to see was the one it erased.
+  // The evidence is what makes these two the same finding: identity falls back to the message when a finding
+  // carries no locator, so without it a reworded message reads as one added and one removed - a different case.
+  const evidence = { state: 'A', event: 'stop' }
+  const before = shaped([{ code: 'S5_UNHANDLED_EVENT', severity: 'warning', message: 'A ignores stop', evidence }])
+  const after = shaped([{ code: 'S5_UNHANDLED_EVENT', severity: 'error', message: 'A ignores stop, and that costs a retry', evidence }])
+  const text = renderReportText(diffReports(before, after))
+  assert(/^CHANGED \(1\)$/m.test(text), 'the changed section is named:\n' + text)
+  assert(/severity warning → error/.test(text), 'the escalation is stated')
+  assert(text.includes('A ignores stop') && text.includes('costs a retry'), 'and both messages survive')
+  assert(!/\[warning\/S5_UNHANDLED_EVENT\]/.test(text), 'a change is not relabelled as a warning finding')
+})
+
 if (failures > 0) {
   console.error(`\n${failures} report-view test(s) failed`)
   process.exit(1)

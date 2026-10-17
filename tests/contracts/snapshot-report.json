@@ -1713,7 +1713,7 @@
       "removed": [],
       "changed": []
     },
-    "body": "model-everything/baseline/v1  verdict=pass  no new findings, nothing resolved  ok=true\n\n{\"ok\":true,\"ran\":true,\"verdict\":\"pass\",\"verdictReason\":\"no new findings, nothing resolved\",\"schema\":\"model-everything/baseline/v1\",\"currentVerdict\":\"pass_with_findings\",\"added\":[],\"removed\":[],\"changed\":[],\"summary\":{\"baseline\":31,\"current\":31,\"added\":0,\"removed\":0,\"changed\":0,\"addedErrors\":0,\"addedWarnings\":0},\"nextSteps\":[\"No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it.\"]}\n\nNEXT  No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
+    "body": "model-everything/baseline/v1  verdict=pass  no new findings, nothing resolved  ok=true\nCURRENT  verdict=pass_with_findings\n\nNEXT  No new findings: re-record the baseline with this report if the slice is accepted, so the next comparison starts from it."
   },
   "design: a layered design that keeps every declaration": {
     "ok": true,
