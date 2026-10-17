@@ -87,8 +87,8 @@ metadata:
 
 ## 4. 较小的整理项
 
-- **技能触发评估**：**harness 已经有了**，不必再从历史备份包取回——`tests/skill-routing/`（按 dsh 的技能目录行重写，语料是「用户怎么说 / 该由哪个技能接」）。结构半随 `test:engine` 跑；打分半是 `--print-prompt` 与 `--decisions`。**剩下的缺口只有「测过没有」**：打分半一次都没跑过，所以没有基线，而它才是唯一能回答「目录真的把这条请求送去那个技能了吗」的东西。
-  结构半这轮修了两处（**都属于「判定说得比自己知道的多」**）：它原先只要求**一个**子串命中，注释却写着「a third of the meaningful words」——而每条描述都以「Use when reviewing…」开头，于是 `"review"` 一个词就满足任何请求；实测把 `migration` 从 datamodel 描述里整词删掉，检查照样绿。现在改成「期望域技能的用例必须点到一个该技能目录行里确实有的词」，按整词 + 五字母词干匹配（所以 `plan` 不会被 `PlantUML` 满足），请求的**动词**（review / draw / audit / check…）不算点到东西；入口技能按「消解式路由」豁免——不点名领域正是它该接的理由。
+- **技能触发评估**：harness 与实测都有，细节在[路由实测](../research/skill-routing-measurement.md)——`tests/skill-routing/`（结构半随 `test:engine`）、`--print-prompt` / `--decisions`（打分半）、`--live-sample`（挑值得花一个会话的 12 条）。**这一轮修了两处判定**：结构半原先只要求一个子串命中（`"review"` 落在 `"Use when reviewing…"` 里就算数，删掉决定性词照样绿），现在要求点到该技能目录行确实有的词、且动词不算；`--print-prompt` 原先把六行 `PASS` 打在提问前面，现在只出提问。
+  **还欠的是 live 那一半**：同一天两次实测都是把目录行交给模型（93/93，然后 92/93，一条翻转），**目录行 + 系统提示 + 模型一起作用的情形还只有一次试点**（那一次的技能选对了，但会话先找了二十分钟不存在的物料）。文本已按翻转的那条修过（`model-everything-uml` 的移交句从「这类图去 structure」改成「这类图由 structure **读取**」），**改完必须重装 + 重启**才能在 live 侧测到。
 - **技能文档双语**：技能文档目前是英文单语，只有 README 成对。若要双语，是一次成规模补写（每个 `SKILL.md` 加各自的 `references/*.md`），动手前先定样例再铺开。
 
 ## 5. 部署面实测后剩下的缺口（2026-10-17，装进 desktop profile 实跑 + 一次只读复审）

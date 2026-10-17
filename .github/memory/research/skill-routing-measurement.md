@@ -11,7 +11,7 @@ metadata:
 
 ## 结论（2026-10-17 实测）
 
-对 `tests/skill-routing/corpus.json` 的全部 **93 条**用例，独立作答 **93/93 全对**，七个族无一失分：
+对 `tests/skill-routing/corpus.json` 的全部 **93 条**用例，独立作答 **93/93 全对**，七个族无一失分（同一天的第二次实测是 92/93，一条翻转，见下——**先读那一节再引用这个数字**）：
 
 | 族 | 得分 | 该族当时是否已测过 |
 |---|---|---|
@@ -32,6 +32,36 @@ metadata:
 
 **为什么必须独立**：自问自答测的是「文本能不能被我读懂」，不是「文本能不能被读懂」。
 
+## 第二次实测（2026-10-17 晚，同一份语料、同一份目录）：92/93，一条翻转
+
+同一天又测了一次，方法与上面完全一致（独立子代理、只读提问文件、只回 JSON、`--decisions` 评分）。结果是 **92/93**，唯一条错：
+
+```text
+[near miss] "draw the class hierarchy as a diagram"    expected model-everything-uml, got model-everything-structure
+```
+
+它属于 `model-everything-design` 的近似误路由，所以七个族里只有 design 掉到 9/10，其余与第一次逐字相同。**这不是路由退化，是同一条用例翻面**：第一次答 uml，第二次答 structure。
+
+**为什么它会翻**：`model-everything-uml` 的目录行原本写着「A component, class, object, package or deployment diagram **goes to** the model-everything-structure skill」——一句无条件的移交，而该技能正文的 render 一节把 class / object / package / component / deployment 都列在 PlantUML 能画的族里；`model-everything-structure` 那边只有读（`uml_structure_verify`），没有渲染。于是「画一张类图」这句话，目录说「不归我」，正文说「归我」，模型每次只能押一个。
+
+**这属于「报告说得比它知道的多」的同一族**：目录行把「**分析**这类图去那边」说成了「这类图去那边」，多出来的那半个意思正好盖住了画图这一半。修法是让行只声明它确实拥有的部分：
+
+- `goes to` → `is read as a dependency graph by`（移交的是读取与依赖检查，不是整个族）；
+- `render a model` → `render a model in a notation that can draw it`（画图一侧明说自己能画）；
+- 行从 428 字符涨到 466（预算 500，第一句 215 ≤ 220 的门槛）。
+
+**留一条方法论教训**：翻转本身就是证据。同一份文本两次作答不同，说明这句文本没有唯一读法——**一条用例从"对"变"错"时，先怀疑文本有二义，再怀疑模型退步**。如果只跑一次，93/93 会让我们把一句自相矛盾的话记成"已经验过"。
+
+## live 会话怎么测，以及它为什么贵
+
+上面两种测法都只把**目录行**交给模型。真实用户遇到的是「目录行 + 系统提示 + 模型」一起作用，所以还有第二种测法：给一个**全新会话**只发那句请求，看它加载哪个技能。成本是一个会话一条，因此由 `--live-sample` 挑值得花会话的 12 条：每个域技能一条（语料顺序第一条），加上「这句话的词更像指向别的技能」的那些。
+
+第一次试点（`"review this migration: the orders table gains a required column"`）的结论：
+
+- **路由是对的**——子代理实际调用了 `model_datamodel_verify`，正是期望的 `model-everything-datamodel`；
+- 但它在文件系统里找了二十分钟「不存在的那份迁移」，才回到方法本身。**裸请求会让会话先去找物料**，所以 live 提问必须写成有界的：说明物料不在、不要去找，只需给出你会先做什么；
+- 观察通道只能是**自报**：要求会话结尾单起一行 `SKILLS LOADED: <技能名或 none>`。这是这套方法最弱的一环（它可能凭记忆写，而不是凭实际调用），读的时候要按这个折扣读。
+
 ## 这个数字**测不到**什么
 
 - **它测的是「目录文本足以判定这 93 条」，不是「任意输入都能路由对」。** 语料是人写的，100% 的含义是「描述区分开了语料里构造的边界」，不是「描述无法被误读」。
@@ -42,7 +72,7 @@ metadata:
 
 | 机制 | 守什么 |
 |---|---|
-| `tests/skill-routing/run.mjs`（结构性一半，进 `test:engine`） | 每条用例点名一个**已发布**技能；每个技能至少是一处触发、一处近似误路由；用例依赖的词必须在**可见的 500 字符预算**内 |
+| `tests/skill-routing/run.mjs`（结构性一半，进 `test:engine`） | 每条用例点名一个**已发布**技能；每个技能至少是一处触发、一处近似误路由；**期望某个域技能的用例必须点到该技能目录行里确实有的词**（按整词 + 五字母词干；请求的动词不算，入口技能按消解式路由豁免）。这条判据原先只要一个子串命中，`"review"` 落在 `"Use when reviewing…"` 里就算数，删掉决定性词照样绿 |
 | `tests/routing-map/run.mjs` | 路由图必须等于**当前**目录生成的图（加技能后忘重新生成会红） |
 | `tests/catalog/run.mjs` | 每行开头是触发句、点名兄弟、有范围声明；不许有脆弱计数 |
 
