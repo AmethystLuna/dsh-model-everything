@@ -22,12 +22,57 @@ test('source model still verifies (sanity)', () => { const r = runVerification(m
 
 test('uppaal export shape', () => {
   const out = exportModel(model, 'uppaal')
-  for (const needle of ['<?xml version=', '<nta>', '<template>', '<name x=', '<init ref=', '<transition id=', 'kind=\"synchronisation\"', 'kind=\"guard\"', 'kind=\"assignment\"', 'system ModelEverything;']) {
+  for (const needle of ['<?xml version=', '<nta>', '<template>', '<name x=', '<init ref=', '<transition id=', 'kind="guard"', 'kind="assignment"', 'kind="comments"', 'system ModelEverything;']) {
     if (!out.primary.includes(needle)) throw new Error('missing ' + needle)
   }
+  // A single machine is one template, so an `e!` synchronisation has no partner to meet: every transition would
+  // block forever, and the channel was never declared either, so UPPAAL would not even load the file. The event name
+  // is a comment now, and nothing waits on a channel this export does not contain.
+  if (out.primary.includes('synchronisation')) throw new Error('a single-template export must not declare a rendezvous')
   const q = out.extras?.queries ?? ''
   if (!q.includes('E<> ModelEverything.B') || !q.includes('A[] not ModelEverything.B')) throw new Error('queries missing')
   if (!out.warnings.some((w) => w.includes('probability'))) throw new Error('probability must be a warning in UPPAAL export')
+})
+
+test('a field no target carries is reported, not dropped', () => {
+  // `cost` and `maxTicks` were simply absent from every export: a reader who ran the exported file trusted it as the
+  // model, and the budget and deadline the checks decided were not in what the target verified.
+  const carrying = {
+    ...model,
+    transitions: model.transitions.map((transition) => ({ ...transition, cost: 3 })),
+    states: model.states.map((state) => ({ ...state, maxTicks: 4 })),
+  }
+  for (const format of ['uppaal', 'tla', 'spin']) {
+    const out = exportModel(carrying, format)
+    const dropped = out.warnings.filter((warning) => warning.includes('EXPORT_FIELD_DROPPED'))
+    if (dropped.length !== 2) throw new Error(format + ': expected one warning per dropped field, got ' + JSON.stringify(out.warnings))
+    if (!dropped.some((warning) => warning.includes('cost'))) throw new Error(format + ': the cost must be named')
+    if (!dropped.some((warning) => warning.includes('maxTicks'))) throw new Error(format + ': the deadline must be named')
+  }
+  // The near miss: a model that declares neither gets no warning about them.
+  for (const format of ['uppaal', 'tla', 'spin', 'prism']) {
+    const out = exportModel(model, format)
+    if (out.warnings.some((warning) => warning.includes('EXPORT_FIELD_DROPPED'))) throw new Error(format + ': nothing was dropped, so nothing may say it was')
+  }
+})
+
+test('a model too large for the PRISM encoding is not called invalid', () => {
+  // The tool mapped every throw onto MODEL_INVALID, so a limit of the encoder came back as a claim about the model.
+  const wide = {
+    schemaVersion: 1,
+    init: 'A',
+    states: [{ id: 'A' }, { id: 'B', terminal: true }],
+    transitions: [{ from: 'A', event: 'go', to: 'B' }],
+    variables: [
+      { name: 'x', kind: 'integer', init: 0, min: 0, max: 200 },
+      { name: 'y', kind: 'integer', init: 0, min: 0, max: 200 },
+    ],
+  }
+  let refusal
+  try { exportModel(wide, 'prism') } catch (error) { refusal = error }
+  if (!(refusal instanceof Error)) throw new Error('the enumeration limit must refuse')
+  if (refusal.code !== 'EXPORT_TOO_LARGE') throw new Error('with its own code, got ' + String(refusal.code) + ': ' + refusal.message)
+  if (!/valid/.test(refusal.message)) throw new Error('and say the model is valid: ' + refusal.message)
 })
 
 test('tla export shape', () => {

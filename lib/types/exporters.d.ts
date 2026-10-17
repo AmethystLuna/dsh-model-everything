@@ -24,4 +24,14 @@ export declare function prepareModel(input: unknown): ExportedModel;
  */
 export declare const EXPORT_FORMATS: readonly ExportFormat[];
 export declare function isExportFormat(value: unknown): value is ExportFormat;
+/**
+ * A refusal an exporter knows by name.
+ *
+ * The tool mapped every throw onto `MODEL_INVALID`, so "this valid model is too large for the PRISM encoding" came
+ * back as "your model is invalid" - a claim about the caller's work made by a limit of the exporter.
+ */
+export declare class ExportError extends Error {
+    readonly code: string;
+    constructor(code: string, message: string);
+}
 export declare function exportModel(input: unknown, format: unknown): ExportResult;
