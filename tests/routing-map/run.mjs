@@ -37,31 +37,37 @@ test('every shipped skill appears in the map', () => {
   if (missing.length > 0) throw new Error('the map does not mention: ' + missing.join(', '))
 })
 
-test('the map is written in mindmap form, not flowchart form', () => {
-  // A mindmap node's label IS the line; `id["label"]` is flowchart syntax. Sixty-seven nodes written that
-  // way rendered as one crowded blob, and nothing here compared the seven maps to each other - the other
-  // six were written the house way and this one was not. A renderer cannot complain, so the suite does.
+test('the map uses the syntax the renderer accepts', () => {
+  // What mermaid's mindmap grammar accepts, per its own documentation: a bare `root((text))` and plain
+  // text after the indent, with shapes only in the `id((text))` form. There is NO backtick form - a
+  // backtick label is a parse error, which is exactly what a renderer reported at line 15 of this map
+  // after an earlier "fix" wrapped the labels in backticks.
+  //
+  // So the rule is: no backticks, and no parenthesis, bracket or arrow inside a label, because those are
+  // what the parser reads as syntax. Spell the character out instead - a corner is cheap, a broken
+  // diagram is not.
   const text = readFileSync(repo + 'docs/routing-map.md', 'utf8')
   const block = /```mermaid\n([\s\S]*?)```/.exec(text)
   if (block === null) throw new Error('the map has no mermaid block')
   const lines = block[1].split('\n').filter((line) => line.trim() !== '' && line.trim() !== 'mindmap')
+  if (lines.length === 0) throw new Error('the map carries no nodes; this check would pass vacuously')
 
+  const backticked = lines.filter((line) => line.includes('`'))
+  if (backticked.length > 0) {
+    throw new Error(String(backticked.length) + ' node(s) use backticks, which a mindmap node does not accept: ' + backticked[0].trim().slice(0, 60))
+  }
   const flowchart = lines.filter((line) => /\["/.test(line))
   if (flowchart.length > 0) {
-    throw new Error(String(flowchart.length) + ' node(s) use the flowchart form id["label"], which a mindmap renders as one crowded blob: ' + flowchart[0].trim().slice(0, 60))
+    throw new Error(String(flowchart.length) + ' node(s) use the flowchart form id["label"]; a mindmap node is plain text: ' + flowchart[0].trim().slice(0, 60))
   }
   const roots = lines.filter((line) => line.includes('root('))
   if (roots.length !== 1) throw new Error('expected exactly one root, found ' + String(roots.length))
-  if (!/root\(\((?!\s*").*?\)\)\s*$/.test(roots[0])) throw new Error('the root must use the bare root shape, not a quoted label: ' + roots[0].trim())
+  if (!/root\(\([^()]*\)\)\s*$/.test(roots[0].trim())) throw new Error('the root must be the bare root shape: ' + roots[0].trim())
 
-  // A label carrying a character the parser reads as syntax has to be in a backtick span.
-  const risky = lines.filter((line) => {
-    if (line.includes('root(')) return false
-    const label = line.trim()
-    if (label.startsWith('`') && label.endsWith('`')) return false
-    return /[[\]{}()]|-->|->/.test(label)
-  })
-  if (risky.length > 0) throw new Error('a label carries parser syntax without a backtick span: ' + risky.slice(0, 2).map((line) => line.trim()).join(' | '))
+  const risky = lines.filter((line) => line.trim().startsWith('root(') ? false : /[[\]{}()]|-->|->/.test(line))
+  if (risky.length > 0) {
+    throw new Error('a label carries a character the parser reads as syntax: ' + risky.slice(0, 3).map((line) => line.trim()).join(' | '))
+  }
 })
 
 test('the map states the catalog budget it is written against', () => {

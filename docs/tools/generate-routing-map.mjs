@@ -109,12 +109,14 @@ lines.push('      closed schema: an unknown key is refused, not ignored')
 lines.push('      the body it just loaded is where the field semantics live')
 for (const skill of skills) {
   const label = skill.name.replace('model-everything', 'me')
-  // A mindmap node's label IS the line. `id["label"]` is flowchart syntax: written that way, sixty-seven
-  // nodes render as one crowded blob. Backticks only where the label carries parser-significant characters.
-  lines.push('    `' + label + ' - ' + String(skill.triggers.length) + ' corpus trigger(s)`')
-  lines.push('      `row: ' + String(skill.length) + ' of ' + String(SKILL_BUDGET) + ' chars`')
+  // A mindmap node's label IS the line, as plain text. There is no backtick form - a backtick label is a
+  // parse error, which is what a renderer reported - so a character the parser reads as syntax is spelled
+  // out instead of escaped. `(s)` became a word and `->` an arrow, which is why no label here carries a
+  // parenthesis or a greater-than sign.
+  lines.push('    ' + label + ' - ' + String(skill.triggers.length) + ' corpus triggers')
+  lines.push('      row: ' + String(skill.length) + ' of ' + String(SKILL_BUDGET) + ' chars')
   for (const tool of TOOL_OWNER[skill.name] ?? []) lines.push('      tool: ' + tool)
-  for (const [destination, count] of skill.sends) lines.push('      `near miss x' + String(count) + ' -> ' + destination.replace('model-everything', 'me') + '`')
+  for (const [destination, count] of skill.sends) lines.push('      near miss x' + String(count) + ' \u2192 ' + destination.replace('model-everything', 'me'))
 }
 lines.push('```')
 lines.push('')
@@ -180,12 +182,12 @@ lines.push('')
 // The map is read by a renderer, so a malformed node is a broken deliverable rather than a
 // cosmetic problem. Refuse to emit one.
 //
-// The accepted shape is the mindmap one: an indent and a label, a bare `root((...))` for the root, and a
-// backtick span where a label carries syntax characters. The earlier pattern required `id["label"]`, so it
-// was enforcing the flowchart form that renders badly - a validator is a specification, and this one
-// specified the bug.
+// The accepted shape is the grammar's: a bare `root((...))` and plain text after the indent. No backticks
+// (there is no such form for a mindmap node, and one produced a parse error), and no parenthesis, bracket or
+// arrow in a label, because those are what the parser reads as syntax. The earlier pattern required
+// `id["label"]`, which was a specification for a shape that renders as a blob.
 const mermaid = lines.slice(lines.indexOf('```mermaid') + 1, lines.lastIndexOf('```'))
-const nodeLine = /^(root\(\(.+\)\)|`[^`]+`|[^[\]{}()>]+)$/
+const nodeLine = /^(root\(\([^()]*\)\)|[^[\]{}()>`]+)$/
 const malformed = mermaid.filter((line) => line.trim() !== '' && line.trim() !== 'mindmap' && !nodeLine.test(line.trim()))
 if (malformed.length > 0) throw new Error('malformed mermaid node(s): ' + malformed.slice(0, 3).join(' | '))
 const text = lines.join('\n')
