@@ -30,7 +30,7 @@ metadata:
 | 渠道 | 提交物 | 状态 |
 |---|---|---|
 | awesome | [PR #7842](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/7842)，一个文件 `data/plugins/AmethystLuna__dsh-model-everything.yml` | `check` 绿；`Submission gate` 只卡一条：**仓库 0.5 天，需满 1 天**，回复明确说「会自动重跑，约 11 小时后清」——不用重推、不用关开重来 |
-| DSH-Store | [issue #1484](https://github.com/AI-Scarlett/DSH-Store/issues/1484)，标题 `[Plugin] <仓库地址>`，`plugin-submission` 标签 | 已建，等机器人预检评论与标签 |
+| DSH-Store | [issue #1484](https://github.com/AI-Scarlett/DSH-Store/issues/1484)，标题 `[Plugin] <仓库地址>`，`plugin-submission` 标签 | 预检**失败**：`SUBMISSION_PATCH_AMBIGUOUS`。已发[评论问口径](https://github.com/AI-Scarlett/DSH-Store/issues/1484#issuecomment-6245870100)，等维护者定 |
 
 提交时用的 YAML（`category: dev`，`en` 里一个数字、一个 API 名都没有）：
 
@@ -42,6 +42,8 @@ description:
   en: 'Turns what a design, plan or document claims into a model and decides it: UML diagrams rendered, read and reviewed; state machines, protocols and data models checked as models; migrations tested for coverage and rollback symmetry; concurrency claims mined and routed to the checker that can decide them; dependency graphs audited; reports diffed.'
   zh: '把设计、计划或文档里的声称抽成模型再判定：UML 图渲染、读取与审查；状态机、协议与数据模型按模型判定；迁移检查覆盖与回滚对称；并发声称挖掘后分派给能判定它的工具；依赖图审查；报告对比。'
 ```
+
+**`SUBMISSION_PATCH_AMBIGUOUS` 的成因（值得记）：** 它的 `bundle-patch-contract.mjs` 把每行的 `name` 当**包身份**——正则只接受 `name` 或 `@scope/name`。我们的第二个组件是**同一个包**的子路径导出（`name: 'dsh-model-everything/gate'`，`exports` 里的 `./gate`，配 `gate/package.json` 与 `gate/locale/*` 给它自己的卡片名），于是被判「身份存疑」。平台本身认这个子路径：装完 `--dump-config` 两行都在、门禁行 `enabled: true`、整棵树加载通过。**所以这不是我们的清单写错，是校验器的模型里「一行 = 一个包」。** 有三种走法：让它接受「同一 patch 已声明包的子路径」；或并成一行、用 `config` 选组件（代价：第二个组件失去独立卡片名）；或不改、由人工审阅放行。已按第三种提问，别在没定之前改包结构。
 
 **还没走的**：OMDSH（缺 `dshWorkshop` 清单，先不动）、dshbase（要邮件/issue，得有人写自测结论）、DSH Get（等聚合）。
 
