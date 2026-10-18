@@ -266,6 +266,7 @@ Write it into the profile's `cordis.patch.yml` by row id:
 
 ## Requirements
 
+- Per-release install / mount / start / uninstall evidence is in [DSH-COMPATIBILITY.md](DSH-COMPATIBILITY.md).
 - DeepSeek Harness: admission reads `peerDependencies` in `package.json` — that is what the plugin manager checks before installing — while `dsh.compatibility.dshReleases` only records what was measured. Per-release compatibility is a **measurement**; releases that were not measured are marked `unknown`.
 - Node.js: `>=20`.
 - No Python dependency and no network calls.

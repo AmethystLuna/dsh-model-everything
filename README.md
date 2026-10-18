@@ -266,6 +266,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 
 ## 环境要求
 
+- 逐版本的安装 / 挂载 / 启动 / 卸载证据在 [DSH-COMPATIBILITY.md](DSH-COMPATIBILITY.md)。
 - DeepSeek Harness：准入看 `package.json` 的 `peerDependencies`——插件管理器按它决定装不装得下，`dsh.compatibility.dshReleases` 只是记录实测结论。逐版本兼容性是**实测项**，没实测过的版本一律标 `unknown`。
 - Node.js：`>=20`。
 - 无 Python 依赖，无网络调用。

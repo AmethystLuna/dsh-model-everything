@@ -25,6 +25,7 @@ const MUST_BE_MENTIONED = [
   { what: 'the contribution guide', marker: 'CONTRIBUTING.md' },
   { what: 'the references list', marker: 'docs/references.md' },
   { what: 'the routing map', marker: 'docs/routing-map.md' },
+  { what: 'the compatibility evidence', marker: 'DSH-COMPATIBILITY.md' },
 ]
 
 test('both READMEs mention everything that must be reachable', () => {

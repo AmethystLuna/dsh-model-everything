@@ -124,6 +124,8 @@ future reader needs to act, not a transcript.
   changed. Every release names its target: `npm run bump -- <x.y.z>`.
 - **Compatibility is measured, never assumed.** `dsh.compatibility.dshReleases` gains a
   release only after a round on it (install, mount, offline checks, uninstall). Until a
-  release has been measured it stays `unknown`.
+  release has been measured it stays `unknown`. The rounds themselves are recorded in
+  [DSH-COMPATIBILITY.md](DSH-COMPATIBILITY.md) — one row per release, with what was
+  established and what was not.
 - **Tags move only on explicit instruction.** Moving a published tag is a force push.
 - The checklist is in [RELEASE.md](RELEASE.md).
