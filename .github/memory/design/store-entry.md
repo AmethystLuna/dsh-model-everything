@@ -13,9 +13,9 @@ metadata:
 
 | 渠道 | 形态 | 提交方式 | 对我们最硬的那条 |
 |---|---|---|---|
-| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | 精选目录，`dsh-market`、DSH Get 等从它读 | PR 加一个文件 `data/plugins/<owner>__<repo>.yml` | 描述**逐条对着代码核**；一个 PR 最多三条 |
-| [DSH-Store](https://github.com/AI-Scarlett/DSH-Store)（dsh.store） | 装进 dsh 的商城与生命周期管理器 | 开一个 plugin-submission issue，只填公开仓库地址 | 来源钉死 40 位 commit；每个 DSH 版本要独立的安装/启动/卸载证据 |
-| [OMDSH Hub](https://github.com/omdsh-dev/dsh-hub-workshop)（hub.omdsh.dev） | 市场 | 按仓库 `INTAKE.md` 提交 | **INTAKE 未读**——提交前先读，别按猜的填 |
+| [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) | 精选目录，`dsh-market`、DSH Get 等从它读 | PR 加一个文件 `data/plugins/<owner>__<repo>.yml` | 描述**逐条对着代码核**；一个 PR 最多三条；仓库满 1 天 |
+| [DSH-Store](https://github.com/AI-Scarlett/DSH-Store)（dsh.store） | 装进 dsh 的商城与生命周期管理器 | 开一个 plugin-submission issue，只填公开仓库地址；预检通过后**由它自己**开 catalog PR | 来源钉死 40 位 commit；每个 DSH 版本要独立的安装/启动/卸载证据 |
+| [OMDSH Hub](https://github.com/omdsh-dev/dsh-hub-workshop)（hub.omdsh.dev） | 市场 | 按仓库 `INTAKE.md`：Author Studio 建 issue → `intake` 工作流开 review PR | 要求 `package.json#dshWorkshop`（`omdsh-workshop-package/v1`）；当前基线 `0.1.0-rc.6`，**本插件没有这个清单**，只能走 guided/legacy 映射，Registry 不直接可入 |
 | [deepseek-harness-plugin-manager](https://github.com/hrhgit/deepseek-harness-plugin-manager) | 管理器，自动发现 | 不用提交 | 要有 npm 包且 `repository` 回指仓库；靠 `dsh-plugin` topic 发现 |
 | [dshbase.com](https://dshbase.com/zh/about/) | 独立实测目录 | 邮件 / issue | 作者亲自装一遍，标「已验证/未验证」 |
 | [DSH Get](https://www.dshget.com/) | 聚合站，每天抓上游 | 不用提交 | 进了上游就出现 |
@@ -23,28 +23,41 @@ metadata:
 
 `dsh-webui-market-plugin`、`dsh-market-sidebar` 是读这些目录的界面，不单独收稿。`dsh.deepseek404.com` 规则没读到，不算渠道。
 
-## 提交物料
+**提交方式不是同一个动词。** 只有 awesome 是「作者开 PR」；DSH-Store 与 OMDSH 的作者入口都是 **issue**，PR 由它们的机器人在预检后开。把这两处说成「开 PR」会在仓库里凭空多一个没人预检的目录改动。
 
-### awesome-dsh-plugin
+## 已提交的两条（2026-10-18）
 
-一个文件，`data/plugins/AmethystLuna__dsh-model-everything.yml`：
+| 渠道 | 提交物 | 状态 |
+|---|---|---|
+| awesome | [PR #7842](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/7842)，一个文件 `data/plugins/AmethystLuna__dsh-model-everything.yml` | `check` 绿；`Submission gate` 只卡一条：**仓库 0.5 天，需满 1 天**，回复明确说「会自动重跑，约 11 小时后清」——不用重推、不用关开重来 |
+| DSH-Store | [issue #1484](https://github.com/AI-Scarlett/DSH-Store/issues/1484)，标题 `[Plugin] <仓库地址>`，`plugin-submission` 标签 | 已建，等机器人预检评论与标签 |
+
+提交时用的 YAML（`category: dev`，`en` 里一个数字、一个 API 名都没有）：
 
 ```yaml
 url: https://github.com/AmethystLuna/dsh-model-everything
 name: AmethystLuna/dsh-model-everything
 category: dev
 description:
-  en: Turns what a design or a document claims into a model, then decides it - UML diagrams, state machines and protocols, data models and migrations, concurrency claims, dependency graphs, report diffs.
-  zh: 把设计或文档里的断言抽成模型再判定——UML 图、状态机与协议、数据模型与迁移、并发断言、依赖图、报告对比。
+  en: 'Turns what a design, plan or document claims into a model and decides it: UML diagrams rendered, read and reviewed; state machines, protocols and data models checked as models; migrations tested for coverage and rollback symmetry; concurrency claims mined and routed to the checker that can decide them; dependency graphs audited; reports diffed.'
+  zh: '把设计、计划或文档里的声称抽成模型再判定：UML 图渲染、读取与审查；状态机、协议与数据模型按模型判定；迁移检查覆盖与回滚对称；并发声称挖掘后分派给能判定它的工具；依赖图审查；报告对比。'
 ```
+
+**还没走的**：OMDSH（缺 `dshWorkshop` 清单，先不动）、dshbase（要邮件/issue，得有人写自测结论）、DSH Get（等聚合）。
+
+## 提交物料
+
+### awesome-dsh-plugin
 
 `category: dev` 是挑的，不是判的：`dev` 是开发与运行时，`tools` 是通用工具能力；本插件面向的是「审阅正在开发的东西」，所以 `dev`。维护者会自己改分类，不会因此打回。
 
-**`en` 里不写数字、不写工具名。** 规则原文是「描述被当作声明，会对着代码核」——写了「11 个工具」就会被数；写了 `model_verify` 就会被点。上面这句一个可核的整数都没有，但每一条都能在仓库里找到对应能力。
+**`en` 里不写数字、不写工具名。** 规则原文是「描述被当作声明，会对着代码核」——写了「11 个工具」就会被数；写了 `model_verify` 就会被点。上面那句一个可核的整数都没有，但每一条都能在仓库里找到对应能力。
 
 ### DSH-Store
 
-issue 正文只有仓库地址；如果有多个插件才补 `Plugin path`（本仓库只有根包，留空）。标题 `[Plugin] https://github.com/AmethystLuna/dsh-model-everything`，可选的 Notes 写一句它凭什么值得上架。
+issue 正文只有仓库地址；如果有多个插件才补 `Plugin path`（本仓库只有根包，留空）。标题 `[Plugin] <仓库地址>`，可选的 Notes 写一句它凭什么值得上架。
+
+**表单是 issue form，不是自由正文。** 用 `gh issue create` 送进去的正文要照表单渲染出来的形状写：`### GitHub repository` 空行接地址、`### Plugin path (optional)` 接 `_No response_`、`### Notes (optional)` 接正文，并带上 `plugin-submission` 标签。机器人按这些标题读字段。
 
 机器人读**默认分支当前的 HEAD**，八小时策略再过一轮更严的门禁。它会核：公开、版本、许可证、`dsh.bundle.patch`、入口 id、生命周期脚本（我们没有）、受保护命名空间（我们没有）、以及 manifest 里声明的兼容范围——所以 `dsh.compatibility` 与 README 的「环境要求 / 权限与数据」两节**必须在提交前就是真的**，它们会被读。
 
@@ -52,7 +65,7 @@ issue 正文只有仓库地址；如果有多个插件才补 `Plugin path`（本
 
 ### 其余
 
-- **OMDSH**：先读 `INTAKE.md`。已知的是它只把 `dsh-plugin` topic 当**候选**，而 awesome 列表、文档仓、模板一律排除——所以「上了 awesome」不等于「OMDSH 会收」。
+- **OMDSH**：`INTAKE.md` 已读。它只把 `dsh-plugin` topic 当**候选**，awesome 列表/文档仓/模板一律排除；可入 Registry 的前提是包里有 `package.json#dshWorkshop`（`omdsh-workshop-package/v1`），当前基线 `0.1.0-rc.6`。本插件没有这个清单，硬提交只会落在 guided/legacy 那格，所以先不动。
 - **dshbase**：邮件或 issue，附作者自测结论；它按实测标状态，不按星数。
 - **DSH Get**：等上游。它抓 awesome、hrhgit、OMDSH 与 GitHub topic，去重后发布；我们不推。
 

@@ -19,8 +19,7 @@ metadata:
 - **`0.1.7-alpha.1` 不在区间内且装不上**（npm 解析那批包时 peer 冲突），不是本插件的问题；更老的 `0.1.2`–`0.1.6` 同样在区间外，未测。
 - **仓库已建、已推（2026-10-17，仍是 private）**：`https://github.com/AmethystLuna/dsh-model-everything`，123 个提交，`main` 已跟踪 `origin`。走的是 SSH（https 推第一次 408 超时）。About 已配：中英双语描述（**GitHub 上限 350 字符**，第一版 470 被 422 拒了）、16 个 topic（照 logicprobe 的清单去掉多宿主的那几个：`claude-code` / `codex`）、MIT 已被识别。**homepage 故意留空**——npm 页面还不存在，填上去就是死链，发布时再补。
 - **CI 首次运行抓到的两处缺陷（都已修）**：两次红都不是环境问题，是**度量依赖机器**。① `docs/toolset`、`docs/usage` 用**原始文件长度**量技能正文/参考资料，CRLF 检出比 LF 多算每个换行（79710→78897、155713→153640）；现在先 `replaceAll('\r\n','\n')` 再量，并且**在真 LF 树上验过**（`git -c core.autocrlf=false archive`，因为 `autocrlf=true` 时连 archive 都会写 CRLF，我第一次"LF 验证"是假的）。② `docs/usage` 去本机装的 dsh 里读 host 事实（目录行预算 500 等），runner 上没有 dsh → 写成 `unreadable` → 地图必然漂移；现在**没有 host 时回退到 `facts.json` 里已记录的值**（那是 host 的测量，不是这台机器的），有 host 仍然重新量。第三次推送后两矩阵全绿。
-- `npm publish`、打 tag、上架各目录。**渠道、各自的提交物料与硬门槛见 [store-entry](../design/store-entry.md)**——那里是唯一一份，不要在这里重复列（旧稿说的 `community.json` 不存在，已改）。**改成 public 的时机**：等 `npm publish` 与 tag 落地之后；先私有大体上只是为了在 CI 与文档稳定前不给人一个半成品。
-- **两个同作者的旧插件已经把读者指向这里（2026-10-18，已推送）**：`logicprobe` 在 README 最前面写"继续以 `dsh-model-everything` 的形式发展"并给出超集清单（同时说明 UML 是拆成多个工具的，不是 API 镜像）；`embedded-workbench` 在"其他插件推荐"里加了本插件一行，并明确**不替代**它（它仍是嵌入式固件工作台）。两处都只写名字不给链接——**发布后要回来补链接与改掉"尚无 npm 包"这句**，否则是过期文案；两仓库的技能同理（`logicprobe/skills/logicprobe`、`embedded-workbench/skills/embedded-workbench` 的继任说明现在也只能给名字）。两仓库各自实测了 dsh `0.2.1-rc.2` 与 `0.2.1-rc.1` 六个步骤（含 ewb 的门禁注入"一次会话恰好一次"）。
+- **已发布（2026-10-18）**：`dsh-model-everything@0.1.0` 上了 npm，tag `v0.1.0` 已推，仓库转 public，GitHub Release 已建。发布物那一轮（tarball 装、按名从 registry 装）都在 [DSH-COMPATIBILITY.md](../../../DSH-COMPATIBILITY.md) 里有行。渠道状态见 [商店与目录上架](../design/store-entry.md)。
 - **设计审阅专项已完成（2026-10-16）**：`model_design_review` + `DES1`-`DES11` + 技能 `model-everything-design`。细节见[设计审阅](../design/design-review.md)。**首次发布前版本一直停在 `0.1.0`**——没发布过就没有「版本推进」可言，semver 描述的是已发布版本之间的关系；记忆因此**不记当前版本号**，记住就会在首次发布时变错（见 RELEASE.md 的版本策略）。两处后续都做了：**最小反馈弧集**已真正算出（环核 ≤ 14 节点给证明过的最小值，超过退回剥离剩余并标 `feedbackArcsExact: false`）；`report_diff` **本来就兼容**设计报告（走 `checks[].findings` + `check.id` + 证据定位），无需改动，已实测（加环报 2 条新增、信号消失报 1 条移除）。
 - **稳健性审查的缺陷修复（2026-10-16 完成 D1-D12）**：只读子代理跑完约 549 次调用，结论与 D1-D12 逐条见[稳健性审查](../design/robustness-audit.md)。**主缺陷族是「拼错的名称把检查静默关掉、然后报出正面的全部通过」**，三个引擎都中；D1-D12 全部修完并各有能红的用例，非机器族 UML 校验器审计也做完了。**贯穿的原则见该文件的「一条贯穿全部修复的原则」**：能用数学挡住的异常不要靠撞上才发现，而异常处理本身也是建模的审查结果。
 
@@ -34,7 +33,7 @@ metadata:
 
 **本轮的四张生成图**（都随测试守漂移）：`docs/routing-map.md`（技能/工具的文字分配）、`docs/report-reading/mindmap.mmd`（报告阅读方法）、`docs/report-reading/skill-routing.mmd`（该不该单独成技能）、`docs/contributing/mindmap.mmd`（贡献两种情形）、`docs/documentation/mindmap.mmd`（本次文档更新）。生成器的共同纪律：**从真实语料读、自检语法、拒绝产出坏图**；它们各自抓出过我的错误（写错的符号数、漂移的旧图、自己编的引用年份）。
 
-- 上架目录：物料与顺序见[商店与目录上架](../design/store-entry.md)。`package.json` 的 `dsh.category` 是 `tools/dev`——但按[插件开发规范](../design/plugin-dev-spec.md)，这个字段 dsh 自己不读；DSH-Store 的名字/分类从 manifest 与 README 派生，awesome 的分类写在它自己的 YAML 里。三处各写各的，别指望一个字段管全部。
+- 上架目录：渠道、物料与状态见[商店与目录上架](../design/store-entry.md)。awesome 的 PR 只卡「仓库满 1 天」，会自己重跑；DSH-Store 的预检等机器人。`package.json` 的 `dsh.category` 是 `tools/dev`，但按[插件开发规范](../design/plugin-dev-spec.md) dsh 自己不读它，DSH-Store 从 manifest 与 README 派生，awesome 的分类写在它自己的 YAML 里——三处各写各的。
 - CI 首次运行会验证三件事：Node 20 与 22 两个版本都过、markdownlint job 为绿、`lib/` 与 `src/` 同步（`git diff --exit-code -- lib`）。
 
 **写作纪律（用户明确要求）**：**所有文档类内容的更新，都必须先有思维导图作为行文结构的指导**，再动笔。已用此法做过两次（`docs/routing-map.md` 的目录契约、`docs/report-reading/` 的解读指南，图都由脚本从真实语料生成，不是手画），并在写作规则的「禁止脆弱计数」上得过一次教训：`tests/structure` 的 guide 夹具原先写死一串码，加一个节点就断——现改为断言**顺序**并把重复码**对着图计数**。
