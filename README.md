@@ -198,7 +198,7 @@ model_verify model=examples/control-dispatcher.json
 ```bash
 # 从源码目录安装（开发中）
 dsh plugin --profile <profile> add "file:$PWD"
-# 发布后从 npm 安装
+# 从 npm 安装（发布版）
 dsh plugin --profile <profile> add dsh-model-everything
 # 未全局安装 dsh 时
 npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything

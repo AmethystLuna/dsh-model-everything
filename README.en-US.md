@@ -198,7 +198,7 @@ The plugin ships as a cordis bundle, declared by `dsh.bundle` in the root `packa
 ```bash
 # from a source checkout (development)
 dsh plugin --profile <profile> add "file:$PWD"
-# from npm once published
+# the published version, from npm
 dsh plugin --profile <profile> add dsh-model-everything
 # without a global dsh
 npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
