@@ -22,9 +22,9 @@ Every row installed its **own** dsh release into its own directory
 (`npm i @deepseek-ai/dsh@<version>`, about 611 packages) and ran against a fresh
 `DSH_HOME` under that same scratch root, so no state leaked between versions and
 the host's real `~/.dsh` was never touched. `DSH_HOME` is set explicitly on every
-command; the dsh on `PATH` is not used. Every row but the last ran from the working
-tree; the last one installed the tarball `npm pack` produced, which is the artifact
-0.1.0 publishes (see "The published artifact" under Results).
+command; the dsh on `PATH` is not used. Every row but the last two ran from the
+working tree; those two installed the published artifact - once as a tarball, once
+by name from the registry (see "The published artifact" under Results).
 
 Seven steps per row:
 
@@ -77,22 +77,25 @@ does not consult. The probe therefore runs from the dsh tree and lends the copy 
 | 0.2.1-alpha.5 | 2026-10-16 | pass | pass | pass | pass | pass | pass |
 | 0.2.1-rc.2 | 2026-10-18 | pass | pass (gate row `enabled: true`) | pass | pass | pass (`model_verify` + `model_interleaving_scan`) | pass |
 | 0.2.1-rc.2 | 2026-10-18 | pass | pass (`enabled: true`) | pass | pass | pass (`model_interleaving_scan`, 5 findings) | pass |
+| 0.2.1-rc.2 | 2026-10-18 | pass (by name, `^0.1.0`) | pass | pass (same bytes) | pass | pass (`model_verify` → `pass`) | pass |
 
-The last row is **the published artifact**: the seven steps ran against the tarball
-`npm pack` produced, installed as `file:<tarball>`, not against the working tree.
-`npm publish` reported the same shasum (`27687378…`) and integrity (`sha512-1Aai9…`)
-the round measured, so the bytes that were exercised and the bytes on the registry
-are the same. Everything the round touched came out of the tarball: the installed
-copy carries the seven skills, `locale/`, `gate/`, `lib/` and `cordis.patch.yml`,
-its `package.json` says `0.1.0`, and the sha256 of each installed file equals the
-one inside the tarball.
+The last two rows are **the published artifact**. The first installed the tarball
+`npm pack` produced; the second let the profile resolve `dsh-model-everything` from
+the registry, which is what a reader does. `npm publish` reported the same shasum
+(`27687378…`) and integrity (`sha512-1Aai9…`) the tarball round measured, so the
+bytes exercised and the bytes on the registry are the same.
 
-The real call was `model_interleaving_scan` on a paragraph about an async handler,
-and it is also the regression evidence for the async vocabulary: the report came
-back `fail` with five findings, including `CONCURRENCY_KEYWORD:warning:await@L1`
-for the word "awaiting". The same text yielded four findings before that form was
-matched - the defect this release fixes, measured from the installed copy rather
-than from the source.
+Everything either round touched came out of the package: the installed copy carries
+the seven skills, `locale/`, `gate/`, `lib/` and `cordis.patch.yml`, its
+`package.json` says `0.1.0` and names `AmethystLuna` as author, and the sha256 of
+each installed file equals the one inside the tarball.
+
+The real call in the tarball round was `model_interleaving_scan` on a paragraph
+about an async handler, and it doubles as the regression evidence for the async
+vocabulary: the report came back `fail` with five findings, including
+`CONCURRENCY_KEYWORD:warning:await@L1` for the word "awaiting". The same text
+yielded four findings before that form was matched - the defect this release fixes,
+measured from the installed copy rather than from the source.
 
 Ten rows from the 2026-10-16 sweep, run by the parameterised `compat-round.ps1` and
 `sweep-versions.ps1` harness in the scratch task directory; the 0.2.1-rc.2 row was
@@ -128,10 +131,9 @@ without `dsh plugin allow-version`, so no version exemption was involved.
   skill catalog and the gate's `agent/pre-step` injection were not exercised in a
   session on these rows.
 - The `web` profile and any non-headless surface.
-- **The registry download itself.** The artifact row installed a local tarball. The
-  identity to the published package is npm's own report of the same shasum and
-  integrity, not a re-download of `dsh-model-everything` through the registry. The
-  first install of the published package will be a reader's, not this file's.
+- **A bare `npm install`.** Both artifact rounds installed through the profile's own
+  package manager (`dsh plugin add`), which is the documented install path; a plain
+  `npm i dsh-model-everything` outside dsh was not run.
 - **`0.2.1-rc.1` for this package.** It is absent from `dshReleases` because no
   round ran on it; an entry there is a claim about a round, not an inference from
   the neighbouring releases.
