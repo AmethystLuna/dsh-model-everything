@@ -30,7 +30,7 @@ metadata:
 | 渠道 | 提交物 | 状态 |
 |---|---|---|
 | awesome | [PR #7842](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/7842)，一个文件 `data/plugins/AmethystLuna__dsh-model-everything.yml` | `check` 绿；`Submission gate` 只卡一条：**仓库 0.5 天，需满 1 天**，回复明确说「会自动重跑，约 11 小时后清」——不用重推、不用关开重来 |
-| DSH-Store | [issue #1484](https://github.com/AI-Scarlett/DSH-Store/issues/1484)，标题 `[Plugin] <仓库地址>`，`plugin-submission` 标签 | 预检**失败**：`SUBMISSION_PATCH_AMBIGUOUS`。已发[评论问口径](https://github.com/AI-Scarlett/DSH-Store/issues/1484#issuecomment-6245870100)，等维护者定 |
+| DSH-Store | [issue #1484](https://github.com/AI-Scarlett/DSH-Store/issues/1484)，标题 `[Plugin] <仓库地址>`，`plugin-submission` 标签 | 预检**失败**：`SUBMISSION_PATCH_AMBIGUOUS`。已发[评论问口径](https://github.com/AI-Scarlett/DSH-Store/issues/1484#issuecomment-6245870100)。**决定：不为它改包结构。** 规则是它自己的缺口（见下），我们的清单在平台上是对的、也实测过 |
 
 提交时用的 YAML（`category: dev`，`en` 里一个数字、一个 API 名都没有）：
 
@@ -44,6 +44,15 @@ description:
 ```
 
 **`SUBMISSION_PATCH_AMBIGUOUS` 的成因（值得记）：** 它的 `bundle-patch-contract.mjs` 把每行的 `name` 当**包身份**——正则只接受 `name` 或 `@scope/name`。我们的第二个组件是**同一个包**的子路径导出（`name: 'dsh-model-everything/gate'`，`exports` 里的 `./gate`，配 `gate/package.json` 与 `gate/locale/*` 给它自己的卡片名），于是被判「身份存疑」。平台本身认这个子路径：装完 `--dump-config` 两行都在、门禁行 `enabled: true`、整棵树加载通过。**所以这不是我们的清单写错，是校验器的模型里「一行 = 一个包」。** 有三种走法：让它接受「同一 patch 已声明包的子路径」；或并成一行、用 `config` 选组件（代价：第二个组件失去独立卡片名）；或不改、由人工审阅放行。已按第三种提问，别在没定之前改包结构。
+
+**决定（2026-10-18）：不为 DSH-Store 改包结构。** 理由是规则本身有缺口，而改我们这边的代价是真实的。
+
+- 平台支持子路径：一个包的 `exports` 暴露 `./gate`，`cordis.patch.yml` 的第二行写 `name: 'dsh-model-everything/gate'`。实测两行都挂上、门禁 `enabled: true`、整棵树加载通过。
+- 它的校验器把「一行」建模成「一个包」：`src/bundle-patch-contract.mjs` 的 `name` 只接受 `name` 或 `@scope/name`，`src/catalog.mjs` 再要求 `row.name === entry.packageName`。于是同一个包的子路径被判成「身份存疑」。
+- 正确的判法只差一个前缀：`row.name === pkg || row.name.startsWith(pkg + '/')`，再确认该子路径在 `exports` 里。它现在的写法把「同一包的第二组件」和「别的包」压成一件事。
+- 它自己的目录里就有这种条目（`dsh-ptc-plus` 的 `dsh-ptc-plus/execution-provider`），只是那几条现在都是 `blocked`——说明规则是后加的，老的留着、新的进不来，两套标准。
+- 改我们的代价：两行必须同名（卡片名来自子路径的 `package.json`，同名就等于第二个组件没有自己的名字），为此发 0.1.1。**为了迁就一个能一行修好的校验器，改掉产品的组件边界，不值。**
+- 已经能拿到曝光的渠道够用：npm + GitHub + awesome（待仓库满 1 天）+ 1024Store（已合并）+ 创意工坊目录（门禁全绿）。它要是哪天把这行修了，我们的清单一行都不用动就能提。
 
 **还没走的**：OMDSH（缺 `dshWorkshop` 清单，先不动）、dshbase（要邮件/issue，得有人写自测结论）、DSH Get（等聚合）。
 
