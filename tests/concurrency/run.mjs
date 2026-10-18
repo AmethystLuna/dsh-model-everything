@@ -136,6 +136,18 @@ test('an absolute async claim is an error with async routing', () => {
   if (!report.findings.every((finding) => typeof finding.family === 'string')) throw new Error('every finding names its family')
 })
 
+test('the gerund form of await is mined', () => {
+  // `\bawaits?\b` matched "await" and "awaits" and not "awaiting", so a design written in the continuous
+  // form - "the reconnect loop is awaiting the handshake" - mined nothing. The Chinese half of the table
+  // already matched 等待 whatever the tense, which is what made the gap visible: a translation mined a
+  // family the original did not.
+  const report = runConcurrencyScan('The reconnect loop is awaiting the handshake before it retries.')
+  if (report.errorCode === 'CONCURRENCY_NO_CLAIM') throw new Error('"awaiting" must count as async vocabulary')
+  if (!report.findings.some((finding) => finding.keyword === 'await' && finding.family === 'async')) {
+    throw new Error('expected an await finding, got ' + JSON.stringify(report.findings.map((finding) => finding.keyword)))
+  }
+})
+
 test('the Chinese async vocabulary is mined too', () => {
   const report = runConcurrencyScan('网关是非阻塞的，每个请求在事件循环里异步处理，回调不能丢。')
   if (report.errorCode === 'CONCURRENCY_NO_CLAIM') throw new Error('Chinese async text must not be refused')
