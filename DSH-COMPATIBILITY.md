@@ -13,8 +13,8 @@ the same evidence the same way; this is the copy for this package.
 | Node.js | v24.17.0 |
 | npm | 11.13.0 |
 | pnpm | 11.21.0 (rounds of 2026-10-16) · 11.28.5 (rounds of 2026-10-18, the host's current pnpm) |
-| Test date | 2026-10-16 (ten-release sweep) · 2026-10-18 (0.2.1-rc.2: mount, tool list, live scan) |
-| Package under test | `dsh-model-everything` 0.1.0 (bundle patch `cordis.patch.yml`, entry ids `dsh-model-everything` and `dsh-model-everything-gate`) |
+| Test date | 2026-10-16 (ten-release sweep) · 2026-10-18 (0.2.1-rc.2: mount, tool list, live scan) · 2026-10-18 (the published 0.1.0 artifact) |
+| Package under test | `dsh-model-everything` 0.1.0 (bundle patch `cordis.patch.yml`, entry ids `dsh-model-everything` and `dsh-model-everything-gate`); published as `dsh-model-everything@0.1.0`, npm shasum `27687378…`, integrity `sha512-1Aai9…` |
 
 ## Method (one disposable dsh tree per version)
 
@@ -22,9 +22,9 @@ Every row installed its **own** dsh release into its own directory
 (`npm i @deepseek-ai/dsh@<version>`, about 611 packages) and ran against a fresh
 `DSH_HOME` under that same scratch root, so no state leaked between versions and
 the host's real `~/.dsh` was never touched. `DSH_HOME` is set explicitly on every
-command; the dsh on `PATH` is not used. The rounds ran from the working tree, not
-from a published tarball: this package has no npm release yet (see "What is not
-established").
+command; the dsh on `PATH` is not used. Every row but the last ran from the working
+tree; the last one installed the tarball `npm pack` produced, which is the artifact
+0.1.0 publishes (see "The published artifact" under Results).
 
 Seven steps per row:
 
@@ -76,6 +76,23 @@ does not consult. The probe therefore runs from the dsh tree and lends the copy 
 | 0.2.1-alpha.4 | 2026-10-16 | pass | pass | pass | pass | pass | pass |
 | 0.2.1-alpha.5 | 2026-10-16 | pass | pass | pass | pass | pass | pass |
 | 0.2.1-rc.2 | 2026-10-18 | pass | pass (gate row `enabled: true`) | pass | pass | pass (`model_verify` + `model_interleaving_scan`) | pass |
+| 0.2.1-rc.2 | 2026-10-18 | pass | pass (`enabled: true`) | pass | pass | pass (`model_interleaving_scan`, 5 findings) | pass |
+
+The last row is **the published artifact**: the seven steps ran against the tarball
+`npm pack` produced, installed as `file:<tarball>`, not against the working tree.
+`npm publish` reported the same shasum (`27687378…`) and integrity (`sha512-1Aai9…`)
+the round measured, so the bytes that were exercised and the bytes on the registry
+are the same. Everything the round touched came out of the tarball: the installed
+copy carries the seven skills, `locale/`, `gate/`, `lib/` and `cordis.patch.yml`,
+its `package.json` says `0.1.0`, and the sha256 of each installed file equals the
+one inside the tarball.
+
+The real call was `model_interleaving_scan` on a paragraph about an async handler,
+and it is also the regression evidence for the async vocabulary: the report came
+back `fail` with five findings, including `CONCURRENCY_KEYWORD:warning:await@L1`
+for the word "awaiting". The same text yielded four findings before that form was
+matched - the defect this release fixes, measured from the installed copy rather
+than from the source.
 
 Ten rows from the 2026-10-16 sweep, run by the parameterised `compat-round.ps1` and
 `sweep-versions.ps1` harness in the scratch task directory; the 0.2.1-rc.2 row was
@@ -89,7 +106,9 @@ without `dsh plugin allow-version`, so no version exemption was involved.
   and this plugin, so a bare `dsh --profile scratch "reply OK"` waits forever
   instead of booting. The rc.2 rounds added the shipped `@deepseek-ai/dsh-headless`
   app to the same disposable profile and booted that; the hang is reproducible on
-  0.2.1-rc.2 and is not caused by this plugin.
+  0.2.1-rc.2 and is not caused by this plugin. The version matters: the `latest`
+  tag of `@deepseek-ai/dsh-headless` is `0.0.1-rc.1`, which 0.2.1-rc.2 rejects as
+  incompatible, so the round names `@deepseek-ai/dsh-headless@0.2.1-rc.2`.
 - **pnpm prints a peer warning for a `file:` install** ("Issues with peer
   dependencies found"): the linked copy resolves its peers from the host tree, not
   from the profile. The round confirms that this is a warning, not an admission
@@ -109,7 +128,10 @@ without `dsh plugin allow-version`, so no version exemption was involved.
   skill catalog and the gate's `agent/pre-step` injection were not exercised in a
   session on these rows.
 - The `web` profile and any non-headless surface.
-- **The published artifact.** Every row ran on the working tree. Once the package
-  is published, this file gains a round that installs the npm release and repeats
-  the seven steps; until then `dsh.compatibility.dshReleases` records what the
-  working tree measured.
+- **The registry download itself.** The artifact row installed a local tarball. The
+  identity to the published package is npm's own report of the same shasum and
+  integrity, not a re-download of `dsh-model-everything` through the registry. The
+  first install of the published package will be a reader's, not this file's.
+- **`0.2.1-rc.1` for this package.** It is absent from `dshReleases` because no
+  round ran on it; an entry there is a claim about a round, not an inference from
+  the neighbouring releases.
