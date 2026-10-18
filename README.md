@@ -317,3 +317,9 @@ MODEL_EVERYTHING_SPIN=/path/to/spin MODEL_EVERYTHING_GCC=/path/to/gcc npm run te
 ## 许可证与安全
 
 MIT，见 [LICENSE](LICENSE)。安全策略见 [SECURITY.md](SECURITY.md)。
+
+## 赞助
+
+本插件以 MIT 许可证开源。如果它节省了你的时间，可以在[爱发电](https://afdian.com/a/amethystluna)赞助开发。
+
+赞助完全自愿，不影响许可证，也不改变任何功能。

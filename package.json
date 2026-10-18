@@ -104,6 +104,10 @@
   },
   "license": "MIT",
   "repository": "https://github.com/AmethystLuna/dsh-model-everything",
+  "funding": {
+    "type": "custom",
+    "url": "https://afdian.com/a/amethystluna"
+  },
   "keywords": [
     "verification",
     "model-checking",

@@ -317,3 +317,9 @@ The published work behind the checks — and which checks have none — is in [d
 ## License and security
 
 MIT, see [LICENSE](LICENSE). Security policy in [SECURITY.md](SECURITY.md).
+
+## Sponsor
+
+This plugin is open source under the MIT license. If it saves you time, you can support development on [Afdian](https://afdian.com/a/amethystluna).
+
+Sponsorship is voluntary and changes neither the license nor the features.
