@@ -115,6 +115,7 @@
     "mermaid",
     "plantuml",
     "dsh",
+    "dsh-plugin",
     "plugin"
   ],
   "engines": {
