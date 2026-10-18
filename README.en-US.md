@@ -2,6 +2,13 @@
 
 <p align="center"><strong>English</strong> · <a href="README.md">中文</a></p>
 
+<p align="center">
+  <a href="https://github.com/AmethystLuna/dsh-model-everything/actions/workflows/dsh-bundle.yml"><img src="https://github.com/AmethystLuna/dsh-model-everything/actions/workflows/dsh-bundle.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D20-blue.svg" alt="Node 20+"></a>
+  <a href="https://afdian.com/a/amethystluna"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-Afdian-946CE6" alt="Sponsor on Afdian"></a>
+</p>
+
 Abstract what a design or a piece of code claims into a model and let an engine run it: findings carry citations and hashes, so they can be recomputed and compared. The conclusion comes from a run rather than from reasoning it out: thinking it through becomes running it.
 
 A native DeepSeek Harness plugin. It turns the assertions a design makes **about behaviour** into models that can be run, reviewed and exported:
