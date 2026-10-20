@@ -9,22 +9,20 @@ For an unverified design, failure is only a matter of time. Complex code becomes
 
 ## When This Skill Applies
 
-**This is the entry point.** If you have any thought of checking whether something about the code is actually true — however small, however informal the claim — load this skill. It owns the doctrine (enumerate the claims, verify each against the code, cite `file:line`, read `verdict` and never `ok`) and the executable verification for behaviour. When the task lands in a neighbouring domain, its routing table below hands it over rather than stretching the doctrine to cover it.
+**This is the entry point.** Load this skill whenever you need to check whether something about the code is true, however small the claim looks. It owns the doctrine: enumerate the claims, verify each against the code, cite `file:line`, read `verdict`. It also owns the executable verification for behaviour. A neighbouring domain goes to its own skill through the routing table below.
 
 | The task involves… | What it does |
 |---|---|
-| Any claim about code you want to check — a design doc, spec, plan, review comment, README, commit message, refactor proposal, or a "this is safe / this always holds / this can't deadlock" assertion | Enumerate the verifiable claims (Phase 1), verify each against the codebase with `file:line` evidence (Phase 2), classify the gaps (Phase 3) |
-| A state machine or protocol — ≥3 states, guards, ACK/NACK/retry, lock/unlock, start/stop ordering | Build an executable model: S1-S8 structural checks, A1-A14 adversarial probes |
-| A quantitative or temporal guarantee — worst-case path cost ≤ budget, "≥90% of runs reach SAFE", "must leave within 2 ticks" | A12 budget, A13 probabilistic reachability, A14 deadlines, each with a counterexample path |
-| A handshake or power-up sequencing across two or more components | `model_compose_verify`: C1 composition deadlock, C2 rendezvous that never fires |
-| A refactoring that changes state topology or guard conditions | BEFORE/AFTER models compared for behavioral preservation, invariant continuity and deadlock regression (D1-D4) |
-| Explicit request to prove code correct, formally verify a module, or check a migration for breakage | Route by domain — the table under [Routing to the Sibling Skills](#routing-to-the-sibling-skills) — and keep the doctrine |
-| An architecture or dependency question about a component/package/class diagram | `model-everything-structure`: parse the diagram into a dependency graph and judge every edge against the dependency matrix |
-| Whether a design keeps its own declarations — a layering, a responsibility boundary, an interface wider than its callers, a subtype that cannot replace its base | `model-everything-design`: `model_design_review` decides the declared contracts (`DES1`-`DES11`) and reports the graph's shape |
+| Any claim about code: design doc, spec, plan, review comment, README, commit message, refactor proposal, "this is safe", "this always holds", "this can't deadlock" | Enumerate the verifiable claims (Phase 1), verify each with `file:line` evidence (Phase 2), classify the gaps (Phase 3) |
+| A state machine or protocol with three or more states, guards, ACK/NACK/retry, lock/unlock, or start/stop ordering | Build an executable model. Run the S1-S8 structural checks and the A1-A14 adversarial probes |
+| A quantitative or temporal guarantee: worst-case cost within a budget, "90% of runs reach SAFE", "must leave within 2 ticks" | A12 budget, A13 probabilistic reachability, A14 deadlines. Each returns a counterexample path |
+| A handshake or power-up sequence across two or more components | `model_compose_verify`: C1 composition deadlock, C2 rendezvous that never fires |
+| A refactoring that changes state topology or guards | Compare BEFORE and AFTER models for behaviour preservation, invariant continuity and deadlock regression (D1-D4) |
+| An explicit request to prove code correct, verify a module, or check a migration for breakage | Route by domain through [Routing to the Sibling Skills](#routing-to-the-sibling-skills). Keep the doctrine |
+| An architecture or dependency question about a component, package or class diagram | `model-everything-structure`: parse it into a dependency graph, judge every edge against the dependency matrix |
+| Whether a design keeps its own declarations: layering, a responsibility boundary, an interface wider than its callers, a subtype that cannot replace its base | `model-everything-design`: `model_design_review` decides the declared contracts (`DES1`-`DES11`) and reports the graph's shape |
 
-**Catalog budget**: DSH renders only the frontmatter `description`, and truncates it at 500 characters (`dsh-tool-skill`, `DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH`). Every description in this plugin is written to fit that budget, and the triggers that do not fit live in this table. `tests/skills/run.mjs` fails when any skill's catalog line would be cut, or would lose one of its use-case triggers.
-
-<HARD-GATE>
+**Catalog budget**: DSH renders only the frontmatter `description` and truncates it at 500 characters. Every description here fits. Triggers that do not fit live in this table.
 
 ## Verification Depth (Plan-Mode Gate)
 
@@ -182,53 +180,21 @@ not a bound on the search.
 
 ### Native dsh Tools
 
-| Tool | Covers |
-|------|--------|
-| `model_verify` | S1-S8 structural + A1-A14 adversarial, including A12 budget / worst-case path cost, A13 probabilistic reachability over a DTMC, and A14 discrete-tick deadlines. `beforeModel` + `stateMapping` add the D1-D4 before/after regression. |
-| `model_datamodel_verify` | Data models and schema migrations: DS/DA checks plus the DD1-DD4 data regression. See the `model-everything-datamodel` skill. |
-| `model_compose_verify` | Two or more machines checked together (rendezvous handshake semantics): C1 composition deadlock, C2 rendezvous never fires. When `shared` and `accesses` declare a location both machines touch, it also decides the sharing: C3 a declaration that names nothing, C4 an unordered write, C5 a read-modify-write pair the model does not make atomic (the lost update). |
-| `model_interleaving_scan` | Mines claims about how work is executed: threads, synchronization, async, interrupts, shared state. Every finding carries a `family`; async terms (async, await, promise, event loop, callback, and their Chinese counterparts) are in the vocabulary, and an absolute async claim such as "non-blocking" is an error like "thread-safe" is. It routes each claim to the tool that decides it - and for a shared location two machines both update, that tool is `model_compose_verify` (C5), not an external analyzer. It proves nothing itself, and it refuses text it can mine nothing from (`CONCURRENCY_NO_CLAIM`) rather than calling it clean. |
-| `model_export` | Emits external-checker input from a verified model: UPPAAL, TLA+, PRISM, SPIN. |
-| `uml_render` | model → Mermaid/PlantUML source, for any family the notation can draw; a view it cannot draw is refused with the reason. |
-| `uml_parse` | diagram text → the model of the family it declares, so a hand-drawn diagram can be checked. |
-| `uml_review` | audit the modelling: structural defects, documentation gaps and the render-and-read-back fidelity check. |
-| `uml_explain_labels` | print the label and comment contract the parser accepts, for one notation. |
-| `uml_structure_verify` | Reviews a structure diagram as a dependency graph. It reports isolated nodes, dangling endpoints, cycles, disallowed edges, layer violations and missing required edges, and it checks refinement across declared levels. The diagram domain belongs to the `model-everything-structure` skill. |
-| `model_design_review` | Reviews a design: the shape of its dependency graph, and the contracts the design declares about itself. Violations of a declaration decide the verdict; structural facts are reported as signals and never do. A check with nothing to hold the design to is `skip`, not `pass`. The design domain belongs to the `model-everything-design` skill. |
-| `report_diff` | Compares two reports of the same family. A finding's identity is its check, its code and its machine-readable locator, so reworded prose reads as changed rather than new. This is slice acceptance computed instead of eyeballed. |
+Twelve tools: `model_verify`, `model_compose_verify`, `model_datamodel_verify`, `model_design_review`, `model_interleaving_scan`, `model_export`, `report_diff`, `uml_render`, `uml_parse`, `uml_review`, `uml_explain_labels`, `uml_structure_verify`. Each tool's description states what it decides and what it does not. Read the description before calling it, and read the report's `verdict` afterwards.
 
-These tools are the engine: every capability this plugin claims is one of the tools above. What is not on that list is out of scope, and the skills name where it is answered instead.
+These tools carry every capability this plugin claims. Anything outside them is out of scope, and the skills name where that claim is answered instead.
 
 ### Reading a Report: `ok` Is Not a Verdict
 
-Every tool report carries the same outcome contract. **`ok` says a report was produced; `verdict` says how the review went.** A report may be `ok: true` and still be a failed review — gating on `ok` is how a failing verification gets read as a passing one.
+**`ok` records that a report was produced. `verdict` records how the review went.** A report can carry `ok: true` and still be a failed review. Gate on `verdict`.
 
-| Field | Meaning |
-|-------|---------|
-| `schema` | The versioned report contract (`model-everything/verify/v1`, `model-everything/uml/review/v1`, …). Branch on this instead of sniffing fields. |
-| `ran` | The tool executed and produced this report. `false` only when the tool refused the request before running (see `errorCode`/`error`). |
-| `verdict` | `pass` \| `pass_with_findings` \| `fail`. **This is the outcome you act on.** |
-| `verdictReason` | Why, e.g. `2 error finding(s) (first: S2_NO_TRANSITIONS)` or `no error findings; 3 warning finding(s)`. |
-| `findings[]` | `{code, severity, message, detail?, evidence?, path?}`. Any `severity: "error"` forces `verdict: "fail"`. |
-| `hashSpec` | Which published model-hash specification `modelHash` follows — see `references/hash-spec.md`. |
-| `hashes` | Every hash the report carries, in one place (a model hash, a diagram hash, before/after hashes). |
-| `nextSteps[]` | What to do next, derived from the findings; never empty, and identical for two runs over the same input. |
-| `metadataKeys[]` | Paths of the `_`-prefixed annotation keys the schema ignored, e.g. `["_source", "_verified", "states[0]._note"]` (present only when the input carried any). |
-| `narrativeCoverage` | `{states: "5/5", events: "3/9", scenarios: "0/12"}` when the model carries a narrative — a partial narrative is valid, and this is how much is still undocumented. The gap is also a `NARRATIVE_PARTIAL` (info) finding, so a gate can read it without parsing `nextSteps` text. |
+- `pass`: no error and no warning. Report the result as verified, together with the scope the model covered.
+- `pass_with_findings`: verification ran clean and warnings exist. Report the pass and the warnings. Do not restate it as "no issues".
+- `fail`: an error finding exists, or the engine rejected the input (`MODEL_INVALID`). State that the claim is not verified, quote the counterexample path, then propose a correction. Do not describe a `fail` as a successful run.
 
-A tool prints a body, not JSON. Passing checks stay in the `CHECKS` inventory line, and a fact that several checks report is listed once. Only error findings inline their evidence. When the body truncates a check's warnings, pass `check: "<id>"` for that one check: its lines then print without the budget. Pass `reportView: "full"` only when you need the structured report itself, for example to hand it to `report_diff` — it returns the whole object as compact JSON, and on a large model that is still the most expensive thing you can ask for.
+`summary.truncated: true` and any code ending in `_UNDECIDED` both mean the search stopped before deciding. Name the invariant that went undecided and report the property as undecided.
 
-Turn the verdict into an answer, never into a summary of `ok`:
-
-- `verdict: "pass"` — no error and no warning finding. Safe to report as verified, still with the scope the model covered.
-- `verdict: "pass_with_findings"` — verification ran clean, but warnings exist (e.g. `S5` implicit-ignore events, `UML012_NO_TERMINAL`). Report the pass **and** the warnings; do not silently upgrade it to "no issues".
-- `verdict: "fail"` — an error-severity finding exists, or the input was rejected (`MODEL_INVALID`). Say plainly that the claim is **not** verified, quote the counterexample path the finding carries, and only then propose a correction. Never describe a `fail` as "the tool ran successfully".
-
-Exit codes: `0` for `pass` / `pass_with_findings`, `2` for `fail`, a refusal, or an unreadable input. In DSH the native tools return the report as data — read `verdict`, and treat `errorCode`/`error` as the refusal path.
-
-`summary.truncated: true`, or a finding whose code ends in `_UNDECIDED`, means the search
-stopped before deciding. That is **not** a pass: name the invariant that went undecided,
-and say the property is undecided rather than reading the silence as success.
+A tool prints a readable body. Passing checks stay in the `CHECKS` inventory line, and a fact that several checks report appears once. Only error findings inline their evidence. When the body truncates a check, pass `check: "<id>"` to print that check in full. `reportView: "full"` returns the whole report as compact JSON. Use it only to hand the report to `report_diff`; it costs the most tokens of any request you can make.
 
 ### Writing the Answer: Name the Finding, Not Its Code
 
@@ -315,24 +281,24 @@ Run these FIRST. They establish basic well-formedness before adversarial probing
 
 ### Phase 2b: Adversarial Probes
 
-Run these SECOND. Each probe actively tries to BREAK the model. If any probe succeeds (finds a violation), the plan has a behavior gap.
+Run these second. Each probe tries to break the model, and a probe that finds a violation proves a behaviour gap.
 
-| # | Attack | Method | Target Claim |
+| # | Attack | Method | Claim it refutes |
 |:--:|--------|--------|-------------|
-| A1 | **Unexpected event** | For each state S, inject every event E where no transition is defined for (S, E). Log whether the model silently ignores or crashes. | "All events are handled in all states" |
-| A2 | **Race interleaving** | For every pair of concurrent events (E1, E2), simulate arrival in both orders: E1-then-E2 vs E2-then-E1. Flag if terminal state differs. | "Behavior is independent of event ordering" |
-| A3 | **Order permutation** | For N independent events, permute arrival order. Flag if different permutations produce different final states or violate invariants. | "Outcome is order-independent" |
-| A4 | **Pair symmetry** | Match every `start/stop`, `lock/unlock`, `alloc/free` pair. Flag if any state allows a path where a pair is unbalanced (start without stop, lock without unlock). State `onEntry`/`onExit` actions are treated as implicit acquire/release. | "Resources are always released" |
-| A5 | **Boundary blast** | Probe counters at 0, 1, max-1, max, max+1. Probe timestamps at 0, tick_wraparound. Flag overflow, underflow, or undefined behavior. | "Handles all counter/timer values" |
-| A6 | **Resource injection** | Simulate `malloc→NULL`, `queue→full`, `semaphore→timeout` at each state that calls them. Flag if any state has no recovery path. | "Graceful degradation under resource pressure" |
-| A7 | **Counter-example witness** | For any invariant that fails, find the event sequence that violates it and output the exact path. Breadth-first searches (state predicates, sequence, atomicity, budget) yield the shortest witness; the leads-to walk and the probability bound report the witness they found without claiming minimality. | "This invariant holds" → refuted by a concrete path |
-| A8 | **Idempotent replay** | For each event declared in `idempotentEvents`, apply it twice from every reachable state. Flag if the second application changes state or is not replayable. | "This event is safe to retry/replay" |
-| A9 | **Leads-to** | From a declared source state, every path must eventually reach the target state, or reach one member of a declared target set. | "This state always progresses to completion" |
-| A10 | **Sequence order** | Events declared in a sequence must occur in the specified order. | "backup before modify before commit" |
-| A11 | **Atomicity** | Once an atomic event starts, the machine must commit or roll back before leaving the scope or terminating. | "all-or-nothing transaction" |
-| A12 | **Budget (worst-case path cost)** | With `cost` on transitions (absent = 1) and a `budget` invariant, every reachable path must stay within budget; reports the shortest over-budget counterexample and flags reachable positive-cost cycles as unbounded. | "Worst-case path cost ≤ budget" |
-| A13 | **Probability reachability (DTMC)** | With `weight` on transitions (absent = 1) and a `probability` invariant, P(ever hitting the target) must satisfy the bound; solved by value iteration over the absorbing chain. | "≥ 90% of runs reach SAFE" |
-| A14 | **Deadline (discrete tick clock)** | State `maxTicks` plus top-level `tickEvents`: a tick step may not keep a state resident past its deadline; reports the over-residency path. | "must leave within 2 ticks" |
+| A1 | **Unexpected event** | Inject every event E into every state S that has no transition for (S, E). Record whether the model ignores it or crashes. | "All events are handled in all states" |
+| A2 | **Race interleaving** | Deliver every pair of concurrent events in both orders. Report a differing terminal state. | "Behaviour is independent of ordering" |
+| A3 | **Order permutation** | Permute N independent events. Report differing final states or broken invariants. | "Outcome is order-independent" |
+| A4 | **Pair symmetry** | Match every `start/stop`, `lock/unlock`, `alloc/free` pair. Report a path where a pair is unbalanced. `onEntry` and `onExit` count as acquire and release. | "Resources are always released" |
+| A5 | **Boundary blast** | Probe counters at 0, 1, max-1, max and max+1, and timestamps at 0 and wraparound. Report overflow, underflow or undefined behaviour. | "Handles all counter and timer values" |
+| A6 | **Resource injection** | Simulate `malloc` returning NULL, a full queue and a semaphore timeout at each state that calls them. Report a state with no recovery path. | "Degrades gracefully under resource pressure" |
+| A7 | **Counter-example witness** | For a failing invariant, emit the exact violating sequence. The breadth-first searches (state, sequence, atomicity, budget) return the shortest witness. Leads-to and probability return the witness they found without claiming minimality. | "This invariant holds" |
+| A8 | **Idempotent replay** | Apply each `idempotentEvents` entry twice from every reachable state. Report a second application that changes state. | "This event is safe to replay" |
+| A9 | **Leads-to** | From a declared source state, every path must reach the target state or a member of the declared target set. | "Always progresses to completion" |
+| A10 | **Sequence order** | Declared events must occur in the declared order. | "backup before modify before commit" |
+| A11 | **Atomicity** | An atomic event must commit or roll back before the scope is left or the machine terminates. | "all-or-nothing" |
+| A12 | **Budget** | With `cost` per transition (absent means 1) and a `budget` invariant, every reachable path must stay within budget. The probe returns the shortest over-budget path and reports reachable positive-cost cycles as unbounded. | "Worst case fits the budget" |
+| A13 | **Probability reachability** | With `weight` per transition (absent means 1) and a `probability` invariant, P(ever hitting the target) must meet the bound, by value iteration over the absorbing chain. | "90% of runs reach SAFE" |
+| A14 | **Deadline** | State `maxTicks` plus top-level `tickEvents`. A tick step must not keep a state resident past its deadline. The probe returns the over-residency path. | "Must leave within 2 ticks" |
 
 ### Integration Back to Phase 3
 
@@ -469,14 +435,14 @@ If you catch yourself thinking any of these, stop:
 
 ## Rules
 
-1. Never trust a document's claim without codebase verification.
-2. Be honest about mechanism boundaries — if the language standard can't do it, say so.
-3. Cite evidence with specific file:line references.
-4. Don't fix during review — point the way, let implementation happen after approval.
-5. **For behavioral claims: verify with code, not reasoning.** If a plan says "always", "never", or "guaranteed", generate and run a model. One counter-example is enough to refute a universal claim.
-6. **Confirm the model before running it** — unless the user has already told you to proceed without confirmation in this session. Extraction errors are the dominant failure mode of formal verification. In auto mode, substitute evidence-cited extraction + round-trip validation and mark the report `UNCONFIRMED`.
-7. **Don't verify what the code already checks.** If the existing codebase has compile-time assertions, static analysis, or runtime checks for a property, cite those — don't re-verify in a model.
-8. **Hand a neighbouring domain to its own skill.** A diagram is a model, not evidence: modelling or auditing one belongs to `model-everything-uml`. A concurrency claim is mined and routed, never proven here: that is `model-everything-interleaving`. Schema, data invariants and migrations are `model-everything-datamodel`. This skill keeps the doctrine and the behavioural checks.
-9. **Say what this does not prove.** For dimensions this toolbox does not verify — hard real time (deadlines, periods), preemptive concurrency, hybrid-control stability, probabilistic reliability, execution-cost budgets — route to the dedicated tool named in `references/gap-routing-guide.md`. `model_verify` reports carry the same routing as informational `coverageNotes` on matching models.
-10. **A declared range is a property, not a bound, and a capped search is not a pass.** `inc`/`dec` are never clamped to `min`/`max`; only a guard that pins the value bounds it. When a report is `truncated` or a check is `_UNDECIDED`, say the property is undecided and narrow the model — never report it as verified.
-11. **Write-site analysis is out of scope, and stays there.** "Only the ISR writes this flag", "one owner per register" — this toolbox verifies models and diagrams, not *who writes what in the source*. That claim needs a source-side AST/rule check or a static analyzer; this plugin's contribution is to flag the claim as unverified and route it (`model_interleaving_scan` does exactly that). Do not imply the diagram or the model settled it.
+1. Verify a document's claim against the code before you trust it.
+2. State mechanism boundaries plainly. When the language standard cannot do the thing, say so.
+3. Cite evidence as `file:line`.
+4. Point the way during review. Implementation happens after approval.
+5. Verify behavioural claims by running code. A plan that says "always", "never" or "guaranteed" gets a model, and one counterexample refutes a universal claim.
+6. Confirm the model before you run it, unless this session already told you to proceed. Extraction errors are the dominant failure mode of formal verification. In auto mode, extract with cited evidence, validate the round trip, and mark the report `UNCONFIRMED`.
+7. Cite the existing check instead of re-verifying it. Compile-time assertions, static analysis and runtime checks already settle that property.
+8. Hand a neighbouring domain to its own skill. A diagram is a model, and auditing one belongs to `model-everything-uml`. A concurrency claim is mined and routed by `model-everything-interleaving`. Schema, data invariants and migrations belong to `model-everything-datamodel`. This skill keeps the doctrine and the behavioural checks.
+9. Say what this does not prove. Hard real time, preemptive concurrency, hybrid-control stability, probabilistic reliability and execution-cost budgets go to the tool named in `references/gap-routing-guide.md`. `model_verify` reports carry the same routing as `coverageNotes`.
+10. A declared range is a property, not a bound. `inc` and `dec` are never clamped; only a guard pins the value. A `truncated` report or an `_UNDECIDED` check means the property is undecided. Report it that way.
+11. Write-site analysis is out of scope. "Only the ISR writes this flag" is a question about source code. `model_interleaving_scan` routes it. Neither the model nor the diagram settles it.
