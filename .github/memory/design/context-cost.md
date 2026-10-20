@@ -35,7 +35,7 @@ metadata:
 1. **「优化结构化输出」不是第一杠杆。** 一次 `model_verify` 的 digest 实测约 250 tokens；但大模型上平均 5.6k/次，报告确实值得再压一档，可它排第三。
 2. **第一杠杆是技能正文与模型去读文件。** 会话里能抓到这样的调用：
 
-   ```
+   ```text
    5× read  …/dsh-model-everything/lib/data-engine.js
    3× read  …/dsh-model-everything/lib/engine.js
    2× read  …/skills/model-everything-datamodel/references/data-model-schema.md
