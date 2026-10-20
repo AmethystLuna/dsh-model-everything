@@ -86,12 +86,11 @@ metadata:
 - **两条 C 用例各挂了 1 次，都不是答错**：一个是 `dsh subprocess exited with code 1`，另一个同样。A 组 9 次运行零退出码失败。C 组会话更长（11 步 vs 5）、调用更多，这是要单独查的风险项，不能记成「模型不稳定」。
 - **单 trial 的总额不可用**：同一套语料三次单跑得到 149k / 157k / 153k，而 3 trials 的中位数是 40.1k/条 × 3 = 120k。以后比改动一律 `trials >= 3`，否则测的是噪声。
 
-
 ## 失败会话的根因：流式工具参数写坏（2026-10-21）
 
 3 trials 基线里 C 组有 2/9 次「失败」，trace 的最后三帧是：
 
-```
+```text
 step/start step 5
 assistant/attempt  stream: [block-start reasoning, reasoning-chunks …]
 turn/end  {kind: "error", code: "MALFORMED_RESPONSE",
@@ -107,7 +106,6 @@ A 组 9 次零发生；C 组 2/9。会话越长（11 步 vs 5）、调用越多�
 `model_verify` / `model_datamodel_verify` / `model_design_review` 现在收 `modelPath`：从工作区读 JSON 文件，格式不影响（缩进、BOM、尾随换行都接受）。规则是**二选一**——两个都给会被拒（会读一个忽略另一个），两个都不给也会被拒，且各自的措辞不同。拒绝是**报告**（`ran: false` + `errorCode`），不是抛错，调用方照 `errorCode` 路由。
 
 代价：三个工具的定义各多一条参数说明，**固定成本 6,627 → 6,862 tokens（+235）**；换来的是内联模型那几百到几千 tokens 的参数消失，以及模型不必手改嵌套 JSON。
-
 
 ## 量具的修正
 
