@@ -12,6 +12,13 @@ export interface ReportViewOptions {
      * matches on check + code + evidence, so a body cannot stand in for the object.
      */
     full?: boolean;
+    /**
+     * Print one check in full: every finding, evidence included, without the per-check budget the
+     * digest applies. The digest truncates a check's warnings and tells the reader to ask for it by
+     * id; before this option existed that sentence named something the tools could not do, and the
+     * only way to see the lines was `full`, which returns the whole structured report.
+     */
+    check?: string | undefined;
 }
 type Record_ = Record<string, unknown>;
 /** One normalized finding. `evidence` is kept because a finding's identity depends on it. */
@@ -22,7 +29,7 @@ export interface ViewFinding {
     evidence?: Record_;
     file?: string;
     line?: number;
-    check?: string;
+    check?: string | undefined;
 }
 /** Normalize one raw finding. Unknown fields are ignored; a missing message renders as the code. */
 export declare function toViewFinding(value: unknown, check?: string): ViewFinding;

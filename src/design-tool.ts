@@ -26,6 +26,10 @@ export const designTool = defineTool({
       description:
         'DesignModelV1: {schemaVersion: 1, architecture: {nodes: [ids], edges: [[from, to]]}, types?: [{name, stereotype, extends?, implements?, operations?, transitions?, forbids?, responsibilities?, dependsOn?, uses?, layer?}], declare?: {layers?, boundaries?, allowedEdges?, requiredEdges?}}. The schema is closed: an unknown key is refused rather than ignored. `types` is what makes the principle checks possible - with no `extends` there is no substitutability to decide, with no `uses` no interface can be called fat, and no `responsibilities` means nothing to compare the dependencies against.',
     },
+    check: {
+      type: 'string',
+      description: 'Print one check in full when the digest truncated it. Pass the check id the CHECKS line lists (for example A9); the per-check budget no longer applies, and an id this report does not carry is answered with the ids that it does.',
+    },
     reportView: {
       type: 'string',
       enum: ['digest', 'full'],
@@ -38,7 +42,7 @@ export const designTool = defineTool({
       description: 'Design review report: every check with its status, `violations` (they decide the verdict), `signals`, `facts` (graph features), summary and next steps.',
     },
     render(args, value) {
-      return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]
+      return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full', check: args.check }) }]
     },
   },
   timeoutMs: 10_000,

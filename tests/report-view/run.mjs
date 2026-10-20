@@ -200,8 +200,40 @@ test('an unrecognized shape still states its failure reason', () => {
 
 test('full is the escape hatch for a caller that needs the object itself', () => {
   const full = renderReportText(report, { full: true })
-  assert(full === JSON.stringify(report, null, 2), 'full must reproduce the structured report byte for byte')
-  assert(full.length > renderReportText(report).length, 'full is the expensive path, by construction')
+  // The contract is that the object survives, not that it keeps its whitespace: `full` is handed to
+  // report_diff, which parses it. Pretty-printing a 37k report spent a third of its bytes on
+  // indentation, so the escape hatch is compact.
+  assert(JSON.stringify(JSON.parse(full)) === JSON.stringify(report), 'full must carry the structured report without loss')
+  assert(full.length < JSON.stringify(report, null, 2).length, 'compact is smaller than pretty, which is the point')
+  assert(full.length > renderReportText(report).length, 'full is still the expensive path, by construction')
+})
+
+test('asking for one check prints its lines past the digest budget', () => {
+  // 30 warning findings on one check: the digest keeps `maxFindingsPerCheck` (24) and says the rest
+  // are available by id — a sentence that named something the tools could not do until `check`.
+  const findings = Array.from({ length: 30 }, (_, i) => ({ severity: 'warning', code: 'A9_RACE', message: 'race on x' + String(i) }))
+  const withFindings = {
+    ok: true,
+    ran: true,
+    verdict: 'pass_with_findings',
+    verdictReason: '30 warning finding(s)',
+    schema: 'model-everything/verify/v1',
+    summary: { checksRun: 1 },
+    checks: [{ id: 'A9', name: 'Race', status: 'fail', detail: 'races', findings }],
+  }
+  const digest = renderReportText(withFindings)
+  assert(digest.includes('ask for this check by id'), 'the digest must offer the narrower view')
+  const one = renderReportText(withFindings, { check: 'A9' })
+  assert(!one.includes('ask for this check by id'), 'the narrowed view must not still be truncated')
+  assert(one.split('race on x').length - 1 >= 30, 'every finding of that check must print')
+  assert(one.includes('CHECKS'), 'the inventory still heads the report, so the reader keeps the map')
+})
+
+test('an unknown check id is answered with the ids the report carries', () => {
+  const one = renderReportText(report, { check: 'ZZ9' })
+  assert(one.includes('no check `ZZ9`'), 'the miss must be named rather than silently printing everything')
+  const ids = (report.checks ?? []).map((check) => check.id)
+  assert(ids.some((id) => one.includes(id)), 'the available ids must be listed')
 })
 
 test('rendering is deterministic', () => {

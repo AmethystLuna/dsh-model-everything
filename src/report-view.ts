@@ -34,9 +34,16 @@ export interface ReportViewOptions {
    * matches on check + code + evidence, so a body cannot stand in for the object.
    */
   full?: boolean
+  /**
+   * Print one check in full: every finding, evidence included, without the per-check budget the
+   * digest applies. The digest truncates a check's warnings and tells the reader to ask for it by
+   * id; before this option existed that sentence named something the tools could not do, and the
+   * only way to see the lines was `full`, which returns the whole structured report.
+   */
+  check?: string | undefined
 }
 
-const DEFAULTS = { maxFindingsPerCheck: 24, maxEvidenceChars: 160, includePassing: false, full: false } as const
+const DEFAULTS = { maxFindingsPerCheck: 24, maxEvidenceChars: 160, includePassing: false, full: false, check: undefined as string | undefined } as const
 
 type Record_ = Record<string, unknown>
 
@@ -54,7 +61,7 @@ export interface ViewFinding {
   evidence?: Record_
   file?: string
   line?: number
-  check?: string
+  check?: string | undefined
 }
 
 /** Normalize one raw finding. Unknown fields are ignored; a missing message renders as the code. */
@@ -268,12 +275,23 @@ function renderChecksReport(report: Record_, options: Required<ReportViewOptions
     .map(([status, ids]) => `${String(status)} ${(ids as string[]).join(' ')}`)
     .join(' | ')
   const lines = [...headerLines(report, options), `CHECKS  ${inventory}`]
+  const requested = options.check
+  const ids = checks.map((check) => text(check.id)).filter((id): id is string => id !== undefined)
+  const selected = requested === undefined ? checks : checks.filter((check) => text(check.id) === requested)
+  // A name that matches nothing is answered with the names that exist: silently printing the whole
+  // report, or an empty body, both read as "that check was clean".
+  if (requested !== undefined && selected.length === 0) {
+    lines.push(`NOTE  no check \`${requested}\` in this report; it carries: ${ids.join(' ')}`)
+  }
+  // Asking for one check is a request for its lines: the per-check budget that keeps the digest
+  // small does not apply, since the caller has already paid for the narrowing.
+  const view = requested === undefined ? options : { ...options, includePassing: true, maxFindingsPerCheck: Number.MAX_SAFE_INTEGER }
   const seenFacts = new Set<string>()
-  for (const check of checks) {
+  for (const check of selected) {
     const status = text(check.status) ?? 'skip'
     const findings = array(check.findings).map((finding) => toViewFinding(finding, text(check.id)))
     if (status === 'pass' && !options.includePassing) continue
-    const body = findingLines(findings, options, seenFacts)
+    const body = findingLines(findings, view, seenFacts)
     if (status !== 'fail' && body.length === 0) continue
     lines.push('')
     // The section header says what the inventory said: `fail` for a check carrying an error, `warn` for one
@@ -424,8 +442,10 @@ function renderFallbackReport(report: Record_, options: Required<ReportViewOptio
  * is still readable rather than silently empty.
  */
 export function renderReportText(value: unknown, options: ReportViewOptions = {}): string {
-  const resolved: Required<ReportViewOptions> = { ...DEFAULTS, ...options }
-  if (resolved.full) return JSON.stringify(value as JsonValue, null, 2)
+  const resolved = { ...DEFAULTS, ...options } as Required<ReportViewOptions>
+  // Compact rather than pretty: `full` exists so a caller can hand the object on (report_diff matches
+  // on check + code + evidence), and indentation is a third of a large report's bytes for no reader.
+  if (resolved.full) return JSON.stringify(value as JsonValue)
   const report = record(value)
   if (report === undefined) return JSON.stringify(value as JsonValue) ?? String(value)
   const hasChecks = array(report.checks).some((check) => record(check) !== undefined)

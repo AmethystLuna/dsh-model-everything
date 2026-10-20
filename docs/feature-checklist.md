@@ -191,7 +191,7 @@ And the gates around it:
 | `baseline` | 17 | self-baseline: the same report adds nothing and removes nothing |
 | `granularity` | 9 | a proper refinement passes and reports the expansion per pair |
 | `exporters` | 9 | source model still verifies (sanity) |
-| `report-view` | 22 | the report object is not mutated by rendering |
+| `report-view` | 24 | the report object is not mutated by rendering |
 | `contracts` | 4 | every frozen case still exists |
 | `tool-boundary` | 73 | every tool the plugin registers on ctx.tools is exercised by this suite |
 | `negatives` | 1 | metamorphic: the same async design in Chinese mines the same families |

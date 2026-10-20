@@ -216,7 +216,7 @@ Every tool report carries the same outcome contract. **`ok` says a report was pr
 | `metadataKeys[]` | Paths of the `_`-prefixed annotation keys the schema ignored, e.g. `["_source", "_verified", "states[0]._note"]` (present only when the input carried any). |
 | `narrativeCoverage` | `{states: "5/5", events: "3/9", scenarios: "0/12"}` when the model carries a narrative — a partial narrative is valid, and this is how much is still undocumented. The gap is also a `NARRATIVE_PARTIAL` (info) finding, so a gate can read it without parsing `nextSteps` text. |
 
-A tool prints a body, not JSON. Passing checks stay in the `CHECKS` inventory line, and a fact that several checks report is listed once. Only error findings inline their evidence. Pass `reportView: "full"` when you need the structured report itself, for example to hand it to `report_diff`.
+A tool prints a body, not JSON. Passing checks stay in the `CHECKS` inventory line, and a fact that several checks report is listed once. Only error findings inline their evidence. When the body truncates a check's warnings, pass `check: "<id>"` for that one check: its lines then print without the budget. Pass `reportView: "full"` only when you need the structured report itself, for example to hand it to `report_diff` — it returns the whole object as compact JSON, and on a large model that is still the most expensive thing you can ask for.
 
 Turn the verdict into an answer, never into a summary of `ok`:
 

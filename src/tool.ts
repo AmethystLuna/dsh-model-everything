@@ -41,6 +41,10 @@ export const modelVerifyTool = defineTool({
       type: 'json',
       description: 'Optional object mapping BEFORE state ids to AFTER state ids. Omit for identity mapping (same state names).',
     },
+    check: {
+      type: 'string',
+      description: 'Print one check in full when the digest truncated it. Pass the check id the CHECKS line lists (for example A9); the per-check budget no longer applies, and an id this report does not carry is answered with the ids that it does.',
+    },
     reportView: {
       type: 'string',
       enum: ['digest', 'full'],
@@ -53,7 +57,7 @@ export const modelVerifyTool = defineTool({
       description: 'this plugin verification report with summary and per-check findings.',
     },
     render(args, value) {
-      return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]
+      return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full', check: args.check }) }]
     },
   },
   timeoutMs: 10_000,

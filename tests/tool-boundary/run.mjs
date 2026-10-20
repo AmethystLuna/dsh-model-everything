@@ -713,7 +713,10 @@ for (const [name, argsFor] of Object.entries(VIEW_CASES)) {
     expectDeepEq(findingCodes(digestValue), findingCodes(fullValue), `${name}: the finding codes must not depend on reportView`)
     const digestText = digest.content[0]?.text ?? ''
     const fullText = full.content[0]?.text ?? ''
-    expectEq(fullText, JSON.stringify(fullValue, null, 2), `${name}: full view prints the structured report verbatim`)
+    // The object must survive the full view; the whitespace need not. It is compact JSON so a
+    // 37k-character report does not spend a third of its bytes on indentation.
+    expectEq(JSON.stringify(JSON.parse(fullText)), JSON.stringify(fullValue), `${name}: full view carries the structured report without loss`)
+    expect(!fullText.includes(String.fromCharCode(10) + '  '), `${name}: full view is compact JSON, not pretty-printed`)
     expect(digestText !== fullText, `${name}: the two views must not render the same text, or the switch does nothing`)
     expect(digestText.length > 0, `${name}: the digest view must not be empty`)
   })
@@ -731,7 +734,7 @@ await test('reportView: a failing verdict survives the full view on every family
     const full = await call(name, { ...args, reportView: 'full' })
     const value = expectReport(full, `${name} in full view on a failing input`)
     expectEq(value.verdict, 'fail', `${name}: the full view must not upgrade a failing verdict`)
-    expectEq(full.content[0]?.text, JSON.stringify(value, null, 2), `${name}: full view prints the structured report verbatim`)
+    expectEq(JSON.stringify(JSON.parse(full.content[0]?.text ?? '')), JSON.stringify(value), `${name}: full view carries the structured report without loss`)
   }
 })
 
@@ -753,7 +756,7 @@ await test('uml_structure_verify: on a findings-free report the default view is 
   const full = await call('uml_structure_verify', { diagram: STRUCTURE_DIAGRAM, reportView: 'full' })
   const digestText = digest.content[0]?.text ?? ''
   const fullText = full.content[0]?.text ?? ''
-  expectEq(fullText, JSON.stringify(full.value, null, 2), 'full view prints the structured report verbatim')
+  expectEq(JSON.stringify(JSON.parse(fullText)), JSON.stringify(full.value), 'full view carries the structured report without loss')
   expect(
     digestText.length < fullText.length,
     `the default view must cost less than full, got ${String(digestText.length)} against ${String(fullText.length)}`,
