@@ -103,6 +103,30 @@ re-run three times on 2026-10-18 as the artifact changed (the tool rename, the
 interleaving scan's five families, and the gate's default). Every row installed
 without `dsh plugin allow-version`, so no version exemption was involved.
 
+## The 0.2.0 artifact
+
+`dsh-model-everything` 0.2.0 is on npm as `latest`. npm reports integrity
+`sha512-AUyBpywxk0FJmjtzIYxyg21FlfF8wLN+ZFfJmBkr86/0TZMbfsUtyH/6AXw09VDL+kso8ePiCL0kJp08Bw1xQw==`
+and shasum `fe385a5d67687b051b9c50d2c31e351e19920305`, the same values `npm pack`
+produced, so the bytes below are the published ones.
+
+Measured 2026-10-21 on dsh `0.2.1-rc.2`, installed as `file:<packed tarball>` into a
+fresh `DSH_HOME`:
+
+| Step | Result |
+|---|---|
+| install | pass (`dsh plugin --profile headless add`, 917ms, no version exemption) |
+| mount row | pass — both rows, the gate row with `enabled: true` |
+| contents | pass — the installed copy reports `0.2.0` |
+| real call from the copy | pass — `model_verify` with `modelPath` returns `verdict: pass`, `checksRun: 6`; the same model inline returns `pass`; `check: "S1"` prints that check |
+| uninstall | pass — `--dump-config` carries no row afterwards |
+
+Not repeated for this artifact: the headless boot to AUTH, and an install by package
+name from the registry. The identity with the published package rests on the
+integrity match above, not on a second install. The nine evaluation sessions that
+exercised this code are recorded in the project memory, not here: they ran against a
+copied build, so they are evidence about the behaviour, not about the artifact.
+
 ## Notes that are properties of the harness, not of this plugin
 
 - **A profile created by `plugin add` is base-only.** It contains the base bundle
