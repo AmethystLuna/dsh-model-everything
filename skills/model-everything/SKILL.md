@@ -7,6 +7,8 @@ description: "Use when a document claims something checkable about code: API nam
 
 For an unverified design, failure is only a matter of time. Complex code becomes clear once you model it and run it. Check every claim before you act on it.
 
+**The tools are the interface.** Call them instead of reading this plugin's implementation. Open a `references/` file only when the question names what that file covers, and never read `lib/` — a schema guessed from the source is how a report gets misread.
+
 ## When This Skill Applies
 
 **This is the entry point.** If you have any thought of checking whether something about the code is actually true — however small, however informal the claim — load this skill. It owns the doctrine (enumerate the claims, verify each against the code, cite `file:line`, read `verdict` and never `ok`) and the executable verification for behaviour. When the task lands in a neighbouring domain, its routing table below hands it over rather than stretching the doctrine to cover it.

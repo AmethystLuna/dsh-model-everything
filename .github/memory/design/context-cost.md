@@ -1,0 +1,57 @@
+---
+name: context-cost
+description: 上下文成本实测：插件把一次会话的 token 抬到 2.6–7×，钱花在工具返回上，而工具返回里最贵的是技能正文与模型跑去读插件源码——不是报告本身
+metadata:
+  type: project
+---
+
+# 上下文成本
+
+2026-10-20 的三轮 A/B/C/D 实测（隔离 `DSH_HOME`、同一 dsh、同一模型、`dsh-eval-harness` 驱动真实 agent）。四组条件：**A** 无插件 · **B** 装插件、注入关 · **C** 装插件、注入开 · **D** 同 C 再加一句「必须先用工具」。
+
+## 总账
+
+| 轮次 | 条件 | 通过 | 总 tokens | 步数 |
+|---|---|---|---|---|
+| 18 用例（常识缺陷） | A / B / C | 13 / 14 / 13 | 145k / 222k / 234k | 113 / 120 / 129 |
+| 8 用例（单缺陷夹具） | A / B / C / D | 8 / 8 / 8 / 8 | 26k / 185k / 242k / 351k | 14 / 44 / 50 / 69 |
+| 3 用例（多文件大夹具） | A / B / C / D | 3 / 3 / 2 / 2 | 56k / 146k / 180k / 213k | 15 / 32 / 47 / 41 |
+
+**正确率三套语料全平**（C/D 丢的分是撞 `max_steps` 上限，不是答错）。所以插件在这类「读代码、判断需求是否成立」的任务上买到的是成本，不是正确性。这是插件自己教条的边界：它对付的是**推理答不出**的断言。
+
+## 逐帧归因（r3，按内容类别）
+
+| 条件 | 推理 | 正文 | 工具参数 | 工具返回 |
+|---|---|---|---|---|
+| A | 82% | 5% | 1% | 11% |
+| B | 38% | 2% | 3% | **57%** |
+| C | 37% | 2% | 3% | **58%** |
+| D | 31% | 1% | 4% | **64%** |
+
+**工具返回里谁最贵**（r3 合计）：`read` 239k、`skill` 167k、`model_verify` 113k、`web_fetch` 63k、`grep` 30k、其余 model_* 合计 30k。**插件自己的工具只占约 28%。**
+
+## 两条判断
+
+1. **「优化结构化输出」不是第一杠杆。** 一次 `model_verify` 的 digest 实测约 250 tokens；但大模型上平均 5.6k/次，报告确实值得再压一档，可它排第三。
+2. **第一杠杆是技能正文与模型去读文件。** 会话里能抓到这样的调用：
+
+   ```
+   5× read  …/dsh-model-everything/lib/data-engine.js
+   3× read  …/dsh-model-everything/lib/engine.js
+   2× read  …/skills/model-everything-datamodel/references/data-model-schema.md
+   2× skill: diagnose-windows-sandbox-acl      ← 与本插件无关的技能
+   ```
+
+   **这不是测试环境独有的。** 真实安装里插件也在 `~/.dsh/profiles/<p>/node_modules/` 下，DSH 注入的 skill 头本来就给了 base directory，模型有读权限。测试环境唯一不真实的是**工作区是空的**——真实用户有代码可读，模型不会只剩插件源码可翻。
+
+## 决定
+
+- **修技能**：技能正文加一条边界——工具就是接口，不要读插件的 `lib/`；`references/*` 只在技能明确点名的问题上读。这条同时省 token 和避免模型据实现文件猜 schema。
+- **不动引擎**。报告可以是第三顺位的下一步（`findings` 视图），但不是现在。
+- **拆组件**（固定 6.4k/请求的工具定义）仍待定：数据支持拆（工具定义比技能目录贵 6 倍），但那是产品决策。
+
+## 量具
+
+三套语料与归因脚本在 scratch 区 `dme-eval` 任务目录：`make-cases.mjs`（8 夹具）、`make-cases-hard2.mjs`（3 大夹具）、`run-eval.mjs`（跑一组）、`attribute.mjs`（逐帧归因，用 `zstd -d` 解多帧 trace）。语料先跑真值再出题，`cases-hard/TRUTH.txt` 与 `cases-hard2/TRUTH.txt` 是跑出来的结论。
+
+**已知的量具缺陷**：判分模型 `max_tokens` 默认 200，rubric 稍长就吐不出 PASS/FAIL → 已在 vendored 副本里改成可配（`EVAL_JUDGE_MAX_TOKENS`）；r1 的 4 条控制用例在 Windows 上恒失败（用例写 `bash`，profile 的 shell 工具是 `pwsh`）。

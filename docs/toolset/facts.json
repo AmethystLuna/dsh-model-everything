@@ -4,12 +4,12 @@
     {
       "skill": "model-everything",
       "chars": 498,
-      "body": 36742
+      "body": 37000
     },
     {
       "skill": "model-everything-datamodel",
       "chars": 483,
-      "body": 6063
+      "body": 6321
     },
     {
       "skill": "model-everything-design",
@@ -19,22 +19,22 @@
     {
       "skill": "model-everything-interleaving",
       "chars": 389,
-      "body": 7118
+      "body": 7376
     },
     {
       "skill": "model-everything-report-reading",
       "chars": 420,
-      "body": 7317
+      "body": 7575
     },
     {
       "skill": "model-everything-structure",
       "chars": 476,
-      "body": 8690
+      "body": 8948
     },
     {
       "skill": "model-everything-uml",
       "chars": 466,
-      "body": 8203
+      "body": 8461
     }
   ],
   "toolChars": 11956,

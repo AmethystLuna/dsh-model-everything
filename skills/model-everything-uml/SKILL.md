@@ -9,6 +9,8 @@ A diagram is a model, and a model can be wrong. A tidy flow chart is not evidenc
 
 This skill covers the diagram half of this toolbox. The claim-verification doctrine it inherits — enumerate verifiable claims, cite `file:line`, read `verdict` and never `ok` — lives in the `model-everything` skill; load that one when the task is to verify behaviour rather than to draw or audit a diagram.
 
+**The tools are the interface.** Call them instead of reading this plugin's implementation. Open a `references/` file only when the question names what that file covers, and never read `lib/` — a schema guessed from the source is how a report gets misread.
+
 ## When This Skill Applies
 
 | The task involves… | What it does |

@@ -12,6 +12,8 @@ the report does not prove.
 Load the `model-everything` skill to *produce* a model or to check a claim. Load this one when a
 report is already in hand and the question is what it says.
 
+**The tools are the interface.** Call them instead of reading this plugin's implementation. Open a `references/` file only when the question names what that file covers, and never read `lib/` — a schema guessed from the source is how a report gets misread.
+
 ## The Reading Order
 
 Three questions, in this order. Each one can make the next unnecessary.

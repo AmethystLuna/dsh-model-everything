@@ -9,6 +9,8 @@ This skill does **not** prove concurrency safety, and no report from it should e
 
 The claim-verification doctrine it inherits — enumerate verifiable claims, cite `file:line`, read `verdict` and never `ok` — lives in the `model-everything` skill. Load that one when the task is behavioural verification of a state machine rather than a judgement about concurrency claims.
 
+**The tools are the interface.** Call them instead of reading this plugin's implementation. Open a `references/` file only when the question names what that file covers, and never read `lib/` — a schema guessed from the source is how a report gets misread.
+
 ## When This Skill Applies
 
 **Only after confirming the target actually has concurrency requirements or behaviour** — multiple threads, async tasks, interrupts, shared state, or parallel execution. If the target is purely sequential, do not invoke concurrency mining; there is nothing to mine.

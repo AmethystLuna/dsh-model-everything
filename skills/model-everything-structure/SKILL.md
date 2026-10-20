@@ -9,6 +9,8 @@ A component diagram is a model of an architecture, and a model can be wrong. Thi
 
 The claim-verification doctrine it inherits — cite evidence, read `verdict` and never `ok` — lives in the `model-everything` skill. Load that one for behavioural claims (state machines, protocols, timing); load this one when the question is *where the dependencies point*.
 
+**The tools are the interface.** Call them instead of reading this plugin's implementation. Open a `references/` file only when the question names what that file covers, and never read `lib/` — a schema guessed from the source is how a report gets misread.
+
 ## When This Skill Applies
 
 | The task involves… | What it does |

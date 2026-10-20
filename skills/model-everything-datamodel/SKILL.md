@@ -7,6 +7,8 @@ description: "Use when reviewing a schema, a migration or a data guarantee: enti
 
 An unverified data model fails later. Model the schema and the migration, run them, and it becomes clear. Check every data claim before you act on it.
 
+**The tools are the interface.** Call them instead of reading this plugin's implementation. Open a `references/` file only when the question names what that file covers, and never read `lib/` — a schema guessed from the source is how a report gets misread.
+
 ## Methodology
 
 ### Phase 1: Enumerate Data Claims

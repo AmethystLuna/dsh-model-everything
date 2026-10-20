@@ -19,5 +19,6 @@ metadata:
 | [design-review](design/design-review.md) | 设计审阅引擎（DES1-DES11）：三级发现（violation／signal／fact）、每码判据与所需词汇、可判与不可判的边界、原则出处，以及为什么不做社区发现与模块度 | 读到一个 `DES*` 码、判断某个设计原则能否被判定、或想给审阅加一条设计判据之前 |
 | [shared-locations](design/shared-locations.md) | 组合验证器自己判丢更新（C3/C4/C5）："同一状态上都被使能"作判据、锁名只证明两侧认同、以及这套判据证明不了什么 | 改 `runCompositionVerification` 的共享判定、给组合加字段、或判断一条丢更新该路由到哪里时 |
 | [synchrony-vocabulary](design/synchrony-vocabulary.md) | 并发扫描器的射程从"并发"扩到"同步 / 异步"：family 分组与按家族路由、异步三种模型看不见的缺陷、以及为什么不开第二个工具 | 改 `src/concurrency.ts` 的词表、给发现加字段、或判断某条异步断言该路由到谁时 |
+| [context-cost](design/context-cost.md) | 上下文成本实测：插件把会话 token 抬到 2.6–7×、钱花在工具返回（技能正文 + 模型读插件源码）而不是报告、A/B/C/D 四组的正确率与成本、以及据此决定的「修技能不修引擎」 | 想压缩 token、判断该不该改报告格式或拆组件、或再跑一轮评测之前 |
 | [robustness-audit](design/robustness-audit.md) | 异常/非法输入专项审查的结论：以「拼错的名称静默关掉检查、再报正面全部通过」为主的一族缺陷、D1-D12 逐条位置、审查者未能判定的模糊点与覆盖缺口、按严重度的修复计划 | 修任何一条引擎的校验/引用解析、判断某个 `pass` 是否可信、或给引擎加新的声明式字段之前 |
 | [deployed-surface](design/deployed-surface.md) | 只在装进 profile 实跑时才现形的缺陷族：两种拒绝形状（`ran: true` 无 `errorCode` 的那种）与解读技能的说法冲突、并发扫描与跨族 diff 的静默通过、验证部署面的办法 | 判断一个 `pass` 是不是「其实什么都没看」、查「已解决」的 diff 可不可信、或装进 profile 验证改动时 |
