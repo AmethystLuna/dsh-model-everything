@@ -148,6 +148,8 @@ The limit: it stores and compares **model and diagram source**; a rendered pictu
 | `model_design_review` | Design review: the dependency graph's shape, plus the contracts the design declares about itself - layering, responsibility boundaries, substitutability, interface width |
 | `report_diff` | Compares two reports: what a change added, removed or changed |
 
+`model_verify`, `model_datamodel_verify` and `model_design_review` also take `modelPath`: a JSON file in the workspace, in any formatting (indentation, a BOM and a trailing newline all parse). It is the alternative to an inline `model`; passing both is refused.
+
 ## Reading a report
 
 What a tool returns is a report, and the outcome is in `verdict`: read `verdict`, never `ok`. `ok` carries a different historical meaning in each family — most set it to `true` for a failing review, and a composition sets it to `false` when any error-severity finding exists — so it cannot be read as a verdict, and reading it as one is how a reader concludes the opposite of what the report says.
@@ -161,7 +163,7 @@ What a tool returns is a report, and the outcome is in `verdict`: read `verdict`
 | `schema` | The versioned report contract, for example `model-everything/verify/v1`. Branch on this field rather than on the shape of the payload |
 | `truncated` | The search hit its ceiling and stopped. **A truncated search is not a pass**, it is no conclusion; a property that could not be decided appears as `_UNDECIDED` |
 
-The body is what comes back by default. For the whole structured result, pass `reportView: "full"`.
+The body is what comes back by default. A truncated check can be expanded on its own: pass `check: "<id>"` and every finding of that check prints. For the whole structured result, pass `reportView: "full"` — compact JSON, no field lost.
 
 When `ok` is `false` the verdict is `fail` as well, but it means something else: the tool did not run. The reason is in `errorCode` - invalid input, an unsupported diagram family, or a declared `intent` this view cannot serve. Such a refusal starts its `verdictReason` with `the tool did not run:`.
 
@@ -241,8 +243,6 @@ How it works, in four sentences:
 
 **Default and switch**: on by default. That default was measured: it reaches the one request class the plugin otherwise never sees, and a control task was not over-triggered. The price is about 3.2k characters per session; turn it off in `cordis.patch.yml` (below) or with the Plugins-page switch, which is also how to run a comparison - the same request with the gate off and on.
 
-`gateContent` can be replaced wholesale to try different wording; `tests/gate` still requires it to name every shipped skill.
-
 ## Configuration
 
 The routing component (on by default) has three keys:
@@ -258,11 +258,11 @@ The main row has one key, `interaction` (what happens when a tool call is offere
 Write it into the profile's `cordis.patch.yml` by row id:
 
 ```yaml
-- insert:
-    - id: dsh-model-everything-gate
-      name: 'dsh-model-everything/gate'
-      config:
-        enabled: false        # turn the injection off
+# Override that row's config by id: the whole config is replaced, not merged.
+# Do not add `name` here - a row with a name inserts a new row instead of changing this one.
+- id: dsh-model-everything-gate
+  config:
+    enabled: false        # turn the injection off
 ```
 
 ## Boundaries

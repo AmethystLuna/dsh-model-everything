@@ -148,6 +148,8 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_design_review` | 设计审阅：依赖图形状 + 设计自身声明的契约（分层、职责边界、可替换性、接口宽度） |
 | `report_diff` | 两份报告比对：新增/消失/变化的发现 |
 
+`model_verify`、`model_datamodel_verify`、`model_design_review` 另收 `modelPath`：从工作区里的 JSON 文件读模型，缩进、BOM、尾随换行都不影响。它与内联的 `model` 二选一，两个都给会被拒绝。
+
 ## 怎么读报告
 
 工具的产出是一份报告，结论只在 `verdict` 里：**看 `verdict`，不看 `ok`**。`ok` 在各族的含义不同——多数族在评审失败时仍是 `true`，组合族在出现 error 级发现时是 `false`——所以它不能当判定读；把它当判定读，会得出与报告相反的结论。
@@ -161,7 +163,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `schema` | 报告的版本化契约，例如 `model-everything/verify/v1`。要按字段分支，就分支在它上面 |
 | `truncated` | 搜索撞到上限就停了。**截断不等于通过**，是没结论；某个性质没判定出来时，报告里会出现 `_UNDECIDED` |
 
-默认返回正文。要完整 JSON，传 `reportView: "full"`。
+默认返回正文。被截断的检查可以单独展开：传 `check: "<id>"`，该检查的全部条目都会打印。要完整结果，传 `reportView: "full"`——紧凑 JSON，对象不丢字段。
 
 `ok` 为 `false` 时判定也是 `fail`，但含义不同：工具根本没跑。原因写在 `errorCode` 里——输入不合法、图族不支持，或声明的 `intent` 服务不了。这类拒绝的 `verdictReason` 以 `the tool did not run:` 开头。
 
@@ -241,8 +243,6 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 
 **开关与默认**：默认开。这个默认值是量出来的——它补上的是插件唯一接不住的那类请求，而对照任务没有被过度触发。代价是每个会话约 3.2k 字符；要关掉就改 `cordis.patch.yml`（见下）或翻插件页的开关。想做对照（同一个请求，关一次开一次）也用它。
 
-`gateContent` 可以整段替换，用来试别的措辞；`tests/gate` 仍要求它点名每个已发布的技能。
-
 ## 配置
 
 注入组件（默认开）有三个键：
@@ -258,11 +258,11 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
 按 row id 写进 profile 的 `cordis.patch.yml`：
 
 ```yaml
-- insert:
-    - id: dsh-model-everything-gate
-      name: 'dsh-model-everything/gate'
-      config:
-        enabled: false        # 关掉注入
+# 按 id 覆盖那一行的 config：整段替换，不做深合并。
+# 这里不要写 name——写了 name 是「插入一行」，不是「改这一行」。
+- id: dsh-model-everything-gate
+  config:
+    enabled: false        # 关掉注入
 ```
 
 ## 边界

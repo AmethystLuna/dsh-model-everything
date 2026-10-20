@@ -78,10 +78,13 @@ for (const file of modules) {
   for (const value of Object.values(mod)) {
     if (value === null || typeof value !== 'object') continue
     if (typeof value.name !== 'string' || typeof value.description !== 'string' || value.parameters === undefined) continue
-    tools.push({ name: value.name, description: value.description })
+    // Measure the definition the model actually pays for: name, description and every parameter
+    // description. Summing descriptions alone understated the surface by half once parameters
+    // carried real text (modelPath, check).
+    tools.push({ name: value.name, description: value.description, chars: JSON.stringify({ name: value.name, description: value.description, parameters: value.parameters }).length })
   }
 }
-const toolChars = tools.reduce((sum, tool) => sum + tool.description.length, 0)
+const toolChars = tools.reduce((sum, tool) => sum + tool.chars, 0)
 const toolsWithWhen = tools.filter((tool) => /\bUse when\b|\bWhen the\b|\bwhen you\b/.test(tool.description)).length
 
 console.log('')
