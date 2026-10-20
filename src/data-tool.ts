@@ -1,6 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runDataVerification, DATA_ENGINE_SCHEMA_VERSION } from './data-engine.js'
+import { oneOf } from './model-file.js'
 import { optionRefusal, requireArrayOption, requireObjectOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
 
@@ -19,8 +20,11 @@ export const modelDataModelVerifyTool = defineTool({
   parameters: {
     model: {
       type: 'json',
-      required: true,
-      description: 'DataModelV1 data model to verify.',
+      description: 'DataModelV1 data model to verify. Pass this, or modelPath, not both.',
+    },
+    modelPath: {
+      type: 'string',
+      description: 'Path to a JSON file holding the model, instead of inlining it. Formatting does not matter: whitespace, a BOM and pretty printing all parse. Relative paths resolve against the process working directory, which is the session workspace.',
     },
     beforeModel: {
       type: 'json',
@@ -71,7 +75,7 @@ export const modelDataModelVerifyTool = defineTool({
       requireArrayOption(args.copyPairs, 'copyPairs', 'DATA_OPTION_INVALID')
       requireArrayOption(args.migrationMappings, 'migrationMappings', 'DATA_OPTION_INVALID')
       requireArrayOption(args.backupPairs, 'backupPairs', 'DATA_OPTION_INVALID')
-      return runDataVerification(args.model, {
+      return runDataVerification(oneOf(args.model, args.modelPath, 'model', 'modelPath', 'DATA_OPTION_INVALID'), {
         beforeModel: args.beforeModel,
         fieldMapping: args.fieldMapping as Record<string, string> | undefined,
         copyPairs: args.copyPairs as Array<{ id: string; sourceEntity: string; targetEntity: string; mapping: Record<string, string> }> | undefined,

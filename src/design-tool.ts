@@ -1,6 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { REPORT_SCHEMAS } from './engine.js'
+import { oneOf } from './model-file.js'
 import { runDesignReview } from './design-engine.js'
 import { renderReportText } from './report-view.js'
 
@@ -22,9 +23,12 @@ export const designTool = defineTool({
   parameters: {
     model: {
       type: 'json',
-      required: true,
       description:
         'DesignModelV1: {schemaVersion: 1, architecture: {nodes: [ids], edges: [[from, to]]}, types?: [{name, stereotype, extends?, implements?, operations?, transitions?, forbids?, responsibilities?, dependsOn?, uses?, layer?}], declare?: {layers?, boundaries?, allowedEdges?, requiredEdges?}}. The schema is closed: an unknown key is refused rather than ignored. `types` is what makes the principle checks possible - with no `extends` there is no substitutability to decide, with no `uses` no interface can be called fat, and no `responsibilities` means nothing to compare the dependencies against.',
+    },
+    modelPath: {
+      type: 'string',
+      description: 'Path to a JSON file holding the model, instead of inlining it. Formatting does not matter: whitespace, a BOM and pretty printing all parse. Relative paths resolve against the process working directory, which is the session workspace.',
     },
     check: {
       type: 'string',
@@ -48,17 +52,17 @@ export const designTool = defineTool({
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
-    if (args.model === undefined) {
+    if (args.model === undefined && args.modelPath === undefined) {
       return {
         ok: false,
         ran: false,
         verdict: 'fail',
-        verdictReason: 'the tool did not run: pass `model`, a DesignModelV1 with schemaVersion, architecture and the declarations to review it against',
+        verdictReason: 'the tool did not run: pass `model` (a DesignModelV1 with schemaVersion, architecture and the declarations) or `modelPath` (a JSON file holding one)',
         schema: REPORT_SCHEMAS.design,
         errorCode: 'DESIGN_INPUT',
-        error: 'design review needs `model`',
+        error: 'design review needs `model` or `modelPath`',
       } as unknown as JsonValue
     }
-    return runDesignReview(args.model) as unknown as JsonValue
+    return runDesignReview(oneOf(args.model, args.modelPath, 'model', 'modelPath', 'DESIGN_OPTION_INVALID')) as unknown as JsonValue
   },
 })

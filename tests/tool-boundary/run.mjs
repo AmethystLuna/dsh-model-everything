@@ -23,6 +23,10 @@
  * beside them, so the day a tool gains a guard the case goes red and gets rewritten on
  * purpose rather than silently passing either way.
  */
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { Context } from '@deepseek-ai/cordis'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { modelVerifyTool } from '../../lib/tool.js'
@@ -242,8 +246,8 @@ const REPORT_CURRENT = {
 
 /** Each tool's required parameters, plus a call that satisfies them. */
 const REQUIRED_PARAMS = {
-  model_verify: { required: ['model'], valid: () => ({ model: MACHINE }) },
-  model_datamodel_verify: { required: ['model'], valid: () => ({ model: DATA_MODEL }) },
+  model_verify: { required: [], valid: () => ({ model: MACHINE }) },
+  model_datamodel_verify: { required: [], valid: () => ({ model: DATA_MODEL }) },
   model_interleaving_scan: { required: ['text'], valid: () => ({ text: SCAN_TEXT_PLAIN }) },
   model_compose_verify: { required: ['machines'], valid: () => ({ machines: [MACHINE, SECOND_MACHINE] }) },
   model_export: { required: ['model', 'format'], valid: () => ({ model: MACHINE, format: 'tla' }) },
@@ -252,7 +256,7 @@ const REQUIRED_PARAMS = {
   uml_review: { required: [], valid: () => ({ model: MACHINE }) },
   uml_explain_labels: { required: [], valid: () => ({}) },
   uml_structure_verify: { required: [], valid: () => ({ diagram: STRUCTURE_DIAGRAM }) },
-  model_design_review: { required: ['model'], valid: () => ({ model: DESIGN_MODEL }) },
+  model_design_review: { required: [], valid: () => ({ model: DESIGN_MODEL }) },
   report_diff: { required: ['baseline', 'current'], valid: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }) },
 }
 
@@ -833,7 +837,10 @@ await test('model_verify: an undeclared field is a schema refusal naming the fie
 })
 
 await test('a tool error, a refusal and a failed review are three different outcomes', async () => {
-  const argumentError = await call('model_verify', {})
+  // A missing `model` is no longer an argument-layer error: the tool takes either `model` or
+  // `modelPath`, so the absence of one is decided in the body and comes back as a refusal. The
+  // argument layer still fails the call on a wrong type, which is what this case now uses.
+  const argumentError = await call('model_verify', { modelPath: 42 })
   expectEq(argumentError.isError, true, 'the argument layer fails the call before any body runs')
   expectEq(argumentError.error?.info?.code, 'INVALID_ARGS', 'and its code is the argument code')
   expectEq(argumentError.value, undefined, 'no report exists for a call that never ran')
@@ -1141,9 +1148,9 @@ await test('the declared concurrency classifier opts valid calls into a parallel
 })
 
 await test('the nearest case — invalid arguments are scheduled exclusively rather than in parallel', () => {
-  const empty = runtime.executionMode({ callId: 'schedule-2', name: 'model_verify', arguments: {}, signal: new AbortController().signal })
+  const wrongShape = runtime.executionMode({ callId: 'schedule-2', name: 'model_verify', arguments: { modelPath: 42 }, signal: new AbortController().signal })
   const wrongType = runtime.executionMode({ callId: 'schedule-3', name: 'model_verify', arguments: { model: MACHINE, maxStates: 'ten' }, signal: new AbortController().signal })
-  expectDeepEq(empty, { kind: 'exclusive' }, 'a call that cannot run must not overlap a sibling')
+  expectDeepEq(wrongShape, { kind: 'exclusive' }, 'a call that cannot run must not overlap a sibling')
   expectDeepEq(wrongType, { kind: 'exclusive' }, 'nor must one with a wrong-typed argument')
 })
 
@@ -1232,6 +1239,33 @@ await test('uml_structure_verify: a diagram that is not text is refused, not thr
     const error = expectToolError(res, `diagram ${show(diagram)}`)
     expect(/diagram/i.test(error.message), `diagram ${show(diagram)}: the refusal must name the argument, got ${error.message}`)
   }
+})
+
+await test('model_verify: the model can come from a file, and formatting does not matter', async () => {
+  // A 16-step session ended with `tool input is invalid JSON` while the model hand-edited an
+  // inline model argument. A path removes that failure mode, and the reader accepts whatever
+  // formatting the file carries: pretty-printed, indented, with a trailing newline.
+  const dir = await mkdtemp(join(tmpdir(), 'dme-model-'))
+  const file = join(dir, 'machine.json')
+  await writeFile(file, JSON.stringify({ schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b', terminal: true }], transitions: [{ from: 'a', event: 'go', to: 'b' }] }, null, 2) + String.fromCharCode(10))
+  const res = await call('model_verify', { modelPath: file })
+  const report = expectReport(res, 'model_verify with modelPath')
+  expectEq(report.verdict, 'pass', 'the model read from the file must verify like the inline one')
+  // Exactly one source: both is ambiguous, neither is missing, and each says which one to drop.
+  // A refusal is a report, not a thrown error: option-shape problems come back with `ran: false`
+  // and an `errorCode`, which is what a caller routes on.
+  const both = await call('model_verify', { model: { schemaVersion: 1, init: 'a', states: [{ id: 'a' }], transitions: [] }, modelPath: file })
+  const bothReport = expectReport(both, 'both sources')
+  expectEq(bothReport.ran, false, 'both sources: the tool must not run')
+  expectEq(bothReport.errorCode, 'VERIFY_OPTION_INVALID', 'both sources: the refusal code')
+  expect(/not both/i.test(String(bothReport.error)), 'both sources must be refused by name')
+  const neither = await call('model_verify', {})
+  const neitherReport = expectReport(neither, 'neither source')
+  expect(/model or modelPath/i.test(String(neitherReport.error)), 'neither source must name both ways to supply a model')
+  const missing = await call('model_verify', { modelPath: join(dir, 'absent.json') })
+  const missingReport = expectReport(missing, 'absent file')
+  expect(/could not be read/i.test(String(missingReport.error)), 'an absent file must be refused with the read error')
+  await rm(dir, { recursive: true, force: true })
 })
 
 if (failures > 0) {

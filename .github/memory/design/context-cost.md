@@ -86,6 +86,29 @@ metadata:
 - **两条 C 用例各挂了 1 次，都不是答错**：一个是 `dsh subprocess exited with code 1`，另一个同样。A 组 9 次运行零退出码失败。C 组会话更长（11 步 vs 5）、调用更多，这是要单独查的风险项，不能记成「模型不稳定」。
 - **单 trial 的总额不可用**：同一套语料三次单跑得到 149k / 157k / 153k，而 3 trials 的中位数是 40.1k/条 × 3 = 120k。以后比改动一律 `trials >= 3`，否则测的是噪声。
 
+
+## 失败会话的根因：流式工具参数写坏（2026-10-21）
+
+3 trials 基线里 C 组有 2/9 次「失败」，trace 的最后三帧是：
+
+```
+step/start step 5
+assistant/attempt  stream: [block-start reasoning, reasoning-chunks …]
+turn/end  {kind: "error", code: "MALFORMED_RESPONSE",
+           message: "DeepSeek Messages stream: tool input is invalid JSON"}
+```
+
+**不是答错，也不是引擎崩**：模型在流式生成工具参数时把 JSON 写坏了，provider 判定后 turn 直接以 error 结束，dsh 退出码 1，**不重试**。两次都发生在嵌套最深的参数上——一次是 `pwsh` 命令里的引号，一次是 `model_datamodel_verify` 的内联数据模型（`indexes` 形状改正的那一轮）。
+
+A 组 9 次零发生；C 组 2/9。会话越长（11 步 vs 5）、调用越多，撞上这个窗口的机会越大。**所以基线里的 pass^k = 0.33 是生成侧故障污染的数字，不是准确率。**
+
+## 对策：文件接口（照 logicprobe 的 Python CLI）
+
+`model_verify` / `model_datamodel_verify` / `model_design_review` 现在收 `modelPath`：从工作区读 JSON 文件，格式不影响（缩进、BOM、尾随换行都接受）。规则是**二选一**——两个都给会被拒（会读一个忽略另一个），两个都不给也会被拒，且各自的措辞不同。拒绝是**报告**（`ran: false` + `errorCode`），不是抛错，调用方照 `errorCode` 路由。
+
+代价：三个工具的定义各多一条参数说明，**固定成本 6,627 → 6,862 tokens（+235）**；换来的是内联模型那几百到几千 tokens 的参数消失，以及模型不必手改嵌套 JSON。
+
+
 ## 量具的修正
 
 判分模型之外，**语料本身也该给工作区**。vendored 的 `dsh-eval-harness` 里加了一条本地补丁（`<casesDir>/../fixtures/<case-name>/` 存在时拷进该用例的 workspace），三条大夹具的仓库文件就写在 `fixtures/` 下，题目改成「工作区根目录就是被测仓库」。没有这条补丁，任何「模型会不会读代码」的结论都是环境造出来的。

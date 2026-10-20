@@ -3,6 +3,7 @@ import type { JsonValue } from './json-value.js'
 import { runVerification } from './engine.js'
 import { renderReportText } from './report-view.js'
 import { OptionShapeError, optionRefusal, requireObjectOption } from './option-shape.js'
+import { oneOf } from './model-file.js'
 
 export const MODEL_VERIFY_TOOL_NAME = 'model_verify'
 
@@ -22,8 +23,11 @@ export const modelVerifyTool = defineTool({
   parameters: {
     model: {
       type: 'json',
-      required: true,
-      description: 'LogicModelV1 state machine model to verify.',
+      description: 'LogicModelV1 state machine model to verify. Pass this, or modelPath, not both.',
+    },
+    modelPath: {
+      type: 'string',
+      description: 'Path to a JSON file holding the model, instead of inlining it. Formatting does not matter: whitespace, a BOM and pretty printing all parse. Relative paths resolve against the process working directory, which is the session workspace.',
     },
     maxStates: {
       type: 'integer',
@@ -85,7 +89,8 @@ export const modelVerifyTool = defineTool({
           )
         }
       }
-      return runVerification(args.model, {
+      const model = oneOf(args.model, args.modelPath, 'model', 'modelPath', 'VERIFY_OPTION_INVALID')
+      return runVerification(model, {
         maxStates: args.maxStates,
         maxPermutationEvents: args.maxPermutationEvents,
         beforeModel: args.beforeModel,
