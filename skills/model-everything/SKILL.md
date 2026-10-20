@@ -182,6 +182,8 @@ not a bound on the search.
 
 Twelve tools: `model_verify`, `model_compose_verify`, `model_datamodel_verify`, `model_design_review`, `model_interleaving_scan`, `model_export`, `report_diff`, `uml_render`, `uml_parse`, `uml_review`, `uml_explain_labels`, `uml_structure_verify`. Each tool's description states what it decides and what it does not. Read the description before calling it, and read the report's `verdict` afterwards.
 
+A model is the largest argument these tools take. When it is long, or you have edited it more than once, write it to a file and pass `modelPath` instead of inlining it: a streamed argument that long is where invalid JSON comes from, and the file accepts any formatting.
+
 These tools carry every capability this plugin claims. Anything outside them is out of scope, and the skills name where that claim is answered instead.
 
 ### Reading a Report: `ok` Is Not a Verdict
