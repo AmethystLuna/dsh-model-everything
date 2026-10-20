@@ -157,8 +157,20 @@ function findingLines(findings: ViewFinding[], options: Required<ReportViewOptio
     group.events.push(event)
     stateGroups.set(state, group)
   }
+  // The same event set on every state is one fact, not one per state: a 26-state machine whose
+  // states all ignore the same four events printed 24 near-identical lines, a quarter of the body.
+  // States that share a set are counted; a handful still name themselves, because there the names
+  // are what the reader acts on.
+  const byEventSet = new Map<string, { severity: string; code: string; events: string[]; states: string[] }>()
   for (const [state, group] of stateGroups) {
-    lines.push(`  ${state} (${String(group.events.length)}) [${group.severity}/${group.code}]: ${group.events.join(', ')}`)
+    const key = `${group.severity}|${group.code}|${group.events.join(',')}`
+    const bucket = byEventSet.get(key) ?? { severity: group.severity, code: group.code, events: group.events, states: [] }
+    bucket.states.push(state)
+    byEventSet.set(key, bucket)
+  }
+  for (const group of byEventSet.values()) {
+    const who = group.states.length > 3 ? `${String(group.states.length)} states` : group.states.join(', ')
+    lines.push(`  ${who} (${String(group.events.length)}) [${group.severity}/${group.code}]: ${group.events.join(', ')}`)
   }
   const rendered = collapse(singles.map((finding) => findingLine(finding, options)))
   const budget = options.maxFindingsPerCheck

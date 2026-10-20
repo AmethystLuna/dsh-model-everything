@@ -291,7 +291,7 @@ function verificationNextSteps(checks: CheckResult[], coverage: NarrativeCoverag
   // named check looked at the model. A list of failures does not say that, and neither does `pass`.
   const skipped = checks.filter((check) => check.status === 'skip').map((check) => check.name + ' (' + check.id + ')')
   if (skipped.length > 0) {
-    steps.push('These examined nothing, so their silence is not a result: ' + skipped.join(', ') + '. Declare what each one would need, or accept that the model is unverified on those points.')
+    steps.push('Not checked: ' + skipped.join(', ') + ' examined nothing — silence there is not a pass. Declare what each needs, or treat the model as unverified on those points.')
   }
   // Named checks above, bare codes here. That is deliberate: each warning is a different kind of thing,
   // so there is no single name to give the set, and the sentence points at where each one IS explained
