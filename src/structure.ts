@@ -107,6 +107,10 @@ export interface StructureSummary {
   errors: number
   warnings: number
   rules: number
+  /** The most depended-on nodes, by incoming edges. What a reader asks first and counts worst. */
+  hubs: { id: string; dependents: number }[]
+  /** Modules nothing depends on (no outgoing edges), capped for the report. */
+  leaves: string[]
 }
 
 export interface StructureReport {
@@ -733,6 +737,26 @@ export function reviewStructure(options: StructureReviewOptions): StructureRepor
     })
   }
 
+  // Degree is what a reader asks first and counts worst: which module everything depends on, and which
+  // depends on nothing. Counting it here means the answer is one line in the report rather than a scan of
+  // the graph by hand, which is where a correct graph still produced a wrong answer.
+  const inDegree = new Map<string, number>()
+  const outDegree = new Map<string, number>()
+  for (const edge of graph.edges) {
+    inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1)
+    outDegree.set(edge.from, (outDegree.get(edge.from) ?? 0) + 1)
+  }
+  const hubs = [...inDegree.entries()]
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => (b[1] === a[1] ? a[0].localeCompare(b[0]) : b[1] - a[1]))
+    .slice(0, 5)
+    .map(([id, dependents]) => ({ id, dependents }))
+  const leaves = nodes
+    .filter((node) => !node.container && (outDegree.get(node.id) ?? 0) === 0)
+    .map((node) => node.id)
+    .sort()
+    .slice(0, 10)
+
   const errors = findings.filter((finding) => finding.severity === 'error').length
   const warningCount = findings.filter((finding) => finding.severity === 'warning').length
   const summary: StructureSummary = {
@@ -748,6 +772,8 @@ export function reviewStructure(options: StructureReviewOptions): StructureRepor
     errors,
     warnings: warningCount,
     rules: rules.length,
+    hubs,
+    leaves,
   }
 
   const nextSteps: string[] = []
@@ -767,7 +793,9 @@ export function reviewStructure(options: StructureReviewOptions): StructureRepor
     findings,
     summary,
     hashes: {
-      diagram: createHash('sha256').update(options.diagram).digest('hex'),
+      // A graph built from source has no diagram text to hash; hashing the text would hash the empty
+      // string, and every scan would then carry the same input hash.
+      diagram: createHash('sha256').update(options.graph === undefined ? options.diagram : canonicalJson({ nodes: options.graph.nodes.map((node) => node.id), edges: options.graph.edges.map((edge) => ({ from: edge.from, to: edge.to })) })).digest('hex'),
       ...(options.matrix === undefined ? {} : { matrix: createHash('sha256').update(canonicalJson(options.matrix)).digest('hex') }),
     },
     warnings,

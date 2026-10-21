@@ -1656,7 +1656,20 @@
       "missingExpectedEdges": 0,
       "errors": 1,
       "warnings": 1,
-      "rules": 0
+      "rules": 0,
+      "hubs": [
+        {
+          "id": "A",
+          "dependents": 1
+        },
+        {
+          "id": "B",
+          "dependents": 1
+        }
+      ],
+      "leaves": [
+        "C"
+      ]
     },
     "findings": [
       {
@@ -1676,7 +1689,7 @@
       "Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.",
       "State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
     ],
-    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML022_CYCLE)  ok=true  errors=1 warnings=1\nFINDINGS  2 total (1 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: C. Either they are dead entries or the diagram is missing their dependencies.\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: A → B → A. A cycle means no build order and no layering can hold. evidence={\"cycle\":[\"A\",\"B\",\"A\"]}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML022_CYCLE)  ok=true  errors=1 warnings=1\nGRAPH  3 modules, 2 edges\n  A (1 dependents), B (1 dependents)\n  imports nothing: C\nFINDINGS  2 total (1 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: C. Either they are dead entries or the diagram is missing their dependencies.\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: A → B → A. A cycle means no build order and no layering can hold. evidence={\"cycle\":[\"A\",\"B\",\"A\"]}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
   },
   "structure: a matrix that forbids the edge the diagram draws": {
     "ok": true,
@@ -1696,7 +1709,16 @@
       "missingExpectedEdges": 0,
       "errors": 1,
       "warnings": 0,
-      "rules": 1
+      "rules": 1,
+      "hubs": [
+        {
+          "id": "DB",
+          "dependents": 1
+        }
+      ],
+      "leaves": [
+        "DB"
+      ]
     },
     "findings": [
       {
@@ -1710,7 +1732,7 @@
       "Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.",
       "State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
     ],
-    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML023_DISALLOWED_EDGE)  ok=true  errors=1 warnings=0\nFINDINGS  1 total (1 error, 0 warning): UML023_DISALLOWED_EDGE x1\n\n  [error/UML023_DISALLOWED_EDGE] edge UI → DB violates rule no-direct (deny DB). evidence={\"edge\":{\"from\":\"UI\",\"to\":\"DB\",\"line\":4},\"matchedRules\":[\"no-direct\"],\"basis\":\"deny\",\"rule\":\"no-direct\"}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML023_DISALLOWED_EDGE)  ok=true  errors=1 warnings=0\nGRAPH  2 modules, 1 edges\n  DB (1 dependents)\n  imports nothing: DB\nFINDINGS  1 total (1 error, 0 warning): UML023_DISALLOWED_EDGE x1\n\n  [error/UML023_DISALLOWED_EDGE] edge UI → DB violates rule no-direct (deny DB). evidence={\"edge\":{\"from\":\"UI\",\"to\":\"DB\",\"line\":4},\"matchedRules\":[\"no-direct\"],\"basis\":\"deny\",\"rule\":\"no-direct\"}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
   },
   "granularity: a child that does not refine its parent": {
     "ok": true,
@@ -2363,7 +2385,20 @@
       "missingExpectedEdges": 0,
       "errors": 1,
       "warnings": 1,
-      "rules": 0
+      "rules": 0,
+      "hubs": [
+        {
+          "id": "Core",
+          "dependents": 1
+        },
+        {
+          "id": "UI",
+          "dependents": 1
+        }
+      ],
+      "leaves": [
+        "Island"
+      ]
     },
     "findings": [
       {
@@ -2383,7 +2418,7 @@
       "Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.",
       "State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
     ],
-    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML022_CYCLE)  ok=true  errors=1 warnings=1\nFINDINGS  2 total (1 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: Island. Either they are dead entries or the diagram is missing their dependencies.\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: UI → Core → UI. A cycle means no build order and no layering can hold. evidence={\"cycle\":[\"UI\",\"Core\",\"UI\"]}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
+    "body": "model-everything/structure/v1  verdict=fail  1 error finding(s) (first error: UML022_CYCLE)  ok=true  errors=1 warnings=1\nGRAPH  3 modules, 2 edges\n  Core (1 dependents), UI (1 dependents)\n  imports nothing: Island\nFINDINGS  2 total (1 error, 1 warning): UML020_ISOLATED_NODE x1 | UML022_CYCLE x1\n\n  [warning/UML020_ISOLATED_NODE] 1 node(s) have no edge at all: Island. Either they are dead entries or the diagram is missing their dependencies.\n  [error/UML022_CYCLE] the dependency graph has a directed cycle: UI → Core → UI. A cycle means no build order and no layering can hold. evidence={\"cycle\":[\"UI\",\"Core\",\"UI\"]}\n\nNEXT  Resolve the error findings first: a dangling endpoint or a layer violation means the diagram and the intended architecture disagree.\nNEXT  Supply a dependency matrix (rules/layers) to have every edge judged and named; without one only the structural checks run.\nNEXT  Reconcile the result with the source-side checker: this audits the diagram, an include/graph scan audits the code, and the difference between them is the finding worth chasing.\nNEXT  State machines are a different question — for a state or activity diagram use uml action=review and model_verify."
   },
   "structure: two levels through the tool": {
     "ok": true,

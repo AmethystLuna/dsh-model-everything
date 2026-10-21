@@ -95,6 +95,13 @@ export interface StructureSummary {
     errors: number;
     warnings: number;
     rules: number;
+    /** The most depended-on nodes, by incoming edges. What a reader asks first and counts worst. */
+    hubs: {
+        id: string;
+        dependents: number;
+    }[];
+    /** Modules nothing depends on (no outgoing edges), capped for the report. */
+    leaves: string[];
 }
 export interface StructureReport {
     /** The tool ran and produced this report; read `verdict` for the outcome. */

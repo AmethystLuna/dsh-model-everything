@@ -199,6 +199,17 @@ function headerLines(report: Record_, options: Required<ReportViewOptions>): str
     ok === undefined || verdict === undefined ? '' : `ok=${String(ok)}`,
   ].filter((bit) => bit !== '')
   lines.push(bits.join('  '))
+  // A graph report answers "which module is the hub" in one line: counting incoming edges off the graph by
+  // hand is where a correct graph still produced a wrong answer, in both conditions of the round that asked.
+  const degreeSummary = record(report.summary)
+  const hubs = array(degreeSummary?.hubs).map((entry) => record(entry)).filter((entry) => entry !== undefined)
+  if (hubs.length > 0) {
+    const counts = degreeSummary?.nodes !== undefined && degreeSummary?.edges !== undefined ? `  ${String(degreeSummary.nodes)} modules, ${String(degreeSummary.edges)} edges` : ''
+    lines.push(`GRAPH${counts}`)
+    lines.push('  ' + hubs.map((entry) => `${String(entry.id)} (${String(entry.dependents)} dependents)`).join(', '))
+    const leaves = array(degreeSummary?.leaves).map((leaf) => String(leaf))
+    if (leaves.length > 0) lines.push('  imports nothing: ' + leaves.join(', '))
+  }
   // A refusal carries no model to hash, and the field is an empty string rather than absent, so it rendered
   // as `modelHash=…` - which reads as a truncated hash rather than as nothing to hash. An empty value means
   // the same thing as a missing one here.
@@ -309,7 +320,8 @@ function renderChecksReport(report: Record_, options: Required<ReportViewOptions
     .filter(([, ids]) => (ids as string[]).length > 0)
     .map(([status, ids]) => `${String(status)} ${(ids as string[]).join(' ')}`)
     .join(' | ')
-  const lines = [...headerLines(report, options), `CHECKS  ${inventory}`]
+  const lines = [...headerLines(report, options)]
+  lines.push(`CHECKS  ${inventory}`)
   const requested = options.check
   const ids = checks.map((check) => text(check.id)).filter((id): id is string => id !== undefined)
   const selected = requested === undefined ? checks : checks.filter((check) => text(check.id) === requested)
