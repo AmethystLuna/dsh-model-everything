@@ -24,6 +24,7 @@
  * purpose rather than silently passing either way.
  */
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -38,6 +39,7 @@ import { umlRenderTool, umlParseTool, umlReviewTool, umlExplainLabelsTool } from
 import { umlStructureTool } from '../../lib/structure-tool.js'
 import { designTool } from '../../lib/design-tool.js'
 import { reportDiffTool } from '../../lib/report-diff-tool.js'
+import { modelEditTool } from '../../lib/edit-tool.js'
 
 // ---------------------------------------------------------------------------
 // The harness
@@ -128,6 +130,7 @@ const TOOL_DEFINITIONS = [
   umlStructureTool,
   designTool,
   reportDiffTool,
+  modelEditTool,
 ]
 
 // `ToolRuntime`'s constructor registers its per-scope tool-schema contribution on
@@ -245,6 +248,11 @@ const REPORT_CURRENT = {
 // ---------------------------------------------------------------------------
 
 /** Each tool's required parameters, plus a call that satisfies them. */
+// A model file the edit tables can share: an edit must apply to something that already exists.
+const EDIT_FIXTURE = join(tmpdir(), 'dme-boundary-edit.json')
+writeFileSync(EDIT_FIXTURE, JSON.stringify(MACHINE, null, 2))
+const EDIT_OPS = [{ op: 'set', path: '/states/0/_touched', value: 1 }]
+
 const REQUIRED_PARAMS = {
   model_verify: { required: [], valid: () => ({ model: MACHINE }) },
   model_datamodel_verify: { required: [], valid: () => ({ model: DATA_MODEL }) },
@@ -258,6 +266,7 @@ const REQUIRED_PARAMS = {
   uml_structure_verify: { required: [], valid: () => ({ diagram: STRUCTURE_DIAGRAM }) },
   model_design_review: { required: [], valid: () => ({ model: DESIGN_MODEL }) },
   report_diff: { required: ['baseline', 'current'], valid: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }) },
+  model_edit: { required: ['modelPath', 'ops'], valid: () => ({ modelPath: EDIT_FIXTURE, ops: EDIT_OPS }) },
 }
 
 /** One wrong-typed or out-of-enum argument per tool, with the violation the schema must report. */
@@ -274,6 +283,7 @@ const TYPE_ERRORS = {
   uml_structure_verify: { args: { diagram: 42 }, param: 'diagram', violation: '"diagram" must be a string' },
   model_design_review: { args: { model: DESIGN_MODEL, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
   report_diff: { args: { baseline: REPORT_BASELINE, current: REPORT_CURRENT, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
+  model_edit: { args: { modelPath: EDIT_FIXTURE, ops: EDIT_OPS, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
 }
 
 /** A call that succeeds, used for the reportView matrix and the per-tool view-schema case. */
@@ -290,6 +300,7 @@ const VIEW_CASES = {
   uml_structure_verify: () => ({ diagram: STRUCTURE_DIAGRAM }),
   model_design_review: () => ({ model: DESIGN_MODEL }),
   report_diff: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }),
+  model_edit: () => ({ modelPath: EDIT_FIXTURE, ops: EDIT_OPS }),
 }
 
 const TABLE_NAMES = [
@@ -1265,6 +1276,33 @@ await test('model_verify: the model can come from a file, and formatting does no
   const missing = await call('model_verify', { modelPath: join(dir, 'absent.json') })
   const missingReport = expectReport(missing, 'absent file')
   expect(/could not be read/i.test(String(missingReport.error)), 'an absent file must be refused with the read error')
+  await rm(dir, { recursive: true, force: true })
+})
+
+await test('model_edit: one call answers what changed and what the engine now decides', async () => {
+  // The loop this replaces: hand back the whole model, read the whole report, repeat. Here the file
+  // keeps the model, one op names the change, and the reply carries both diffs.
+  const dir = await mkdtemp(join(tmpdir(), 'dme-edit-'))
+  const file = join(dir, 'machine.json')
+  const broken = { schemaVersion: 1, init: 'idle', states: [{ id: 'idle' }, { id: 'done', terminal: true }], transitions: [] }
+  await writeFile(file, JSON.stringify(broken, null, 2) + String.fromCharCode(10))
+  const fixed = await call('model_edit', { modelPath: file, ops: [{ op: 'addTransition', transition: { from: 'idle', event: 'finish', to: 'done' } }] })
+  const report = expectReport(fixed, 'model_edit that fixes the machine')
+  expectEq(report.schema, 'model-everything/edit/v1', 'an edit result carries its own schema')
+  expectEq(report.changes.length, 1, 'the structural diff names one change')
+  expectEq(report.changes[0].kind, 'added', 'and it is an addition')
+  // The finding the edit removed is the reason the edit happened, so it has to be in the reply.
+  const delta = report.reportDelta
+  expect(Array.isArray(delta?.removed) && delta.removed.length > 0, 'the report delta must show the finding that went away')
+  expectEq(report.verdict, 'pass', 'the verdict is the edited model, not the one it started from')
+  // A refused edit leaves the file exactly as it was: an invalid model on disk costs the next verify a round.
+  const before = readFileSync(file, 'utf8')
+  const refused = await call('model_edit', { modelPath: file, ops: [{ op: 'remove', path: '/init' }] })
+  const refusal = expectReport(refused, 'an edit that would break the model')
+  expectEq(refusal.ran, false, 'a refused edit does not run')
+  expectEq(readFileSync(file, 'utf8'), before, 'a refused edit writes nothing')
+  const unknown = await call('model_edit', { modelPath: file, ops: [{ op: 'renameState' }] })
+  expect(/unknown op/i.test(String(expectReport(unknown, 'an unknown op').error)), 'an unknown op is refused by name')
   await rm(dir, { recursive: true, force: true })
 })
 

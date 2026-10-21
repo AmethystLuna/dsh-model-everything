@@ -71,7 +71,7 @@ const { UML_FAMILIES } = await import('file:///' + join(repoRoot, 'lib/uml-synta
 
 /** Which skill owns which tools. Declared here because it is a routing decision, not derivable. */
 const TOOL_OWNER = {
-  'model-everything': ['model_verify', 'model_compose_verify', 'model_export', 'report_diff'],
+  'model-everything': ['model_verify', 'model_edit', 'model_compose_verify', 'model_export', 'report_diff'],
   'model-everything-uml': ['uml_render', 'uml_parse', 'uml_review', 'uml_explain_labels'],
   'model-everything-structure': ['uml_structure_verify'],
   'model-everything-datamodel': ['model_datamodel_verify'],

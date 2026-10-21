@@ -479,6 +479,7 @@ export const REPORT_SCHEMAS = {
   granularity: 'model-everything/granularity/v1',
   design: 'model-everything/design/v1',
   baseline: 'model-everything/baseline/v1',
+  edit: 'model-everything/edit/v1',
 } as const
 
 export type ReportSchema = typeof REPORT_SCHEMAS[keyof typeof REPORT_SCHEMAS]

@@ -314,6 +314,7 @@ export declare const REPORT_SCHEMAS: {
     readonly granularity: 'model-everything/granularity/v1';
     readonly design: 'model-everything/design/v1';
     readonly baseline: 'model-everything/baseline/v1';
+    readonly edit: 'model-everything/edit/v1';
 };
 export type ReportSchema = typeof REPORT_SCHEMAS[keyof typeof REPORT_SCHEMAS];
 /**

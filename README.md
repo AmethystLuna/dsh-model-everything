@@ -146,6 +146,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_export` | 导出到外部检查器（UPPAAL / TLA+ / PRISM / SPIN） |
 | `uml_structure_verify` | 依赖图审计（含依赖矩阵与多层级细化） |
 | `model_design_review` | 设计审阅：依赖图形状 + 设计自身声明的契约（分层、职责边界、可替换性、接口宽度） |
+| `model_edit` | 按条改动模型文件（加/删状态、加/删/改迁移、指针 set/remove）：返回结构 diff 与发现 diff，一次调用完成「改—验—比」 |
 | `report_diff` | 两份报告比对：新增/消失/变化的发现 |
 
 `model_verify`、`model_datamodel_verify`、`model_design_review` 另收 `modelPath`：从工作区里的 JSON 文件读模型，缩进、BOM、尾随换行都不影响。它与内联的 `model` 二选一，两个都给会被拒绝。

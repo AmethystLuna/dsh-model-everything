@@ -24,6 +24,7 @@ mindmap
     me - 7 corpus triggers
       row: 498 of 500 chars
       tool: model_verify
+      tool: model_edit
       tool: model_compose_verify
       tool: model_export
       tool: report_diff
@@ -121,6 +122,7 @@ nothing else at that moment.
 | `model_compose_verify` | `model-everything` | "Check two or more LogicModelV1 machines together." |
 | `model_datamodel_verify` | `model-everything-datamodel` | "Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression." |
 | `model_design_review` | `model-everything-design` | "Hold a design to the contracts it declares about itself: layering, responsibility ownership, substitutability, interface width." |
+| `model_edit` | `model-everything` | "Change a model file by naming one change, then see what the engine now decides." |
 | `model_export` | `model-everything` | "Translate a LogicModelV1 into the input language of an external checker - UPPAAL, TLA+, PRISM or SPIN - for a property this plugin does not decide its" |
 | `model_interleaving_scan` | `model-everything-interleaving` | "Scan a document or plan text for claims about how work is executed: threads, synchronization, async tasks, interrupts, shared state." |
 | `model_verify` | `model-everything` | "Verify one state machine: does this LogicModelV1 reach a state it must not, deadlock, livelock, or leave an invariant undecided." |

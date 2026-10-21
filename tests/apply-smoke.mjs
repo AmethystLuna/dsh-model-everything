@@ -32,6 +32,7 @@ const modules = {
   uml_structure_verify: (await import('../lib/structure-tool.js')).umlStructureTool,
   model_design_review: (await import('../lib/design-tool.js')).designTool,
   report_diff: (await import('../lib/report-diff-tool.js')).reportDiffTool,
+  model_edit: (await import('../lib/edit-tool.js')).modelEditTool,
 }
 const expected = new Set(Object.values(modules).map((definition) => definition.name))
 const missing = [...expected].filter((name) => !registered.includes(name))

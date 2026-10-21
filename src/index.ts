@@ -39,6 +39,7 @@ import { umlRenderTool, umlParseTool, umlReviewTool, umlExplainLabelsTool } from
 import { umlStructureTool } from './structure-tool.js'
 import { designTool } from './design-tool.js'
 import { reportDiffTool } from './report-diff-tool.js'
+import { modelEditTool } from './edit-tool.js'
 import { ENGINE_SCHEMA_VERSION } from './engine.js'
 
 // DSH 0.1.7-alpha.1 (session format v4) retires the shared
@@ -245,6 +246,7 @@ export function apply(ctx: Context, config: Config): void {
       ctx.effect(() => tools.register(umlStructureTool), 'dsh-model-everything: structure tool')
       ctx.effect(() => tools.register(designTool), 'dsh-model-everything: design review tool')
       ctx.effect(() => tools.register(reportDiffTool), 'dsh-model-everything: report diff tool')
+      ctx.effect(() => tools.register(modelEditTool), 'dsh-model-everything: model edit tool')
       toolRegistered = true
       dataToolRegistered = true
       concurrencyToolRegistered = true
