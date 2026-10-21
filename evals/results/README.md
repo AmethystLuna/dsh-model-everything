@@ -82,4 +82,3 @@ The plugin used `uml_structure_verify` with `repoPath` in all three trials (3, 7
 Both conditions failed the same way: the question "which module has the most dependents, and how
 many" is not answered by the report, which lists cycles, isolated nodes and matrix violations but no
 degree summary. Every trial that failed got the hub count wrong, whichever condition it ran in.
-
