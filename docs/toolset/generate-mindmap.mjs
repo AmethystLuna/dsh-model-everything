@@ -31,14 +31,14 @@ const catalogChars = rows.reduce((sum, row) => sum + row.chars + row.skill.lengt
 
 // --------------------------------------------------------------------- the tools, from the objects --
 
-const modules = ['compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js']
+const modules = ['compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'edit-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js']
 const tools = []
 for (const file of modules) {
   const mod = await import(libUrl + file)
   for (const value of Object.values(mod)) {
     if (value === null || typeof value !== 'object') continue
     if (typeof value.name !== 'string' || typeof value.description !== 'string' || value.parameters === undefined) continue
-    tools.push({ name: value.name, chars: value.description.length, description: value.description })
+    tools.push({ name: value.name, chars: value.description.length, description: value.description, definition: JSON.stringify({ name: value.name, description: value.description, parameters: value.parameters }).length })
   }
 }
 const toolChars = tools.reduce((sum, tool) => sum + tool.chars, 0)
@@ -57,6 +57,22 @@ const rowsWithNonGoal = rows.filter((row) => statesNonGoal(row.description, [...
 const toolsWithSibling = tools.filter((tool) => tools.some((other) => other.name !== tool.name && tool.description.includes(other.name)))
 const toolsWithNonGoal = tools.filter((tool) => statesNonGoal(tool.description, tools.filter((o) => o.name !== tool.name && tool.description.includes(o.name)).map((o) => o.name)))
 const toolsWithoutSibling = tools.filter((tool) => !toolsWithSibling.includes(tool)).map((tool) => tool.name)
+
+// --------------------------------------------- value routing: what each description decides --
+
+// A description earns its space by answering three questions: what this decides, when it pays, and
+// what to use instead. The second is the one a schema cannot carry, and the third is the one that
+// keeps two look-alikes from being chosen at random. Both are read out of the description here, so a
+// tool that stops stating its boundary shows up in the map rather than in a bad tool call.
+const valueRouting = tools.map((tool) => {
+  // A boundary is stated either by declining ("do not use it to ...") or by naming the tool that owns
+  // the adjacent job ("for two machines, use model_compose_verify instead"). Both count; the second is
+  // the stronger one, because it also tells the model where to go.
+  const declines = /do not use|does not|is not|never|only (reads|reports)/i.test(tool.description)
+  const instead = [...new Set([...tool.description.matchAll(/(model|uml)_[a-z_]+/g)].map((match) => match[0]))].filter((name) => name !== tool.name)
+  return { name: tool.name, tokens: tokens('x'.repeat(tool.definition)), instead, statesBoundary: declines || instead.length > 0 }
+})
+const routingWithoutBoundary = valueRouting.filter((entry) => !entry.statesBoundary).map((entry) => entry.name)
 
 // ----------------------------------------------------- the fifth surface, from real reports --
 
@@ -145,6 +161,13 @@ add(2, 'a finding code carries its domain in the prefix')
 add(2, 'the report states which schema it follows')
 add(2, 'a description names its neighbour and its edge')
 
+add(1, 'what each description decides, and what it costs to have it')
+add(2, 'a description earns its space three ways: what it decides, when that pays, what to use instead')
+for (const entry of valueRouting.filter((tool) => tool.statesBoundary)) {
+  add(2, entry.name + ' - ' + String(entry.tokens) + ' tokens, ' + (entry.instead.length === 0 ? 'sends you nowhere else' : 'instead: ' + entry.instead.join(', ')))
+}
+add(2, routingWithoutBoundary.length === 0 ? 'every description states its boundary' : 'no stated boundary: ' + routingWithoutBoundary.join(', '))
+
 add(1, 'why a map rather than a paragraph')
 add(2, 'the budget is spatial, so the picture has to be spatial')
 add(3, 'a row is a fixed width, and every sentence competes for it')
@@ -214,6 +237,10 @@ const factsText = JSON.stringify({
     toolsWithoutSibling,
     familiesRoutingOnward: routingFamilies.length,
     familyCount: Object.keys(reports).length,
+  },
+  valueRouting: {
+    entries: valueRouting,
+    withoutBoundary: routingWithoutBoundary,
   },
 }, null, 2) + '\n'
 

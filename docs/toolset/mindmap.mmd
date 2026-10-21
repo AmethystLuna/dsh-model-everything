@@ -5,7 +5,7 @@ root((how a model learns to use this plugin))
       7 rows, the longest at 498 of 500
         a row past 500 loses its tail to the model, silently
     the tool descriptions: about ten thousand characters, always visible
-      12 descriptions, the longest at 1834 characters
+      13 descriptions, the longest at 1834 characters
         no ceiling here, so a description grows without anything objecting
     a skill body: about nine thousand characters, on load
       the model chooses it from the row alone
@@ -23,7 +23,7 @@ root((how a model learns to use this plugin))
       the budget is why: space spent on praise is space not spent on a trigger
   where each property stands today
     skill rows: 7 of 7 name a sibling, 7 of 7 state a non-goal
-    tool descriptions: 12 of 12 name a sibling, 12 of 12 state a non-goal
+    tool descriptions: 13 of 13 name a sibling, 13 of 13 state a non-goal
       the ones that name none: 
     and the result routes onward in 6 of 6 families
       that is the only channel that can redirect a model mid-task
@@ -34,6 +34,22 @@ root((how a model learns to use this plugin))
     a finding code carries its domain in the prefix
     the report states which schema it follows
     a description names its neighbour and its edge
+  what each description decides, and what it costs to have it
+    a description earns its space three ways: what it decides, when that pays, what to use instead
+    model_compose_verify - 646 tokens, instead: model_verify
+    model_interleaving_scan - 570 tokens, instead: model_verify, model_compose_verify
+    model_datamodel_verify - 551 tokens, instead: model_verify, uml_structure_verify
+    model_design_review - 601 tokens, instead: uml_structure_verify
+    model_edit - 574 tokens, instead: model_datamodel_verify, model_design_review, model_verify
+    model_export - 286 tokens, instead: model_verify
+    report_diff - 426 tokens, instead: model_verify, model_datamodel_verify, model_design_review, uml_review, uml_structure_verify, model_interleaving_scan
+    uml_structure_verify - 514 tokens, instead: model_verify
+    uml_explain_labels - 231 tokens, instead: uml_parse, uml_review
+    uml_parse - 459 tokens, instead: uml_review
+    uml_render - 594 tokens, instead: uml_review, uml_parse
+    uml_review - 593 tokens, instead: model_verify
+    model_verify - 706 tokens, instead: model_compose_verify
+    every description states its boundary
   why a map rather than a paragraph
     the budget is spatial, so the picture has to be spatial
       a row is a fixed width, and every sentence competes for it

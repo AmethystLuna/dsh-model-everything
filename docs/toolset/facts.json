@@ -37,7 +37,7 @@
       "body": 8203
     }
   ],
-  "toolChars": 11956,
+  "toolChars": 12807,
   "tools": [
     {
       "name": "model_compose_verify",
@@ -54,6 +54,10 @@
     {
       "name": "model_design_review",
       "chars": 968
+    },
+    {
+      "name": "model_edit",
+      "chars": 851
     },
     {
       "name": "model_export",
@@ -89,18 +93,138 @@
     }
   ],
   "perTurn": {
-    "chars": 15351,
-    "tokens": 3838
+    "chars": 16202,
+    "tokens": 4051
   },
   "routing": {
     "rowsWithSibling": 7,
     "rowsWithNonGoal": 7,
     "rowCount": 7,
-    "toolsWithSibling": 12,
-    "toolsWithNonGoal": 12,
-    "toolCount": 12,
+    "toolsWithSibling": 13,
+    "toolsWithNonGoal": 13,
+    "toolCount": 13,
     "toolsWithoutSibling": [],
     "familiesRoutingOnward": 6,
     "familyCount": 6
+  },
+  "valueRouting": {
+    "entries": [
+      {
+        "name": "model_compose_verify",
+        "tokens": 646,
+        "instead": [
+          "model_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "model_interleaving_scan",
+        "tokens": 570,
+        "instead": [
+          "model_verify",
+          "model_compose_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "model_datamodel_verify",
+        "tokens": 551,
+        "instead": [
+          "model_verify",
+          "uml_structure_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "model_design_review",
+        "tokens": 601,
+        "instead": [
+          "uml_structure_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "model_edit",
+        "tokens": 574,
+        "instead": [
+          "model_datamodel_verify",
+          "model_design_review",
+          "model_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "model_export",
+        "tokens": 286,
+        "instead": [
+          "model_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "report_diff",
+        "tokens": 426,
+        "instead": [
+          "model_verify",
+          "model_datamodel_verify",
+          "model_design_review",
+          "uml_review",
+          "uml_structure_verify",
+          "model_interleaving_scan"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "uml_structure_verify",
+        "tokens": 514,
+        "instead": [
+          "model_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "uml_explain_labels",
+        "tokens": 231,
+        "instead": [
+          "uml_parse",
+          "uml_review"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "uml_parse",
+        "tokens": 459,
+        "instead": [
+          "uml_review"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "uml_render",
+        "tokens": 594,
+        "instead": [
+          "uml_review",
+          "uml_parse"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "uml_review",
+        "tokens": 593,
+        "instead": [
+          "model_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "model_verify",
+        "tokens": 706,
+        "instead": [
+          "model_compose_verify"
+        ],
+        "statesBoundary": true
+      }
+    ],
+    "withoutBoundary": []
   }
 }
