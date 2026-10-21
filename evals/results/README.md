@@ -65,3 +65,21 @@ ceiling; the first two got the hub count wrong. Ratio **1.14x**, against 3.55x o
 
 `modelPath` on its own was used 0 times in 9 trials; `model_edit`, which closes the loop with a
 report, was used 5 times in 6.
+
+## Round 6 - the same structural question, with the scanner in place (2026-10-22)
+
+Same case, same three questions, three trials, step ceiling raised to 80 so the ceiling cannot be the
+result. `repoPath` was available to the plugin condition for the first time.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 1/3 | 28 / 17 / 26 | 97,059 / 70,153 / 74,894 |
+| C | 1/3 | 24 / 25 / 31 | 62,599 / 86,578 / 82,326 |
+
+Mean tokens: A 80,702, C 77,168 - **0.96x**, against 1.14x in round 4 and 3.55x on the small fixtures.
+The plugin used `uml_structure_verify` with `repoPath` in all three trials (3, 7 and 10 calls).
+
+Both conditions failed the same way: the question "which module has the most dependents, and how
+many" is not answered by the report, which lists cycles, isolated nodes and matrix violations but no
+degree summary. Every trial that failed got the hub count wrong, whichever condition it ran in.
+

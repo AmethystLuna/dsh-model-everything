@@ -13,7 +13,7 @@ prompt: |
 
 assert:
   turn_end: completed
-  max_steps: 40
+  max_steps: 80
   max_tokens: 300000
   output_judge:
     rubric: |
