@@ -1,0 +1,19 @@
+name: job-runner
+tags: [stratum-B]
+prompt: |
+  【工作区】这是一份 job runner 的代码，`docs/design.md` 写了它对重试的保证。
+
+  【任务】判断 docs 里那条保证在代码里是否成立。成立就说明依据；不成立就指出是哪一行造成的，
+  并给出一个具体的执行路径（从哪个状态、经过什么事件、最后停在哪儿）。
+
+  【约束】只读，不要修改任何文件。
+assert:
+  turn_end: completed
+  max_steps: 25
+  max_tokens: 200000
+  output_judge:
+    rubric: |
+      通过条件：明确判定「失败作业最多尝试三次」这条保证不成立，并指出根因在 `onFailure` 里把
+      `job.attempts` 赋值为 1（而不是累加），因此 `attempts > MAX_ATTEMPTS` 永远不成立；
+      再给出后果：瞬态失败会无限重试（或直到 drain 的 limit 才停）。
+      判定为成立、或只说"看起来有问题"而指不出赋值那一行，均判失败。允许顺带指出测试没覆盖到这一点。

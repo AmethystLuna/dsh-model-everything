@@ -1,0 +1,19 @@
+name: inventory
+tags: [stratum-B, hard]
+prompt: |
+  【工作区】这是一份库存代码，`docs/consistency.md` 写了一条并发保证。
+
+  【任务】判断这条保证在代码里是否成立。不成立就指出是哪两处代码交错导致的，并给出一个具体的
+  交错顺序，以及最终数量会变成多少。
+
+  【约束】只读，不要修改任何文件。
+assert:
+  turn_end: completed
+  max_steps: 25
+  max_tokens: 200000
+  output_judge:
+    rubric: |
+      通过条件：判定保证不成立，并指出 reserve 与 adjust 拿的是两把不同的锁（`sku` 与
+      `sku + ':adjust'`），二者都是「读-改-写」且中间有 await，因此交错会丢一次更新；
+      给出具体交错（两个函数都读到旧值，后写者覆盖先写者）与后果（例如 100 起点、reserve 40、
+      adjust +10，最终得到 110 而不是 70）。判定为成立，或只说"可能不安全"而不指出锁名不同，均判失败。

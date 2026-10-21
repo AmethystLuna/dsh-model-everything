@@ -1,0 +1,175 @@
+{
+  "states": [
+    "s0",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6",
+    "s7",
+    "s8",
+    "s9",
+    "s10",
+    "s11",
+    "s12",
+    "s13",
+    "s14",
+    "s15",
+    "s16",
+    "s17",
+    "s18",
+    "s19",
+    "s20",
+    "s21",
+    "s22",
+    "s23",
+    "done",
+    "failed"
+  ],
+  "transitions": [
+    {
+      "from": "s0",
+      "event": "step",
+      "to": "s1"
+    },
+    {
+      "from": "s1",
+      "event": "step",
+      "to": "s2"
+    },
+    {
+      "from": "s2",
+      "event": "step",
+      "to": "s3"
+    },
+    {
+      "from": "s3",
+      "event": "step",
+      "to": "s4"
+    },
+    {
+      "from": "s4",
+      "event": "step",
+      "to": "s5"
+    },
+    {
+      "from": "s5",
+      "event": "step",
+      "to": "s6"
+    },
+    {
+      "from": "s6",
+      "event": "step",
+      "to": "s7"
+    },
+    {
+      "from": "s7",
+      "event": "step",
+      "to": "s8"
+    },
+    {
+      "from": "s8",
+      "event": "step",
+      "to": "s9"
+    },
+    {
+      "from": "s9",
+      "event": "step",
+      "to": "s10"
+    },
+    {
+      "from": "s10",
+      "event": "step",
+      "to": "s11"
+    },
+    {
+      "from": "s11",
+      "event": "step",
+      "to": "s12"
+    },
+    {
+      "from": "s12",
+      "event": "step",
+      "to": "s13"
+    },
+    {
+      "from": "s13",
+      "event": "step",
+      "to": "s14"
+    },
+    {
+      "from": "s14",
+      "event": "step",
+      "to": "s15"
+    },
+    {
+      "from": "s15",
+      "event": "step",
+      "to": "s16"
+    },
+    {
+      "from": "s16",
+      "event": "step",
+      "to": "s17"
+    },
+    {
+      "from": "s17",
+      "event": "step",
+      "to": "s18"
+    },
+    {
+      "from": "s18",
+      "event": "step",
+      "to": "s19"
+    },
+    {
+      "from": "s19",
+      "event": "step",
+      "to": "s20"
+    },
+    {
+      "from": "s20",
+      "event": "step",
+      "to": "s21"
+    },
+    {
+      "from": "s21",
+      "event": "step",
+      "to": "s22"
+    },
+    {
+      "from": "s22",
+      "event": "step",
+      "to": "s23"
+    },
+    {
+      "from": "s23",
+      "event": "finish",
+      "to": "done",
+      "guard": {
+        "variable": "ok",
+        "op": "==",
+        "value": true
+      }
+    },
+    {
+      "from": "s23",
+      "event": "fail",
+      "to": "failed"
+    },
+    {
+      "from": "s9",
+      "event": "retry",
+      "to": "s3"
+    },
+    {
+      "from": "s17",
+      "event": "park",
+      "to": "s17"
+    }
+  ],
+  "variables": {
+    "ok": false
+  }
+}

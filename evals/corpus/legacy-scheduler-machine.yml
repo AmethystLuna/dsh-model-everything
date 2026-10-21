@@ -1,0 +1,23 @@
+name: legacy-scheduler-machine
+tags: [hard2]
+prompt: |
+  【代码仓库】工作区根目录就是被测仓库，用 read/grep 直接看文件（不要修改）。
+
+  【需求】
+  undefined
+
+  用这份 machine.json 判断 R1–R3 是否成立。对不成立的给出反例路径（状态或事件序列）。
+
+  只读分析，不要修改任何文件。
+assert:
+  turn_end: completed
+  tools_not_called: [write, edit]
+  max_steps: 20
+  max_tokens: 200000
+  output_judge:
+    rubric: |
+      The reply must reject R2: the graph has cycles - the 'retry' edge from s9 back to s3, and the
+          'park' self loop on s17 - so a task can loop forever. It must also state that R1 does not hold for
+          those looping paths (a task that keeps taking retry never reaches done or failed). On R3, accept either
+          verdict as long as the reasoning is explicit: 'done' is unreachable while ok is false, and the machine
+          itself never sets ok. A reply that calls the graph acyclic fails.

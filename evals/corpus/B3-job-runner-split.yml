@@ -1,0 +1,19 @@
+name: job-runner-split
+tags: [stratum-B, hard]
+prompt: |
+  【工作区】这是一份 job runner 的代码，`docs/design.md` 写了对重试预算的保证。
+
+  【任务】判断这条保证在代码里是否成立。成立就说明依据；不成立就指出是哪条调用路径造成的，
+  并说明为什么只看单个模块发现不了。
+
+  【约束】只读，不要修改任何文件。
+assert:
+  turn_end: completed
+  max_steps: 25
+  max_tokens: 200000
+  output_judge:
+    rubric: |
+      通过条件：判定保证不成立，并指出根因在 rehydrate 从 history 重建 attempts，而失败尝试从不写入
+      history（只写 failures），所以重建后的 attempts 恒为 0，预算永远不耗尽；给出后果：走 snapshot/
+      rehydrate 那条路径会无限重试。只说"计数器有问题"而不指出 history 与 failures 的错位，判失败。
+      允许顺带指出单看 worker 或单看 retry 都自洽。

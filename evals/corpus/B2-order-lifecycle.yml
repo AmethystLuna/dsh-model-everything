@@ -1,0 +1,19 @@
+name: order-lifecycle
+tags: [stratum-B]
+prompt: |
+  【工作区】这是一份订单状态机的代码，`docs/lifecycle.md` 写了两条保证。
+
+  【任务】逐条判断这两条保证在代码里是否成立。对每条给出 verdict（成立 / 不成立），
+  不成立的那条要给出具体的状态与事件路径。
+
+  【约束】只读，不要修改任何文件。
+assert:
+  turn_end: completed
+  max_steps: 25
+  max_tokens: 200000
+  output_judge:
+    rubric: |
+      通过条件：(1) 判定「cancelled 是终态」这条不成立，并指出 `cancelled --approve--> placed`
+      这条迁移（在 `TRANSITIONS` 里），给出路径 cancelled →(approve) placed；(2) 判定
+      「placed 可以直接到 shipped」这条成立。
+      把第一条判成成立，或两条都判成不成立，均判失败。

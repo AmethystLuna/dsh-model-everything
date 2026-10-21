@@ -1,0 +1,1 @@
+{ "name": "order-lifecycle", "private": true, "type": "module", "scripts": { "test": "node --test test/" } }

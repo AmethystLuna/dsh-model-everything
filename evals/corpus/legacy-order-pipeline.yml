@@ -1,0 +1,31 @@
+name: legacy-order-pipeline
+tags: [hard2]
+prompt: |
+  【代码仓库】工作区根目录就是被测仓库，用 read/grep 直接看文件（不要修改）。
+
+  【需求】
+  # 订单服务需求
+
+  - R1 并发调用 reserve 时不得超卖：库存 1 的 SKU 只能成功一次。
+  - R2 折扣与税额以「分」为单位四舍五入，总额等于各行净额之和再加税。
+  - R3 已取消的订单不得被发货。
+  - R4 支付失败时必须释放预留库存。
+  - R5 订单状态只允许 pending / paid / shipped / cancelled。
+
+  逐条判断 R1–R5 在当前实现下是否成立。对每一条不成立的，给出一个最小输入或调用序列，并指出是哪段代码导致的。
+
+  只读分析，不要修改任何文件。
+assert:
+  turn_end: completed
+  tools_not_called: [write, edit]
+  max_steps: 20
+  max_tokens: 200000
+  output_judge:
+    rubric: |
+      The reply must identify R1, R3 and R4 as the failing requirements and must not claim R2 or
+          R5 fails. R1 fails because two concurrent reserve calls can both pass the stock check (read-modify-write
+          spanning an await), so the same stock is sold twice. R3 fails because an order can be cancelled and
+          still shipped. R4 fails because a reservation made for an earlier line (or a payment) is not released
+          when a later step fails - either the createOrder early return or the missing payment-failure branch
+          is an acceptable framing, as long as the reply says reserved stock stays consumed. A reply that
+          misses any of the three, or that declares R2 or R5 broken, does not pass.
