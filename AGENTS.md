@@ -51,6 +51,7 @@ npm install
 npm run typecheck        # tsc --noEmit
 npm run build            # tsc -> lib/
 npm run test:engine      # every regression suite, including the memory gate
+npm run check            # lint:md then test:engine - the two jobs CI runs
 npm run test:full        # end-to-end combined suite
 npm run bump -- <x.y.z>  # sync versions across declared manifests
 npm run bump -- --check  # all declared manifests agree

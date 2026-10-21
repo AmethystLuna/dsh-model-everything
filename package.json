@@ -65,7 +65,8 @@
     "lint:md": "markdownlint --dot --ignore \"**/node_modules/**\" .",
     "bump": "node scripts/bump-version.mjs",
     "test:engine": "npm run build && node tests/engine/run.mjs && node tests/design-engine/run.mjs && node tests/catalog/run.mjs && node tests/data-engine/run.mjs && node tests/concurrency/run.mjs && node tests/uml/run.mjs && node tests/apply-smoke.mjs && node tests/memory/run.mjs && node tests/skills/run.mjs && node tests/gate/run.mjs && node tests/skill-routing/run.mjs && node tests/toolset/run.mjs && node tests/principles/run.mjs && node tests/feature-checklist/run.mjs && node tests/usage/run.mjs && node tests/translation/run.mjs && node tests/documentation/run.mjs && node tests/contributing/run.mjs && node tests/routing-map/run.mjs && node tests/report-reading/run.mjs && node tests/structure/run.mjs && node tests/baseline/run.mjs && node tests/granularity/run.mjs && node tests/exporters/run.mjs && node tests/report-view/run.mjs && node tests/contracts/run.mjs && node tests/tool-boundary/run.mjs && node tests/negatives/run.mjs && node tests/external/run.mjs",
-    "test:full": "npm run build && node tests/full-suite.mjs"
+    "test:full": "npm run build && node tests/full-suite.mjs",
+    "check": "npm run lint:md && npm run test:engine"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
