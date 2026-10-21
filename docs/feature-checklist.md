@@ -193,7 +193,7 @@ And the gates around it:
 | `exporters` | 9 | source model still verifies (sanity) |
 | `report-view` | 24 | the report object is not mutated by rendering |
 | `contracts` | 4 | every frozen case still exists |
-| `tool-boundary` | 76 | every tool the plugin registers on ctx.tools is exercised by this suite |
+| `tool-boundary` | 77 | every tool the plugin registers on ctx.tools is exercised by this suite |
 | `negatives` | 1 | metamorphic: the same async design in Chinese mines the same families |
 | `external` | 2 | spin: never-states violated (A is initial) |
 

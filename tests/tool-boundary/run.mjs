@@ -1279,6 +1279,24 @@ await test('model_verify: the model can come from a file, and formatting does no
   await rm(dir, { recursive: true, force: true })
 })
 
+await test('model_edit: the compact spelling of an operation does the same thing as the long one', async () => {
+  // Key names cost more than some of the changes do. Five operations are 76 tokens spelled out and
+  // 39 in the compact form, and a batch is where that adds up.
+  const dir = await mkdtemp(join(tmpdir(), 'dme-edit-short-'))
+  const longFile = join(dir, 'long.json')
+  const shortFile = join(dir, 'short.json')
+  const base = { schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b', terminal: true }], transitions: [{ from: 'a', event: 'go', to: 'b' }] }
+  await writeFile(longFile, JSON.stringify(base, null, 2))
+  await writeFile(shortFile, JSON.stringify(base, null, 2))
+  const longForm = [{ op: 'addState', state: { id: 'c' } }, { op: 'addTransition', transition: { from: 'c', event: 'go', to: 'b' } }, { op: 'set', path: '/init', value: 'a' }]
+  const shortForm = [{ addState: 'c' }, { addTransition: ['c', 'go', 'b'] }, { set: ['/init', 'a'] }]
+  const a = expectReport(await call('model_edit', { modelPath: longFile, ops: longForm, verify: false }), 'long form')
+  const b = expectReport(await call('model_edit', { modelPath: shortFile, ops: shortForm, verify: false }), 'compact form')
+  expectEq(JSON.stringify(b.changes), JSON.stringify(a.changes), 'both spellings must report the same changes')
+  expectEq(readFileSync(shortFile, 'utf8'), readFileSync(longFile, 'utf8'), 'and write the same model')
+  await rm(dir, { recursive: true, force: true })
+})
+
 await test('model_edit: a batch may break the model on its way through, not at the end', async () => {
   // Wiring is not one operation: a transition is added before the state it points at, or a state is
   // removed before the transition that used it. Only the state at the end of the batch is judged.

@@ -94,6 +94,74 @@ function atPointer(model: Json, parts: string[], create: boolean): { parent: Jso
   return { parent: node, key: parts[parts.length - 1] ?? '' }
 }
 
+/**
+ * Accept the compact spelling of an operation as well as the long one.
+ *
+ * An operation is a small thing - add a state, wire a transition - and the long form spends more
+ * tokens on key names than on the change. Five operations cost 76 tokens spelled out and 39 in the
+ * compact form, and a batch of twenty is where that difference starts to matter.
+ *
+ *   {addState: "c"}                    {addState: {id: "c", terminal: true}}
+ *   {removeState: "c"}
+ *   {addTransition: ["a", "reset", "c"]}     {addTransition: {from, event, to, guard?, ...}}
+ *   {removeTransition: ["a", "go"]}          {updateTransition: ["a", "go", {guard: ...}]}
+ *   {set: ["/init", "a"]}                    {remove: "/init"}
+ *
+ * The long form is unchanged and is what the errors talk about.
+ */
+export function normalizeOperation(raw: unknown): EditOperation {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new OptionShapeError('EDIT_OPTION_INVALID', 'every op must be an object.')
+  }
+  const value = raw as Record<string, unknown>
+  if (typeof value.op === 'string') return value as EditOperation
+  const keys = Object.keys(value)
+  if (keys.length !== 1) {
+    throw new OptionShapeError('EDIT_OPTION_INVALID', `an operation names exactly one op, got ${JSON.stringify(keys)}.`)
+  }
+  const name = keys[0]
+  const argument = value[name]
+  if (name === 'addState' || name === 'removeState') {
+    if (typeof argument === 'string') {
+      return name === 'addState' ? { op: name, state: { id: argument } } : { op: name, id: argument }
+    }
+    if (name === 'addState' && argument !== null && typeof argument === 'object') return { op: name, state: argument }
+    throw new OptionShapeError('EDIT_OPTION_INVALID', `${name} takes a state id, or a state object for addState.`)
+  }
+  if (name === 'addTransition' || name === 'removeTransition' || name === 'updateTransition') {
+    if (Array.isArray(argument)) {
+      if (name === 'addTransition' && argument.length === 3) {
+        const [from, event, to] = argument
+        return { op: name, transition: { from, event, to } }
+      }
+      if (name === 'removeTransition' && argument.length === 2) {
+        const [from, event] = argument
+        return { op: name, from, event }
+      }
+      if (name === 'updateTransition' && argument.length === 3) {
+        const [from, event, patch] = argument
+        return { op: name, from, event, patch }
+      }
+      throw new OptionShapeError('EDIT_OPTION_INVALID', `${name} takes ${name === 'updateTransition' ? '["from", "event", {patch}]' : name === 'addTransition' ? '["from", "event", "to"]' : '["from", "event"]'}.`)
+    }
+    if (name === 'addTransition' && argument !== null && typeof argument === 'object') return { op: name, transition: argument }
+    throw new OptionShapeError('EDIT_OPTION_INVALID', `${name} takes a list, or a transition object for addTransition.`)
+  }
+  if (name === 'set') {
+    if (Array.isArray(argument) && argument.length === 2) return { op: 'set', path: argument[0], value: argument[1] }
+    if (argument !== null && typeof argument === 'object' && 'path' in (argument as Record<string, unknown>)) {
+      const { path, value } = argument as Record<string, unknown>
+      return { op: 'set', path, value }
+    }
+    throw new OptionShapeError('EDIT_OPTION_INVALID', 'set takes ["/path", value] or {path, value}.')
+  }
+  if (name === 'remove') {
+    if (typeof argument === 'string') return { op: 'remove', path: argument }
+    throw new OptionShapeError('EDIT_OPTION_INVALID', 'remove takes a JSON pointer string.')
+  }
+  throw new OptionShapeError('EDIT_OPTION_INVALID', `unknown op ${JSON.stringify(name)}. Known ops: addState, removeState, addTransition, removeTransition, updateTransition, set, remove.`)
+}
+
 /** Apply one operation to a model copy, returning the changes it made. */
 export function applyOperation(model: Json, operation: EditOperation): ModelChange[] {
   const op = requireString(operation.op, 'op')
@@ -192,10 +260,15 @@ export function applyEdits(path: unknown, operations: unknown, options: { allowI
   const { model: original, full } = readModelFile(path)
   const next = CLONE(original) as Json
   const changes: ModelChange[] = []
-  for (const [index, raw] of (operations as EditOperation[]).entries()) {
-    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new OptionShapeError('EDIT_OPTION_INVALID', `operation ${String(index + 1)} is not an object.`)
+  const normalized = (operations as unknown[]).map((raw, index) => {
+    try {
+      return normalizeOperation(raw)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new OptionShapeError('EDIT_OPTION_INVALID', `operation ${String(index + 1)} was refused: ${reason}`)
     }
+  })
+  for (const [index, raw] of normalized.entries()) {
     try {
       changes.push(...applyOperation(next, raw))
     } catch (error) {

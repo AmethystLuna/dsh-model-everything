@@ -37,7 +37,7 @@ export const modelEditTool = defineTool({
       type: 'json',
       required: true,
       description:
-        'Ordered list of operations. addState {state:{id, terminal?}} · removeState {id} · addTransition {transition:{from, event, to, guard?, updates?, cost?}} · removeTransition {from, event} · updateTransition {from, event, patch} · set {path, value} (JSON pointer) · remove {path}.',
+        'Ordered list of operations, applied as one batch. Compact form: {addState: "c"} · {removeState: "c"} · {addTransition: ["from", "event", "to"]} · {removeTransition: ["from", "event"]} · {updateTransition: ["from", "event", {guard: ...}]} · {set: ["/path", value]} · {remove: "/path"}. Long form ({op: ..., state/transition/path/value}) works too, and addState/addTransition take the full object when you need terminal, guard, updates or cost.',
     },
     reportView: {
       type: 'string',
