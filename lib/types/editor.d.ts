@@ -16,9 +16,15 @@ export declare function readModelFile(path: unknown): {
 /** Apply one operation to a model copy, returning the changes it made. */
 export declare function applyOperation(model: Json, operation: EditOperation): ModelChange[];
 /** Validate the edited model and write it atomically. A refused edit leaves the file untouched. */
-export declare function applyEdits(path: unknown, operations: unknown): {
+export interface EditOutcome {
     model: Json;
     changes: ModelChange[];
     full: string;
-};
+    /** Whether the model as written validates. False only when the caller allowed it. */
+    valid: boolean;
+    errors: string[];
+}
+export declare function applyEdits(path: unknown, operations: unknown, options?: {
+    allowInvalid?: boolean;
+}): EditOutcome;
 export {};

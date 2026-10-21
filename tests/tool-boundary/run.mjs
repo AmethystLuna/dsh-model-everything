@@ -1279,6 +1279,38 @@ await test('model_verify: the model can come from a file, and formatting does no
   await rm(dir, { recursive: true, force: true })
 })
 
+await test('model_edit: a batch may break the model on its way through, not at the end', async () => {
+  // Wiring is not one operation: a transition is added before the state it points at, or a state is
+  // removed before the transition that used it. Only the state at the end of the batch is judged.
+  const dir = await mkdtemp(join(tmpdir(), 'dme-edit-batch-'))
+  const file = join(dir, 'machine.json')
+  await writeFile(file, JSON.stringify({ schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b', terminal: true }], transitions: [{ from: 'a', event: 'go', to: 'b' }] }, null, 2) + String.fromCharCode(10))
+  const wired = await call('model_edit', {
+    modelPath: file,
+    ops: [
+      { op: 'addTransition', transition: { from: 'a', event: 'reset', to: 'c' } }, // c does not exist yet
+      { op: 'addState', state: { id: 'c' } },
+      { op: 'addTransition', transition: { from: 'c', event: 'go', to: 'b' } },
+    ],
+  })
+  const report = expectReport(wired, 'a batch that wires itself up')
+  expect(report.verdict !== 'fail', `the end state is a valid machine, got ${report.verdict}`)
+  expectEq(report.changes.length, 3, 'all three operations are reported')
+
+  // A batch that ENDS invalid names the operation it broke at, so the list can be fixed in one go.
+  const broken = await call('model_edit', { modelPath: file, ops: [{ op: 'addState', state: { id: 'd' } }, { op: 'addTransition', transition: { from: 'd', event: 'x', to: 'ghost' } }] })
+  const refusal = expectReport(broken, 'a batch that ends invalid')
+  expectEq(refusal.ran, false, 'nothing runs when the end state does not validate')
+  expect(/operation 2/i.test(String(refusal.error)), 'the refusal names the operation it broke at')
+
+  // A caller that genuinely needs two calls can say so, and then the file is invalid on purpose.
+  const staged = await call('model_edit', { modelPath: file, ops: [{ op: 'remove', path: '/init' }], allowInvalid: true, verify: false })
+  const stagedReport = expectReport(staged, 'a staged invalid write')
+  expectEq(stagedReport.modelValid, false, 'the reply says the model does not validate')
+  expect(Array.isArray(stagedReport.validationErrors) && stagedReport.validationErrors.length > 0, 'and carries the errors')
+  await rm(dir, { recursive: true, force: true })
+})
+
 await test('model_edit: one call answers what changed and what the engine now decides', async () => {
   // The loop this replaces: hand back the whole model, read the whole report, repeat. Here the file
   // keeps the model, one op names the change, and the reply carries both diffs.

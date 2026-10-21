@@ -176,26 +176,49 @@ export function applyOperation(model: Json, operation: EditOperation): ModelChan
 }
 
 /** Validate the edited model and write it atomically. A refused edit leaves the file untouched. */
-export function applyEdits(path: unknown, operations: unknown): { model: Json; changes: ModelChange[]; full: string } {
+export interface EditOutcome {
+  model: Json
+  changes: ModelChange[]
+  full: string
+  /** Whether the model as written validates. False only when the caller allowed it. */
+  valid: boolean
+  errors: string[]
+}
+
+export function applyEdits(path: unknown, operations: unknown, options: { allowInvalid?: boolean } = {}): EditOutcome {
   if (!Array.isArray(operations) || operations.length === 0) {
     throw new OptionShapeError('EDIT_OPTION_INVALID', 'ops must be a non-empty array of operations.')
   }
   const { model: original, full } = readModelFile(path)
   const next = CLONE(original) as Json
   const changes: ModelChange[] = []
-  for (const raw of operations as EditOperation[]) {
+  for (const [index, raw] of (operations as EditOperation[]).entries()) {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new OptionShapeError('EDIT_OPTION_INVALID', 'every op must be an object.')
+      throw new OptionShapeError('EDIT_OPTION_INVALID', `operation ${String(index + 1)} is not an object.`)
     }
-    changes.push(...applyOperation(next, raw))
+    try {
+      changes.push(...applyOperation(next, raw))
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new OptionShapeError('EDIT_OPTION_INVALID', `operation ${String(index + 1)} (${String((raw as EditOperation).op)}) was refused: ${reason}`)
+    }
   }
   const validation = validateModel(next)
-  if (!validation.ok) {
-    throw new OptionShapeError('EDIT_RESULT_INVALID', 'the edit would leave an invalid model, so nothing was written: ' + validation.errors.join('; '))
+  if (!validation.ok && options.allowInvalid !== true) {
+    // Name the operation the batch first stops validating at, not just the symptom: a caller that
+    // reads "a transition to an unknown state" still has to find which entry introduced it.
+    let firstBad = -1
+    const partial = CLONE(original) as Json
+    for (const [index, raw] of (operations as EditOperation[]).entries()) {
+      try { applyOperation(partial, raw) } catch { firstBad = index; break }
+      if (!validateModel(partial).ok) { firstBad = index; break }
+    }
+    const where = firstBad < 0 ? '' : ` Operation ${String(firstBad + 1)} (${String((operations as EditOperation[])[firstBad]?.op)}) is where it first stops validating.`
+    throw new OptionShapeError('EDIT_RESULT_INVALID', 'the batch would leave an invalid model, so nothing was written: ' + validation.errors.join('; ') + '.' + where + ' Fix the list, or pass allowInvalid to write it anyway and continue in a second call.')
   }
-  const text = JSON.stringify(validation.model, null, 2) + '\n'
+  const text = JSON.stringify(validation.ok ? validation.model : next, null, 2) + '\n'
   const temporary = full + '.tmp'
   writeFileSync(temporary, text, 'utf8')
   renameSync(temporary, full)
-  return { model: next, changes, full }
+  return { model: next, changes, full, valid: validation.ok, errors: validation.ok ? [] : validation.errors }
 }
