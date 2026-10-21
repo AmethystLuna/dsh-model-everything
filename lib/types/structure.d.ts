@@ -142,6 +142,8 @@ export declare function shortestCycle(nodes: string[], edges: StructureEdge[]): 
 export interface StructureReviewOptions {
     /** Diagram text to review. */
     diagram: string;
+    /** A graph built from source, instead of parsed from a diagram. `diagram` is then ignored. */
+    graph?: StructureGraph;
     notation?: 'auto' | StructureNotation;
     /** Dependency matrix: allowed/denied edges, layers, required edges. */
     matrix?: unknown;

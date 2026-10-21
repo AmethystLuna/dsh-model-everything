@@ -374,5 +374,34 @@ test('fixtures on disk parse', () => {
   if (report.summary.nodes < 4) throw new Error('fixture did not parse into a graph')
 })
 
+test('a source tree is scanned into a graph, and the graph is what gets judged', async () => {
+  // The review engine always judged a graph; drawing one first was the expensive step, and a model
+  // enumerating imports by hand gets it wrong in a way that looks like a code finding. This builds the
+  // graph from the code instead: a cycle, a hub, and a module nothing points at.
+  const { mkdtemp, rm, writeFile, mkdir } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { scanDependencyGraph } = await import('../../lib/scan.js')
+  const NL = String.fromCharCode(10)
+  const dir = await mkdtemp(join(tmpdir(), 'dme-scan-'))
+  await writeFile(join(dir, 'a.ts'), "import { b } from './b.js'" + NL + 'export const a = 1' + NL)
+  await writeFile(join(dir, 'b.ts'), "import { a } from './a.js'" + NL + 'export const b = 2' + NL)
+  await writeFile(join(dir, 'c.ts'), "import { a } from './a.js'" + NL + 'export const c = 3' + NL)
+  await writeFile(join(dir, 'lonely.ts'), 'export const lonely = true' + NL)
+  await mkdir(join(dir, 'node_modules'))
+  await writeFile(join(dir, 'node_modules', 'ignored.ts'), "import './a.js'" + NL)
+
+  const graph = scanDependencyGraph(dir)
+  if (graph.nodes.length !== 4) throw new Error('scanned nodes: expected 4, got ' + JSON.stringify(graph.nodes))
+  if (graph.edges.length !== 3) throw new Error('scanned edges: expected 3, got ' + JSON.stringify(graph.edges))
+  if (graph.nodes.includes('node_modules/ignored.ts')) throw new Error('node_modules must not be scanned')
+
+  const fromSource = reviewStructure({ diagram: '', graph: { notation: 'plantuml', nodes: graph.nodes.map((id) => ({ id, label: id, kind: 'component', container: false, declared: true })), edges: graph.edges.map((edge) => ({ from: edge.from, to: edge.to, line: 0 })), warnings: [] } })
+  const codes = [...new Set((fromSource.findings ?? []).map((finding) => finding.code))]
+  if (!codes.some((code) => code.startsWith('UML022'))) throw new Error('the a -> b -> a cycle must be reported, got ' + JSON.stringify(codes))
+  if (!codes.some((code) => code.startsWith('UML020'))) throw new Error('the unreferenced module must be reported isolated, got ' + JSON.stringify(codes))
+  await rm(dir, { recursive: true, force: true })
+})
+
 if (failures > 0) { console.log('structure tests failed:', failures); process.exit(1) }
 console.log('all structure tests passed')

@@ -187,7 +187,7 @@ And the gates around it:
 | `contributing` | 8 | the contribution mind map is the one the repository produces now |
 | `routing-map` | 4 | the routing map is the one the catalog produces now |
 | `report-reading` | 6 | the mind map is the one the engines produce now |
-| `structure` | 26 | parse: declarations, aliases, labels, containers and nesting |
+| `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `baseline` | 17 | self-baseline: the same report adds nothing and removes nothing |
 | `granularity` | 9 | a proper refinement passes and reports the expansion per pair |
 | `exporters` | 9 | source model still verifies (sanity) |

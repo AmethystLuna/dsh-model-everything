@@ -503,6 +503,8 @@ export function shortestCycle(nodes: string[], edges: StructureEdge[]): string[]
 export interface StructureReviewOptions {
   /** Diagram text to review. */
   diagram: string
+  /** A graph built from source, instead of parsed from a diagram. `diagram` is then ignored. */
+  graph?: StructureGraph
   notation?: 'auto' | StructureNotation
   /** Dependency matrix: allowed/denied edges, layers, required edges. */
   matrix?: unknown
@@ -531,8 +533,9 @@ function requireDiagramText(value: unknown): string {
 export function reviewStructure(options: StructureReviewOptions): StructureReport {
   // Not `if (options.diagram !== undefined)`: a missing `diagram` reached the parser as `undefined`
   // and threw a read of `split` on it - the same defect, one guard narrower.
-  requireDiagramText(options.diagram)
-  const graph = parseStructure(options.diagram, options.notation ?? 'auto')
+  // A graph built from source arrives already parsed; a caller that passes one has no diagram text to
+  // require, so the text guard belongs to the other branch.
+  const graph = options.graph ?? parseStructure(requireDiagramText(options.diagram), options.notation ?? 'auto')
   const warnings = [...graph.warnings]
   const findings: Finding[] = []
   const nodes = graph.nodes

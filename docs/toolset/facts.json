@@ -4,7 +4,7 @@
     {
       "skill": "model-everything",
       "chars": 498,
-      "body": 31047
+      "body": 31194
     },
     {
       "skill": "model-everything-datamodel",
@@ -176,7 +176,7 @@
       },
       {
         "name": "uml_structure_verify",
-        "tokens": 514,
+        "tokens": 583,
         "instead": [
           "model_verify"
         ],

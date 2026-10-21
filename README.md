@@ -144,7 +144,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_datamodel_verify` | 数据模型与迁移验证 |
 | `model_interleaving_scan` | 并发 / 同步 / 异步声明的挖掘与路由 |
 | `model_export` | 导出到外部检查器（UPPAAL / TLA+ / PRISM / SPIN） |
-| `uml_structure_verify` | 依赖图审计（含依赖矩阵与多层级细化） |
+| `uml_structure_verify` | 依赖图审计（含依赖矩阵与多层级细化）；也可以直接给 `repoPath`，由工具扫 TypeScript/JavaScript 的相对 import 建图 |
 | `model_design_review` | 设计审阅：依赖图形状 + 设计自身声明的契约（分层、职责边界、可替换性、接口宽度） |
 | `model_edit` | 按条改动模型文件（加/删状态、加/删/改迁移、指针 set/remove）：返回结构 diff 与发现 diff，一次调用完成「改—验—比」 |
 | `report_diff` | 两份报告比对：新增/消失/变化的发现 |
