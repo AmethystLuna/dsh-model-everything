@@ -236,3 +236,24 @@ baseline lost one trial in each run - one to the 420s timeout, one to a rubric t
 `tcp_slowtmr` and the `nrtx >= TCP_SYNMAXRTX` branch.
 
 Six trials per condition across the two runs: A passed four, C passed six.
+
+## Round 15 - a second protocol stack, and the advantage does not repeat (2026-10-22)
+
+picoTCP `modules/` + `include/` (125 files, `pico_tcp.c` at 3,314 lines). Two claims: that the
+retransmission bound applies to every state (false - the delete branch enumerates seven states and
+SYN_SENT is not among them), and that a client that never gets a reply leaves SYN_SENT (true - via
+`initconn_retry` and `PICO_TCP_MAX_CONNECT_RETRIES`).
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 3/3 | 23 / 26 / 25 | 64,798 / 68,571 / 58,062 |
+| C | 3/3 | 29 / 23 / 25 | 117,677 / 110,708 / 108,210 |
+
+Mean: A 63,810, C 112,198 - **1.76x**. Both passed everything.
+
+Where the difference went: the plugin condition read *more* than the baseline (69 reads and 111k chars
+against 63 and 72k), plus 26k of skill body and 14 `model_verify` calls. On lwIP the same condition
+read less; here it read more.
+
+So the protocol class is not a domain where the plugin pays. Across the two protocol cases the plugin
+is 0.93x on one and 1.76x on the other, and the direction does not repeat.
