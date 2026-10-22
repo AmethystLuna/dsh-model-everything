@@ -147,6 +147,20 @@ copied build, so they are evidence about the behaviour, not about the artifact.
   `dsh.compatibility.dshReleases` rather than assumed: the two sibling plugins
   measured it, this one did not.
 
+## Round: 0.3.0 on 0.1.7-rc.2
+
+- **What ran**: `compat-round.ps1` - install through the profile's package manager, `--dump-config`,
+  the packaged skills and locale files, a headless boot with a deliberately invalid API key, a real
+  report from the installed copy, then uninstall.
+- **Result**: row present and enabled; fourteen tools registered; the automaton family answered from
+  the installed copy (verdict `pass`, schema `model-everything/automaton/v1`); the row was gone after
+  uninstall.
+- **What it does not establish**: a live model session (the boot stops at AUTH), the loader tree beyond
+  `--dump-config`, and any surface other than headless.
+- **One thing to carry forward**: the row id is `dsh-model-everything`, not the bundle's short name. A
+  round invoked with `-Row model-everything` reports `ROW MISSING` while the plugin is mounted and
+  working, so read that line against `cordis.patch.yml` before believing it.
+
 ## What is not established
 
 - Loader-level composition beyond `--dump-config`: the probe mounts the installed
