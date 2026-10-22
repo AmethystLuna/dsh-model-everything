@@ -206,11 +206,13 @@ model_verify model=examples/control-dispatcher.json
 ```bash
 # 从源码目录安装（开发中）
 dsh plugin --profile <profile> add "file:$PWD"
-# 从 npm 安装（发布版）
-dsh plugin --profile <profile> add dsh-model-everything
+# 从 npm 安装（发布版）：**钉住版本**
+dsh plugin --profile <profile> add dsh-model-everything@<version>
 # 未全局安装 dsh 时
-npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
+npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything@<version>
 ```
+
+**为什么要钉版本**：刚发布的版本，不钉版本会装到上一个。两个原因叠加——镜像源的 `latest` 同步有延迟，而 pnpm 的 `minimumReleaseAge` 会拒收刚发布的版本。钉住版本时 dsh 的安装器会自动把这一条写进 profile 的 `minimumReleaseAgeExclude`，装完用 `--dump-config` 与安装副本的 `package.json` 核对版本。
 
 装完重启该 profile，`dsh --profile <profile> --dump-config` 里应能看到本插件的行。卸载同样走插件管理器，从目标 profile 移除。
 

@@ -215,11 +215,16 @@ The plugin ships as a cordis bundle, declared by `dsh.bundle` in the root `packa
 ```bash
 # from a source checkout (development)
 dsh plugin --profile <profile> add "file:$PWD"
-# the published version, from npm
-dsh plugin --profile <profile> add dsh-model-everything
+# the published version, from npm: pin it
+dsh plugin --profile <profile> add dsh-model-everything@<version>
 # without a global dsh
-npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything
+npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything@<version>
 ```
+
+**Why pin it.** Right after a release, an unpinned install resolves the previous version: the mirror's
+`latest` lags, and pnpm's `minimumReleaseAge` refuses a version that was published minutes ago. With the
+version named, the dsh installer records the exception in the profile's `minimumReleaseAgeExclude` itself;
+check the result with `--dump-config` and the installed copy's `package.json`.
 
 Restart the profile afterwards; `dsh --profile <profile> --dump-config` should list this plugin. Remove it with the same plugin manager.
 

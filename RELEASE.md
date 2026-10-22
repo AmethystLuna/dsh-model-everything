@@ -29,6 +29,20 @@ be stale the moment the first release lands.
 - [ ] `npm run lint:md`
 - [ ] `README.md` and `README.en-US.md` still say the same thing
 
+## 0b. After the publish
+
+An unpinned install resolves the previous version for a while: the mirror's `latest` lags and pnpm's
+`minimumReleaseAge` refuses a version published minutes ago. So the check is a **pinned** install, and it
+is the release's own confirmation that the registry has the artifact:
+
+```bash
+dsh plugin --profile scratch add dsh-model-everything@<x.y.z>
+```
+
+- [ ] the installed copy's `package.json` reports `<x.y.z>`
+- [ ] `--dump-config` lists the row, enabled
+- [ ] the README install lines name the version rather than the bare package
+
 ## 1. Mount check, in an isolated home
 
 Point `DSH_HOME` at a throwaway directory. Never test a mount against the real one.
