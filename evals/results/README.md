@@ -100,3 +100,19 @@ The substance: at 34 files the baseline answers correctly without help. The plug
 `uml_structure_verify` six to nine times per run, and also globbed (5-19 calls) and read (2-46 files)
 to cross-check it. So the tool is reached and trusted only partly, and the extra checks are what the
 13% buys.
+
+## Round 8 - the report states its own boundary (2026-10-22)
+
+Same case, plugin condition only (A is unchanged from round 7). The report now carries a SCAN line -
+files read, unresolved references, languages - and a sentence saying a recount by hand cannot find more.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A (round 7) | 3/3 | 28 / 25 / 28 | 76,402 / 58,705 / 72,410 |
+| C | 3/3 | 32 / 38 / 21 | 86,474 / 69,673 / 52,721 |
+
+Mean: A 69,172, C 69,623 - **1.01x**, against 1.13x in round 7.
+
+The model still cross-checks (7-12 globs, 2-37 reads, 3-8 structure calls per trial), so the parity is
+not "it stopped checking". The spread inside the condition is wide - 52k to 86k - which is the honest
+limit of three trials on a single case.
