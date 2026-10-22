@@ -117,7 +117,16 @@ The model still cross-checks (7-12 globs, 2-37 reads, 3-8 structure calls per tr
 not "it stopped checking". The spread inside the condition is wide - 52k to 86k - which is the honest
 limit of three trials on a single case.
 
-## Round 9 - a real repository of 226 files (2026-10-22)
+## Round 9 - VOID: the fixture was never seeded (2026-10-22)
+
+The case is `redis-graph`; the fixture directory was named `redis-src`, and the runner seeds
+`fixtures/<case name>`. So every redis run so far started in an **empty** workspace, the model went
+looking outside it, and the numbers below describe a search of the eval tree rather than a scan of the
+fixture. They are kept only to show what went wrong.
+
+The real round is round 13.
+
+## Round 9 (void) - a real repository of 226 files (2026-10-22)
 
 `redis/redis` at `src/`: 226 C files, 215,164 lines, 12 MB. Truth from an independent Python parse of
 `#include "..."`, cross-checked against the plugin's scan: 226 files, 552-562 edges, one cycle
@@ -194,3 +203,19 @@ trial, and one trial ran past the seven-minute harness timeout. The plugin condi
 This is the first round where the plugin costs less and passes more. It is also the first task whose
 answer is a decision over paths rather than a text lookup, which is what the earlier rounds kept
 failing to buy. One timeout in three trials is the whole margin, so treat it as a signal, not a result.
+
+## Round 13 - the redis case with its fixture actually present (2026-10-22)
+
+`fixtures/redis-graph/` renamed to match the case name, so the 226-file tree is seeded. Same three
+questions, prompt unchanged.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 3/3 | 14 / 23 / 19 | 56,168 / 68,913 / 51,851 |
+| C | 3/3 | 19 / 13 / 23 | 74,620 / 54,174 / 67,958 |
+
+Mean: A 58,977, C 65,584 - **1.11x**. Both loaded the ACL-diagnosis skill three times, so that
+artifact is symmetric and no longer distorts the comparison.
+
+Numbers for this case are ~30% lower than the void round, which is what a real workspace does: the
+model reads a seeded tree instead of searching for one.
