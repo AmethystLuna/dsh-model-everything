@@ -116,3 +116,20 @@ Mean: A 69,172, C 69,623 - **1.01x**, against 1.13x in round 7.
 The model still cross-checks (7-12 globs, 2-37 reads, 3-8 structure calls per trial), so the parity is
 not "it stopped checking". The spread inside the condition is wide - 52k to 86k - which is the honest
 limit of three trials on a single case.
+
+## Round 9 - a real repository of 226 files (2026-10-22)
+
+`redis/redis` at `src/`: 226 C files, 215,164 lines, 12 MB. Truth from an independent Python parse of
+`#include "..."`, cross-checked against the plugin's scan: 226 files, 552-562 edges, one cycle
+(`server.h` <-> `rdb.h`), `server.h` depended on by 82 files.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 3/3 | 30 / 31 / 21 | 99,910 / 72,613 / 67,776 |
+| C | 3/3 | 27 / 22 / 35 | 89,243 / 75,000 / 90,815 |
+
+Mean: A 80,100, C 85,019 - **1.06x**. Both answered all three questions.
+
+At 215k lines the baseline is still cheap, because it never reads the tree: it greps for one include
+and counts. A graph question is a computation the model can script, so size does not make the plugin
+worth it. What the plugin would need is a question grep cannot answer.
