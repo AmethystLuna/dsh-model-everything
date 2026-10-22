@@ -82,3 +82,21 @@ The plugin used `uml_structure_verify` with `repoPath` in all three trials (3, 7
 Both conditions failed the same way: the question "which module has the most dependents, and how
 many" is not answered by the report, which lists cycles, isolated nodes and matrix violations but no
 degree summary. Every trial that failed got the hub count wrong, whichever condition it ran in.
+
+## Round 7 - the structural question with the truth corrected (2026-10-22)
+
+Round 6's rubric named `report-view.ts` as the hub. It is not: the report's own GRAPH line puts
+`engine.ts` first with 18 dependents. The rubric was the failure, and it marked correct answers wrong.
+With the truth corrected, and the degree summary shipping, the same case:
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 3/3 | 28 / 25 / 28 | 76,402 / 58,705 / 72,410 |
+| C | 3/3 | 32 / 31 / 30 | 95,823 / 56,225 / 83,299 |
+
+Mean: A 69,172, C 78,449 - **1.13x**, three steps more each.
+
+The substance: at 34 files the baseline answers correctly without help. The plugin condition called
+`uml_structure_verify` six to nine times per run, and also globbed (5-19 calls) and read (2-46 files)
+to cross-check it. So the tool is reached and trusted only partly, and the extra checks are what the
+13% buys.
