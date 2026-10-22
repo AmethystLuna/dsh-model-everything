@@ -74,6 +74,11 @@
   ],
   "provenance": [
     {
+      "path": "model-everything/references/automata.md",
+      "hasProvenance": true,
+      "citesSource": false
+    },
+    {
       "path": "model-everything/references/dsh-model-schema.md",
       "hasProvenance": true,
       "citesSource": true

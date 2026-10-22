@@ -6,11 +6,11 @@
   },
   "surfaces": {
     "catalog": 3381,
-    "bodies": 78237,
-    "references": 154331,
-    "referenceFiles": 10,
-    "toolChars": 27448,
-    "toolCount": 13
+    "bodies": 78338,
+    "references": 160167,
+    "referenceFiles": 11,
+    "toolChars": 29271,
+    "toolCount": 14
   },
   "toolsWithWhen": 0,
   "routingFamilies": [
@@ -22,6 +22,10 @@
     "uml"
   ],
   "tools": [
+    {
+      "name": "model_automaton_verify",
+      "chars": 983
+    },
     {
       "name": "model_compose_verify",
       "chars": 1362

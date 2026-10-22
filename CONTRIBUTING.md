@@ -29,7 +29,7 @@ would change is agreed and reproducible.
 
 - **The published method**, with its year and venue. Which paper or standard, and where in it.
 - **The house convention it would replace.** Some checks are published methods and some are this
-  repository's own conventions, and the reference files separate the two: 4 of 10 reference files
+  repository's own conventions, and the reference files separate the two: 5 of 11 reference files
   carry a provenance section today. Most of the shipped checks are house conventions, so a proposal
   that assumes a published basis needs to say where it comes from.
 - **Whether the source is being read correctly.** The two results in a source are often neighbours:
