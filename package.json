@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-everything",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Modeling abstraction and automated review for designs and code, including a refactoring harness: UML diagrams, executable verification of machines and protocols with before/after regression, data-model and migration checks, concurrency claim routing, export to external checkers, dependency-graph review, and report diffing. Native plugin for DeepSeek Harness (dsh).",
   "type": "module",
   "main": "lib/index.js",

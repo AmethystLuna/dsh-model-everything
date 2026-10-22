@@ -44,10 +44,13 @@ one because three of them were the corpus's fault rather than the descriptions':
 | draw the machine, and flag anything unsound | `uml_render` | `uml_review` | a compound request |
 
 The two compound requests were measuring which half of a two-part job a reader picks, which is not routing.
-They are single-purpose now. The two on the structure/design pair are a real finding: one request about a
-fact and one about a rule, and the descriptions did not separate them for a reader in a hurry. That is the
-kind of defect this corpus exists to expose, and the next move is to sharpen those two descriptions rather
-than to change the expectation.
+They are single-purpose now. The two on the structure/design pair were a real finding: one request about a
+fact and one about a rule, and the descriptions did not separate them for a reader in a hurry.
+
+**Third run, after both were fixed: 36 of 36.** The descriptions now say which one answers a fact and which
+one judges a rule, each pointing at the other, and the compound requests ask for one thing. Nothing else
+changed between the runs, so the four fixes are what moved the score - which is the point of keeping the
+corpus: a misroute is a description defect, and a description defect is fixable in an afternoon.
 
 Both runs are description-level. A description that routes well in this test can still fail in a live
 session, where the model also has the system prompt, the skill catalog and its own priors; the way to
