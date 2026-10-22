@@ -33,6 +33,7 @@ const modules = {
   model_design_review: (await import('../lib/design-tool.js')).designTool,
   report_diff: (await import('../lib/report-diff-tool.js')).reportDiffTool,
   model_edit: (await import('../lib/edit-tool.js')).modelEditTool,
+  model_automaton_verify: (await import('../lib/automaton-tool.js')).modelAutomatonTool,
 }
 const expected = new Set(Object.values(modules).map((definition) => definition.name))
 const missing = [...expected].filter((name) => !registered.includes(name))

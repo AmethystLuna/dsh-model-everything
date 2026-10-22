@@ -40,6 +40,10 @@
       "count": 10
     },
     {
+      "file": "automaton.ts",
+      "count": 9
+    },
+    {
       "file": "uml-composite.ts",
       "count": 8
     },
@@ -121,6 +125,7 @@
     }
   ],
   "suites": [
+    "automaton",
     "baseline",
     "catalog",
     "concurrency",

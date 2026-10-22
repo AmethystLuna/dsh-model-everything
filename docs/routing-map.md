@@ -25,6 +25,7 @@ mindmap
       row: 498 of 500 chars
       tool: model_verify
       tool: model_edit
+      tool: model_automaton_verify
       tool: model_compose_verify
       tool: model_export
       tool: report_diff
@@ -119,6 +120,7 @@ nothing else at that moment.
 
 | Tool | Owned by skill | First sentence (what the model reads first) |
 |---|---|---|
+| `model_automaton_verify` | `model-everything` | "Decide a finite-word automaton: what it accepts, whether it is empty, whether a state is a trap, and whether its language equals, contains or is conta" |
 | `model_compose_verify` | `model-everything` | "Check two or more LogicModelV1 machines together." |
 | `model_datamodel_verify` | `model-everything-datamodel` | "Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression." |
 | `model_design_review` | `model-everything-design` | "Hold a design to the contracts it declares about itself: layering, responsibility ownership, substitutability, interface width." |

@@ -158,6 +158,7 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_export` | 导出到外部检查器（UPPAAL / TLA+ / PRISM / SPIN） |
 | `uml_structure_verify` | 依赖图审计（含依赖矩阵与多层级细化）；也可以直接给 `repoPath`，由工具按语言的 import 构造建图（C/C++、Python、TypeScript/JavaScript、Go、Rust、Java/Kotlin/Scala、C#、PHP、Ruby、Lua、Zig、Dart、Elixir） |
 | `model_design_review` | 设计审阅：依赖图形状 + 设计自身声明的契约（分层、职责边界、可替换性、接口宽度） |
+| `model_automaton_verify` | 有限词自动机：空语言、陷阱状态、可达性，以及与另一台自动机的等价/包含关系；关系不成立时给出**最短反例词** |
 | `model_edit` | 按条改动模型文件（加/删状态、加/删/改迁移、指针 set/remove）：返回结构 diff 与发现 diff，一次调用完成「改—验—比」 |
 | `report_diff` | 两份报告比对：新增/消失/变化的发现 |
 

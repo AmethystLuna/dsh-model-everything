@@ -40,6 +40,7 @@ import { umlStructureTool } from '../../lib/structure-tool.js'
 import { designTool } from '../../lib/design-tool.js'
 import { reportDiffTool } from '../../lib/report-diff-tool.js'
 import { modelEditTool } from '../../lib/edit-tool.js'
+import { modelAutomatonTool } from '../../lib/automaton-tool.js'
 
 // ---------------------------------------------------------------------------
 // The harness
@@ -131,6 +132,7 @@ const TOOL_DEFINITIONS = [
   designTool,
   reportDiffTool,
   modelEditTool,
+  modelAutomatonTool,
 ]
 
 // `ToolRuntime`'s constructor registers its per-scope tool-schema contribution on
@@ -253,6 +255,20 @@ const EDIT_FIXTURE = join(tmpdir(), 'dme-boundary-edit.json')
 writeFileSync(EDIT_FIXTURE, JSON.stringify(MACHINE, null, 2))
 const EDIT_OPS = [{ op: 'set', path: '/states/0/_touched', value: 1 }]
 
+/** A two-state automaton that accepts words ending in `a`. */
+const AUTOMATON_FIXTURE = {
+  states: ['s0', 's1'],
+  alphabet: ['a', 'b'],
+  transitions: [
+    { from: 's0', symbol: 'a', to: 's1' },
+    { from: 's0', symbol: 'b', to: 's0' },
+    { from: 's1', symbol: 'a', to: 's1' },
+    { from: 's1', symbol: 'b', to: 's1' },
+  ],
+  init: 's0',
+  accepting: ['s1'],
+}
+
 const REQUIRED_PARAMS = {
   model_verify: { required: [], valid: () => ({ model: MACHINE }) },
   model_datamodel_verify: { required: [], valid: () => ({ model: DATA_MODEL }) },
@@ -267,6 +283,7 @@ const REQUIRED_PARAMS = {
   model_design_review: { required: [], valid: () => ({ model: DESIGN_MODEL }) },
   report_diff: { required: ['baseline', 'current'], valid: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }) },
   model_edit: { required: ['modelPath', 'ops'], valid: () => ({ modelPath: EDIT_FIXTURE, ops: EDIT_OPS }) },
+  model_automaton_verify: { required: ['automaton'], valid: () => ({ automaton: AUTOMATON_FIXTURE }) },
 }
 
 /** One wrong-typed or out-of-enum argument per tool, with the violation the schema must report. */
@@ -284,6 +301,7 @@ const TYPE_ERRORS = {
   model_design_review: { args: { model: DESIGN_MODEL, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
   report_diff: { args: { baseline: REPORT_BASELINE, current: REPORT_CURRENT, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
   model_edit: { args: { modelPath: EDIT_FIXTURE, ops: EDIT_OPS, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
+  model_automaton_verify: { args: { automaton: AUTOMATON_FIXTURE, reportView: 'pretty' }, param: 'reportView', violation: 'must be one of ["digest","full"]' },
 }
 
 /** A call that succeeds, used for the reportView matrix and the per-tool view-schema case. */
@@ -301,6 +319,7 @@ const VIEW_CASES = {
   model_design_review: () => ({ model: DESIGN_MODEL }),
   report_diff: () => ({ baseline: REPORT_BASELINE, current: REPORT_CURRENT }),
   model_edit: () => ({ modelPath: EDIT_FIXTURE, ops: EDIT_OPS }),
+  model_automaton_verify: () => ({ automaton: AUTOMATON_FIXTURE }),
 }
 
 const TABLE_NAMES = [
