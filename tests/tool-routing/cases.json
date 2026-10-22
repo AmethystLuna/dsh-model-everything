@@ -1,0 +1,89 @@
+{
+  "note": "One case per tool, each written at the boundary the routing table names: the expected tool, and the neighbour a reader could mistake for it. The structural half of the suite checks coverage against src/routing.ts; the scored half is run by hand with --print-prompt or --decisions.",
+  "cases": [
+    {
+      "prompt": "Does this order state machine have a reachable state where it is paid but never shipped?",
+      "expect": "model_verify",
+      "mustNot": "model_compose_verify",
+      "why": "one machine on its own, not a composition"
+    },
+    {
+      "prompt": "Two workers both increment the same counter through one queue. Can an update be lost?",
+      "expect": "model_compose_verify",
+      "mustNot": "model_verify",
+      "why": "two machines and a shared location"
+    },
+    {
+      "prompt": "Does our parser accept every message the specification's grammar accepts?",
+      "expect": "model_automaton_verify",
+      "mustNot": "model_verify",
+      "why": "a language relation, not reachability in one machine"
+    },
+    {
+      "prompt": "Rename the state idle to waiting and add a transition from waiting to done on commit.",
+      "expect": "model_edit",
+      "mustNot": "model_verify",
+      "why": "an edit round, answered with the diff"
+    },
+    {
+      "prompt": "Our migration dropped a column. Did any row lose a value that the old table held?",
+      "expect": "model_datamodel_verify",
+      "mustNot": "model_verify",
+      "why": "stored data across a migration, not behaviour over time"
+    },
+    {
+      "prompt": "Does this design keep its own layering rule, and can the subtype stand in for the supertype?",
+      "expect": "model_design_review",
+      "mustNot": "uml_structure_verify",
+      "why": "the design's own declarations, not a graph audit"
+    },
+    {
+      "prompt": "The plan says the scheduler is thread-safe. Which claims does it make, and who decides them?",
+      "expect": "model_interleaving_scan",
+      "mustNot": "model_compose_verify",
+      "why": "mining claims and routing them, before any protocol is built"
+    },
+    {
+      "prompt": "Turn this model into a TLA+ spec so we can check the liveness property ourselves.",
+      "expect": "model_export",
+      "mustNot": "model_verify",
+      "why": "a translation for a property this plugin does not decide"
+    },
+    {
+      "prompt": "What changed between the report we had last week and the one we just ran?",
+      "expect": "report_diff",
+      "mustNot": "model_verify",
+      "why": "two reports to compare, not a new run"
+    },
+    {
+      "prompt": "Draw this state machine as a PlantUML state diagram.",
+      "expect": "uml_render",
+      "mustNot": "uml_review",
+      "why": "drawing, not judging"
+    },
+    {
+      "prompt": "Read this Mermaid stateDiagram back into a model we can run.",
+      "expect": "uml_parse",
+      "mustNot": "uml_review",
+      "why": "reading a diagram, not auditing it"
+    },
+    {
+      "prompt": "Is this diagram's modelling sound - unreachable states, ambiguous branches, a dead end?",
+      "expect": "uml_review",
+      "mustNot": "model_verify",
+      "why": "a question about the drawing"
+    },
+    {
+      "prompt": "What labels will the PlantUML parser accept for a deployment diagram?",
+      "expect": "uml_explain_labels",
+      "mustNot": "uml_parse",
+      "why": "the accepted spellings, not a particular diagram"
+    },
+    {
+      "prompt": "Scan the source tree for import cycles between these packages.",
+      "expect": "uml_structure_verify",
+      "mustNot": "model_design_review",
+      "why": "a graph, from the code rather than from a drawing"
+    }
+  ]
+}
