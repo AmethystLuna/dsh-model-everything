@@ -173,3 +173,24 @@ Mean: A 68,426, C 96,428 - **1.41x**, eight steps more.
 Both found the relaxed counter and the missing happens-before, so the claim did not discriminate. The
 plugin condition ran longer: it loaded the skill twice, ran `model_interleaving_scan`, and still read
 the same two files the baseline read.
+
+## Round 12 - a protocol state machine, and the first round the plugin wins (2026-10-22)
+
+lwIP `src/` (200 files, `tcp.c` at 2,696 lines, 11 PCB states, retransmit counters, two timers). Two
+claims, both false: that `SYN_SENT` retries forever because `nrtx` resets, and that a PCB can sit with
+unacked data and no timer to fire. Prompt-level network ban; transcripts show **0 web calls**.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 2/3 (one **timed out at 420s**) | 34 / 34 / 69 | 141,042 / 143,746 / 154,432 |
+| C | 3/3 | 40 / 25 / 33 | 144,567 / 144,485 / 126,878 |
+
+Mean tokens: A 146,407, C 138,643 - **0.95x**, and C passed one trial more.
+
+What the two conditions did with that budget: the baseline grepped 18-40 times and read 25-49 files per
+trial, and one trial ran past the seven-minute harness timeout. The plugin condition called
+`model_verify` three or four times in every trial - it built the machine and decided on it.
+
+This is the first round where the plugin costs less and passes more. It is also the first task whose
+answer is a decision over paths rather than a text lookup, which is what the earlier rounds kept
+failing to buy. One timeout in three trials is the whole margin, so treat it as a signal, not a result.
