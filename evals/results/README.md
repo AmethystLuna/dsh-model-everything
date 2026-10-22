@@ -152,5 +152,24 @@ Three runs, and none of them is a measurement:
 
 What that establishes: a case built from a public fix leaks through the network, an assertion is
 post-hoc and cannot prevent the call, and disabling the rows is not the same as taking the network
-away. The case is parked until the eval runs with no network at all - a sandbox-level block, not a
-tool-level one.
+away.
+
+**The fix that worked: forbid it in the prompt.** The case now says "do not use any network tool - no
+web_search, no web_fetch, no curl", and the post-hoc assertion is gone. Re-run with that wording: zero
+web calls in either condition, which is what makes the numbers below a measurement.
+
+## Round 11 - the semantic case, valid this time (2026-10-22)
+
+libuv at the parent of `067c56e3`, the busy-counter race. Prompt-level network ban, verified from the
+transcripts: **0 web calls in either condition**.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 3/3 | 10 / 7 / 13 | 102,615 / 48,831 / 53,831 |
+| C | 3/3 | 16 / 23 / 16 | 109,197 / 99,433 / 80,653 |
+
+Mean: A 68,426, C 96,428 - **1.41x**, eight steps more.
+
+Both found the relaxed counter and the missing happens-before, so the claim did not discriminate. The
+plugin condition ran longer: it loaded the skill twice, ran `model_interleaving_scan`, and still read
+the same two files the baseline read.
