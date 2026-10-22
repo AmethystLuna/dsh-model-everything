@@ -190,7 +190,9 @@ B 层两条新夹具（测试全绿、文档断言为假）：`job-runner`（`on
 1. **读工作区**（`read`+`grep`，47–87%）——这是基线的主要开销，也是判定类工具能替代的部分（tcp 里 read 从 108 次降到 85 次）；
 2. **技能正文加载**（11–30%）——这一项**上一版记错了**：那 3–6 次是**三 trial 的合计**。按单个会话看，每次 trial 只加载 **1–2 次**（入口技能 + 一个领域技能），这是设计如此，不是重复读取。
 
-   真正浪费的是第三种情况：redis 的三次 trial 都加载了 **`diagnose-windows-sandbox-acl`**——任务与它无关，触发原因是评测环境的沙箱拒绝（`sandbox escalation to "danger-full-access" requires approval`），模型看到报错就去读诊断技能，每次约 5k tokens。**这是评测环境的伪影，不是产品问题**：给评测一个 workspace-write 的沙箱即可消除。
+   真正浪费的是第三种情况：redis 的三次 trial 都加载了 **`diagnose-windows-sandbox-acl`**——任务与它无关，触发原因是评测环境的沙箱拒绝（`sandbox escalation to "danger-full-access" requires approval`），模型看到报错就去读诊断技能，每次约 5k tokens。**这是评测环境的伪影，不是产品问题**。
+
+   **但「换成 workspace-write」没能消掉它**：把 `permission` 行的 `defaultPreset` 改成 workspace-write（`--dump-config` 已确认生效）后重跑 redis，模型仍然触发同一条提权拒绝、仍然加载诊断技能（8 次加载、36,731 tokens，占 30%）。原因是它执行的命令要读**工作区之外**的路径（用户主目录），那在任何沙箱下都要提权。要真正消掉，得让模型不越界读，或者在评测 home 里干脆**不提供这个技能**。
 
 所以「像编译器一样只报 warning/error、通过项只给计数」这个方向**已经实现了**（`CHECKS` 行就是计数概要，正文只内联 error 的条目），它能再挤的空间只有 3–4%。
 
