@@ -34,6 +34,11 @@ export interface ReportCard {
     next: string | null;
     /** Which family produced this, so a card can pick an icon and a colour without parsing codes. */
     family: string;
+    /** What this family owns, and where the case just outside it goes. One table, not a second prose copy. */
+    route?: {
+        owns: string;
+        instead: string;
+    };
 }
 /**
  * Project a report into the card payload.

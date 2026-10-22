@@ -27,18 +27,35 @@ for (const skill of skills) {
   const description = /^description:\s*"([\s\S]*?)"\s*$/m.exec(body)[1]
   rows.push({ skill, chars: description.length, body: body.length, description })
 }
-const catalogChars = rows.reduce((sum, row) => sum + row.chars + row.skill.length + 2, 0)
+// The same formula the usage guide quotes: the description clamped to the host's budget, plus the skill
+// name. Two guides, one number.
+const catalogChars = rows.reduce((sum, row) => sum + Math.min(row.chars, 500) + row.skill.length, 0)
+
+// The two on-demand surfaces, measured from the same files the host ships: a body is paid when the model
+// loads it, a reference only when it follows through.
+const lf = (text) => text.replace(/\r\n/g, '\n')
+const bodies = rows.reduce((sum, row) => sum + row.body, 0)
+let references = 0
+for (const skill of skills) {
+  let names = []
+  try { names = readdirSync(repo + 'skills/' + skill + '/references').filter((entry) => entry.endsWith('.md')) } catch { continue }
+  for (const name of names) references += lf(readFileSync(repo + 'skills/' + skill + '/references/' + name, 'utf8')).length
+}
 
 // --------------------------------------------------------------------- the tools, from the objects --
 
-const modules = ['compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'edit-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js']
+const modules = ['automaton-tool.js', 'compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'edit-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js']
 const tools = []
 for (const file of modules) {
   const mod = await import(libUrl + file)
   for (const value of Object.values(mod)) {
     if (value === null || typeof value !== 'object') continue
     if (typeof value.name !== 'string' || typeof value.description !== 'string' || value.parameters === undefined) continue
-    tools.push({ name: value.name, chars: value.description.length, description: value.description, definition: JSON.stringify({ name: value.name, description: value.description, parameters: value.parameters }).length })
+    // Measure what the model pays for every turn: the name, the description and every parameter's own
+    // description. Counting descriptions alone understates the surface by more than half once parameters
+    // carry real text, and the two guides quoting different numbers for one surface is the drift this
+    // map exists to prevent.
+    tools.push({ name: value.name, chars: JSON.stringify({ name: value.name, description: value.description, parameters: value.parameters }).length, description: value.description })
   }
 }
 const toolChars = tools.reduce((sum, tool) => sum + tool.chars, 0)
@@ -77,6 +94,14 @@ const routingWithoutBoundary = valueRouting.filter((entry) => !entry.statesBound
 // ----------------------------------------------------- the fifth surface, from real reports --
 
 const { runVerification, runCompositionVerification } = await import(libUrl + 'engine.js')
+const { ROUTES } = await import(libUrl + 'routing.js')
+
+// The map may not be written for a roster the table does not cover: a tool with no route is a tool whose
+// neighbouring case nobody decided, and the map is where that decision is published.
+const unrouted = tools.filter((tool) => ROUTES[tool.name] === undefined).map((tool) => tool.name)
+if (unrouted.length > 0) throw new Error('tools with no routing entry: ' + unrouted.join(', '))
+const strayRoutes = Object.keys(ROUTES).filter((name) => !tools.some((tool) => tool.name === name))
+if (strayRoutes.length > 0) throw new Error('routing entries for tools that do not exist: ' + strayRoutes.join(', '))
 const { runDataVerification } = await import(libUrl + 'data-engine.js')
 const { runDesignReview } = await import(libUrl + 'design-engine.js')
 const { reviewStructure } = await import(libUrl + 'structure.js')
@@ -124,15 +149,15 @@ const add = (depth, text, isRoot = false) => {
 add(0, 'root((how a model learns to use this plugin))', true)
 
 add(1, 'four orders of magnitude, and only two of them are free')
-add(2, 'the catalog: about four thousand characters, always visible')
+add(2, 'the catalog: ' + String(catalogChars) + ' characters, always visible')
 add(3, String(rows.length) + ' rows, the longest at ' + String(Math.max(...rows.map((row) => row.chars))) + ' of 500')
 add(4, 'a row past 500 loses its tail to the model, silently')
-add(2, 'the tool descriptions: about ten thousand characters, always visible')
+add(2, 'the tool descriptions: ' + String(toolChars) + ' characters, always visible')
 add(3, String(tools.length) + ' descriptions, the longest at ' + String(longest.chars) + ' characters')
 add(4, 'no ceiling here, so a description grows without anything objecting')
-add(2, 'a skill body: about nine thousand characters, on load')
+add(2, 'a skill body: the bodies together are ' + String(bodies) + ' characters, loaded one at a time')
 add(3, 'the model chooses it from the row alone')
-add(2, 'the references: about thirty-eight thousand characters, on follow-through')
+add(2, 'the references: ' + String(references) + ' characters, on follow-through')
 add(3, 'the only part paid for by need rather than by default')
 
 add(1, 'what the always-visible text has to carry')
@@ -152,6 +177,13 @@ add(2, 'tool descriptions: ' + String(toolsWithSibling.length) + ' of ' + String
 add(3, 'the ones that name none: ' + toolsWithoutSibling.join(', '))
 add(2, 'and the result routes onward in ' + String(routingFamilies.length) + ' of ' + String(Object.keys(reports).length) + ' families')
 add(3, 'that is the only channel that can redirect a model mid-task')
+
+add(1, 'what each tool owns, and where the case beside it goes')
+for (const tool of tools) {
+  const route = ROUTES[tool.name]
+  add(2, tool.name + ': ' + route.owns)
+  add(3, 'not this: ' + route.notFor.when + ' - that is ' + route.notFor.tool)
+}
 
 add(1, 'the five routes that do not need luck')
 add(2, 'a rejection names the tool that would accept the input')

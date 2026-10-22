@@ -15,6 +15,7 @@
  * Both are pure and replayable: they read the persisted value, never the filesystem.
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { routeFor } from './routing.js'
 import type { ToolResultView } from '@deepseek-ai/dsh-tools'
 
 /** One finding, as a card needs it: a code to name it and a sentence to read. */
@@ -36,6 +37,8 @@ export interface ReportCard {
   next: string | null
   /** Which family produced this, so a card can pick an icon and a colour without parsing codes. */
   family: string
+  /** What this family owns, and where the case just outside it goes. One table, not a second prose copy. */
+  route?: { owns: string; instead: string }
 }
 
 const SHORT = 160
@@ -86,6 +89,9 @@ export function reportCard(value: unknown, family: string): ReportCard {
       : { code: String(first.code ?? 'UNKNOWN'), severity: severity(first), message: shorten(String(first.message ?? '')) },
     next: next === undefined ? null : shorten(next),
     family,
+    ...(routeFor(family) === undefined
+      ? {}
+      : { route: { owns: routeFor(family)?.owns ?? '', instead: routeFor(family)?.notFor.tool ?? '' } }),
   }
 }
 

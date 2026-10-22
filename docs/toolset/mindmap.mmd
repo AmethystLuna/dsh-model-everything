@@ -1,15 +1,15 @@
 mindmap
 root((how a model learns to use this plugin))
   four orders of magnitude, and only two of them are free
-    the catalog: about four thousand characters, always visible
+    the catalog: 3381 characters, always visible
       7 rows, the longest at 498 of 500
         a row past 500 loses its tail to the model, silently
-    the tool descriptions: about ten thousand characters, always visible
-      13 descriptions, the longest at 1834 characters
+    the tool descriptions: 29271 characters, always visible
+      14 descriptions, the longest at 2824 characters
         no ceiling here, so a description grows without anything objecting
-    a skill body: about nine thousand characters, on load
+    a skill body: the bodies together are 78338 characters, loaded one at a time
       the model chooses it from the row alone
-    the references: about thirty-eight thousand characters, on follow-through
+    the references: 160167 characters, on follow-through
       the only part paid for by need rather than by default
   what the always-visible text has to carry
     the words a user would say
@@ -23,10 +23,39 @@ root((how a model learns to use this plugin))
       the budget is why: space spent on praise is space not spent on a trigger
   where each property stands today
     skill rows: 7 of 7 name a sibling, 7 of 7 state a non-goal
-    tool descriptions: 13 of 13 name a sibling, 13 of 13 state a non-goal
+    tool descriptions: 14 of 14 name a sibling, 14 of 14 state a non-goal
       the ones that name none: 
     and the result routes onward in 6 of 6 families
       that is the only channel that can redirect a model mid-task
+  what each tool owns, and where the case beside it goes
+    model_automaton_verify: a finite-word language, and its relation to another automaton
+      not this: the question is reachability or deadlock inside one state machine - that is model_verify
+    model_compose_verify: several machines run together: rendezvous, shared locations, lost updates
+      not this: the question is about one machine on its own - that is model_verify
+    model_interleaving_scan: mining a document or plan for concurrency claims, and routing each to the analysis that decides it
+      not this: the protocol itself has to be decided - that is model_compose_verify
+    model_datamodel_verify: entities, keys, migrations, and whether the data survived them
+      not this: the question is about behaviour over time rather than stored state - that is model_verify
+    model_design_review: a design's own declarations: layering, responsibility, substitutability, interface width
+      not this: the artifact is a dependency drawing to audit as a graph - that is uml_structure_verify
+    model_edit: one editing round on a model file, answered with the structural diff and the change in findings
+      not this: the edit is done and the model has to be decided again - that is model_verify
+    model_export: a model translated into UPPAAL, TLA+, PRISM or SPIN for a property this plugin does not decide
+      not this: the property can be decided here - that is model_verify
+    report_diff: what changed between two reports of the same family
+      not this: the current report does not exist yet - that is model_verify
+    uml_structure_verify: a dependency graph as a graph - cycles, layers, dangling edges - from a drawing or a source tree
+      not this: the question is whether the design keeps its own principles - that is model_design_review
+    uml_explain_labels: the label spellings a notation accepts and the directives that pin the rest
+      not this: a diagram has to be read rather than explained - that is uml_parse
+    uml_parse: reading a diagram back into the model its family declares
+      not this: the question is whether the diagram says something sound - that is uml_review
+    uml_render: drawing a model in the notation that can carry its family
+      not this: the question is whether the modelling is sound - that is uml_review
+    uml_review: auditing the modelling: reachability, ambiguity, round-trip fidelity, family-specific defects
+      not this: the claim is about behaviour rather than the drawing - that is model_verify
+    model_verify: one machine: reachable states, invariants, deadlock, and a before/after regression
+      not this: two or more machines must handshake or share a location - that is model_compose_verify
   the five routes that do not need luck
     a rejection names the tool that would accept the input
       the model is already holding the wrong one when it finds out
@@ -36,19 +65,20 @@ root((how a model learns to use this plugin))
     a description names its neighbour and its edge
   what each description decides, and what it costs to have it
     a description earns its space three ways: what it decides, when that pays, what to use instead
-    model_compose_verify - 646 tokens, instead: model_verify
-    model_interleaving_scan - 570 tokens, instead: model_verify, model_compose_verify
-    model_datamodel_verify - 551 tokens, instead: model_verify, uml_structure_verify
-    model_design_review - 601 tokens, instead: uml_structure_verify
-    model_edit - 574 tokens, instead: model_datamodel_verify, model_design_review, model_verify
-    model_export - 286 tokens, instead: model_verify
-    report_diff - 426 tokens, instead: model_verify, model_datamodel_verify, model_design_review, uml_review, uml_structure_verify, model_interleaving_scan
-    uml_structure_verify - 626 tokens, instead: model_verify
-    uml_explain_labels - 231 tokens, instead: uml_parse, uml_review
-    uml_parse - 459 tokens, instead: uml_review
-    uml_render - 594 tokens, instead: uml_review, uml_parse
-    uml_review - 593 tokens, instead: model_verify
-    model_verify - 706 tokens, instead: model_compose_verify
+    model_automaton_verify - 0 tokens, instead: model_verify, model_compose_verify
+    model_compose_verify - 0 tokens, instead: model_verify
+    model_interleaving_scan - 0 tokens, instead: model_verify, model_compose_verify
+    model_datamodel_verify - 0 tokens, instead: model_verify, uml_structure_verify
+    model_design_review - 0 tokens, instead: uml_structure_verify
+    model_edit - 0 tokens, instead: model_datamodel_verify, model_design_review, model_verify
+    model_export - 0 tokens, instead: model_verify
+    report_diff - 0 tokens, instead: model_verify, model_datamodel_verify, model_design_review, uml_review, uml_structure_verify, model_interleaving_scan
+    uml_structure_verify - 0 tokens, instead: model_verify
+    uml_explain_labels - 0 tokens, instead: uml_parse, uml_review
+    uml_parse - 0 tokens, instead: uml_review
+    uml_render - 0 tokens, instead: uml_review, uml_parse
+    uml_review - 0 tokens, instead: model_verify
+    model_verify - 0 tokens, instead: model_compose_verify
     every description states its boundary
   why a map rather than a paragraph
     the budget is spatial, so the picture has to be spatial
