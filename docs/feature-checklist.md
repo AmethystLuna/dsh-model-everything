@@ -196,7 +196,7 @@ And the gates around it:
 | `automaton` | 10 | a well-formed automaton with a reachable accepting state passes |
 | `presentation` | 6 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
-| `tool-routing` | 4 | every case names a tool the routing table covers |
+| `tool-routing` | 6 | every case names a tool the routing table covers |
 | `tools` | 6 | a refused edit leaves the file byte-identical |
 | `baseline` | 17 | self-baseline: the same report adds nothing and removes nothing |
 | `granularity` | 9 | a proper refinement passes and reports the expansion per pair |

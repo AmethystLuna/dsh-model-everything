@@ -67,6 +67,22 @@ check('every routed tool is the answer to at least one case', () => {
   if (missing.length > 0) throw new Error('no case expects: ' + missing.join(', '))
 })
 
+check('every route has a case where the two tools could both be argued for', () => {
+  // A clean one-to-one corpus can be answered by elimination. The ambiguous case is what forces a reading
+  // of the descriptions: both tools fit, and only the wording decides.
+  for (const [tool, route] of Object.entries(ROUTES)) {
+    const ambiguous = corpus.cases.some((entry) => entry.expect === tool && entry.mustNot === route.notFor.tool && entry.ambiguous === true)
+    if (!ambiguous) throw new Error(tool + ' has no ambiguous case against ' + route.notFor.tool)
+  }
+})
+
+check('an ambiguous case says which phrase decides it', () => {
+  for (const entry of corpus.cases) {
+    if (entry.ambiguous !== true) continue
+    if (typeof entry.why !== 'string' || entry.why.length < 20) throw new Error('ambiguous case for ' + entry.expect + ' does not say what decides it')
+  }
+})
+
 check("every route's own near miss is a case's near miss", () => {
   for (const [tool, route] of Object.entries(ROUTES)) {
     const used = corpus.cases.some((entry) => entry.expect === tool && entry.mustNot === route.notFor.tool)

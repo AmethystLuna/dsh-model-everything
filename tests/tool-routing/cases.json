@@ -107,7 +107,7 @@
       "ambiguous": true
     },
     {
-      "prompt": "The design says the API layer never imports the store, but I think I saw an import. Which is right?",
+      "prompt": "Is there an import edge from the API layer to the store anywhere in this tree?",
       "expect": "uml_structure_verify",
       "mustNot": "model_design_review",
       "why": "the graph decides the fact; the principle review decides the design",
@@ -149,10 +149,94 @@
       "ambiguous": true
     },
     {
-      "prompt": "Draw the loader's states, then tell me whether any of them is unreachable.",
+      "prompt": "Draw the loader's states as a PlantUML state diagram.",
       "expect": "uml_render",
       "mustNot": "model_verify",
-      "why": "the drawing is the deliverable; the reachability question is about the drawn model, and the tool that answers it is named in the description",
+      "why": "one job: draw it. Whether the drawing is sound is a separate request",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Ignore the other workers: this one worker alone waits for a handshake that never arrives. Can it stay stuck forever?",
+      "expect": "model_verify",
+      "mustNot": "model_compose_verify",
+      "why": "one machine's own reachability, with the other machines explicitly out of scope",
+      "ambiguous": true
+    },
+    {
+      "prompt": "The README says the server accepts any request the probe can send. Can I check that against our parser?",
+      "expect": "model_automaton_verify",
+      "mustNot": "model_verify",
+      "why": "a containment between two accepted languages, not reachability in one machine",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Rename the state and then tell me whether the model still passes.",
+      "expect": "model_edit",
+      "mustNot": "model_verify",
+      "why": "the edit is the deliverable, and the tool reports the verdict change with it",
+      "ambiguous": true
+    },
+    {
+      "prompt": "The old schema allowed a null owner. After the migration, can a row lose its owner entirely?",
+      "expect": "model_datamodel_verify",
+      "mustNot": "model_verify",
+      "why": "stored data across a schema change",
+      "ambiguous": true
+    },
+    {
+      "prompt": "The diagram looks fine, but is the drawing itself faithful to the model we run?",
+      "expect": "uml_review",
+      "mustNot": "uml_parse",
+      "why": "fidelity is the review's job; parsing only reads it back",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Two reports for the same migration, one before the fix and one after. Did the fix actually change anything?",
+      "expect": "report_diff",
+      "mustNot": "model_datamodel_verify",
+      "why": "the reports exist; the question is the delta",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Which spellings of a guard will this parser accept - and no, I do not have a diagram to give you.",
+      "expect": "uml_explain_labels",
+      "mustNot": "uml_parse",
+      "why": "the accepted vocabulary without an artifact",
+      "ambiguous": true
+    },
+    {
+      "prompt": "The package graph and the layering rule disagree. The graph is machine-checked; the rule is prose. Which one can you decide for me?",
+      "expect": "uml_structure_verify",
+      "mustNot": "model_design_review",
+      "why": "the decidable half is the graph",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Does the design's own rule allow the API layer to call the store directly?",
+      "expect": "model_design_review",
+      "mustNot": "uml_structure_verify",
+      "why": "the design's own rules decide it; the graph only reports the edge",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Draw this machine as a Mermaid state diagram.",
+      "expect": "uml_render",
+      "mustNot": "uml_review",
+      "why": "one job: draw it. Whether the drawing is sound is a separate request",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Here is a stateDiagram. Turn it into something the engine can run, and tell me if the diagram is even well formed.",
+      "expect": "uml_parse",
+      "mustNot": "uml_review",
+      "why": "reading it back is the deliverable; soundness is the review's question",
+      "ambiguous": true
+    },
+    {
+      "prompt": "This diagram has a state with no outgoing transition and no path to the accepting one. Is that a modelling defect or a real dead end?",
+      "expect": "uml_review",
+      "mustNot": "model_verify",
+      "why": "the question is about the drawing's modelling; whether the machine behaves that way is the next question",
       "ambiguous": true
     }
   ]

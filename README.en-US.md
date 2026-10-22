@@ -34,18 +34,24 @@ What the extra buys:
 When it is not worth it: when one reading of the code settles the claim, or three lines of script count
 it out. **It does not buy speed over reading.** It buys the claims that reading cannot decide.
 
+**It decides small models, not programs.** The engine enumerates states, so a model that explodes is
+reported `truncated` with the undecided check named. That is not a bug to retry with a larger `maxStates`:
+reduce the model first, and if it still explodes the property needs a tool that does not enumerate - SPIN
+for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin builds no
+abstraction and reads no program source.
+
 ## What it covers
 
 | Domain | What it does |
 |---|---|
 | Claim checking | Enumerates the verifiable claims in a design, spec or review comment. Checks each against the code with a citation, and says plainly which ones it could not settle |
-| Behaviour | State machines and protocols: structural checks, adversarial probes, budgets and deadlines, before/after regression. Composition checks catch deadlock and a rendezvous that never fires |
+| Behaviour | State machines and protocols: structural checks, adversarial probes, budgets and deadlines, before/after regression. Composition checks catch deadlock and a rendezvous that never fires. Finite-word automata decide language relations - equivalence, inclusion - and return the shortest witness word |
 | Diagrams | UML 2.5 diagram families: render, parse and modelling review (including the render→parse fidelity check), in Mermaid and PlantUML |
 | Structure | Component, package, class and deployment diagrams audited as dependency graphs: isolated nodes, dangling endpoints, cycles, matrix and layer violations, missing required edges |
 | Data | Data models and migrations: structure, migration coverage, copy consistency, rollback symmetry, before/after data regression |
 | Concurrency / synchrony / async | Mines claims about how work is executed (thread-safe, locks, interrupts, async/await, the event loop) and routes each to a tool that can decide it. It proves nothing itself |
 | Export | Exports a verified model as input for UPPAAL, TLA+, PRISM or SPIN |
-| Reports | Report body rendering, baseline comparison (`report_diff`), hash specification |
+| Reports | Report body rendering, baseline comparison (`report_diff`), hash specification. Every report also carries a summary for a UI - verdict, the first finding, the next step - while the model still gets the full text |
 
 ## Typical uses
 
