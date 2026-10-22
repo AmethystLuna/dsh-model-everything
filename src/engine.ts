@@ -300,6 +300,12 @@ function verificationNextSteps(checks: CheckResult[], coverage: NarrativeCoverag
   if (coverage !== undefined && !narrativeComplete(coverage)) {
     steps.push('Complete the narrative (states ' + coverage.states + ', events ' + coverage.events + ', scenarios ' + coverage.scenarios + ') — a partial narrative is valid, but a reader still has to re-derive the missing symbols.')
   }
+  // A truncated search is the one outcome where "look harder" is the wrong advice: the wall is
+  // combinatorial, and raising maxStates buys a constant factor. Name the ladder instead, so the reader
+  // knows this is not a bug to fix but a model to reduce, or a different tool to use.
+  if (hasUndecidedFinding(checks)) {
+    steps.push('The search stopped before deciding, so the undecided checks are neither proven nor refuted. Do not just raise maxStates: first reduce the model (drop variables the property does not read, collapse symmetric states, order independent events), and if it still explodes, move to a tool that does not enumerate every state - SPIN for partial-order reduction, NuSMV/nuXMV for symbolic search, CBMC for bounded SAT. This plugin establishes no abstraction and reads no program source, so a property that needs one is outside it.')
+  }
   // The range is dropped: the code that would be reported back is already named in `findings`, and a
   // reader who has not seen a report yet learns nothing from four digits.
   steps.push('Re-run with beforeModel/stateMapping after the change to prove the behaviour did not regress: behaviour preserved, invariants continuous, the state mapping consistent. Then compare the two reports with `report_diff` rather than reading them side by side.')

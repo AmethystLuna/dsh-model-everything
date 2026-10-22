@@ -11,6 +11,8 @@ For an unverified design, failure is only a matter of time. Complex code becomes
 
 **This is the entry point.** Load this skill when a claim about the code has to be settled and a reading will not settle it. It owns the doctrine: enumerate the claims, verify each against the code, cite `file:line`, read `verdict`. It also owns the executable verification for behaviour. A neighbouring domain goes to its own skill through the routing table below.
 
+**It decides small models, not programs.** The engine enumerates states, so a model that explodes is reported `truncated` with the undecided check named. That is not a bug to retry with a larger `maxStates`: reduce the model first (drop variables the property does not read, collapse symmetric states), and if it still explodes the property needs a tool that does not enumerate - SPIN for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin builds no abstraction and reads no program source.
+
 **This costs more than reading.** Measured on our own corpus, the same task runs from parity to several times the cost, depending on the shape of the question. Reach for it when the claim is about all paths rather than one, when nothing in the repository will go red if it is false, or when the verdict has to be reproducible later. A claim one reading settles belongs in a sentence, not in a model.
 
 | The task involves… | What it does |

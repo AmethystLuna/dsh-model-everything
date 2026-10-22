@@ -154,12 +154,23 @@ function determinise(automaton: Automaton, symbols: string[]): Dfa {
   return { start, accept, delta, labels: subsets.map((subset) => (subset[0] === SINK ? [] : subset)) }
 }
 
-/** Shortest word accepted by `a` but not by `b`, when one exists. */
-function difference(first: Dfa, second: Dfa, symbols: string[]): string[] | undefined {
+/** The product search stopped at its cap, so the relation is undecided rather than true. */
+const UNDECIDED = Symbol('undecided')
+
+/**
+ * Shortest word accepted by `a` but not by `b`, when one exists.
+ *
+ * The product has at most |a| x |b| states, which is fine for the machines this family is for and can
+ * still explode on two large ones. The cap turns that into "undecided", because a search that stopped
+ * is not a proof that the languages are equal.
+ */
+function difference(first: Dfa, second: Dfa, symbols: string[], limit = 10_000): string[] | undefined | typeof UNDECIDED {
   const seen = new Set<string>()
   const queue: { left: number; right: number; word: string[] }[] = [{ left: first.start, right: second.start, word: [] }]
   seen.add(first.start + ':' + second.start)
+  let expanded = 0
   while (queue.length > 0) {
+    if (++expanded > limit) return UNDECIDED
     const node = queue.shift() as { left: number; right: number; word: string[] }
     if (first.accept[node.left] && !second.accept[node.right]) return node.word
     for (const [symbolIndex, symbol] of symbols.entries()) {
@@ -233,6 +244,8 @@ export interface AutomatonReport {
   findings: AutomatonFinding[]
   /** Set when the relation fails: the shortest word that breaks it. */
   witness?: { word: string[]; reason: string }
+  /** True when the product search stopped before deciding, so `pass` is not a proof of equality. */
+  truncated?: boolean
   hashes: { automaton: string; other?: string }
   nextSteps: string[]
 }
@@ -304,6 +317,9 @@ export function verifyAutomaton(input: unknown, options: { other?: unknown; rela
       const second = determinise(other, symbols)
       const missing = difference(dfa, second, symbols)
       const extra = difference(second, dfa, symbols)
+      if (missing === UNDECIDED || extra === UNDECIDED) {
+        findings.push({ code: 'AUT009_UNDECIDED', severity: 'warning', message: 'the product search stopped at its state cap before deciding the relation, so equality is neither proven nor refuted', detail: 'the product of two automata can be exponential; reduce one of them, or decide the relation with a tool that searches symbolically' })
+      } else
       if (relation === 'equivalent') {
         if (missing !== undefined || extra !== undefined) {
           const word = missing ?? extra
@@ -346,6 +362,7 @@ export function verifyAutomaton(input: unknown, options: { other?: unknown; rela
     automaton: { states: automaton.states.length, transitions: automaton.transitions.length, alphabet: automaton.alphabet.length, deterministic },
     findings,
     ...(witness === undefined ? {} : { witness }),
+    ...(findings.some((finding) => finding.code === 'AUT009_UNDECIDED') ? { truncated: true } : {}),
     hashes: { automaton: hashAutomaton(automaton), ...(otherForHash === undefined ? {} : { other: hashAutomaton(otherForHash) }) },
     nextSteps,
   }

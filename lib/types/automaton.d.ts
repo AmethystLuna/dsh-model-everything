@@ -43,6 +43,8 @@ export interface AutomatonReport {
         word: string[];
         reason: string;
     };
+    /** True when the product search stopped before deciding, so `pass` is not a proof of equality. */
+    truncated?: boolean;
     hashes: {
         automaton: string;
         other?: string;
