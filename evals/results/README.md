@@ -257,3 +257,18 @@ read less; here it read more.
 
 So the protocol class is not a domain where the plugin pays. Across the two protocol cases the plugin
 is 0.93x on one and 1.76x on the other, and the direction does not repeat.
+
+## Round 16 - the 0.3.0 regression check on the one case that had a result (2026-10-23)
+
+0.3.0 added a tool and grew the tool definitions by about nine per cent, so the question was whether the
+one case with a measured advantage still had it. Same case, same environment, new build.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 2/3 (one error at 42 steps) | 42 / 43 / 43 | 169,380 / 155,170 / 168,694 |
+| C | 3/3 | 37 / 40 / 31 | 146,029 / 159,935 / 128,572 |
+
+Mean: A 164,415, C 144,845 - **0.88x**, against 0.93x at round 14 and 0.95x at round 12.
+
+Three runs of this case now: the plugin passed nine of nine trials, the baseline six of nine, and the
+ratio moved from 0.95 to 0.88 while its fixed cost grew. The added text did not eat the advantage.
