@@ -219,3 +219,20 @@ artifact is symmetric and no longer distorts the comparison.
 
 Numbers for this case are ~30% lower than the void round, which is what a real workspace does: the
 model reads a seeded tree instead of searching for one.
+
+## Round 14 - the protocol case again, in a clean environment (2026-10-22)
+
+Same case as round 12: seeded fixture, prompt-level network ban, HOME inside the scratch tree. Run
+independently of round 12.
+
+| condition | passed | steps | tokens |
+|---|---|---|---|
+| A | 2/3 | 37 / 37 / 33 | 143,671 / 150,999 / 159,294 |
+| C | 3/3 | 41 / 33 / 32 | 149,796 / 139,070 / 134,433 |
+
+Mean: A 151,321, C 141,100 - **0.93x**. Round 12 gave 0.95x on the same case, so the direction repeated
+across two independent runs: the plugin condition is slightly cheaper and passed every trial, while the
+baseline lost one trial in each run - one to the 420s timeout, one to a rubric that requires naming
+`tcp_slowtmr` and the `nrtx >= TCP_SYNMAXRTX` branch.
+
+Six trials per condition across the two runs: A passed four, C passed six.
