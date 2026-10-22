@@ -147,6 +147,7 @@ node tests/routing-map/run.mjs
 node tests/report-reading/run.mjs
 node tests/structure/run.mjs
 node tests/automaton/run.mjs
+node tests/presentation/run.mjs
 node tests/baseline/run.mjs
 node tests/granularity/run.mjs
 node tests/exporters/run.mjs
@@ -190,6 +191,7 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 10 | a well-formed automaton with a reachable accepting state passes |
+| `presentation` | 6 | the card keeps the verdict, the counts and the first error |
 | `baseline` | 17 | self-baseline: the same report adds nothing and removes nothing |
 | `granularity` | 9 | a proper refinement passes and reports the expansion per pair |
 | `exporters` | 9 | source model still verifies (sanity) |

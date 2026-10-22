@@ -6,6 +6,7 @@ import { scanDependencyGraph } from './scan.js'
 import { reviewGranularity, type GranularityDiagram } from './granularity.js'
 import { OptionShapeError, optionRefusal, requireArrayOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
+import { reportCard, reportResultView } from './presentation.js'
 
 export const STRUCTURE_TOOL_NAME = 'uml_structure_verify'
 
@@ -57,7 +58,12 @@ export const umlStructureTool = defineTool({
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]
     },
+    // The card a UI shows, separated from the text the model reads.
+    presentationMeta(_args, value) {
+      return reportCard(value, STRUCTURE_TOOL_NAME) as unknown as JsonValue
+    },
   },
+  presentResult: reportResultView(STRUCTURE_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {

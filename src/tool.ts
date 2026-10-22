@@ -2,6 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runVerification } from './engine.js'
 import { renderReportText } from './report-view.js'
+import { reportCard, reportResultView } from './presentation.js'
 import { OptionShapeError, optionRefusal, requireObjectOption } from './option-shape.js'
 import { oneOf } from './model-file.js'
 
@@ -63,7 +64,12 @@ export const modelVerifyTool = defineTool({
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full', check: args.check }) }]
     },
+    // The card a UI shows, separated from the text the model reads.
+    presentationMeta(_args, value) {
+      return reportCard(value, MODEL_VERIFY_TOOL_NAME) as unknown as JsonValue
+    },
   },
+  presentResult: reportResultView(MODEL_VERIFY_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
