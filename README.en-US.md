@@ -19,6 +19,21 @@ A native DeepSeek Harness plugin. It turns the assertions a design makes **about
 - **Compare a refactor**: a model before and after, with the two reports side by side.
 - **Leave a record**: conclusions fixed into a report with hashes, recomputable and comparable and exportable.
 
+## It costs more; what it returns is a verdict
+
+This is a capability tool, not a token-saving one. We measured it on our own corpus: on the same task it
+runs from parity to several times the cost, depending on the shape of the question, and the direction
+does not hold.
+
+What the extra buys:
+
+- a conclusion that can be **recomputed**: hashes, `verdict`, citations, not a paragraph that reads like one;
+- a **counterexample path**: the steps or the event sequence that breaks the claim;
+- a **portable model**: the same conclusion can be handed to UPPAAL, TLA+, PRISM or SPIN for a second opinion.
+
+When it is not worth it: when one reading of the code settles the claim, or three lines of script count
+it out. **It does not buy speed over reading.** It buys the claims that reading cannot decide.
+
 ## What it covers
 
 | Domain | What it does |

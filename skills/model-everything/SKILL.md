@@ -9,7 +9,9 @@ For an unverified design, failure is only a matter of time. Complex code becomes
 
 ## When This Skill Applies
 
-**This is the entry point.** Load this skill whenever you need to check whether something about the code is true, however small the claim looks. It owns the doctrine: enumerate the claims, verify each against the code, cite `file:line`, read `verdict`. It also owns the executable verification for behaviour. A neighbouring domain goes to its own skill through the routing table below.
+**This is the entry point.** Load this skill when a claim about the code has to be settled and a reading will not settle it. It owns the doctrine: enumerate the claims, verify each against the code, cite `file:line`, read `verdict`. It also owns the executable verification for behaviour. A neighbouring domain goes to its own skill through the routing table below.
+
+**This costs more than reading.** Measured on our own corpus, the same task runs from parity to several times the cost, depending on the shape of the question. Reach for it when the claim is about all paths rather than one, when nothing in the repository will go red if it is false, or when the verdict has to be reproducible later. A claim one reading settles belongs in a sentence, not in a model.
 
 | The task involves… | What it does |
 |---|---|
