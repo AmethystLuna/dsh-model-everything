@@ -21,9 +21,13 @@ A native DeepSeek Harness plugin. It turns the assertions a design makes **about
 
 ## It costs more; what it returns is a verdict
 
-This is a capability tool, not a token-saving one. We measured it on our own corpus: on the same task it
-runs from parity to several times the cost, depending on the shape of the question, and the direction
-does not hold.
+This is a capability tool, not a token-saving one.
+
+**How much it costs depends on the size of the task, and the direction is the opposite of intuition.** On a
+fixture of a few hundred lines it costs several times the baseline, because the fixed cost - skill body,
+tool definitions - has nothing to amortise against. On an object of tens of thousands of lines across
+hundreds of files the ratio falls back toward parity: we measured 0.93x to 1.11x. **The larger the task,
+the better the trade**: one decision replaces dozens of `read` calls rather than a few lines of code.
 
 What the extra buys:
 

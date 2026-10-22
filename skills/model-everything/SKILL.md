@@ -13,7 +13,7 @@ For an unverified design, failure is only a matter of time. Complex code becomes
 
 **It decides small models, not programs.** The engine enumerates states, so a model that explodes is reported `truncated` with the undecided check named. That is not a bug to retry with a larger `maxStates`: reduce the model first (drop variables the property does not read, collapse symmetric states), and if it still explodes the property needs a tool that does not enumerate - SPIN for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin builds no abstraction and reads no program source.
 
-**This costs more than reading.** Measured on our own corpus, the same task runs from parity to several times the cost, depending on the shape of the question. Reach for it when the claim is about all paths rather than one, when nothing in the repository will go red if it is false, or when the verdict has to be reproducible later. A claim one reading settles belongs in a sentence, not in a model.
+**This costs more than reading, and less the larger the task.** On a fixture of a few hundred lines it costs several times a plain reading, because the fixed cost has nothing to amortise against. On a tree of tens of thousands of lines the ratio falls to roughly parity. Spend it where the object is large enough for one decision to replace many reads. Reach for it when the claim is about all paths rather than one, when nothing in the repository will go red if it is false, or when the verdict has to be reproducible later. A claim one reading settles belongs in a sentence, not in a model.
 
 | The task involves… | What it does |
 |---|---|
