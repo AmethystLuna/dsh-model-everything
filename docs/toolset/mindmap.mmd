@@ -4,8 +4,8 @@ root((how a model learns to use this plugin))
     the catalog: 3381 characters, always visible
       7 rows, the longest at 498 of 500
         a row past 500 loses its tail to the model, silently
-    the tool descriptions: 29271 characters, always visible
-      14 descriptions, the longest at 2824 characters
+    the tool descriptions: 29935 characters, always visible
+      14 descriptions, the longest at 2960 characters
         no ceiling here, so a description grows without anything objecting
     a skill body: the bodies together are 78531 characters, loaded one at a time
       the model chooses it from the row alone
@@ -37,7 +37,7 @@ root((how a model learns to use this plugin))
     model_datamodel_verify: entities, keys, migrations, and whether the data survived them
       not this: the question is about behaviour over time rather than stored state - that is model_verify
     model_design_review: a design's own declarations: layering, responsibility, substitutability, interface width
-      not this: the artifact is a dependency drawing to audit as a graph - that is uml_structure_verify
+      not this: the question is a fact about the graph - does this edge exist - that is uml_structure_verify
     model_edit: one editing round on a model file, answered with the structural diff and the change in findings
       not this: the edit is done and the model has to be decided again - that is model_verify
     model_export: a model translated into UPPAAL, TLA+, PRISM or SPIN for a property this plugin does not decide
@@ -45,7 +45,7 @@ root((how a model learns to use this plugin))
     report_diff: what changed between two reports of the same family
       not this: the current report does not exist yet - that is model_verify
     uml_structure_verify: a dependency graph as a graph - cycles, layers, dangling edges - from a drawing or a source tree
-      not this: the question is whether the design keeps its own principles - that is model_design_review
+      not this: the question is a rule the design declared for itself, not an edge that exists - that is model_design_review
     uml_explain_labels: the label spellings a notation accepts and the directives that pin the rest
       not this: a diagram has to be read rather than explained - that is uml_parse
     uml_parse: reading a diagram back into the model its family declares
@@ -73,7 +73,7 @@ root((how a model learns to use this plugin))
     model_edit - 0 tokens, instead: model_datamodel_verify, model_design_review, model_verify
     model_export - 0 tokens, instead: model_verify
     report_diff - 0 tokens, instead: model_verify, model_datamodel_verify, model_design_review, uml_review, uml_structure_verify, model_interleaving_scan
-    uml_structure_verify - 0 tokens, instead: model_verify
+    uml_structure_verify - 0 tokens, instead: model_design_review, model_verify
     uml_explain_labels - 0 tokens, instead: uml_parse, uml_review
     uml_parse - 0 tokens, instead: uml_review
     uml_render - 0 tokens, instead: uml_review, uml_parse

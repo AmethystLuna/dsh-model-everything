@@ -44,7 +44,7 @@ export const ROUTES: Record<string, Route> = {
   },
   model_design_review: {
     owns: "a design's own declarations: layering, responsibility, substitutability, interface width",
-    notFor: { when: 'the artifact is a dependency drawing to audit as a graph', tool: 'uml_structure_verify' },
+    notFor: { when: 'the question is a fact about the graph - does this edge exist', tool: 'uml_structure_verify' },
   },
   model_interleaving_scan: {
     owns: 'mining a document or plan for concurrency claims, and routing each to the analysis that decides it',
@@ -76,7 +76,7 @@ export const ROUTES: Record<string, Route> = {
   },
   uml_structure_verify: {
     owns: 'a dependency graph as a graph - cycles, layers, dangling edges - from a drawing or a source tree',
-    notFor: { when: 'the question is whether the design keeps its own principles', tool: 'model_design_review' },
+    notFor: { when: 'the question is a rule the design declared for itself, not an edge that exists', tool: 'model_design_review' },
   },
 }
 

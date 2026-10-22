@@ -37,7 +37,7 @@
       "body": 8203
     }
   ],
-  "toolChars": 29271,
+  "toolChars": 29935,
   "tools": [
     {
       "name": "model_automaton_verify",
@@ -57,7 +57,7 @@
     },
     {
       "name": "model_design_review",
-      "chars": 2404
+      "chars": 2611
     },
     {
       "name": "model_edit",
@@ -73,7 +73,7 @@
     },
     {
       "name": "uml_structure_verify",
-      "chars": 2503
+      "chars": 2960
     },
     {
       "name": "uml_explain_labels",
@@ -97,8 +97,8 @@
     }
   ],
   "perTurn": {
-    "chars": 32652,
-    "tokens": 8163
+    "chars": 33316,
+    "tokens": 8329
   },
   "routing": {
     "rowsWithSibling": 7,
@@ -191,6 +191,7 @@
         "name": "uml_structure_verify",
         "tokens": 0,
         "instead": [
+          "model_design_review",
           "model_verify"
         ],
         "statesBoundary": true

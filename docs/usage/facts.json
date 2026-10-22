@@ -9,10 +9,10 @@
     "bodies": 78531,
     "references": 160167,
     "referenceFiles": 11,
-    "toolChars": 29271,
+    "toolChars": 29935,
     "toolCount": 14
   },
-  "toolsWithWhen": 0,
+  "toolsWithWhen": 1,
   "routingFamilies": [
     "verify",
     "compose",
@@ -40,7 +40,7 @@
     },
     {
       "name": "model_design_review",
-      "chars": 968
+      "chars": 1175
     },
     {
       "name": "model_edit",
@@ -56,7 +56,7 @@
     },
     {
       "name": "uml_structure_verify",
-      "chars": 959
+      "chars": 1416
     },
     {
       "name": "uml_explain_labels",

@@ -20,8 +20,8 @@ root((how a plugin gets used))
   what each surface costs
     per turn, paid whether or not it is used
       catalog rows, 3381 characters
-      tool definitions, 29271 characters
-        the four that cost most: model_verify 784, model_compose_verify 718, uml_structure_verify 695, model_design_review 668 tokens
+      tool definitions, 29935 characters
+        the four that cost most: uml_structure_verify 822, model_verify 784, model_design_review 725, model_compose_verify 718 tokens
         the other 10 total 5266 tokens
         what each buys, and where it sends you instead, is in docs/toolset/mindmap.mmd
     on load, paid once
@@ -36,7 +36,7 @@ root((how a plugin gets used))
     and neither surface is read after a tool has run
       so the result has to carry the routing
   what the numbers say is missing
-    0 of 14 tool descriptions open with a when clause
+    1 of 14 tool descriptions open with a when clause
       the model reads these every turn and acts through them
     6 of 6 report families route to a sibling
       a report that says nothing next leaves the model where it was

@@ -59,102 +59,83 @@ abstraction and reads no program source.
 
 ## Typical uses
 
+Each one says what to hand over, which field to read, and what the tool does not do.
+
 ### A refactoring harness
 
-A refactor may change the implementation. It may not change the behaviour. Let an engine settle that, instead of reading the diff:
+1. Extract the **BEFORE** model; keep the old schema for the data side.
+2. Refactor.
+3. Extract the **AFTER** model.
+4. `model_verify` with `beforeModel` and `stateMapping`; `model_datamodel_verify` with `fieldMapping` for data.
+5. `report_diff` against the baseline report: **a newly added error is the reason to reject the refactor**.
 
-1. **Before**: extract a BEFORE model from the code as it stands (`uml_parse` reads an existing diagram, or write the model against the schema).
-2. **Refactor**.
-3. **After**: extract an AFTER model.
-4. **Regression**: `model_verify` with `beforeModel` and `stateMapping` runs the before/after regression: behaviour preserved, invariants continuous, the state mapping consistent. On the data side, `model_datamodel_verify` runs the same comparison over data, from its `beforeModel`, `fieldMapping` and `migrationMappings`.
-5. **Verdict and record**: `report_diff` compares against the baseline report. An added error finding is the reason not to accept the refactor. The hashes in the report let the conclusion be recomputed.
+It compares two models, not two codebases. It reads no diff, changes no code, runs no test.
 
-It compares the **two models you give it**, not two versions of the code. Whether each model is faithful to its own source is what steps 1 and 3 are for, and it does not do that part for you. It does not read the diff, edit code or run your tests either. It answers "is the behaviour still the same", not "was this a good refactor".
+### A state machine or a flow
 
-### Reviewing a code flow
+1. Hand the diagram to `uml_parse`, or write the model against the schema.
+2. `model_verify` runs the structural checks and the adversarial probes: unreachable states, absorbing cycles, silently ignored events, budgets, deadlines.
+3. Put the always/never claims into `invariants` and get the shortest counterexample path back.
+4. For the drawing alone, `uml_review`: are the branches exhaustive, is there a dead end.
+5. Every error finding goes back to the code; fixing the model is `model_edit`, which returns the structural diff and the change in findings in one call.
 
-Draw the branching logic as a flow, then read what the picture actually says:
+**A correct drawing is not correct code** - that step belongs to the extraction.
 
-1. **Extract the flow**: write the branches of a function or a service as a `LogicModelV1`, or draw a `stateDiagram-v2` / PlantUML diagram by hand.
-2. **Read it back**: give the hand-drawn diagram to `uml_parse`. A line it cannot read becomes a warning rather than disappearing.
-3. **Review it**: `uml_review` reports the structural defects - unreachable states, dead ends, a branch that is ambiguous or not exhaustive, a self-loop with no exit, isolated nodes, cycles - and the documentation gaps.
-4. **Reconcile with the source**: take every finding back to the code. A correct diagram does not make the code correct.
+### Auditing a dependency graph
 
-It reviews the diagram and the model you give it. Whether they match the code is what step 1 is for.
+1. Hand over a diagram, or a `repoPath` and let `uml_structure_verify` build the graph from the source.
+2. Optional matrix: `layers` plus `rules`.
+3. Read the findings: cycle, isolated node, dangling endpoint, layer violation, missing required edge. When the parser reports **label drift**, `uml_explain_labels` prints the spellings that notation accepts.
 
-### Reviewing a state machine
+**Facts belong here, rules do not**: whether an edge exists is this tool's question; whether it was allowed is `model_design_review`.
 
-Build the machine as an executable model and let an engine run it, instead of reading the code and concluding that it cannot get stuck:
+### A design held to its own declarations
 
-1. **Build the model**: `uml_parse` reads a hand-drawn `stateDiagram-v2` or PlantUML state diagram; a `LogicModelV1` can also be written directly against the schema.
-2. **Run the checks**: `model_verify` looks for unreachable states, absorbing cycles, events silently ignored, an allocation with no recovery path, a budget overrun, and a deadline that cannot be met. It reports each as a code whose prefix says which family it belongs to.
-3. **State the always/never claims**: put them in `invariants`. The engine searches every reachable state for a counterexample and returns the shortest one it finds.
-4. **Reconcile with the source**: every error finding goes back to the code.
+1. Write the design and the rules it declares as a `DesignModelV1`.
+2. `model_design_review` reports three lists: `violations` decide the verdict, `signals` are signals, `facts` are measurements.
+3. A check with nothing to hold the design to is `skip`, not `pass`.
 
-Concurrency claims split in two: the ones about **two models touching one shared location** are decided here, by `model_compose_verify` (declare `shared` and `accesses`; C3/C4/C5 decide the declaration, the unordered write and the lost update). Source-level data races, interrupt latency, a blocking call and a missing `await` are still routed to TSan/Helgrind/CBMC/TLA+. Hard real-time semantics - deadlines and periods - are outside its scope.
+It judges no design **by an external standard**. It asks whether the design holds to what it says about itself.
 
-### Auditing a dependency diagram
+### Two machines that must cooperate
 
-A component diagram is a claim about which modules may depend on which. Read it as a graph, then ask whether the edges are allowed:
+1. Model each one, hand the array to `model_compose_verify`.
+2. Put the handshakes that need both sides ready into `rendezvous`.
+3. Read C1 (a node no machine can advance from) and C2 (a rendezvous that never fires), each with a per-machine reason and, for C1, the shortest counterexample.
 
-1. **Give it the drawing**: PlantUML component, package, class or deployment source, or a Mermaid class diagram. `uml_structure_verify` parses it into nodes and edges.
-2. **Say what is allowed**, if you have a rule: a matrix of `layers` and `rules`, each rule naming a `source` with `allow` / `deny` / `require` and a `default` for everything else. Without a matrix it reports only structural defects.
-3. **Read the findings**: an isolated node, an endpoint never declared, a cycle with its shortest path, an edge that crosses a layer, a required edge that is missing, and - when no node is declared at all - that the input said nothing to audit.
-4. **Ask the same question about a code flow**, if the drawing is a state or activity diagram: that is `uml_review`, not this.
+A question about one machine alone goes back to `model_verify`. There is no rate ratio and no fairness in a composition.
 
-It audits the drawing, not the code. A drawing that is internally consistent can still be wrong about the system, so pair it with a source-side scan. When a hand-drawn diagram reports label drift, `uml_explain_labels` prints the label forms the parser accepts for that notation.
+### Concurrency claims: mine, then route
 
-### Holding a design to its own declarations
+1. `model_interleaving_scan` reads a document and reports absolute claims by `family` (thread-safe, lock-free, ISR-safe ...).
+2. Each one names the analysis that decides it: TSan or Helgrind, CBMC, TLA+, RTOS-aware analysis.
+3. This plugin **runs none of them** and proves nothing about concurrency.
 
-A design says things about itself: this layer sits above that one, this component owns that dependency, this interface is narrower than its callers. `model_design_review` decides whether the design keeps those promises:
+A clean scan is not a clean bill of health: it says no claim was found.
 
-1. **Write the design as a model**: the architecture (nodes and edges), plus what it declares - layers, boundaries, allowed and required edges, types with responsibilities, operations, transitions, supertypes.
-2. **Run it**: `model_design_review` reports the places the design contradicts itself, and separately the shape of its graph - cycles and the fewest edges that break them, load-bearing elements, ranks, fan-in and fan-out.
-3. **Read the three lists**: `violations` decide the verdict; `signals` are worth a look and fail nothing; `facts` is a measurement, not a finding. `checksSkipped` says which principles went unchecked because nothing was declared to hold the design to.
+### A migration: two models, one assertion
 
-It never judges a design by an outside standard. It reports that the design contradicted **something it declared**, or a structural fact about its graph. Asking whether the design is *good* is a question for a reviewer, and this tool answers a different one: does it hold together on its own terms.
+1. A data model before and after.
+2. `fieldMapping`; `migrationMappings` for a field whose source is not its own old name.
+3. `model_datamodel_verify` checks migration coverage, copy consistency, rollback symmetry, and the before/after data regression.
+4. `DS2_REQUIRED_FIELD_UNSOURCED` is a **warning**: it is a decision for you, not a failure the engine can announce.
 
-### Two machines that have to agree
+### Language inclusion: two automata
 
-One machine cannot deadlock *because of another one*. When two components hand-shake, the interesting failures live in the composition:
+1. Write the specification and the implementation as automata: `states`, `alphabet`, `transitions`, `accepting`.
+2. `model_automaton_verify` with `other` and `relation` (`equivalent`, `subset` or `superset`).
+3. When the relation fails you get the **shortest witness word** - accepted by one, rejected by the other, replayable through both.
 
-1. **Model each machine** on its own, then pass them together: `model_compose_verify` takes an array of models.
-2. **Name the shared events** in `rendezvous` if a handshake is only legal when both sides are ready. An event not named there advances one machine, so a machine waiting on a handshake can take any number of its own steps first.
-3. **Read C1 and C2**: a reachable node where no machine can advance and one of them is not terminal, and a rendezvous that can never fire. Both name the reason per machine, and C1 gives the shortest counterexample.
+Finite words only. Liveness, fairness and timing need a Büchi or timed automaton, which this family does not build.
 
-There is no rate ratio and no fairness bound in the model. For one machine on its own - unreachable states, invariants, cost against budget - that is `model_verify`.
+### Diagrams as source: freeze and iterate
 
-### Concurrency claims, mined and routed
+1. `uml_render` writes Mermaid or PlantUML source; `uml_parse` reads it back into a model.
+2. Commit the source, the model and the report of that run together, as the design record at a point in time.
+3. On the next change, re-extract, re-run, and compare with `report_diff`.
+4. For a second opinion, `model_export` writes UPPAAL, TLA+, PRISM or SPIN input.
 
-"Thread-safe", "lock-free", "ISR-safe" are claims that need a tool that can settle them, and the first job is finding them:
-
-1. **Scan the text**: `model_interleaving_scan` takes the document, plan or notes and reports the risk points - the claim, the shared state, the interrupt, the critical section, and the async ones (`async`, `await`, `promise`, the event loop, a callback). Every finding carries a `family` (threads / synchronization / async / interrupts / shared-state), and an absolute claim is an error.
-2. **Read what each absolute claim owes**: a claim like "no data race is possible" is reported as an error requiring dedicated verification, and each finding names the analysis that could settle it - TSan or Helgrind for a race, CBMC for a bounded proof, TLA+ for a protocol, RTOS-aware interrupt analysis for an ISR.
-3. **Run that analysis**: this plugin does not run it and proves nothing about concurrency itself.
-
-It reads text. It does not see your threads, and a clean scan is not a clean bill of health - it means no claim was found, which is a different statement.
-
-### A migration, before and after
-
-A migration is two models and a claim that the data survived. Give it both and the claim becomes checkable:
-
-1. **Two models**: the schema as it was, and the schema as it will be, each a data model with entities, fields, keys and relationships.
-2. **Say how fields move**: `fieldMapping` from the old path to the new one, plus `migrationMappings` for a field whose source is not simply its own old name.
-3. **Run the comparison**: `model_datamodel_verify` with `beforeModel` checks migration coverage, copy consistency, rollback symmetry and the before/after data regression.
-4. **Read the warning**: a field declared `required` in the new schema with nothing supplying it is reported as `DS2_REQUIRED_FIELD_UNSOURCED`. That is a warning, so the verdict stays `pass_with_findings` - it is a decision to make, not a failure the engine gets to declare.
-
-It compares the two models you give it. Whether either is faithful to the database it describes is the extraction step, and this tool does not do it.
-
-### Importing and exporting diagrams: a frozen record, and a reference for the long run
-
-What is kept here is the **source file**, not a screenshot: `uml_render` writes Mermaid or PlantUML source, and `uml_parse` reads that source back into a model. One diagram therefore serves two purposes:
-
-- **A frozen record of the design**: commit the diagram source, the model and that round's verification report together, as the design as it stood at a point in time. The model may carry `_`-prefixed metadata - a ticket number, a date, an owner, the caveats left by the extraction - and those keys take no part in the hash, so archive notes do not change the identity of a conclusion.
-- **A reference for the long run**: on the next change, extract the model again, run the verification again, and compare with the frozen report through `report_diff`. An added error is what this change introduced; a finding that disappeared is an old problem solved. The hashes decide whether this is still the same model, instead of an eyeball comparison of two pictures.
-
-When an external checker is needed, the same model can be exported with `model_export` as native input for UPPAAL, TLA+, PRISM or SPIN.
-
-The limit: it stores and compares **model and diagram source**; a rendered picture is a by-product. A diagram that changed while the model did not - or the reverse - shows up at the next parse or comparison.
+What is kept is the **source file**; a rendered image is a by-product.
 
 ## Tools
 
