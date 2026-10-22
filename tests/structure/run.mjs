@@ -403,5 +403,66 @@ test('a source tree is scanned into a graph, and the graph is what gets judged',
   await rm(dir, { recursive: true, force: true })
 })
 
+// Per-language scan fixtures: every language the scan claims must turn its own import construct into an
+// edge, and a two-file cycle must survive that translation. Each tree is written to a temporary
+// directory, so the assertion is about the extractor and the resolver, not about a sample that drifts.
+{
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join, dirname } = await import('node:path')
+  const { scanDependencyGraph } = await import('../../lib/scan.js')
+  const NL = String.fromCharCode(10)
+  const scanTree = (files) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dme-scan-'))
+    try {
+      for (const [name, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, name)), { recursive: true })
+        writeFileSync(join(dir, name), text)
+      }
+      return scanDependencyGraph(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  const cases = [
+    ['typescript', { 'a.ts': "import { b } from './b.js'", 'b.ts': "import { a } from './a.js'" }],
+    ['c', { 'a.c': '#include "b.h"', 'b.h': '#include "a.c"' }],
+    ['python', { 'a.py': 'from .b import thing', 'b.py': 'from .a import other' }],
+    ['go', { 'pkg/a/a.go': 'package a' + NL + 'import (' + NL + '"example.com/proj/pkg/b"' + NL + ')', 'pkg/b/b.go': 'package b' + NL + 'import (' + NL + '"example.com/proj/pkg/a"' + NL + ')' }],
+    ['rust', { 'src/a.rs': 'mod b;', 'src/b.rs': 'mod a;' }],
+    ['java', { 'com/acme/a/A.java': 'package com.acme.a;' + NL + 'import com.acme.b.B;', 'com/acme/b/B.java': 'package com.acme.b;' + NL + 'import com.acme.a.A;' }],
+    ['csharp', { 'Acme/A/A.cs': 'namespace Acme.A;' + NL + 'using Acme.B;', 'Acme/B/B.cs': 'namespace Acme.B;' + NL + 'using Acme.A;' }],
+    ['php', { 'a.php': "<?php require 'b.php';", 'b.php': "<?php require 'a.php';" }],
+    ['ruby', { 'a.rb': "require_relative 'b'", 'b.rb': "require_relative 'a'" }],
+    ['lua', { 'a.lua': "local b = require('./b')", 'b.lua': "local a = require('./a')" }],
+    ['zig', { 'a.zig': 'const b = @import("b.zig");', 'b.zig': 'const a = @import("a.zig");' }],
+    ['dart', { 'a.dart': "import 'b.dart';", 'b.dart': "import 'a.dart';" }],
+    ['elixir', { 'a.ex': 'alias B', 'b.ex': 'alias A' }],
+  ]
+  for (const [language, tree] of cases) {
+    test('scan: ' + language + ' turns its own import construct into an edge', () => {
+      const graph = scanTree(tree)
+      const names = graph.languages.map((entry) => entry.language)
+      if (names.length !== 1 || names[0] !== language) throw new Error(language + ': scanned as ' + JSON.stringify(names))
+      if (graph.edges.length < 2) throw new Error(language + ': expected the cycle, got ' + JSON.stringify(graph.edges))
+      const cyclic = graph.edges.some((first) => graph.edges.some((second) => second.from === first.to && second.to === first.from))
+      if (!cyclic) throw new Error(language + ': the a -> b -> a cycle did not survive resolution: ' + JSON.stringify(graph.edges))
+      if (graph.unresolved.length !== 0) throw new Error(language + ': unresolved ' + JSON.stringify(graph.unresolved))
+    })
+  }
+  test('scan: a commented-out import is not an edge, an external one is not a node', () => {
+    const graph = scanTree({ 'a.ts': "// import { x } from './ghost.js'" + NL + "/* require('./also-ghost.js') */" + NL + "import { real } from './real.js'" + NL + "import external from 'left-pad'", 'real.ts': 'export const real = 1' })
+    if (JSON.stringify(graph.edges) !== JSON.stringify([{ from: 'a.ts', to: 'real.ts' }])) throw new Error('edges: ' + JSON.stringify(graph.edges))
+    if (!graph.packages.includes('left-pad')) throw new Error('the external package must be counted, not resolved')
+    if (graph.unresolved.length !== 0) throw new Error('a commented-out path must not be unresolved: ' + JSON.stringify(graph.unresolved))
+  })
+  test('scan: a quoted C include is an edge, an angle-bracket one is external', () => {
+    const graph = scanTree({ 'main.c': '#include <stdio.h>' + NL + '#include "driver.h"', 'driver.h': '#include "main.c"' })
+    const pairs = graph.edges.map((edge) => edge.from + '->' + edge.to).sort()
+    if (JSON.stringify(pairs) !== JSON.stringify(['driver.h->main.c', 'main.c->driver.h'])) throw new Error('edges: ' + JSON.stringify(pairs))
+    if (!graph.packages.includes('stdio')) throw new Error('the system header must be external: ' + JSON.stringify(graph.packages))
+  })
+}
+
 if (failures > 0) { console.log('structure tests failed:', failures); process.exit(1) }
 console.log('all structure tests passed')

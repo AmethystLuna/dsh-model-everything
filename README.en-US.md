@@ -144,7 +144,7 @@ The limit: it stores and compares **model and diagram source**; a rendered pictu
 | `model_datamodel_verify` | Data models and migrations |
 | `model_interleaving_scan` | Mines and routes concurrency, synchrony and async claims |
 | `model_export` | Exports to an external checker (UPPAAL, TLA+, PRISM, SPIN) |
-| `uml_structure_verify` | Dependency-graph audit, including a dependency matrix and multi-level refinement; give it `repoPath` and it builds the graph from TypeScript/JavaScript relative imports |
+| `uml_structure_verify` | Dependency-graph audit, including a dependency matrix and multi-level refinement; give it `repoPath` and it builds the graph from each language's own import construct (C/C++, Python, TypeScript/JavaScript, Go, Rust, Java/Kotlin/Scala, C#, PHP, Ruby, Lua, Zig, Dart, Elixir) |
 | `model_design_review` | Design review: the dependency graph's shape, plus the contracts the design declares about itself - layering, responsibility boundaries, substitutability, interface width |
 | `model_edit` | Changes a model file by naming one change (add/remove a state, add/remove/update a transition, pointer set/remove): returns the structural diff and the difference in findings, so edit-verify-compare takes one call |
 | `report_diff` | Compares two reports: what a change added, removed or changed |
