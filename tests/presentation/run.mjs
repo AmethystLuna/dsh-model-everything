@@ -59,11 +59,21 @@ test('no meta at all falls back to the raw content', () => {
   if (view !== undefined) throw new Error('without meta the host must render the raw result')
 })
 
-test('the report tools declare both hooks', () => {
-  for (const [name, tool] of [[MODEL_VERIFY_TOOL_NAME, modelVerifyTool], [MODEL_AUTOMATON_TOOL_NAME, modelAutomatonTool], [STRUCTURE_TOOL_NAME, umlStructureTool]]) {
-    if (typeof tool.output?.presentationMeta !== 'function') throw new Error(name + ' declares no presentationMeta')
-    if (typeof tool.presentResult !== 'function') throw new Error(name + ' declares no presentResult')
+test('every report tool in the plugin declares both hooks', async () => {
+  // Read the modules rather than a list written here: a tool added later must not be able to skip the
+  // card, and a list in the test is exactly how it would.
+  const modules = ['automaton-tool', 'compose-tool', 'concurrency-tool', 'data-tool', 'design-tool', 'edit-tool', 'export-tool', 'report-diff-tool', 'structure-tool', 'uml-tool', 'tool']
+  const missing = []
+  for (const file of modules) {
+    const mod = await import('../../lib/' + file + '.js')
+    for (const value of Object.values(mod)) {
+      if (value === null || typeof value !== 'object') continue
+      if (typeof value.name !== 'string' || value.output === undefined) continue
+      if (typeof value.output.presentationMeta !== 'function') missing.push(value.name + ' (presentationMeta)')
+      if (typeof value.presentResult !== 'function') missing.push(value.name + ' (presentResult)')
+    }
   }
+  if (missing.length > 0) throw new Error('no card: ' + missing.join(', '))
 })
 
 test('the card comes from the report, never from a second render', () => {

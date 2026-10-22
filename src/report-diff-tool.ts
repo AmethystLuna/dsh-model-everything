@@ -2,6 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { diffReports } from './baseline.js'
 import { refusalVerdict } from './engine.js'
+import { reportCard, reportResultView } from './presentation.js'
 import { renderReportText } from './report-view.js'
 
 export const REPORT_DIFF_TOOL_NAME = 'report_diff'
@@ -54,7 +55,12 @@ export const reportDiffTool = defineTool({
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]
     },
-  },
+    // The card a UI shows, separated from the text the model reads.
+    presentationMeta(_args, value) {
+      return reportCard(value, REPORT_DIFF_TOOL_NAME) as unknown as JsonValue
+    },
+  },  presentResult: reportResultView(REPORT_DIFF_TOOL_NAME),
+
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {

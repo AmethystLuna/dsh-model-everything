@@ -1,6 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runCompositionVerification } from './engine.js'
+import { reportCard, reportResultView } from './presentation.js'
 import type { SharedAccess, SharedLocation } from './engine.js'
 import { OptionShapeError, optionRefusal, requireArrayOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
@@ -56,7 +57,12 @@ export const modelComposeTool = defineTool({
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full', check: args.check }) }]
     },
-  },
+    // The card a UI shows, separated from the text the model reads.
+    presentationMeta(_args, value) {
+      return reportCard(value, COMPOSE_TOOL_NAME) as unknown as JsonValue
+    },
+  },  presentResult: reportResultView(COMPOSE_TOOL_NAME),
+
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {

@@ -7,6 +7,7 @@ import {
   type UmlDiagram, type UmlFinding, type UmlIntent, type UmlNotation, type UmlParseResult,
 } from './uml.js'
 import { renderReportText } from './report-view.js'
+import { reportCard, reportResultView } from './presentation.js'
 
 /**
  * The UML front end as four tools, one per job.
@@ -53,13 +54,18 @@ const intentParameter = {
   description: 'What the artifact is for, declared up front: present = a human will read it; verify = it must be readable as a model by the verification engine; fidelity = the render-and-reparse proof is the point. A view that cannot serve the declared intent is refused before any work, with errorCode UML_INTENT_UNSERVABLE, UML_VIEW_UNREPRESENTABLE or UML_INTENT_MISMATCH. Omit it and nothing changes.',
 } as const
 
-const reportOutput = {
-  schema: { type: 'json', description: 'The result: diagram source, a family model, or a modelling review report with findings, round-trip fidelity and next steps.' },
+const reportOutput = (family: string) => ({
+  schema: { type: 'json' as const, description: 'The result: diagram source, a family model, or a modelling review report with findings, round-trip fidelity and next steps.' },
   render(args: Record<string, unknown>, value: unknown) {
     // A rendered diagram is source text: the body prints it verbatim, once.
     return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full' }) }]
   },
-} as const
+  // The card a UI shows, separated from the text the model reads. The family is the tool's own name, so
+  // one shared output does not have to guess which tool is calling it.
+  presentationMeta(_args: unknown, value: unknown) {
+    return reportCard(value, family) as unknown as JsonValue
+  },
+})
 
 /** Draw a model as diagram source. */
 export const umlRenderTool = defineTool({
@@ -74,7 +80,8 @@ export const umlRenderTool = defineTool({
     intent: intentParameter,
     reportView: reportViewParameter,
   },
-  output: reportOutput,
+  output: reportOutput(UML_RENDER_TOOL_NAME),
+  presentResult: reportResultView(UML_RENDER_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
@@ -111,7 +118,8 @@ export const umlParseTool = defineTool({
     intent: intentParameter,
     reportView: reportViewParameter,
   },
-  output: reportOutput,
+  output: reportOutput(UML_PARSE_TOOL_NAME),
+  presentResult: reportResultView(UML_PARSE_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
@@ -162,7 +170,8 @@ export const umlReviewTool = defineTool({
     intent: intentParameter,
     reportView: reportViewParameter,
   },
-  output: reportOutput,
+  output: reportOutput(UML_REVIEW_TOOL_NAME),
+  presentResult: reportResultView(UML_REVIEW_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
@@ -193,7 +202,8 @@ export const umlExplainLabelsTool = defineTool({
     notation: notationParameter,
     reportView: reportViewParameter,
   },
-  output: reportOutput,
+  output: reportOutput(UML_LABELS_TOOL_NAME),
+  presentResult: reportResultView(UML_LABELS_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {

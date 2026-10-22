@@ -84,6 +84,76 @@
       "expect": "uml_structure_verify",
       "mustNot": "model_design_review",
       "why": "a graph, from the code rather than from a drawing"
+    },
+    {
+      "prompt": "The scheduler and the worker both bump the retry counter, and it lives in one shared struct. Can a retry be lost?",
+      "expect": "model_compose_verify",
+      "mustNot": "model_verify",
+      "why": "two machines and a shared location, even though one counter is mentioned",
+      "ambiguous": true
+    },
+    {
+      "prompt": "A request reaching the payment state is never shipped - can that actually happen in this one machine?",
+      "expect": "model_verify",
+      "mustNot": "model_automaton_verify",
+      "why": "reachability in one machine, phrased as a liveness question",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Does the client grammar accept every request the server grammar accepts?",
+      "expect": "model_automaton_verify",
+      "mustNot": "uml_structure_verify",
+      "why": "a language relation between two automata, not a dependency graph",
+      "ambiguous": true
+    },
+    {
+      "prompt": "The design says the API layer never imports the store, but I think I saw an import. Which is right?",
+      "expect": "uml_structure_verify",
+      "mustNot": "model_design_review",
+      "why": "the graph decides the fact; the principle review decides the design",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Is this storage backend substitutable for the one the interface promises?",
+      "expect": "model_design_review",
+      "mustNot": "model_verify",
+      "why": "substitutability, not behaviour over a run",
+      "ambiguous": true
+    },
+    {
+      "prompt": "The README says the queue is lock-free. What exactly does it claim, and what would decide it?",
+      "expect": "model_interleaving_scan",
+      "mustNot": "model_compose_verify",
+      "why": "mine the claim first; deciding it is the next step, not this one",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Turn this machine into UPPAAL so I can check the deadline property, which I know you cannot decide.",
+      "expect": "model_export",
+      "mustNot": "model_verify",
+      "why": "the property is out of scope; the deliverable is the translation",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Our migration renamed a column. Can a reader of the new table still reach every value the old one held?",
+      "expect": "model_datamodel_verify",
+      "mustNot": "model_verify",
+      "why": "stored data across a rename, not state transitions",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Last week's report said pass, this run says fail for the same model. What changed?",
+      "expect": "report_diff",
+      "mustNot": "model_verify",
+      "why": "two reports already exist; the question is the delta",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Draw the loader's states, then tell me whether any of them is unreachable.",
+      "expect": "uml_render",
+      "mustNot": "model_verify",
+      "why": "the drawing is the deliverable; the reachability question is about the drawn model, and the tool that answers it is named in the description",
+      "ambiguous": true
     }
   ]
 }

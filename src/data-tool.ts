@@ -4,6 +4,7 @@ import { runDataVerification, DATA_ENGINE_SCHEMA_VERSION } from './data-engine.j
 import { oneOf } from './model-file.js'
 import { optionRefusal, requireArrayOption, requireObjectOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
+import { reportCard, reportResultView } from './presentation.js'
 
 export const DATAMODEL_VERIFY_TOOL_NAME = 'model_datamodel_verify'
 
@@ -64,7 +65,12 @@ export const modelDataModelVerifyTool = defineTool({
     render(args, value) {
       return [{ type: 'text' as const, text: renderReportText(value, { full: args.reportView === 'full', check: args.check }) }]
     },
-  },
+    // The card a UI shows, separated from the text the model reads.
+    presentationMeta(_args, value) {
+      return reportCard(value, DATAMODEL_VERIFY_TOOL_NAME) as unknown as JsonValue
+    },
+  },  presentResult: reportResultView(DATAMODEL_VERIFY_TOOL_NAME),
+
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {
