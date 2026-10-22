@@ -133,3 +133,24 @@ Mean: A 80,100, C 85,019 - **1.06x**. Both answered all three questions.
 At 215k lines the baseline is still cheap, because it never reads the tree: it greps for one include
 and counts. A graph question is a computation the model can script, so size does not make the plugin
 worth it. What the plugin would need is a question grep cannot answer.
+
+## Round 10 - the first semantic case, and why it does not count (2026-10-22)
+
+The case: libuv at the parent of `067c56e3` (`async: restore release/acquire on the busy counter`,
+issue #5297). The claim asked about is a real race: the busy counter was relaxed, so the sender's write
+to the wakeup fd had no happens-before edge with `uv__async_stop()` closing it.
+
+Three runs, and none of them is a measurement:
+
+1. **First run**: both conditions passed 3/3 (A 74,654, C 87,787, 1.18x) - but both had fetched
+   `raw.githubusercontent.com/libuv/libuv/v1.x/src/uv-common.c`, which is the *fixed* file. The answer
+   was online.
+2. **Second run**: `tools_not_called: [web_fetch, web_search]` added. Every attempt in both
+   conditions still called a web tool, so every attempt failed the assertion.
+3. **Third run**: the two web rows disabled in both eval homes (`--dump-config` shows
+   `disabled: true`). Attempts still issued web calls; the assertion still failed them.
+
+What that establishes: a case built from a public fix leaks through the network, an assertion is
+post-hoc and cannot prevent the call, and disabling the rows is not the same as taking the network
+away. The case is parked until the eval runs with no network at all - a sandbox-level block, not a
+tool-level one.
