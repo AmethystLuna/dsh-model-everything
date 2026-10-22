@@ -100,6 +100,7 @@ export const umlStructureTool = defineTool({
         return reviewStructure({
           diagram: '',
           graph,
+          scan: { files: scanned.filesRead, unresolved: scanned.unresolved.length, packages: scanned.packages.length, languages: scanned.languages.map((entry) => entry.language) },
           ...(args.matrix === undefined ? {} : { matrix: args.matrix }),
         }) as unknown as JsonValue
       } catch (error) {

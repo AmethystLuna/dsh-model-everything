@@ -509,6 +509,8 @@ export interface StructureReviewOptions {
   diagram: string
   /** A graph built from source, instead of parsed from a diagram. `diagram` is then ignored. */
   graph?: StructureGraph
+  /** How the graph was produced, when it came from a scan rather than a drawing. */
+  scan?: { files: number; unresolved: number; packages: number; languages: string[] }
   notation?: 'auto' | StructureNotation
   /** Dependency matrix: allowed/denied edges, layers, required edges. */
   matrix?: unknown
@@ -790,6 +792,7 @@ export function reviewStructure(options: StructureReviewOptions): StructureRepor
     notation: graph.notation,
     graph,
     ...(options.matrix === undefined ? {} : { edgeVerdicts }),
+    ...(options.scan === undefined ? {} : { scan: options.scan }),
     findings,
     summary,
     hashes: {
