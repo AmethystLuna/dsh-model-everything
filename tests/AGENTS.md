@@ -73,6 +73,20 @@ say so rather than stay silent. Check both before trusting a suite:
 node tests/<suite>/run.mjs   # run it three times: byte-identical output
 ```
 
+## Measuring what a suite reaches
+
+A suite can be green and still never enter a branch. `c8` runs a suite the way it already runs and reports
+the lines and branches it never took:
+
+```bash
+npx c8 --reporter=text node tests/<suite>/run.mjs
+```
+
+Read it as a question, not a score: a branch with no test is either a path worth covering or a condition
+that cannot happen. Both are findings - the first wants a case, the second wants the branch removed. Two
+of this repository's own dead branches were found that way, and one replay-safety bug: a card checked
+`!== null` on fields a replayed payload can be missing entirely, and threw instead of falling back.
+
 ## The mutation check
 
 When a suite is new, or a finding was just fixed, break the engine on purpose and require the

@@ -118,6 +118,7 @@ export function reportCard(value: unknown, family: string): ReportCard {
       : undefined
   const first = errors[0] ?? warnings[0]
   const next = array(report.nextSteps).map((step) => String(step))[0]
+  const route = routeFor(family)
   const deltaSummary = record(record(report.reportDelta)?.summary) ?? record(report.summary)
   const delta = deltaSummary === undefined
     ? undefined
@@ -144,9 +145,7 @@ export function reportCard(value: unknown, family: string): ReportCard {
       : { code: String(first.code ?? 'UNKNOWN'), severity: severity(first), message: shorten(String(first.message ?? '')) },
     next: next === undefined ? null : shorten(next),
     family,
-    ...(routeFor(family) === undefined
-      ? {}
-      : { route: { owns: routeFor(family)?.owns ?? '', instead: routeFor(family)?.notFor.tool ?? '' } }),
+    ...(route === undefined ? {} : { route: { owns: route.owns, instead: route.notFor.tool } }),
     ...(changes.length === 0 ? {} : { changes }),
     ...(delta === undefined ? {} : { delta }),
     ...(firstAddedRaw === undefined ? {} : { firstAdded: { code: String(firstAddedRaw.code ?? '?'), severity: String(firstAddedRaw.severity ?? 'info'), message: shorten(String(firstAddedRaw.message ?? '')) } }),
@@ -172,10 +171,10 @@ export function cardBlocks(card: ReportCard): ContentBlock[] {
     : `${String(card.checksRun)} checks · ${String(card.errors)} error(s) · ${String(card.warnings)} warning(s)`
   lines.push(head + '  —  ' + counts)
   if (card.verdictReason !== undefined) lines.push(card.verdictReason)
-  if (card.first !== null) {
+  if (card.first != null) {
     lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
   }
-  if (card.next !== null) lines.push('next: ' + card.next)
+  if (card.next != null) lines.push('next: ' + card.next)
   if (card.source !== undefined) {
     lines.push('')
     const shown = card.source.lines.length
@@ -247,7 +246,7 @@ export function editCardBlocks(card: ReportCard): ContentBlock[] {
   if (card.delta !== undefined) {
     lines.push('findings: added ' + String(card.delta.added) + ' (' + String(card.delta.addedErrors) + ' error) · removed ' + String(card.delta.removed) + ' · changed ' + String(card.delta.changed))
   }
-  if (card.next !== null) lines.push('next: ' + card.next)
+  if (card.next != null) lines.push('next: ' + card.next)
   return [{ type: 'text', text: lines.join('\n') }]
 }
 
@@ -265,7 +264,7 @@ export function diffCardBlocks(card: ReportCard): ContentBlock[] {
   if (card.currentVerdict !== undefined) lines.push('the current report on its own: ' + card.currentVerdict)
   if (card.firstAdded !== undefined) lines.push('✗ ' + card.firstAdded.code + ': ' + card.firstAdded.message)
   if ((delta?.added ?? 0) === 0) lines.push('nothing was added: this change is accepted by the "no new findings" rule')
-  if (card.next !== null) lines.push('next: ' + card.next)
+  if (card.next != null) lines.push('next: ' + card.next)
   return [{ type: 'text', text: lines.join('\n') }]
 }
 
@@ -283,7 +282,7 @@ export function reportResultView(family: string) {
   return (_args: unknown, result: { content: ContentBlock[]; meta?: unknown }): ToolResultView | undefined => {
     const card = record(result.meta) as unknown as ReportCard | undefined
     if (card === undefined || card === null) return undefined
-    if (card.verdict === undefined && card.next === null && card.first === null) return undefined
+    if (card.verdict === undefined && card.next == null && card.first == null) return undefined
     return { card: 'generic', title: family + '  ' + (card.verdict ?? '') , content: cardBlocks(card) }
   }
 }
@@ -307,8 +306,8 @@ export function structureCardBlocks(card: ReportCard): ContentBlock[] {
   if (card.graph !== undefined) {
     lines.push('graph: ' + String(card.graph.nodes) + ' nodes · ' + String(card.graph.edges) + ' edges · ' + String(card.graph.cycles) + ' cycle(s) · ' + String(card.graph.isolated) + ' isolated')
   }
-  if (card.first !== null) lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
-  if (card.next !== null) lines.push('next: ' + card.next)
+  if (card.first != null) lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
+  if (card.next != null) lines.push('next: ' + card.next)
   return [{ type: 'text', text: lines.join(String.fromCharCode(10)) }]
 }
 
@@ -320,9 +319,9 @@ export function designCardBlocks(card: ReportCard): ContentBlock[] {
   if (card.levels !== undefined) {
     lines.push('levels: ' + String(card.levels.violations) + ' violation · ' + String(card.levels.signals) + ' signal · ' + String(card.levels.facts) + ' fact · ' + String(card.levels.skipped) + ' check(s) skipped')
   }
-  if (card.first !== null) lines.push('✗ ' + card.first.code + ': ' + card.first.message)
+  if (card.first != null) lines.push('✗ ' + card.first.code + ': ' + card.first.message)
   if (card.levels !== undefined && card.levels.skipped > 0) lines.push('a skipped check examined nothing: silence there is not a pass')
-  if (card.next !== null) lines.push('next: ' + card.next)
+  if (card.next != null) lines.push('next: ' + card.next)
   return [{ type: 'text', text: lines.join(String.fromCharCode(10)) }]
 }
 
@@ -335,7 +334,7 @@ export function scanCardBlocks(card: ReportCard): ContentBlock[] {
     const families = card.claims.families.map((entry) => entry.family + ' ' + String(entry.count)).join(' · ')
     lines.push('claims: ' + String(card.claims.absolute) + ' absolute, ' + String(card.claims.keywords) + ' keyword(s) hit' + (families === '' ? '' : ' · ' + families))
   }
-  if (card.first !== null) lines.push('✗ ' + card.first.code + ': ' + card.first.message)
+  if (card.first != null) lines.push('✗ ' + card.first.code + ': ' + card.first.message)
   lines.push('this plugin routed the claims; it proved none of them')
   return [{ type: 'text', text: lines.join(String.fromCharCode(10)) }]
 }

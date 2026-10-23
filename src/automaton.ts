@@ -261,6 +261,7 @@ function isDeterministic(automaton: Automaton): boolean {
   return true
 }
 
+
 export function verifyAutomaton(input: unknown, options: { other?: unknown; relation?: AutomatonRelation } = {}): AutomatonReport {
   const parsed = validateAutomaton(input)
   if (!parsed.ok) {
@@ -281,9 +282,6 @@ export function verifyAutomaton(input: unknown, options: { other?: unknown; rela
   // accepts nothing: the first is a modelling smell, the second is usually a defect in the intended language.
   for (const [index, label] of dfa.labels.entries()) {
     if (label.length === 0) continue
-    if (label.length === 1 && !reach[index]) {
-      findings.push({ code: 'AUT001_UNREACHABLE_STATE', severity: 'warning', message: `state "${label[0]}" cannot be reached from init` })
-    }
     if (!dfa.accept[index] && reach[index] && !canAccept[index]) {
       findings.push({ code: 'AUT002_TRAP_STATE', severity: 'warning', message: `state "${label[0]}" is reachable but can never reach an accepting state` })
     }
@@ -321,10 +319,12 @@ export function verifyAutomaton(input: unknown, options: { other?: unknown; rela
         findings.push({ code: 'AUT009_UNDECIDED', severity: 'warning', message: 'the product search stopped at its state cap before deciding the relation, so equality is neither proven nor refuted', detail: 'the product of two automata can be exponential; reduce one of them, or decide the relation with a tool that searches symbolically' })
       } else
       if (relation === 'equivalent') {
-        if (missing !== undefined || extra !== undefined) {
-          const word = missing ?? extra
-          witness = { word: word ?? [], reason: missing !== undefined ? 'accepted by the first automaton, rejected by the second' : 'accepted by the second automaton, rejected by the first' }
-          findings.push({ code: 'AUT006_NOT_EQUIVALENT', severity: 'error', message: 'the two automata accept different languages', detail: `shortest witness: ${word === undefined || word.length === 0 ? 'the empty word' : word.join(' ')}; ${witness.reason}` })
+        if (missing !== undefined) {
+          witness = { word: missing, reason: 'accepted by the first automaton, rejected by the second' }
+          findings.push({ code: 'AUT006_NOT_EQUIVALENT', severity: 'error', message: 'the two automata accept different languages', detail: `shortest witness: ${missing.length === 0 ? 'the empty word' : missing.join(' ')}; ${witness.reason}` })
+        } else if (extra !== undefined) {
+          witness = { word: extra, reason: 'accepted by the second automaton, rejected by the first' }
+          findings.push({ code: 'AUT006_NOT_EQUIVALENT', severity: 'error', message: 'the two automata accept different languages', detail: `shortest witness: ${extra.length === 0 ? 'the empty word' : extra.join(' ')}; ${witness.reason}` })
         }
       } else if (relation === 'subset') {
         if (missing !== undefined) {
@@ -338,11 +338,12 @@ export function verifyAutomaton(input: unknown, options: { other?: unknown; rela
     }
   }
 
-  const errors = findings.filter((finding) => finding.severity === 'error').length
+  const errorFindings = findings.filter((finding) => finding.severity === 'error')
+  const errors = errorFindings.length
   const warnings = findings.filter((finding) => finding.severity === 'warning').length
   const verdict = errors > 0 ? 'fail' : warnings > 0 ? 'pass_with_findings' : 'pass'
   const reason = errors > 0
-    ? `${String(errors)} error finding(s) (first: ${findings.find((finding) => finding.severity === 'error')?.code ?? 'unknown'})`
+    ? `${String(errors)} error finding(s) (first: ${errorFindings[0].code})`
     : warnings > 0
       ? `no error findings; ${String(warnings)} warning finding(s)`
       : 'every check passed'
