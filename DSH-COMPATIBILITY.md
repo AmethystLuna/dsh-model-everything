@@ -161,6 +161,18 @@ copied build, so they are evidence about the behaviour, not about the artifact.
   round invoked with `-Row model-everything` reports `ROW MISSING` while the plugin is mounted and
   working, so read that line against `cordis.patch.yml` before believing it.
 
+## Round: 0.4.0 on 0.1.7-rc.2
+
+- **What ran**: `compat-round.ps1` - install through the profile's package manager, `--dump-config`, the
+  packaged skills, a headless boot with a deliberately invalid API key, a real report from the installed
+  copy, then uninstall; and afterwards a **pinned install from the registry** (`dsh-model-everything@0.4.0`)
+  in a fresh home, which is the release's own confirmation that the artifact is published.
+- **Result**: row present and enabled, fourteen tools registered, the automaton family answered from the
+  installed copy (`verdict = pass`, schema `model-everything/automaton/v1`), the row gone after uninstall.
+  The registry install reported 0.4.0 and the installer recorded its own `minimumReleaseAgeExclude` entry.
+- **What it does not establish**: a live model session (the boot stops at AUTH), the loader tree beyond
+  `--dump-config`, and any surface other than headless.
+
 ## What is not established
 
 - Loader-level composition beyond `--dump-config`: the probe mounts the installed
