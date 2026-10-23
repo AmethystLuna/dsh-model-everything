@@ -482,6 +482,90 @@ test('a first addition without a code or a severity is still rendered', () => {
   if (card.firstAdded.code !== '?') throw new Error('the missing code was not named: ' + card.firstAdded.code)
 })
 
+
+// ------------------------------------------------------------------------------------------------
+// The defensive defaults, on purpose.
+//
+// These payloads are not shapes any engine emits. They are the fields an older session log, a hand-written
+// meta, or a future producer can omit - and the card has a default for each. Reaching 100% on them is the
+// difference between "the default is there" and "the default is exercised": an untaken branch is a claim
+// that a payload will always carry the field.
+
+test('a change without a kind or a what still lists', () => {
+  // Through `reportCard`, because that is where an unlabelled change is defaulted; the builder renders what
+  // it was given.
+  const card = presentation.reportCard({ verdict: 'pass', changes: [{}] }, 'model_edit')
+  if (card.changes === undefined) throw new Error('the change was dropped')
+  if (card.changes[0].kind !== '?') throw new Error('the missing kind was not defaulted: ' + card.changes[0].kind)
+  const text = joined(presentation.editCardBlocks(card))
+  if (!text.includes('?')) throw new Error('the default did not reach the card: ' + text)
+})
+
+test('a change with a detail shows it in parentheses', () => {
+  const card = { verdict: 'pass', errors: 0, warnings: 0, first: null, next: null, family: 'model_edit', changes: [{ kind: 'added', what: 'state a', detail: 'from idle' }] }
+  const text = joined(presentation.editCardBlocks(card))
+  if (!text.includes('(from idle)')) throw new Error('the detail is not shown: ' + text)
+})
+
+test('a finding with no message does not print an empty one', () => {
+  const card = presentation.reportCard({ verdict: 'fail', findings: [{ code: 'S1', severity: 'error' }] }, 'model_verify')
+  if (card.first === null) throw new Error('the finding was dropped')
+  if (card.first.message !== '') throw new Error('a missing message became something: ' + card.first.message)
+  const text = presentation.cardBlocks(card)[0].text
+  if (/S1:\s*$/.test(text)) throw new Error('a colon with nothing after it: ' + text)
+  if (!text.includes('S1')) throw new Error('the code is missing')
+})
+
+test('a first addition with no severity is defaulted rather than dropped', () => {
+  const card = presentation.reportCard({ verdict: 'pass_with_findings', summary: { added: 1, removed: 0, changed: 0, addedErrors: 0 }, added: [{ message: 'an unlabelled addition' }] }, 'report_diff')
+  if (card.firstAdded === undefined) throw new Error('the addition was dropped')
+  if (card.firstAdded.severity !== 'info') throw new Error('the missing severity was not defaulted: ' + card.firstAdded.severity)
+})
+
+test('a claim summary without a keyword count defaults to zero', () => {
+  const card = presentation.reportCard({ verdict: 'fail', findings: [{ code: 'C', severity: 'error', message: 'm', family: 'threads' }], summary: { absoluteClaims: 1 } }, 'model_interleaving_scan')
+  if (card.claims === undefined) throw new Error('no claim summary')
+  if (card.claims.keywords !== 0) throw new Error('a missing keyword count became ' + String(card.claims.keywords))
+})
+
+test('a report card with no verdict but something to say keeps its title', () => {
+  // The guard lets a payload through when it carries a finding or a next step; the title then has no
+  // verdict to append, so it must not render the word "undefined".
+  const view = presentation.reportResultView('model_verify')({}, { content: [], meta: { errors: 1, warnings: 0, first: { code: 'S1', severity: 'error', message: 'm' }, next: null, family: 'model_verify' } })
+  if (view === undefined) throw new Error('a payload with a finding should render')
+  if (String(view.title).includes('undefined')) throw new Error('the title rendered undefined: ' + String(view.title))
+})
+
+
+test('an empty detail is treated as no detail', () => {
+  const card = presentation.reportCard({ verdict: 'pass', changes: [{ kind: 'added', what: 'state a', detail: '' }] }, 'model_edit')
+  if (card.changes === undefined || card.changes[0].detail !== undefined) throw new Error('an empty detail survived: ' + JSON.stringify(card.changes))
+})
+
+test('a diff with no additions carries no first added finding', () => {
+  const card = presentation.reportCard({ verdict: 'pass', summary: { added: 0, removed: 1, changed: 0, addedErrors: 0 }, added: [] }, 'report_diff')
+  if (card.firstAdded !== undefined) throw new Error('a first addition appeared with nothing added')
+})
+
+test('a diff carries the current verdict through to the card', () => {
+  const card = presentation.reportCard({ verdict: 'pass', currentVerdict: 'fail', summary: { added: 0, removed: 0, changed: 0, addedErrors: 0 } }, 'report_diff')
+  if (card.currentVerdict !== 'fail') throw new Error('the current verdict was dropped')
+  const text = joined(presentation.diffCardBlocks(card))
+  if (!text.includes('the current report on its own: fail')) throw new Error('the current verdict is not distinguished: ' + text)
+})
+
+
+test('a change that carries a detail keeps it through the projection', () => {
+  const card = presentation.reportCard({ verdict: 'pass', changes: [{ kind: 'moved', what: 'transition a', detail: 'to state b' }] }, 'model_edit')
+  if (card.changes === undefined || card.changes[0].detail !== 'to state b') throw new Error('the detail was dropped: ' + JSON.stringify(card.changes))
+})
+
+test('an addition with no message does not print an empty one', () => {
+  const card = presentation.reportCard({ verdict: 'pass_with_findings', summary: { added: 1, removed: 0, changed: 0, addedErrors: 0 }, added: [{ code: 'W1', severity: 'warning' }] }, 'report_diff')
+  if (card.firstAdded === undefined) throw new Error('the addition was dropped')
+  if (card.firstAdded.message !== '') throw new Error('a missing message became something: ' + card.firstAdded.message)
+})
+
 if (failures > 0) {
   console.log('presentation tests failed:', failures)
   process.exit(1)

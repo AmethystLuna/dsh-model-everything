@@ -79,8 +79,14 @@ A suite can be green and still never enter a branch. `c8` runs a suite the way i
 the lines and branches it never took:
 
 ```bash
-npx c8 --reporter=text node tests/<suite>/run.mjs
+npm run coverage                     # every suite, through c8
+npx c8 --reporter=text node tests/<suite>/run.mjs   # one suite, while iterating
 ```
+
+Three modules are held at 100% on statements, branches, functions and lines - `presentation.js`,
+`automaton.js`, `routing.js` - and a change that drops a branch there is a change that needs a case or a
+deleted line. The rest of the tree is not gated, because most of its uncovered paths are family-specific
+refusals that `tests/negatives` already decides by behaviour.
 
 Read it as a question, not a score: a branch with no test is either a path worth covering or a condition
 that cannot happen. Both are findings - the first wants a case, the second wants the branch removed. Two
