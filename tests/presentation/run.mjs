@@ -168,6 +168,67 @@ test('an export card previews the artifact and says how much it left out', async
   if (!JSON.stringify(view).includes('MODULE')) throw new Error('the preview does not show the artifact')
 })
 
+
+test('the card and the report agree on the verdict, family by family', async () => {
+  // The rule every card follows: it renders the same computation. A card that recomputed anything could
+  // disagree with the report it accompanies, and the reader would have no way to tell which is right.
+  const machine = { schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b' }], transitions: [{ from: 'a', event: 'go', to: 'b' }] }
+  const calls = [
+    ['../../lib/tool.js', 'modelVerifyTool', { model: machine }],
+    ['../../lib/compose-tool.js', 'modelComposeTool', { machines: [machine, machine] }],
+    ['../../lib/data-tool.js', 'modelDataModelVerifyTool', { model: { entities: [{ name: 'User', fields: [{ name: 'id', type: 'string' }], primaryKey: ['id'] }] } }],
+    ['../../lib/structure-tool.js', 'umlStructureTool', { diagram: 'component a\ncomponent b\na --> b\n' }],
+    ['../../lib/design-tool.js', 'designTool', { model: { schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } } }],
+    ['../../lib/concurrency-tool.js', 'modelConcurrencyScanTool', { text: 'The queue is thread-safe.' }],
+    ['../../lib/automaton-tool.js', 'modelAutomatonTool', { automaton: { states: ['s0', 's1'], alphabet: ['a'], transitions: [{ from: 's0', symbol: 'a', to: 's1' }, { from: 's1', symbol: 'a', to: 's1' }], init: 's0', accepting: ['s1'] } }],
+    ['../../lib/export-tool.js', 'modelExportTool', { model: machine, format: 'tla' }],
+    ['../../lib/uml-tool.js', 'umlRenderTool', { model: machine, notation: 'mermaid' }],
+  ]
+  const disagreements = []
+  for (const [modulePath, exportName, args] of calls) {
+    const tool = (await import(modulePath))[exportName]
+    const report = await tool.execute(args)
+    const meta = tool.output.presentationMeta(args, report)
+    if (meta.verdict !== report.verdict) disagreements.push(exportName + ': card ' + String(meta.verdict) + ' vs report ' + String(report.verdict))
+    const view = tool.presentResult(args, { content: [], meta })
+    if (view === undefined) disagreements.push(exportName + ': no card')
+  }
+  if (disagreements.length > 0) throw new Error(disagreements.join('; '))
+})
+
+test('a signal is not shown as a violation', async () => {
+  const { designTool } = await import('../../lib/design-tool.js')
+  const args = { model: { schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } } }
+  const report = await designTool.execute(args)
+  const meta = designTool.output.presentationMeta(args, report)
+  if (meta.levels === undefined) throw new Error('the design card carries no levels')
+  if (meta.levels.violations !== 0) throw new Error('a bridge is a signal, not a violation')
+  if (meta.first !== null) throw new Error('a signal must not be presented as the first finding')
+  const text = JSON.stringify(designTool.presentResult(args, { content: [], meta }))
+  if (text.includes('✗')) throw new Error('the card marks a signal with an error glyph')
+})
+
+test('the structure card states the graph, not only the findings', async () => {
+  const { umlStructureTool } = await import('../../lib/structure-tool.js')
+  const args = { diagram: 'component a\ncomponent b\na --> b\nb --> a\n' }
+  const report = await umlStructureTool.execute(args)
+  const meta = umlStructureTool.output.presentationMeta(args, report)
+  if (meta.graph === undefined) throw new Error('no graph counts in the card')
+  if (meta.graph.nodes !== report.summary.nodes || meta.graph.cycles !== report.summary.cycles) throw new Error('graph counts disagree with the summary')
+  const text = umlStructureTool.presentResult(args, { content: [], meta }).content[0].text
+  if (!text.includes('edges')) throw new Error('the card does not state the graph: ' + text)
+})
+
+test('the scan card says the claims were routed, not proven', async () => {
+  const { modelConcurrencyScanTool } = await import('../../lib/concurrency-tool.js')
+  const args = { text: 'The queue is thread-safe and never blocks.' }
+  const report = await modelConcurrencyScanTool.execute(args)
+  const meta = modelConcurrencyScanTool.output.presentationMeta(args, report)
+  if (meta.claims === undefined || meta.claims.absolute < 1) throw new Error('no claim count in the card')
+  const text = modelConcurrencyScanTool.presentResult(args, { content: [], meta }).content[0].text
+  if (!text.includes('proved none')) throw new Error('the card claims more than it did: ' + text)
+})
+
 if (failures > 0) {
   console.log('presentation tests failed:', failures)
   process.exit(1)

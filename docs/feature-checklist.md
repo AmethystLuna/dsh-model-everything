@@ -194,7 +194,7 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 10 | a well-formed automaton with a reachable accepting state passes |
-| `presentation` | 12 | the card keeps the verdict, the counts and the first error |
+| `presentation` | 16 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
 | `tools` | 6 | a refused edit leaves the file byte-identical |

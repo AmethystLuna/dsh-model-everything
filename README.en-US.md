@@ -44,6 +44,21 @@ reduce the model first, and if it still explodes the property needs a tool that 
 for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin builds no
 abstraction and reads no program source.
 
+## Report cards
+
+A report still prints in full, and gains a card where the UI can render one. The card is not a second
+conclusion: it is the same computation, arranged for a reader.
+
+- **The verdict first**, then the first finding, then the next step;
+- **A diff keeps two questions apart**: what this change added, and what the current report decides on its
+  own - they differ exactly when a clean change lands on an already-failing report;
+- **A design review keeps three levels apart**: a violation decides the verdict, a signal is a structural
+  fact, a fact is a measurement;
+- **A concurrency scan** says it routed the claims and **proved none of them**;
+- Without a card the raw text is what shows, so an unsupported UI loses nothing.
+
+A card **saves no tokens**: the model still gets the full text.
+
 ## What it covers
 
 | Domain | What it does |

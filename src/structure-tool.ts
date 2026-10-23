@@ -6,7 +6,7 @@ import { scanDependencyGraph } from './scan.js'
 import { reviewGranularity, type GranularityDiagram } from './granularity.js'
 import { OptionShapeError, optionRefusal, requireArrayOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
-import { reportCallView, reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, structureResultView } from './presentation.js'
 
 export const STRUCTURE_TOOL_NAME = 'uml_structure_verify'
 
@@ -64,7 +64,7 @@ export const umlStructureTool = defineTool({
     },
   },
   presentCall: reportCallView(STRUCTURE_TOOL_NAME),
-  presentResult: reportResultView(STRUCTURE_TOOL_NAME),
+  presentResult: structureResultView,
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args) {

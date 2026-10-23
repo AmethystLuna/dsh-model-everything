@@ -62,6 +62,30 @@ export interface ReportCard {
         lines: string[];
         total: number;
     };
+    /** `uml_structure_verify`: the graph's own counts, which are measurements rather than findings. */
+    graph?: {
+        nodes: number;
+        edges: number;
+        cycles: number;
+        isolated: number;
+        dangling: number;
+    };
+    /** `model_design_review`: three levels, because a signal is not a violation and a fact is neither. */
+    levels?: {
+        violations: number;
+        signals: number;
+        facts: number;
+        skipped: number;
+    };
+    /** `model_interleaving_scan`: how many claims were found, and in which families. */
+    claims?: {
+        absolute: number;
+        keywords: number;
+        families: Array<{
+            family: string;
+            count: number;
+        }>;
+    };
 }
 /**
  * Project a report into the card payload.
@@ -107,6 +131,29 @@ export declare function editResultView(family: string): (_args: unknown, result:
     meta?: unknown;
 }) => ToolResultView | undefined;
 export declare function reportResultView(family: string): (_args: unknown, result: {
+    content: ContentBlock[];
+    meta?: unknown;
+}) => ToolResultView | undefined;
+/** The card for `uml_structure_verify`: the graph's shape first, then the first finding. */
+export declare function structureCardBlocks(card: ReportCard): ContentBlock[];
+/** The card for `model_design_review`: violations, then signals, then facts - never one number. */
+export declare function designCardBlocks(card: ReportCard): ContentBlock[];
+/** The card for `model_interleaving_scan`: claims by family, and the reminder that nothing was proven. */
+export declare function scanCardBlocks(card: ReportCard): ContentBlock[];
+/** One `presentResult` per card body, since the shapes differ but the fallback does not. */
+export declare function familyResultView(family: string, body: (card: ReportCard) => ContentBlock[]): (_args: unknown, result: {
+    content: ContentBlock[];
+    meta?: unknown;
+}) => ToolResultView | undefined;
+export declare const structureResultView: (_args: unknown, result: {
+    content: ContentBlock[];
+    meta?: unknown;
+}) => ToolResultView | undefined;
+export declare const designResultView: (_args: unknown, result: {
+    content: ContentBlock[];
+    meta?: unknown;
+}) => ToolResultView | undefined;
+export declare const scanResultView: (_args: unknown, result: {
     content: ContentBlock[];
     meta?: unknown;
 }) => ToolResultView | undefined;

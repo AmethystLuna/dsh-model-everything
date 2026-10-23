@@ -49,6 +49,12 @@ export interface ReportCard {
   currentVerdict?: string
   /** The artifact a translation or a rendering produced, as the first lines of it. */
   source?: { label: string; lines: string[]; total: number }
+  /** `uml_structure_verify`: the graph's own counts, which are measurements rather than findings. */
+  graph?: { nodes: number; edges: number; cycles: number; isolated: number; dangling: number }
+  /** `model_design_review`: three levels, because a signal is not a violation and a fact is neither. */
+  levels?: { violations: number; signals: number; facts: number; skipped: number }
+  /** `model_interleaving_scan`: how many claims were found, and in which families. */
+  claims?: { absolute: number; keywords: number; families: Array<{ family: string; count: number }> }
 }
 
 const SHORT = 160
@@ -80,7 +86,18 @@ export function reportCard(value: unknown, family: string): ReportCard {
   // Two shapes live under one payload: the families with a top-level `findings` array, and the verify
   // family, whose findings sit inside `checks` and whose counts live in `summary`. Reading only the first
   // shape made a failing verification card say "0 error(s)" while its own verdict said fail.
-  if (findings.length === 0) {
+  const violations = array(report.violations)
+  const signals = array(report.signals)
+  const facts = array(report.facts)
+  if (findings.length === 0 && violations.length > 0) {
+    // The design family keeps three levels apart on purpose: a violation decides the verdict, a signal is a
+    // structural fact, and a fact is a measurement. Only the violations are findings here, or the card would
+    // show a signal with an error mark.
+    for (const entry of violations) {
+      const finding = record(entry)
+      if (finding !== undefined) findings.push({ ...finding, severity: 'error' })
+    }
+  } else if (findings.length === 0 && violations.length === 0 && array(report.violations).length === 0 && !Array.isArray(report.violations)) {
     for (const check of array(report.checks)) {
       for (const entry of array(record(check)?.findings)) {
         const finding = record(entry)
@@ -134,6 +151,15 @@ export function reportCard(value: unknown, family: string): ReportCard {
     ...(delta === undefined ? {} : { delta }),
     ...(firstAddedRaw === undefined ? {} : { firstAdded: { code: String(firstAddedRaw.code ?? '?'), severity: String(firstAddedRaw.severity ?? 'info'), message: shorten(String(firstAddedRaw.message ?? '')) } }),
     ...(typeof report.currentVerdict === 'string' ? { currentVerdict: report.currentVerdict } : {}),
+    ...(typeof summary?.nodes === 'number' && typeof summary?.edges === 'number'
+      ? { graph: { nodes: summary.nodes, edges: summary.edges, cycles: Number(summary.cycles ?? 0), isolated: Number(summary.isolated ?? 0), dangling: Number(summary.dangling ?? 0) } }
+      : {}),
+    ...(violations.length === 0 && signals.length === 0 && facts.length === 0
+      ? {}
+      : { levels: { violations: violations.length, signals: signals.length, facts: facts.length, skipped: array(report.checksSkipped).length } }),
+    ...(typeof summary?.absoluteClaims === 'number'
+      ? { claims: { absolute: summary.absoluteClaims, keywords: Number(summary.keywords ?? 0), families: claimFamilies(findings) } }
+      : {}),
   }
 }
 
@@ -261,6 +287,71 @@ export function reportResultView(family: string) {
     return { card: 'generic', title: family + '  ' + (card.verdict ?? '') , content: cardBlocks(card) }
   }
 }
+
+
+/** How many findings per family, for the scan card: the reader wants the shape, not the list. */
+function claimFamilies(findings: Array<Record<string, unknown>>): Array<{ family: string; count: number }> {
+  const counts = new Map<string, number>()
+  for (const finding of findings) {
+    const family = typeof finding.family === 'string' ? finding.family : 'other'
+    counts.set(family, (counts.get(family) ?? 0) + 1)
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([family, count]) => ({ family, count }))
+}
+
+/** The card for `uml_structure_verify`: the graph's shape first, then the first finding. */
+export function structureCardBlocks(card: ReportCard): ContentBlock[] {
+  const lines: string[] = []
+  const head = card.verdict === undefined ? card.family : card.verdict.toUpperCase()
+  lines.push(head + '  —  ' + String(card.errors) + ' error(s) · ' + String(card.warnings) + ' warning(s)')
+  if (card.graph !== undefined) {
+    lines.push('graph: ' + String(card.graph.nodes) + ' nodes · ' + String(card.graph.edges) + ' edges · ' + String(card.graph.cycles) + ' cycle(s) · ' + String(card.graph.isolated) + ' isolated')
+  }
+  if (card.first !== null) lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
+  if (card.next !== null) lines.push('next: ' + card.next)
+  return [{ type: 'text', text: lines.join(String.fromCharCode(10)) }]
+}
+
+/** The card for `model_design_review`: violations, then signals, then facts - never one number. */
+export function designCardBlocks(card: ReportCard): ContentBlock[] {
+  const lines: string[] = []
+  const head = card.verdict === undefined ? card.family : card.verdict.toUpperCase()
+  lines.push(head + '  —  ' + String(card.errors) + ' violation(s) · ' + String(card.warnings) + ' signal(s)')
+  if (card.levels !== undefined) {
+    lines.push('levels: ' + String(card.levels.violations) + ' violation · ' + String(card.levels.signals) + ' signal · ' + String(card.levels.facts) + ' fact · ' + String(card.levels.skipped) + ' check(s) skipped')
+  }
+  if (card.first !== null) lines.push('✗ ' + card.first.code + ': ' + card.first.message)
+  if (card.levels !== undefined && card.levels.skipped > 0) lines.push('a skipped check examined nothing: silence there is not a pass')
+  if (card.next !== null) lines.push('next: ' + card.next)
+  return [{ type: 'text', text: lines.join(String.fromCharCode(10)) }]
+}
+
+/** The card for `model_interleaving_scan`: claims by family, and the reminder that nothing was proven. */
+export function scanCardBlocks(card: ReportCard): ContentBlock[] {
+  const lines: string[] = []
+  const head = card.verdict === undefined ? card.family : card.verdict.toUpperCase()
+  lines.push(head + '  —  ' + String(card.errors) + ' absolute claim(s) · ' + String(card.warnings) + ' risk(s)')
+  if (card.claims !== undefined) {
+    const families = card.claims.families.map((entry) => entry.family + ' ' + String(entry.count)).join(' · ')
+    lines.push('claims: ' + String(card.claims.absolute) + ' absolute, ' + String(card.claims.keywords) + ' keyword(s) hit' + (families === '' ? '' : ' · ' + families))
+  }
+  if (card.first !== null) lines.push('✗ ' + card.first.code + ': ' + card.first.message)
+  lines.push('this plugin routed the claims; it proved none of them')
+  return [{ type: 'text', text: lines.join(String.fromCharCode(10)) }]
+}
+
+/** One `presentResult` per card body, since the shapes differ but the fallback does not. */
+export function familyResultView(family: string, body: (card: ReportCard) => ContentBlock[]) {
+  return (_args: unknown, result: { content: ContentBlock[]; meta?: unknown }): ToolResultView | undefined => {
+    const card = record(result.meta) as unknown as ReportCard | undefined
+    if (card === undefined || card === null) return undefined
+    return { card: 'generic', title: family + '  ' + (card.verdict ?? ''), content: body(card) }
+  }
+}
+
+export const structureResultView = familyResultView('uml_structure_verify', structureCardBlocks)
+export const designResultView = familyResultView('model_design_review', designCardBlocks)
+export const scanResultView = familyResultView('model_interleaving_scan', scanCardBlocks)
 
 /** `presentResult` for `report_diff`: the delta leads, never the current report's own verdict. */
 export function diffResultView(family: string) {
