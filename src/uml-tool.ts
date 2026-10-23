@@ -7,7 +7,7 @@ import {
   type UmlDiagram, type UmlFinding, type UmlIntent, type UmlNotation, type UmlParseResult,
 } from './uml.js'
 import { renderReportText } from './report-view.js'
-import { reportCallView, reportCard, reportResultView } from './presentation.js'
+import { cardWithSource, reportCallView, reportCard, reportResultView } from './presentation.js'
 
 /**
  * The UML front end as four tools, one per job.
@@ -63,7 +63,8 @@ const reportOutput = (family: string) => ({
   // The card a UI shows, separated from the text the model reads. The family is the tool's own name, so
   // one shared output does not have to guess which tool is calling it.
   presentationMeta(_args: unknown, value: unknown) {
-    return reportCard(value, family) as unknown as JsonValue
+    const report = value as Record<string, unknown>
+    return cardWithSource(value, family, typeof report.diagram === 'string' ? report.diagram : undefined, 'diagram source') as unknown as JsonValue
   },
 })
 

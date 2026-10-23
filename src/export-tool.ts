@@ -1,7 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { REPORT_SCHEMAS, DEFAULT_HASH_SPEC, modelHash, refusalVerdict, validateModel, verdictOf } from './engine.js'
-import { reportCallView, reportCard, reportResultView } from './presentation.js'
+import { cardWithSource, reportCallView, reportCard, reportResultView } from './presentation.js'
 import { ExportError, exportModel, type ExportFormat } from './exporters.js'
 import { renderReportText } from './report-view.js'
 
@@ -52,7 +52,8 @@ export const modelExportTool = defineTool({
     },
     // The card a UI shows, separated from the text the model reads.
     presentationMeta(_args, value) {
-      return reportCard(value, EXPORT_TOOL_NAME) as unknown as JsonValue
+      const report = value as Record<string, unknown>
+      return cardWithSource(value, EXPORT_TOOL_NAME, typeof report.primary === 'string' ? report.primary : undefined, typeof report.format === 'string' ? 'artifact: ' + report.format : 'artifact') as unknown as JsonValue
     },
   },
   presentCall: reportCallView(EXPORT_TOOL_NAME),

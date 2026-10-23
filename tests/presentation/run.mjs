@@ -155,6 +155,62 @@ test('a diff with nothing added says so', () => {
   if (!JSON.stringify(view).includes('nothing was added')) throw new Error('an empty delta should say the slice is accepted')
 })
 
+
+test('a verify card takes its counts from the summary and draws the machine', async () => {
+  const { modelVerifyTool } = await import('../../lib/tool.js')
+  const model = {
+    schemaVersion: 1,
+    init: 'idle',
+    states: [{ id: 'idle' }, { id: 'loading' }, { id: 'done' }],
+    transitions: [
+      { from: 'idle', event: 'load', to: 'loading' },
+      { from: 'loading', event: 'ok', to: 'done' },
+    ],
+  }
+  const args = { model }
+  const report = await modelVerifyTool.execute(args)
+  const meta = modelVerifyTool.output.presentationMeta(args, report)
+  // The verify family keeps its findings inside `checks`; a card that read only a top-level array said
+  // "0 error(s)" under a verdict of fail.
+  if (meta.errors !== report.summary.errors) throw new Error('card counts disagree with the summary: ' + String(meta.errors) + ' vs ' + String(report.summary.errors))
+  if (!Array.isArray(meta.diagram)) throw new Error('the card carries no drawing')
+  const drawing = meta.diagram.join(String.fromCharCode(10))
+  if (!drawing.includes('((idle))')) throw new Error('the initial state is not marked: ' + drawing)
+  if (!drawing.includes('load')) throw new Error('the edge label is missing: ' + drawing)
+})
+
+test('a machine too large to draw says so instead of printing a tangle', async () => {
+  const { drawStateDiagram } = await import('../../lib/visualize.js')
+  const states = Array.from({ length: 20 }, (_, index) => ({ id: 's' + String(index) }))
+  const transitions = states.slice(1).map((state, index) => ({ from: states[index].id, to: state.id }))
+  const lines = drawStateDiagram({ states, transitions, initial: 's0' })
+  if (lines.length !== 1) throw new Error('expected a single refusal line, got ' + String(lines.length))
+  if (!lines[0].includes('too large')) throw new Error('the refusal does not say why: ' + lines[0])
+})
+
+test('the drawing shows every declared edge, including a back edge', async () => {
+  const { drawStateDiagram } = await import('../../lib/visualize.js')
+  const lines = drawStateDiagram({
+    states: [{ id: 'a' }, { id: 'b' }],
+    transitions: [{ from: 'a', to: 'b', label: 'go' }, { from: 'b', to: 'a', label: 'back' }],
+    initial: 'a',
+  }).join(String.fromCharCode(10))
+  if (!lines.includes('go')) throw new Error('the forward edge is missing')
+  if (!lines.includes('back')) throw new Error('the back edge is missing')
+})
+
+test('an export card previews the artifact and says how much it left out', async () => {
+  const { modelExportTool } = await import('../../lib/export-tool.js')
+  const model = { schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b' }], transitions: [{ from: 'a', event: 'go', to: 'b' }] }
+  const args = { model, format: 'tla' }
+  const report = await modelExportTool.execute(args)
+  const meta = modelExportTool.output.presentationMeta(args, report)
+  if (meta.source === undefined) throw new Error('the artifact is not previewed')
+  if (meta.source.total < meta.source.lines.length) throw new Error('the preview claims more lines than the artifact has')
+  const view = modelExportTool.presentResult(args, { content: [], meta })
+  if (!JSON.stringify(view).includes('MODULE')) throw new Error('the preview does not show the artifact')
+})
+
 if (failures > 0) {
   console.log('presentation tests failed:', failures)
   process.exit(1)

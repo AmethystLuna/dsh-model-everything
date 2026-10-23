@@ -11,7 +11,7 @@ import { verifyAutomaton, type AutomatonRelation } from './automaton.js'
 import type { JsonValue } from './json-value.js'
 import { optionRefusal } from './option-shape.js'
 import { renderReportText } from './report-view.js'
-import { reportCallView, reportCard, reportResultView } from './presentation.js'
+import { automatonDrawable, cardWithDiagram, reportCallView, reportCard, reportResultView } from './presentation.js'
 
 export const MODEL_AUTOMATON_TOOL_NAME = 'model_automaton_verify'
 
@@ -53,8 +53,8 @@ export const modelAutomatonTool = defineTool({
     },
     // The card a UI shows, separated from the text the model reads: a verdict and the first thing wrong,
     // never the whole report.
-    presentationMeta(_args, value) {
-      return reportCard(value, MODEL_AUTOMATON_TOOL_NAME) as unknown as JsonValue
+    presentationMeta(args, value) {
+      return cardWithDiagram(value, MODEL_AUTOMATON_TOOL_NAME, automatonDrawable(args.automaton)) as unknown as JsonValue
     },
   },
   presentCall: reportCallView(MODEL_AUTOMATON_TOOL_NAME),

@@ -16,6 +16,7 @@
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { routeFor } from './routing.js'
+import { diagramLegend, drawStateDiagram, type Drawable } from './visualize.js'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 
 /** One finding, as a card needs it: a code to name it and a sentence to read. */
@@ -47,6 +48,10 @@ export interface ReportCard {
   firstAdded?: CardFinding
   /** `report_diff`: the current report's own verdict, which differs from the delta's when a clean change lands on a failing report. */
   currentVerdict?: string
+  /** A machine drawn as text, for the card only: the report still describes the machine in words. */
+  diagram?: string[]
+  /** The artifact a translation or a rendering produced, as the first lines of it. */
+  source?: { label: string; lines: string[]; total: number }
 }
 
 const SHORT = 160
@@ -75,10 +80,23 @@ export function reportCard(value: unknown, family: string): ReportCard {
   const findings = array(report.findings)
     .map((entry) => record(entry))
     .filter((entry): entry is Record<string, unknown> => entry !== undefined)
+  // Two shapes live under one payload: the families with a top-level `findings` array, and the verify
+  // family, whose findings sit inside `checks` and whose counts live in `summary`. Reading only the first
+  // shape made a failing verification card say "0 error(s)" while its own verdict said fail.
+  if (findings.length === 0) {
+    for (const check of array(report.checks)) {
+      for (const entry of array(record(check)?.findings)) {
+        const finding = record(entry)
+        if (finding !== undefined) findings.push(finding)
+      }
+    }
+  }
   const severity = (entry: Record<string, unknown>): string => String(entry.severity ?? 'info')
   const errors = findings.filter((entry) => severity(entry) === 'error')
   const warnings = findings.filter((entry) => severity(entry) === 'warning')
   const summary = record(report.summary)
+  const summaryErrors = typeof summary?.errors === 'number' ? summary.errors : undefined
+  const summaryWarnings = typeof summary?.warnings === 'number' ? summary.warnings : undefined
   const checksRun = typeof summary?.checksRun === 'number'
     ? summary.checksRun
     : array(report.checks).length > 0
@@ -104,8 +122,8 @@ export function reportCard(value: unknown, family: string): ReportCard {
   return {
     ...(typeof report.verdict === 'string' ? { verdict: report.verdict } : {}),
     ...(typeof report.verdictReason === 'string' ? { verdictReason: shorten(report.verdictReason) } : {}),
-    errors: errors.length,
-    warnings: warnings.length,
+    errors: summaryErrors ?? errors.length,
+    warnings: summaryWarnings ?? warnings.length,
     ...(checksRun === undefined ? {} : { checksRun }),
     first: first === undefined
       ? null
@@ -135,6 +153,16 @@ export function cardBlocks(card: ReportCard): ContentBlock[] {
     lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
   }
   if (card.next !== null) lines.push('next: ' + card.next)
+  if (card.diagram !== undefined && card.diagram.length > 0) {
+    lines.push('')
+    lines.push(...card.diagram)
+  }
+  if (card.source !== undefined) {
+    lines.push('')
+    const shown = card.source.lines.length
+    lines.push(card.source.label + (card.source.total > shown ? ' (first ' + String(shown) + ' of ' + String(card.source.total) + ' lines)' : ''))
+    lines.push(...card.source.lines)
+  }
   return [{ type: 'text', text: lines.join('\n') }]
 }
 
@@ -154,6 +182,64 @@ function lastSegment(path: string): string {
  * From the arguments only, because a UI calls this during streaming and again on replay; the file has not
  * been opened at that point and must not be.
  */
+
+/**
+ * The card payload with the machine drawn, when the arguments carry one worth drawing.
+ *
+ * Drawn from the arguments, not the report: the model already knows its own machine, and putting it in the
+ * result would spend tokens to tell it what it just wrote.
+ */
+export function cardWithDiagram(value: unknown, family: string, drawable: Drawable | undefined): ReportCard {
+  const card = reportCard(value, family)
+  if (drawable === undefined) return card
+  const diagram = drawStateDiagram(drawable)
+  return diagram.length === 0 ? card : { ...card, diagram }
+}
+
+/** A LogicModelV1 shape as the drawing needs it: `event` labels the edge, `init` is the start. */
+export function machineDrawable(model: unknown): Drawable | undefined {
+  const m = record(model)
+  if (m === undefined) return undefined
+  const states = array(m.states).map((entry) => record(entry)).filter((entry): entry is Record<string, unknown> => entry !== undefined && typeof entry.id === 'string')
+  const transitions = array(m.transitions).map((entry) => record(entry)).filter((entry): entry is Record<string, unknown> => entry !== undefined && typeof entry.from === 'string' && typeof entry.to === 'string')
+  if (states.length === 0 || transitions.length === 0) return undefined
+  return {
+    states: states.map((state) => ({ id: String(state.id) })),
+    transitions: transitions.map((transition) => ({ from: String(transition.from), to: String(transition.to), ...(typeof transition.event === 'string' ? { label: transition.event } : {}) })),
+    ...(typeof m.init === 'string' ? { initial: m.init } : {}),
+  }
+}
+
+/** An automaton shape as the drawing needs it: the symbol labels the edge, `init` is the start. */
+export function automatonDrawable(automaton: unknown): Drawable | undefined {
+  const a = record(automaton)
+  if (a === undefined) return undefined
+  const states = array(a.states).filter((state): state is string => typeof state === 'string')
+  const transitions = array(a.transitions).map((entry) => record(entry)).filter((entry): entry is Record<string, unknown> => entry !== undefined && typeof entry.from === 'string' && typeof entry.to === 'string')
+  if (states.length === 0 || transitions.length === 0) return undefined
+  return {
+    states: states.map((id) => ({ id })),
+    transitions: transitions.map((transition) => ({ from: String(transition.from), to: String(transition.to), ...(typeof transition.symbol === 'string' ? { label: transition.symbol } : {}) })),
+    ...(typeof a.init === 'string' ? { initial: a.init } : {}),
+  }
+}
+
+
+/**
+ * The card payload with the artifact previewed.
+ *
+ * A translation and a rendering both produce text a reader wants to see the shape of, and neither should
+ * paste the whole file into a card: the preview is bounded, and it says how much it left out. The report
+ * keeps the artifact in full for whoever needs it.
+ */
+export function cardWithSource(value: unknown, family: string, text: string | undefined, label: string, limit = 14): ReportCard {
+  const card = reportCard(value, family)
+  if (text === undefined || text.trim() === '') return card
+  const all = text.split(String.fromCharCode(10))
+  const lines = all.slice(0, limit)
+  return { ...card, source: { label, lines, total: all.length } }
+}
+
 export function reportCallView(family: string) {
   return (args: unknown): ToolCallView | undefined => {
     const a = record(args) ?? {}
