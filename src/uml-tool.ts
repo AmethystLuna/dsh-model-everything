@@ -7,7 +7,7 @@ import {
   type UmlDiagram, type UmlFinding, type UmlIntent, type UmlNotation, type UmlParseResult,
 } from './uml.js'
 import { renderReportText } from './report-view.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 
 /**
  * The UML front end as four tools, one per job.
@@ -81,6 +81,7 @@ export const umlRenderTool = defineTool({
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_RENDER_TOOL_NAME),
+  presentCall: reportCallView(UML_RENDER_TOOL_NAME),
   presentResult: reportResultView(UML_RENDER_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
@@ -119,6 +120,7 @@ export const umlParseTool = defineTool({
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_PARSE_TOOL_NAME),
+  presentCall: reportCallView(UML_PARSE_TOOL_NAME),
   presentResult: reportResultView(UML_PARSE_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
@@ -171,6 +173,7 @@ export const umlReviewTool = defineTool({
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_REVIEW_TOOL_NAME),
+  presentCall: reportCallView(UML_REVIEW_TOOL_NAME),
   presentResult: reportResultView(UML_REVIEW_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
@@ -203,6 +206,7 @@ export const umlExplainLabelsTool = defineTool({
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_LABELS_TOOL_NAME),
+  presentCall: reportCallView(UML_LABELS_TOOL_NAME),
   presentResult: reportResultView(UML_LABELS_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

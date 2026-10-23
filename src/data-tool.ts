@@ -4,7 +4,7 @@ import { runDataVerification, DATA_ENGINE_SCHEMA_VERSION } from './data-engine.j
 import { oneOf } from './model-file.js'
 import { optionRefusal, requireArrayOption, requireObjectOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 
 export const DATAMODEL_VERIFY_TOOL_NAME = 'model_datamodel_verify'
 
@@ -69,7 +69,9 @@ export const modelDataModelVerifyTool = defineTool({
     presentationMeta(_args, value) {
       return reportCard(value, DATAMODEL_VERIFY_TOOL_NAME) as unknown as JsonValue
     },
-  },  presentResult: reportResultView(DATAMODEL_VERIFY_TOOL_NAME),
+  },
+  presentCall: reportCallView(DATAMODEL_VERIFY_TOOL_NAME),
+  presentResult: reportResultView(DATAMODEL_VERIFY_TOOL_NAME),
 
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

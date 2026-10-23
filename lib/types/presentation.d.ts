@@ -15,7 +15,7 @@
  * Both are pure and replayable: they read the persisted value, never the filesystem.
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
-import type { ToolResultView } from '@deepseek-ai/dsh-tools';
+import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools';
 /** One finding, as a card needs it: a code to name it and a sentence to read. */
 export interface CardFinding {
     code: string;
@@ -39,6 +39,23 @@ export interface ReportCard {
         owns: string;
         instead: string;
     };
+    /** `model_edit`: the changes this call applied, as the report lists them. */
+    changes?: Array<{
+        kind: string;
+        what: string;
+        detail?: string;
+    }>;
+    /** `model_edit` and `report_diff`: how the findings moved, when either report could compare. */
+    delta?: {
+        added: number;
+        removed: number;
+        changed: number;
+        addedErrors: number;
+    };
+    /** `report_diff`: the first finding the change adds, so a card can lead with it. */
+    firstAdded?: CardFinding;
+    /** `report_diff`: the current report's own verdict, which differs from the delta's when a clean change lands on a failing report. */
+    currentVerdict?: string;
 }
 /**
  * Project a report into the card payload.
@@ -50,10 +67,37 @@ export declare function reportCard(value: unknown, family: string): ReportCard;
 /** The card body: four lines, in the order a reader asks the questions. */
 export declare function cardBlocks(card: ReportCard): ContentBlock[];
 /**
- * `presentResult` for a report tool: render the card from the persisted payload, and fall back to the
- * raw content by returning undefined when there is none.
+ * The pending card for a report tool: a title naming the artifact, and the file to follow.
+ *
+ * From the arguments only, because a UI calls this during streaming and again on replay; the file has not
+ * been opened at that point and must not be.
  */
+export declare function reportCallView(family: string): (args: unknown) => ToolCallView | undefined;
+/**
+ * The card for `model_edit`: what changed, and what the change did to the findings.
+ *
+ * Both lists are already in the report, so this is a rendering of the same value rather than a second
+ * computation - the rule every card here follows.
+ */
+export declare function editCardBlocks(card: ReportCard): ContentBlock[];
+/**
+ * The card for `report_diff`: does this change add anything, read as counts and the first added error.
+ *
+ * A diff's `verdict` is about the delta, so the card leads with the delta and never with the current
+ * report's own verdict - the two differ exactly when a clean change lands on an already-failing report.
+ */
+export declare function diffCardBlocks(card: ReportCard): ContentBlock[];
+/** `presentResult` for `model_edit`, falling back to the generic card when the payload has no changes. */
+export declare function editResultView(family: string): (_args: unknown, result: {
+    content: ContentBlock[];
+    meta?: unknown;
+}) => ToolResultView | undefined;
 export declare function reportResultView(family: string): (_args: unknown, result: {
+    content: ContentBlock[];
+    meta?: unknown;
+}) => ToolResultView | undefined;
+/** `presentResult` for `report_diff`: the delta leads, never the current report's own verdict. */
+export declare function diffResultView(family: string): (_args: unknown, result: {
     content: ContentBlock[];
     meta?: unknown;
 }) => ToolResultView | undefined;

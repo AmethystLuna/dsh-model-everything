@@ -11,7 +11,7 @@ import { verifyAutomaton, type AutomatonRelation } from './automaton.js'
 import type { JsonValue } from './json-value.js'
 import { optionRefusal } from './option-shape.js'
 import { renderReportText } from './report-view.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 
 export const MODEL_AUTOMATON_TOOL_NAME = 'model_automaton_verify'
 
@@ -57,6 +57,7 @@ export const modelAutomatonTool = defineTool({
       return reportCard(value, MODEL_AUTOMATON_TOOL_NAME) as unknown as JsonValue
     },
   },
+  presentCall: reportCallView(MODEL_AUTOMATON_TOOL_NAME),
   presentResult: reportResultView(MODEL_AUTOMATON_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

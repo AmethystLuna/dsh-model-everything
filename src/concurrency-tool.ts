@@ -2,7 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runConcurrencyScan } from './concurrency.js'
 import { renderReportText } from './report-view.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 
 export const INTERLEAVING_SCAN_TOOL_NAME = 'model_interleaving_scan'
 
@@ -40,7 +40,9 @@ export const modelConcurrencyScanTool = defineTool({
     presentationMeta(_args, value) {
       return reportCard(value, INTERLEAVING_SCAN_TOOL_NAME) as unknown as JsonValue
     },
-  },  presentResult: reportResultView(INTERLEAVING_SCAN_TOOL_NAME),
+  },
+  presentCall: reportCallView(INTERLEAVING_SCAN_TOOL_NAME),
+  presentResult: reportResultView(INTERLEAVING_SCAN_TOOL_NAME),
 
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

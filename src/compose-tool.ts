@@ -1,7 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runCompositionVerification } from './engine.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 import type { SharedAccess, SharedLocation } from './engine.js'
 import { OptionShapeError, optionRefusal, requireArrayOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
@@ -61,7 +61,9 @@ export const modelComposeTool = defineTool({
     presentationMeta(_args, value) {
       return reportCard(value, COMPOSE_TOOL_NAME) as unknown as JsonValue
     },
-  },  presentResult: reportResultView(COMPOSE_TOOL_NAME),
+  },
+  presentCall: reportCallView(COMPOSE_TOOL_NAME),
+  presentResult: reportResultView(COMPOSE_TOOL_NAME),
 
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

@@ -8,6 +8,8 @@ import { verifyAutomaton } from '../../lib/automaton.js'
 import { MODEL_AUTOMATON_TOOL_NAME, modelAutomatonTool } from '../../lib/automaton-tool.js'
 import { MODEL_VERIFY_TOOL_NAME, modelVerifyTool } from '../../lib/tool.js'
 import { STRUCTURE_TOOL_NAME, umlStructureTool } from '../../lib/structure-tool.js'
+import { modelEditTool } from '../../lib/edit-tool.js'
+import { reportDiffTool } from '../../lib/report-diff-tool.js'
 
 let failures = 0
 function test(name, body) {
@@ -93,6 +95,64 @@ test('the card comes from the report, never from a second render', () => {
   if (meta.verdict !== report.verdict) throw new Error('the card and the report disagree on the verdict')
   const view = modelAutomatonTool.presentResult(args, { content: [], meta })
   if (view === undefined || view.card !== 'generic') throw new Error('presentResult returned no card')
+})
+
+
+test('the pending card names the artifact and the file to follow', () => {
+  const view = modelEditTool.presentCall({ modelPath: 'F:/repo/examples/order.json', ops: [{ addState: 'x' }] })
+  if (view === undefined) throw new Error('no call card for a valid call')
+  if (!String(view.title).includes('order.json')) throw new Error('the title does not name the file: ' + String(view.title))
+  if (view.kind !== 'edit') throw new Error('model_edit should carry kind edit, got ' + String(view.kind))
+  if (JSON.stringify(view.locations) !== JSON.stringify([{ path: 'F:/repo/examples/order.json' }])) throw new Error('no follow-along location')
+})
+
+test('a call that cannot be validated shows no card of its own', () => {
+  // defineTool validates before the presenter runs, so a malformed call falls back to the raw presentation
+  // rather than to a title computed from arguments the tool would refuse.
+  const view = modelEditTool.presentCall({})
+  if (view !== undefined) throw new Error('an invalid call produced a card')
+})
+
+test('the edit card lists the changes and the delta', () => {
+  const meta = {
+    verdict: 'fail',
+    errors: 1,
+    warnings: 0,
+    first: null,
+    next: 'fix the budget',
+    family: 'model_edit',
+    changes: [{ kind: 'added', what: 'state waiting' }, { kind: 'removed', what: 'transition idle + go' }],
+    delta: { added: 2, removed: 1, changed: 0, addedErrors: 1 },
+  }
+  const view = modelEditTool.presentResult({ modelPath: 'x.json', ops: [{ addState: 'a' }] }, { content: [], meta })
+  const text = JSON.stringify(view)
+  if (!text.includes('state waiting')) throw new Error('the change is missing from the card')
+  if (!text.includes('added 2')) throw new Error('the delta is missing from the card')
+})
+
+test('the diff card leads with the delta, not with the current verdict', () => {
+  const meta = {
+    verdict: 'fail',
+    errors: 1,
+    warnings: 0,
+    first: null,
+    next: 'accept or fix',
+    family: 'report_diff',
+    delta: { added: 1, removed: 0, changed: 0, addedErrors: 1 },
+    firstAdded: { code: 'A12_BUDGET', severity: 'error', message: 'budget 5 exceeded' },
+    currentVerdict: 'fail',
+  }
+  const view = reportDiffTool.presentResult({ baseline: {}, current: {} }, { content: [], meta })
+  const text = view.content.map((block) => block.text ?? '').join(String.fromCharCode(10))
+  if (!/^FAIL\s+—\s+added 1/.test(text)) throw new Error('the card does not lead with the delta: ' + text)
+  if (!text.includes('A12_BUDGET')) throw new Error('the first added finding is missing')
+  if (!text.includes('current report on its own')) throw new Error('the current verdict is not distinguished from the delta')
+})
+
+test('a diff with nothing added says so', () => {
+  const meta = { verdict: 'pass', errors: 0, warnings: 0, first: null, next: 'none', family: 'report_diff', delta: { added: 0, removed: 2, changed: 1, addedErrors: 0 } }
+  const view = reportDiffTool.presentResult({ baseline: {}, current: {} }, { content: [], meta })
+  if (!JSON.stringify(view).includes('nothing was added')) throw new Error('an empty delta should say the slice is accepted')
 })
 
 if (failures > 0) {

@@ -14,7 +14,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { diffReports } from './baseline.js'
 import { applyEdits, readModelFile } from './editor.js'
 import { REPORT_SCHEMAS, runVerification } from './engine.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { editResultView, reportCallView, reportCard } from './presentation.js'
 import type { JsonValue } from './json-value.js'
 import { optionRefusal } from './option-shape.js'
 import { renderReportText } from './report-view.js'
@@ -66,7 +66,9 @@ export const modelEditTool = defineTool({
     presentationMeta(_args, value) {
       return reportCard(value, MODEL_EDIT_TOOL_NAME) as unknown as JsonValue
     },
-  },  presentResult: reportResultView(MODEL_EDIT_TOOL_NAME),
+  },
+  presentCall: reportCallView(MODEL_EDIT_TOOL_NAME),
+  presentResult: editResultView(MODEL_EDIT_TOOL_NAME),
 
   timeoutMs: 20_000,
   isConcurrencySafe: () => false,

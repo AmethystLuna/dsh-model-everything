@@ -1,7 +1,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { REPORT_SCHEMAS } from './engine.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 import { oneOf } from './model-file.js'
 import { runDesignReview } from './design-engine.js'
 import { renderReportText } from './report-view.js'
@@ -53,7 +53,9 @@ export const designTool = defineTool({
     presentationMeta(_args, value) {
       return reportCard(value, DESIGN_TOOL_NAME) as unknown as JsonValue
     },
-  },  presentResult: reportResultView(DESIGN_TOOL_NAME),
+  },
+  presentCall: reportCallView(DESIGN_TOOL_NAME),
+  presentResult: reportResultView(DESIGN_TOOL_NAME),
 
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

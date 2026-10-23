@@ -2,7 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from './json-value.js'
 import { runVerification } from './engine.js'
 import { renderReportText } from './report-view.js'
-import { reportCard, reportResultView } from './presentation.js'
+import { reportCallView, reportCard, reportResultView } from './presentation.js'
 import { OptionShapeError, optionRefusal, requireObjectOption } from './option-shape.js'
 import { oneOf } from './model-file.js'
 
@@ -69,6 +69,7 @@ export const modelVerifyTool = defineTool({
       return reportCard(value, MODEL_VERIFY_TOOL_NAME) as unknown as JsonValue
     },
   },
+  presentCall: reportCallView(MODEL_VERIFY_TOOL_NAME),
   presentResult: reportResultView(MODEL_VERIFY_TOOL_NAME),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
