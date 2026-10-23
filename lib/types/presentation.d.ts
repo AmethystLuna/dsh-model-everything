@@ -15,7 +15,6 @@
  * Both are pure and replayable: they read the persisted value, never the filesystem.
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
-import { type Drawable } from './visualize.js';
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools';
 /** One finding, as a card needs it: a code to name it and a sentence to read. */
 export interface CardFinding {
@@ -57,8 +56,6 @@ export interface ReportCard {
     firstAdded?: CardFinding;
     /** `report_diff`: the current report's own verdict, which differs from the delta's when a clean change lands on a failing report. */
     currentVerdict?: string;
-    /** A machine drawn as text, for the card only: the report still describes the machine in words. */
-    diagram?: string[];
     /** The artifact a translation or a rendering produced, as the first lines of it. */
     source?: {
         label: string;
@@ -81,17 +78,6 @@ export declare function cardBlocks(card: ReportCard): ContentBlock[];
  * From the arguments only, because a UI calls this during streaming and again on replay; the file has not
  * been opened at that point and must not be.
  */
-/**
- * The card payload with the machine drawn, when the arguments carry one worth drawing.
- *
- * Drawn from the arguments, not the report: the model already knows its own machine, and putting it in the
- * result would spend tokens to tell it what it just wrote.
- */
-export declare function cardWithDiagram(value: unknown, family: string, drawable: Drawable | undefined): ReportCard;
-/** A LogicModelV1 shape as the drawing needs it: `event` labels the edge, `init` is the start. */
-export declare function machineDrawable(model: unknown): Drawable | undefined;
-/** An automaton shape as the drawing needs it: the symbol labels the edge, `init` is the start. */
-export declare function automatonDrawable(automaton: unknown): Drawable | undefined;
 /**
  * The card payload with the artifact previewed.
  *

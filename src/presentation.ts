@@ -16,7 +16,6 @@
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { routeFor } from './routing.js'
-import { diagramLegend, drawStateDiagram, type Drawable } from './visualize.js'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 
 /** One finding, as a card needs it: a code to name it and a sentence to read. */
@@ -48,8 +47,6 @@ export interface ReportCard {
   firstAdded?: CardFinding
   /** `report_diff`: the current report's own verdict, which differs from the delta's when a clean change lands on a failing report. */
   currentVerdict?: string
-  /** A machine drawn as text, for the card only: the report still describes the machine in words. */
-  diagram?: string[]
   /** The artifact a translation or a rendering produced, as the first lines of it. */
   source?: { label: string; lines: string[]; total: number }
 }
@@ -153,10 +150,6 @@ export function cardBlocks(card: ReportCard): ContentBlock[] {
     lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
   }
   if (card.next !== null) lines.push('next: ' + card.next)
-  if (card.diagram !== undefined && card.diagram.length > 0) {
-    lines.push('')
-    lines.push(...card.diagram)
-  }
   if (card.source !== undefined) {
     lines.push('')
     const shown = card.source.lines.length
@@ -182,48 +175,6 @@ function lastSegment(path: string): string {
  * From the arguments only, because a UI calls this during streaming and again on replay; the file has not
  * been opened at that point and must not be.
  */
-
-/**
- * The card payload with the machine drawn, when the arguments carry one worth drawing.
- *
- * Drawn from the arguments, not the report: the model already knows its own machine, and putting it in the
- * result would spend tokens to tell it what it just wrote.
- */
-export function cardWithDiagram(value: unknown, family: string, drawable: Drawable | undefined): ReportCard {
-  const card = reportCard(value, family)
-  if (drawable === undefined) return card
-  const diagram = drawStateDiagram(drawable)
-  return diagram.length === 0 ? card : { ...card, diagram }
-}
-
-/** A LogicModelV1 shape as the drawing needs it: `event` labels the edge, `init` is the start. */
-export function machineDrawable(model: unknown): Drawable | undefined {
-  const m = record(model)
-  if (m === undefined) return undefined
-  const states = array(m.states).map((entry) => record(entry)).filter((entry): entry is Record<string, unknown> => entry !== undefined && typeof entry.id === 'string')
-  const transitions = array(m.transitions).map((entry) => record(entry)).filter((entry): entry is Record<string, unknown> => entry !== undefined && typeof entry.from === 'string' && typeof entry.to === 'string')
-  if (states.length === 0 || transitions.length === 0) return undefined
-  return {
-    states: states.map((state) => ({ id: String(state.id) })),
-    transitions: transitions.map((transition) => ({ from: String(transition.from), to: String(transition.to), ...(typeof transition.event === 'string' ? { label: transition.event } : {}) })),
-    ...(typeof m.init === 'string' ? { initial: m.init } : {}),
-  }
-}
-
-/** An automaton shape as the drawing needs it: the symbol labels the edge, `init` is the start. */
-export function automatonDrawable(automaton: unknown): Drawable | undefined {
-  const a = record(automaton)
-  if (a === undefined) return undefined
-  const states = array(a.states).filter((state): state is string => typeof state === 'string')
-  const transitions = array(a.transitions).map((entry) => record(entry)).filter((entry): entry is Record<string, unknown> => entry !== undefined && typeof entry.from === 'string' && typeof entry.to === 'string')
-  if (states.length === 0 || transitions.length === 0) return undefined
-  return {
-    states: states.map((id) => ({ id })),
-    transitions: transitions.map((transition) => ({ from: String(transition.from), to: String(transition.to), ...(typeof transition.symbol === 'string' ? { label: transition.symbol } : {}) })),
-    ...(typeof a.init === 'string' ? { initial: a.init } : {}),
-  }
-}
-
 
 /**
  * The card payload with the artifact previewed.
