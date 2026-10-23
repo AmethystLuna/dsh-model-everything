@@ -173,6 +173,19 @@ copied build, so they are evidence about the behaviour, not about the artifact.
 - **What it does not establish**: a live model session (the boot stops at AUTH), the loader tree beyond
   `--dump-config`, and any surface other than headless.
 
+## Round: 0.2.1-rc.3
+
+- **What ran**: `compat-round.ps1` against `0.2.1-rc.3` - install through the profile's package manager,
+  `--dump-config`, the packaged skills, a headless boot with a deliberately invalid API key, a real report
+  from the installed copy, then uninstall.
+- **Result**: row present and enabled, fourteen tools registered, the automaton family answered from the
+  installed copy (`verdict = pass`, schema `model-everything/automaton/v1`), the row gone after uninstall.
+- **Why it mattered**: 0.4.0 had been published with a compatibility table that stopped at `0.2.1-rc.2`.
+  A release that claims compatibility it never measured is the same defect as a report that claims a check
+  it never ran, so 0.4.0 was withdrawn and the table was completed before the next publish.
+- **What it does not establish**: a live model session (the boot stops at AUTH), the loader tree beyond
+  `--dump-config`, and any surface other than headless.
+
 ## What is not established
 
 - Loader-level composition beyond `--dump-config`: the probe mounts the installed
