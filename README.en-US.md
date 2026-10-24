@@ -19,34 +19,28 @@ A native DeepSeek Harness plugin. It turns the assertions a design makes **about
 - **Compare a refactor**: a model before and after, with the two reports side by side.
 - **Leave a record**: conclusions fixed into a report with hashes, recomputable and comparable and exportable.
 
-## A modelling review tool for medium-to-large, medium-to-high-complexity projects
+## Specialised in modelling review for medium-to-large, medium-to-high-complexity projects
 
-This is a capability tool, not a token-saving one, and the position is specific: **medium-to-large,
-medium-to-high-complexity projects**.
+This tool does one thing: it turns what a project claims about behaviour, structure and data into a model,
+runs it, and returns a conclusion that can be recomputed - not a paragraph that reads like one.
 
-**That is the scale at which it holds up.** On a fixture of a few hundred lines it costs several times the
-baseline, because the fixed cost - skill body, tool definitions - has nothing to amortise against. On an
-object of tens of thousands of lines across hundreds of files the ratio falls back toward parity: we
-measured 0.93x to 1.11x. The difference is that **one decision replaces dozens of reads** rather than a few
-lines of code, so the money only makes sense on a project big enough to have those reads.
+**The scale it specialises in is the medium-to-large, medium-to-high-complexity project**: tens of
+thousands of lines, hundreds of files, protocols and state machines that cross modules. At that scale one
+decision replaces dozens of reads, and the fixed cost of the skill body and the tool definitions is
+amortised; the ratio we measured falls to 0.93x-1.11x there.
 
-What the extra buys:
+It hands back three things:
 
-- a conclusion that can be **recomputed**: hashes, `verdict`, citations, not a paragraph that reads like one;
+- a conclusion that can be **recomputed**: hashes, `verdict`, citations;
 - a **counterexample path**: the steps or the event sequence that breaks the claim;
-- a **portable model**: the same conclusion can be handed to UPPAAL, TLA+, PRISM or SPIN for a second opinion.
+- a **portable model**: the same conclusion can be handed to UPPAAL, TLA+, PRISM or SPIN for a second
+  opinion.
 
-**Two boundaries.**
-
-The first is **project size**: on a few hundred lines, where one reading or three lines of script settles
-the claim, it is at its most expensive and its least useful.
-
-The second is **where the abstraction sits**: it decides **small models a person has already abstracted**,
-not programs. A model that explodes is reported `truncated` with the undecided check named, and that is not
-a bug to retry with a larger `maxStates`: reduce the model first (drop variables the property does not
-read, collapse symmetric states), and if it still explodes the property needs a tool that does not
-enumerate - SPIN for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin
-builds no abstraction and reads no program source.
+**What it specialises in deciding is the small model a person has already abstracted**: state machines,
+finite-word automata, data models and migrations, design declarations, dependency graphs. When a model is
+too large to enumerate, it reports `truncated` and names the undecided check; reducing the model (dropping
+variables the property does not read, collapsing symmetric states), or handing that model to SPIN for
+partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT, carries the question further.
 
 ## Report cards
 
