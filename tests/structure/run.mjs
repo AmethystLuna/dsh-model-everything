@@ -464,5 +464,101 @@ test('a source tree is scanned into a graph, and the graph is what gets judged',
   })
 }
 
+// ------------------------------------------------------------------------------------------------
+// The scan's own reach: what it resolved, and what it could not.
+//
+// A dependency scan that silently drops an edge produces a clean-looking graph of a project it does not
+// understand, and nothing in the report says so. These cases pin the two halves of that: a declared alias
+// is followed, and an alias nothing declares is named as unresolved instead of counted as a package.
+{
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join, dirname } = await import('node:path')
+  const { scanDependencyGraph } = await import('../../lib/scan.js')
+  const NL = String.fromCharCode(10)
+  const scanTree = (files) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dme-alias-'))
+    try {
+      for (const [name, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, name)), { recursive: true })
+        writeFileSync(join(dir, name), text)
+      }
+      return scanDependencyGraph(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('a declared path alias is followed, the way the project resolves it', () => {
+    const graph = scanTree({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '@/*': ['src/*'] } } }),
+      'src/main.ts': "import { a } from '@/lib/a'" + NL,
+      'src/lib/a.ts': 'export const a = 1' + NL,
+    })
+    if (!graph.edges.some((edge) => edge.from === 'src/main.ts' && edge.to === 'src/lib/a.ts')) {
+      throw new Error('the alias edge is missing: ' + JSON.stringify(graph.edges))
+    }
+    if (graph.unresolved.length !== 0) throw new Error('a resolved alias was reported unresolved: ' + graph.unresolved.join('|'))
+    if (graph.packages.length !== 0) throw new Error('the alias was counted as a package: ' + graph.packages.join('|'))
+  })
+
+  test('an alias no tsconfig declares is named, not counted as a package', () => {
+    const graph = scanTree({
+      'src/main.ts': "import { a } from '@/lib/a'" + NL,
+      'src/lib/a.ts': 'export const a = 1' + NL,
+    })
+    if (graph.packages.length !== 0) throw new Error('an alias-shaped specifier became a package: ' + graph.packages.join('|'))
+    if (!graph.unresolved.some((entry) => entry.includes('@/lib/a'))) {
+      throw new Error('the unresolvable alias is silent: ' + JSON.stringify(graph.unresolved))
+    }
+  })
+
+  test('baseUrl alone resolves a bare specifier', () => {
+    const graph = scanTree({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { baseUrl: 'src' } }),
+      'src/main.ts': "import { a } from 'lib/a'" + NL,
+      'src/lib/a.ts': 'export const a = 1' + NL,
+    })
+    if (!graph.edges.some((edge) => edge.to === 'src/lib/a.ts')) throw new Error('baseUrl was not used: ' + JSON.stringify(graph.edges))
+  })
+
+  test('a tsconfig with comments and a trailing comma is read, not rejected', () => {
+    const graph = scanTree({
+      'tsconfig.json': '{' + NL + '  // the project alias' + NL + '  "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["src/*"] }, }' + NL + '}' + NL,
+      'src/main.ts': "import { a } from '@/lib/a'" + NL,
+      'src/lib/a.ts': 'export const a = 1' + NL,
+    })
+    if (!graph.edges.some((edge) => edge.to === 'src/lib/a.ts')) throw new Error('a jsonc tsconfig was ignored: ' + JSON.stringify(graph.edges))
+  })
+
+  test('a real npm scope is still a package', () => {
+    const graph = scanTree({ 'src/main.ts': "import x from '@scope/pkg'" + NL + "import y from 'lodash'" + NL })
+    if (!graph.packages.includes('@scope/pkg') || !graph.packages.includes('lodash')) {
+      throw new Error('packages are no longer counted: ' + JSON.stringify(graph.packages))
+    }
+    if (graph.unresolved.length !== 0) throw new Error('a package became unresolved: ' + JSON.stringify(graph.unresolved))
+  })
+
+  test('the report and the card both state the scan reach', async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { umlStructureTool } = await import('../../lib/structure-tool.js')
+    const dir = mkdtempSync(join(tmpdir(), 'dme-scan-card-'))
+    try {
+      writeFileSync(join(dir, 'main.ts'), "import x from '@scope/pkg'" + NL)
+      const args = { repoPath: dir }
+      const report = await umlStructureTool.execute(args)
+      if (report.scan === undefined || report.scan.files !== 1) throw new Error('the report carries no scan block: ' + JSON.stringify(report.scan))
+      const meta = umlStructureTool.output.presentationMeta(args, report)
+      if (meta.scan === undefined) throw new Error('the card carries no scan block')
+      const text = umlStructureTool.presentResult(args, { content: [], meta }).content[0].text
+      if (!text.includes('scan:')) throw new Error('the card does not state the scan: ' + text)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+}
+
 if (failures > 0) { console.log('structure tests failed:', failures); process.exit(1) }
 console.log('all structure tests passed')

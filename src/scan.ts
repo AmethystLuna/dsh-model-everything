@@ -31,12 +31,66 @@ export interface ScannedGraph {
   edges: ScannedEdge[]
   /** Files read, and files skipped because they are not source. */
   filesRead: number
-  /** Relative specifiers that pointed outside the root or at a file that does not exist. */
+  /**
+   * Specifiers that are project-internal but did not resolve: a relative path that leaves the root or names
+   * no file, and an alias-shaped specifier (`@/x`, `~/x`, `#x`) that no `tsconfig`/`jsconfig` declares.
+   */
   unresolved: string[]
   /** Bare specifiers seen (a package name), counted once each. */
   packages: string[]
   /** Which languages were scanned, and at what granularity. */
   languages: { language: string; files: number; granularity: 'file' | 'package' }[]
+}
+
+/** A path alias from `tsconfig.json`: `@/*` -> `src/*`, or a bare `baseUrl`. */
+interface Alias {
+  prefix: string
+  targets: string[]
+}
+
+/** `tsconfig.json` allows comments and trailing commas; this reads the subset it needs without a parser. */
+function parseJsonc(text: string): unknown {
+  const withoutComments = stripCComments(text)
+  const withoutTrailingCommas = withoutComments.replaceAll(/,\s*([}\]])/g, '$1')
+  try {
+    return JSON.parse(withoutTrailingCommas)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The aliases a TypeScript or JavaScript tree declares in its own `tsconfig.json`/`jsconfig.json`.
+ *
+ * Read rather than asked for: the project already states how it resolves `@/x`, and asking a caller to
+ * repeat it is how a scan silently loses half its edges.
+ */
+function readAliases(root: string): { aliases: Alias[]; baseUrl?: string } {
+  for (const name of ['tsconfig.json', 'jsconfig.json']) {
+    let text: string
+    try {
+      text = readFileSync(resolve(root, name), 'utf8')
+    } catch {
+      continue
+    }
+    const parsed = parseJsonc(text)
+    if (typeof parsed !== 'object' || parsed === null) continue
+    const options = (parsed as { compilerOptions?: unknown }).compilerOptions
+    if (typeof options !== 'object' || options === null) continue
+    const compiler = options as { baseUrl?: unknown; paths?: unknown }
+    const baseUrl = typeof compiler.baseUrl === 'string' ? compiler.baseUrl.replaceAll(String.fromCharCode(92), '/').replace(/^\.\//, '') : undefined
+    const aliases: Alias[] = []
+    if (typeof compiler.paths === 'object' && compiler.paths !== null) {
+      for (const [pattern, targets] of Object.entries(compiler.paths as Record<string, unknown>)) {
+        if (!Array.isArray(targets)) continue
+        const cleaned = targets.filter((target): target is string => typeof target === 'string').map((target) => (baseUrl === undefined ? target : normalise([baseUrl, target])))
+        if (cleaned.length === 0) continue
+        aliases.push({ prefix: pattern.replace(/\*$/, ''), targets: cleaned.map((target) => target.replace(/\*$/, '')) })
+      }
+    }
+    return { aliases, ...(baseUrl === undefined ? {} : { baseUrl }) }
+  }
+  return { aliases: [] }
 }
 
 const SKIP = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', 'target', 'vendor', '__pycache__', '.venv', 'venv'])
@@ -95,7 +149,11 @@ const JS_LIKE: Language = {
   extract(text) {
     const source = stripCComments(text)
     const { local, external } = specifiers(source, [/(?:^|[^.\w])from\s*['"]([^'"]+)['"]/g, /(?:^|[^.\w])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g, /(?:^|[^.\w])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g, /(?:^|[^.\w])import\s*['"]([^'"]+)['"]/g])
-    return { local, external: external.filter((name) => !name.startsWith('node:')) }
+    // `@/x`, `~/x` and `#x` are project-internal by convention: a path alias, a subpath import. Counting
+    // them as packages made a tree full of aliases look like it had one external dependency and almost no
+    // internal edges - the quietest way for a scan to be wrong.
+    const aliasShaped = (name: string): boolean => name.startsWith('@/') || name.startsWith('~/') || name.startsWith('#')
+    return { local: [...local, ...external.filter(aliasShaped)], external: external.filter((name) => !name.startsWith('node:') && !aliasShaped(name)) }
   },
 }
 
@@ -374,6 +432,10 @@ export function languageOf(path: string): Language | undefined {
 interface Index {
   /** Every scanned file id. */
   files: Set<string>
+  /** Declared path aliases, so `@/lib/a` resolves the way the project resolves it. */
+  aliases: Alias[]
+  /** `compilerOptions.baseUrl`, for a bare specifier that names a file under it. */
+  baseUrl?: string
   /** Directory ids, so a package language can resolve a package name to a directory. */
   directories: string[]
   /** Directory ids by their dotted form (`a/b` for both `a.b` and `a/b`). */
@@ -443,6 +505,13 @@ function resolveSpecifier(language: Language, fromId: string, specifier: string,
     return index.byDotted.get(specifier.toLowerCase())
   }
   if (specifier.startsWith('/')) return undefined
+  if (!specifier.startsWith('.')) {
+    // A bare specifier is resolved the way the project declares it: a path alias first, then `baseUrl`.
+    // That is also the only way a bare specifier can be project-internal, so the same helper decides
+    // whether one is an edge or a package.
+    const declared = resolveDeclared(language, specifier, index)
+    if (declared !== undefined) return declared
+  }
   const base = joinPath(fromId, specifier)
   const extension = extname(base)
   const stem = extension === '' ? base : base.slice(0, -extension.length)
@@ -455,6 +524,28 @@ function resolveSpecifier(language: Language, fromId: string, specifier: string,
 }
 
 // ------------------------------------------------------------------------------------------------ scan --
+
+
+/**
+ * A bare specifier that the project itself declares: a `paths` alias, or a file under `baseUrl`.
+ *
+ * `@/lib/a` is not a package, and counting it as one dropped the edge without saying so. Returns
+ * undefined when nothing is declared for it, which leaves the caller free to treat it as external.
+ */
+function resolveDeclared(language: Language, specifier: string, index: Index): string | undefined {
+  for (const alias of index.aliases) {
+    if (!specifier.startsWith(alias.prefix)) continue
+    const rest = specifier.slice(alias.prefix.length)
+    for (const target of alias.targets) {
+      const hit = tryFiles(normalise([target + rest]), language.extensions, index)
+      if (hit !== undefined) return hit
+    }
+  }
+  if (index.baseUrl !== undefined) {
+    return tryFiles(normalise([index.baseUrl, specifier]), language.extensions, index)
+  }
+  return undefined
+}
 
 export function scanDependencyGraph(root: unknown): ScannedGraph {
   if (typeof root !== 'string' || root.trim() === '') {
@@ -513,7 +604,7 @@ export function scanDependencyGraph(root: unknown): ScannedGraph {
   const directories = [...new Set(files.map((id) => dirOf(id)).filter((id) => id !== ''))].sort()
   const byDotted = new Map<string, string>()
   for (const directory of directories) byDotted.set(directory.replaceAll('/', '.'), directory)
-  const index: Index = { files: fileSet, directories, byDotted }
+  const index: Index = { files: fileSet, directories, byDotted, ...readAliases(absolute) }
 
   const edges: ScannedEdge[] = []
   const seen = new Set<string>()
@@ -550,6 +641,19 @@ export function scanDependencyGraph(root: unknown): ScannedGraph {
       edges.push({ from, to })
     }
     for (const specifier of external) {
+      const internal = language.granularity === 'file' ? resolveDeclared(language, specifier, index) : undefined
+      if (internal !== undefined) {
+        const target = nodeOf(internal)
+        nodeSet.add(target)
+        if (target !== from) {
+          const key = from + ' ' + target
+          if (!seen.has(key)) {
+            seen.add(key)
+            edges.push({ from, to: target })
+          }
+        }
+        continue
+      }
       const name = specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split(/[/.:]/)[0]
       if (name !== undefined && name !== '') packages.add(name)
     }

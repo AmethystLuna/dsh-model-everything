@@ -37,7 +37,7 @@
       "body": 8203
     }
   ],
-  "toolChars": 29935,
+  "toolChars": 30157,
   "tools": [
     {
       "name": "model_automaton_verify",
@@ -73,7 +73,7 @@
     },
     {
       "name": "uml_structure_verify",
-      "chars": 2960
+      "chars": 3182
     },
     {
       "name": "uml_explain_labels",
@@ -97,8 +97,8 @@
     }
   ],
   "perTurn": {
-    "chars": 33316,
-    "tokens": 8329
+    "chars": 33538,
+    "tokens": 8385
   },
   "routing": {
     "rowsWithSibling": 7,

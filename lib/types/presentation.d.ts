@@ -77,6 +77,12 @@ export interface ReportCard {
         facts: number;
         skipped: number;
     };
+    /** `uml_structure_verify` with `repoPath`: what the scan itself resolved, and what it could not. */
+    scan?: {
+        files: number;
+        unresolved: number;
+        packages: number;
+    };
     /** `model_interleaving_scan`: how many claims were found, and in which families. */
     claims?: {
         absolute: number;

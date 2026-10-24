@@ -38,7 +38,7 @@ export const umlStructureTool = defineTool({
     },
     repoPath: {
       type: 'string',
-      description: 'Directory or single source file to scan instead of drawing the diagram yourself. Reads the import construct of C/C++, Python, TypeScript/JavaScript, Go, Rust, Java/Kotlin/Scala, C#, PHP, Ruby, Lua, Zig, Dart and Elixir, building a file graph for file languages and a package graph for package languages (Go, Java, C#). The graph is reviewed by the same checks; `diagram` and `diagrams` are then ignored.',
+      description: 'Directory or single source file to scan instead of drawing the diagram yourself. Reads the import construct of C/C++, Python, TypeScript/JavaScript, Go, Rust, Java/Kotlin/Scala, C#, PHP, Ruby, Lua, Zig, Dart and Elixir, building a file graph for file languages and a package graph for package languages (Go, Java, C#). Path aliases come from the project own `tsconfig.json`/`jsconfig.json` (`baseUrl` and `paths`), and a project-internal specifier that resolves to nothing is listed as unresolved rather than counted as an external package. The graph is reviewed by the same checks; `diagram` and `diagrams` are then ignored.',
     },
     matrix: {
       type: 'json',

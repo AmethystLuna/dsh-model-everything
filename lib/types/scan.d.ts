@@ -8,7 +8,10 @@ export interface ScannedGraph {
     edges: ScannedEdge[];
     /** Files read, and files skipped because they are not source. */
     filesRead: number;
-    /** Relative specifiers that pointed outside the root or at a file that does not exist. */
+    /**
+     * Specifiers that are project-internal but did not resolve: a relative path that leaves the root or names
+     * no file, and an alias-shaped specifier (`@/x`, `~/x`, `#x`) that no `tsconfig`/`jsconfig` declares.
+     */
     unresolved: string[];
     /** Bare specifiers seen (a package name), counted once each. */
     packages: string[];
