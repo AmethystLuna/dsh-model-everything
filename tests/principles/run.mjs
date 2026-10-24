@@ -5,6 +5,7 @@
 // two properties a generator cannot see - that the document is reachable, and that it does not drift
 // into becoming a second copy of the rules.
 import { execFileSync } from 'node:child_process'
+import { readNormalised } from '../generated-text.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -20,9 +21,9 @@ const test = (name, fn) => {
 }
 
 test('the principles index is the one the repository produces now', () => {
-  const before = readFileSync(repo + 'docs/principles.md', 'utf8')
+  const before = readNormalised(repo + 'docs/principles.md')
   execFileSync(process.execPath, [repo + 'docs/principles/generate.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(repo + 'docs/principles.md', 'utf8')
+  const after = readNormalised(repo + 'docs/principles.md')
   if (before !== after) throw new Error('the index drifted from the files it quotes. Regenerate and read the diff: a source moved, or a quote no longer matches.')
 })
 

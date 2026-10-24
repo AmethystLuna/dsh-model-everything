@@ -5,6 +5,7 @@
 // generator alone would not catch: that the checklist names every suite CI runs, and that it does not
 // restate a rule whose home is elsewhere.
 import { execFileSync } from 'node:child_process'
+import { readNormalised } from '../generated-text.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -20,9 +21,9 @@ const test = (name, fn) => {
 }
 
 test('the checklist is the one the repository produces now', () => {
-  const before = readFileSync(repo + 'docs/feature-checklist.md', 'utf8')
+  const before = readNormalised(repo + 'docs/feature-checklist.md')
   execFileSync(process.execPath, [repo + 'docs/feature-checklist/generate.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(repo + 'docs/feature-checklist.md', 'utf8')
+  const after = readNormalised(repo + 'docs/feature-checklist.md')
   if (before !== after) {
     throw new Error('the checklist drifted from the repository. Run `node docs/feature-checklist/generate.mjs` and read the diff: a gate, a suite or a path moved.')
   }

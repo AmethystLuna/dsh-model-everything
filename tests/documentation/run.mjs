@@ -5,6 +5,7 @@
 // REGISTRY of things that must be mentioned, not on prose - a missing mention fails, and adding to the
 // registry is a deliberate act.
 import { execFileSync } from 'node:child_process'
+import { readNormalised } from '../generated-text.mjs'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -64,16 +65,16 @@ test('every relative link in the README pair resolves', () => {
 })
 
 test('the documentation mind map is the one the repository produces now', () => {
-  const before = readFileSync(repo + 'docs/documentation/mindmap.mmd', 'utf8')
+  const before = readNormalised(repo + 'docs/documentation/mindmap.mmd')
   execFileSync(process.execPath, [repo + 'docs/documentation/generate-mindmap.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(repo + 'docs/documentation/mindmap.mmd', 'utf8')
+  const after = readNormalised(repo + 'docs/documentation/mindmap.mmd')
   if (before !== after) throw new Error('the map drifted: the README gaps or the provenance list moved')
 })
 
 test('the references list is the one the provenance tables produce now', () => {
-  const before = readFileSync(repo + 'docs/references.md', 'utf8')
+  const before = readNormalised(repo + 'docs/references.md')
   execFileSync(process.execPath, [repo + 'docs/references/generate.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(repo + 'docs/references.md', 'utf8')
+  const after = readNormalised(repo + 'docs/references.md')
   if (before !== after) throw new Error('the references drifted from the provenance tables they are extracted from')
 })
 

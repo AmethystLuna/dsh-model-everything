@@ -11,6 +11,7 @@
 //   2. the same for the measured facts the guide quotes;
 //   3. every code the guide names exists, and every field it names is in the report it claims.
 import { readFileSync, readdirSync } from 'node:fs'
+import { readNormalised } from '../generated-text.mjs'
 import { execFileSync } from 'node:child_process'
 
 const root = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -28,9 +29,9 @@ const test = (name, fn) => {
 }
 
 test('the mind map is the one the engines produce now', () => {
-  const before = readFileSync(guideDir + '/mindmap.mmd', 'utf8')
+  const before = readNormalised(guideDir + '/mindmap.mmd')
   execFileSync(process.execPath, [guideDir + '/generate-mindmap.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(guideDir + '/mindmap.mmd', 'utf8')
+  const after = readNormalised(guideDir + '/mindmap.mmd')
   if (before !== after) {
     throw new Error('the map drifted; the guide in docs/report-reading/guide.md describes the old one. Run docs/report-reading/generate-mindmap.mjs and read the diff.')
   }

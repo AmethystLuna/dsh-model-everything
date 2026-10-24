@@ -5,6 +5,7 @@
 // this repository records nowhere; it was memory rather than a source, sitting in the guide whose own
 // advice is to check a source before citing it. The check below is what caught it.
 import { execFileSync } from 'node:child_process'
+import { readNormalised } from '../generated-text.mjs'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -20,9 +21,9 @@ const test = (name, fn) => {
 }
 
 test('the contribution mind map is the one the repository produces now', () => {
-  const before = readFileSync(repo + 'docs/contributing/mindmap.mmd', 'utf8')
+  const before = readNormalised(repo + 'docs/contributing/mindmap.mmd')
   execFileSync(process.execPath, [repo + 'docs/contributing/generate-mindmap.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(repo + 'docs/contributing/mindmap.mmd', 'utf8')
+  const after = readNormalised(repo + 'docs/contributing/mindmap.mmd')
   if (before !== after) throw new Error('the map drifted: the gates, the code tables or the provenance list moved, and the map is what the guide is written from')
 })
 
