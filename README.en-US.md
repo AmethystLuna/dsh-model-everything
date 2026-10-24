@@ -19,15 +19,16 @@ A native DeepSeek Harness plugin. It turns the assertions a design makes **about
 - **Compare a refactor**: a model before and after, with the two reports side by side.
 - **Leave a record**: conclusions fixed into a report with hashes, recomputable and comparable and exportable.
 
-## It costs more; what it returns is a verdict
+## A modelling review tool for medium-to-large, medium-to-high-complexity projects
 
-This is a capability tool, not a token-saving one.
+This is a capability tool, not a token-saving one, and the position is specific: **medium-to-large,
+medium-to-high-complexity projects**.
 
-**How much it costs depends on the size of the task, and the direction is the opposite of intuition.** On a
-fixture of a few hundred lines it costs several times the baseline, because the fixed cost - skill body,
-tool definitions - has nothing to amortise against. On an object of tens of thousands of lines across
-hundreds of files the ratio falls back toward parity: we measured 0.93x to 1.11x. **The larger the task,
-the better the trade**: one decision replaces dozens of `read` calls rather than a few lines of code.
+**That is the scale at which it holds up.** On a fixture of a few hundred lines it costs several times the
+baseline, because the fixed cost - skill body, tool definitions - has nothing to amortise against. On an
+object of tens of thousands of lines across hundreds of files the ratio falls back toward parity: we
+measured 0.93x to 1.11x. The difference is that **one decision replaces dozens of reads** rather than a few
+lines of code, so the money only makes sense on a project big enough to have those reads.
 
 What the extra buys:
 
@@ -35,14 +36,17 @@ What the extra buys:
 - a **counterexample path**: the steps or the event sequence that breaks the claim;
 - a **portable model**: the same conclusion can be handed to UPPAAL, TLA+, PRISM or SPIN for a second opinion.
 
-When it is not worth it: when one reading of the code settles the claim, or three lines of script count
-it out. **It does not buy speed over reading.** It buys the claims that reading cannot decide.
+**Two boundaries.**
 
-**It decides small models, not programs.** The engine enumerates states, so a model that explodes is
-reported `truncated` with the undecided check named. That is not a bug to retry with a larger `maxStates`:
-reduce the model first, and if it still explodes the property needs a tool that does not enumerate - SPIN
-for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin builds no
-abstraction and reads no program source.
+The first is **project size**: on a few hundred lines, where one reading or three lines of script settles
+the claim, it is at its most expensive and its least useful.
+
+The second is **where the abstraction sits**: it decides **small models a person has already abstracted**,
+not programs. A model that explodes is reported `truncated` with the undecided check named, and that is not
+a bug to retry with a larger `maxStates`: reduce the model first (drop variables the property does not
+read, collapse symmetric states), and if it still explodes the property needs a tool that does not
+enumerate - SPIN for partial-order reduction, NuSMV for symbolic search, CBMC for bounded SAT. This plugin
+builds no abstraction and reads no program source.
 
 ## Report cards
 
