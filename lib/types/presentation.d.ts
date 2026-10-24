@@ -82,6 +82,7 @@ export interface ReportCard {
         files: number;
         unresolved: number;
         packages: number;
+        dynamic: number;
     };
     /** `model_interleaving_scan`: how many claims were found, and in which families. */
     claims?: {

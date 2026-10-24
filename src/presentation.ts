@@ -54,7 +54,7 @@ export interface ReportCard {
   /** `model_design_review`: three levels, because a signal is not a violation and a fact is neither. */
   levels?: { violations: number; signals: number; facts: number; skipped: number }
   /** `uml_structure_verify` with `repoPath`: what the scan itself resolved, and what it could not. */
-  scan?: { files: number; unresolved: number; packages: number }
+  scan?: { files: number; unresolved: number; packages: number; dynamic: number }
   /** `model_interleaving_scan`: how many claims were found, and in which families. */
   claims?: { absolute: number; keywords: number; families: Array<{ family: string; count: number }> }
 }
@@ -160,7 +160,7 @@ export function reportCard(value: unknown, family: string): ReportCard {
       ? {}
       : { levels: { violations: violations.length, signals: signals.length, facts: facts.length, skipped: array(report.checksSkipped).length } }),
     ...(typeof scan?.files === 'number'
-      ? { scan: { files: scan.files, unresolved: Number(scan.unresolved ?? 0), packages: Number(scan.packages ?? 0) } }
+      ? { scan: { files: scan.files, unresolved: Number(scan.unresolved ?? 0), packages: Number(scan.packages ?? 0), dynamic: Number(scan.dynamic ?? 0) } }
       : {}),
     ...(typeof summary?.absoluteClaims === 'number'
       ? { claims: { absolute: summary.absoluteClaims, keywords: Number(summary.keywords ?? 0), families: claimFamilies(findings) } }
@@ -318,7 +318,8 @@ export function structureCardBlocks(card: ReportCard): ContentBlock[] {
   if (card.scan !== undefined) {
     // A scan that resolved half its imports reads the same as one that resolved all of them unless the
     // counts are on the card.
-    lines.push('scan: ' + String(card.scan.files) + ' file(s) · ' + String(card.scan.unresolved) + ' unresolved · ' + String(card.scan.packages) + ' package(s)')
+    const dynamic = card.scan.dynamic > 0 ? ' · ' + String(card.scan.dynamic) + ' computed' : ''
+    lines.push('scan: ' + String(card.scan.files) + ' file(s) · ' + String(card.scan.unresolved) + ' unresolved · ' + String(card.scan.packages) + ' package(s)' + dynamic)
   }
   if (card.first != null) lines.push((card.first.severity === 'error' ? '✗ ' : '⚠ ') + card.first.code + ': ' + card.first.message)
   if (card.next != null) lines.push('next: ' + card.next)

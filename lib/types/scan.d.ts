@@ -13,8 +13,12 @@ export interface ScannedGraph {
      * no file, and an alias-shaped specifier (`@/x`, `~/x`, `#x`) that no `tsconfig`/`jsconfig` declares.
      */
     unresolved: string[];
-    /** Bare specifiers seen (a package name), counted once each. */
+    /** Bare specifiers seen, counted once each: external packages and, for a package language, a package
+     * path this tree does not contain. */
     packages: string[];
+    /** Import calls whose target is computed at run time. No static scan can resolve them, so they are
+     * counted rather than guessed. */
+    dynamic: number;
     /** Which languages were scanned, and at what granularity. */
     languages: {
         language: string;
@@ -31,6 +35,7 @@ export interface Language {
     extract(text: string): {
         local: string[];
         external: string[];
+        dynamic?: number;
     };
 }
 /** Every language this scan understands, by extension. */

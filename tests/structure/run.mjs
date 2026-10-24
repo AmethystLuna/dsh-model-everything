@@ -560,5 +560,74 @@ test('a source tree is scanned into a graph, and the graph is what gets judged',
   })
 }
 
+// ------------------------------------------------------------------------------------------------
+// The rest of a scan's reach: a monorepo's own package names, a C include directory, a package
+// language's broken reference, and the imports no static scan can follow.
+{
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join, dirname } = await import('node:path')
+  const { scanDependencyGraph } = await import('../../lib/scan.js')
+  const NL = String.fromCharCode(10)
+  const scanTree = (files) => {
+    const dir = mkdtempSync(join(tmpdir(), 'dme-reach-'))
+    try {
+      for (const [name, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, name)), { recursive: true })
+        writeFileSync(join(dir, name), text)
+      }
+      return scanDependencyGraph(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('a monorepo package name resolves to the workspace that declares it', () => {
+    const graph = scanTree({
+      'package.json': JSON.stringify({ name: 'acme', workspaces: ['packages/ui', 'packages/app'] }),
+      'packages/ui/package.json': JSON.stringify({ name: '@acme/ui' }),
+      'packages/ui/index.ts': 'export const ui = 1' + NL,
+      'packages/app/package.json': JSON.stringify({ name: '@acme/app' }),
+      'packages/app/main.ts': "import { ui } from '@acme/ui'" + NL,
+    })
+    if (!graph.edges.some((edge) => edge.to === 'packages/ui/index.ts')) {
+      throw new Error('the workspace import is not an edge: ' + JSON.stringify(graph.edges))
+    }
+    if (graph.packages.includes('@acme/ui')) throw new Error('a workspace package was counted as external: ' + graph.packages.join('|'))
+  })
+
+  test('a package-language reference into the project own tree is reported, not counted', () => {
+    const graph = scanTree({
+      'go.mod': 'module example.com/proj' + NL + NL + 'go 1.22' + NL,
+      'pkg/a/a.go': 'package a' + NL + 'import (' + NL + '"example.com/proj/pkg/missing"' + NL + ')' + NL,
+    })
+    if (graph.unresolved.length !== 1) throw new Error('the broken internal import is not reported: ' + JSON.stringify(graph.unresolved))
+    if (!graph.unresolved[0].includes('pkg/missing')) throw new Error('the report does not name it: ' + graph.unresolved[0])
+  })
+
+  test('a package-language reference outside the project stays external', () => {
+    const graph = scanTree({ 'pkg/a/a.go': 'package a' + NL + 'import (' + NL + '"github.com/other/thing"' + NL + ')' + NL })
+    if (graph.unresolved.length !== 0) throw new Error('an external module was reported as broken: ' + JSON.stringify(graph.unresolved))
+    if (!graph.packages.some((name) => name.includes('github'))) throw new Error('the external module was not counted: ' + JSON.stringify(graph.packages))
+  })
+
+  test('a C include found through an include directory is an edge', () => {
+    const graph = scanTree({
+      'compile_commands.json': JSON.stringify([{ directory: '.', command: 'cc -Iinclude -c src/a.c -o a.o' }]),
+      'src/a.c': '#include "b.h"' + NL,
+      'include/b.h': '#pragma once' + NL,
+    })
+    if (!graph.edges.some((edge) => edge.to === 'include/b.h')) {
+      throw new Error('the include directory was not used: ' + JSON.stringify(graph.edges))
+    }
+  })
+
+  test('a computed import is counted, not guessed', () => {
+    const graph = scanTree({ 'src/a.ts': 'const name = pick()' + NL + 'const m = require(name)' + NL + 'export const a = 1' + NL })
+    if (graph.dynamic !== 1) throw new Error('the computed import was not counted: ' + String(graph.dynamic))
+    if (graph.edges.length !== 0) throw new Error('a computed import became an edge')
+  })
+}
+
 if (failures > 0) { console.log('structure tests failed:', failures); process.exit(1) }
 console.log('all structure tests passed')

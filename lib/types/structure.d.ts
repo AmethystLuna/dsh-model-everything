@@ -156,6 +156,7 @@ export interface StructureReviewOptions {
         files: number;
         unresolved: number;
         packages: number;
+        dynamic: number;
         languages: string[];
     };
     notation?: 'auto' | StructureNotation;

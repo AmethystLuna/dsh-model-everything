@@ -36,8 +36,12 @@ export interface ScannedGraph {
    * no file, and an alias-shaped specifier (`@/x`, `~/x`, `#x`) that no `tsconfig`/`jsconfig` declares.
    */
   unresolved: string[]
-  /** Bare specifiers seen (a package name), counted once each. */
+  /** Bare specifiers seen, counted once each: external packages and, for a package language, a package
+   * path this tree does not contain. */
   packages: string[]
+  /** Import calls whose target is computed at run time. No static scan can resolve them, so they are
+   * counted rather than guessed. */
+  dynamic: number
   /** Which languages were scanned, and at what granularity. */
   languages: { language: string; files: number; granularity: 'file' | 'package' }[]
 }
@@ -125,7 +129,7 @@ export interface Language {
   extensions: string[]
   granularity: LangGranularity
   /** Specifiers this file names, already separated from external ones. */
-  extract(text: string): { local: string[]; external: string[] }
+  extract(text: string): { local: string[]; external: string[]; dynamic?: number }
 }
 
 const specifiers = (text: string, patterns: RegExp[]): { local: string[]; external: string[] } => {
@@ -153,7 +157,10 @@ const JS_LIKE: Language = {
     // them as packages made a tree full of aliases look like it had one external dependency and almost no
     // internal edges - the quietest way for a scan to be wrong.
     const aliasShaped = (name: string): boolean => name.startsWith('@/') || name.startsWith('~/') || name.startsWith('#')
-    return { local: [...local, ...external.filter(aliasShaped)], external: external.filter((name) => !name.startsWith('node:') && !aliasShaped(name)) }
+    // A call whose target is not a literal cannot be resolved from the source at all. Counting it is the
+    // honest move: the graph is missing those edges and the report says how many.
+    const dynamic = [...source.matchAll(/(?:^|[^.\w])import\s*\(\s*[^'"\s)]|(?:^|[^.\w])require\s*\(\s*[^'"\s)]/g)].length
+    return { local: [...local, ...external.filter(aliasShaped)], external: external.filter((name) => !name.startsWith('node:') && !aliasShaped(name)), dynamic }
   },
 }
 
@@ -436,6 +443,12 @@ interface Index {
   aliases: Alias[]
   /** `compilerOptions.baseUrl`, for a bare specifier that names a file under it. */
   baseUrl?: string
+  /** Workspace package name -> directory, from the root `package.json`. */
+  workspaces: Map<string, string>
+  /** Extra `#include` search directories, from `compile_commands.json`. */
+  includeDirs: string[]
+  /** Package-language roots this tree owns: the `module` in `go.mod`, and the top-level package names. */
+  internalRoots: string[]
   /** Directory ids, so a package language can resolve a package name to a directory. */
   directories: string[]
   /** Directory ids by their dotted form (`a/b` for both `a.b` and `a/b`). */
@@ -512,6 +525,14 @@ function resolveSpecifier(language: Language, fromId: string, specifier: string,
     const declared = resolveDeclared(language, specifier, index)
     if (declared !== undefined) return declared
   }
+  // A C/C++ include that is not beside the importing file is usually found through an include directory
+  // the build already knows about, so `compile_commands.json` is read rather than asked for.
+  if (language.name === 'c' && !specifier.startsWith('.')) {
+    for (const directory of index.includeDirs) {
+      const hit = tryFiles(normalise([directory, specifier]), language.extensions, index)
+      if (hit !== undefined) return hit
+    }
+  }
   const base = joinPath(fromId, specifier)
   const extension = extname(base)
   const stem = extension === '' ? base : base.slice(0, -extension.length)
@@ -533,6 +554,16 @@ function resolveSpecifier(language: Language, fromId: string, specifier: string,
  * undefined when nothing is declared for it, which leaves the caller free to treat it as external.
  */
 function resolveDeclared(language: Language, specifier: string, index: Index): string | undefined {
+  // A workspace package is the project too: `import { x } from '@acme/ui'` in a monorepo is an edge, not
+  // an external dependency. The name comes from the package's own manifest.
+  for (const [name, directory] of index.workspaces) {
+    if (specifier !== name && !specifier.startsWith(name + '/')) continue
+    const rest = specifier === name ? '' : specifier.slice(name.length + 1)
+    const hit = tryFiles(normalise([directory, rest]), language.extensions, index)
+      ?? tryFiles(normalise([directory]), language.extensions, index)
+      ?? tryFiles(normalise([directory, 'src']), language.extensions, index)
+    if (hit !== undefined) return hit
+  }
   for (const alias of index.aliases) {
     if (!specifier.startsWith(alias.prefix)) continue
     const rest = specifier.slice(alias.prefix.length)
@@ -545,6 +576,103 @@ function resolveDeclared(language: Language, specifier: string, index: Index): s
     return tryFiles(normalise([index.baseUrl, specifier]), language.extensions, index)
   }
   return undefined
+}
+
+/**
+ * Does this package-language specifier name something this tree owns?
+ *
+ * `com.acme.b.B` in a tree whose top level is `com/`, and `example.com/proj/pkg/b` in a module whose
+ * `go.mod` says `module example.com/proj`, are both internal: if they do not resolve, the reference is
+ * broken. `java.util.List` and `lodash` are not.
+ */
+function isInternalSpecifier(specifier: string, roots: string[]): boolean {
+  const head = specifier.replaceAll('\\', '/').split(/[/.]/).filter(Boolean)[0]
+  if (head === undefined) return false
+  return roots.some((root) => root === head || specifier.startsWith(root + '/') || specifier.startsWith(root + '.'))
+}
+
+/** Workspace packages declared by the root manifest, so a monorepo's own names resolve inside the tree. */
+function readWorkspaces(root: string): Map<string, string> {
+  const names = new Map<string, string>()
+  let manifest: unknown
+  try {
+    manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+  } catch {
+    return names
+  }
+  if (typeof manifest !== 'object' || manifest === null) return names
+  const declared = (manifest as { workspaces?: unknown }).workspaces
+  const patterns = Array.isArray(declared)
+    ? declared
+    : typeof declared === 'object' && declared !== null && Array.isArray((declared as { packages?: unknown }).packages)
+      ? ((declared as { packages: unknown[] }).packages)
+      : []
+  for (const pattern of patterns) {
+    if (typeof pattern !== 'string' || pattern.includes('*')) continue
+    const directory = pattern.replace(/^\.\//, '').replace(/\/$/, '')
+    try {
+      const entry = JSON.parse(readFileSync(resolve(root, directory, 'package.json'), 'utf8')) as { name?: unknown }
+      if (typeof entry.name === 'string' && entry.name !== '') names.set(entry.name, directory)
+    } catch {
+      continue
+    }
+  }
+  return names
+}
+
+/** `-I`/`-isystem` directories from `compile_commands.json`, kept inside the scanned tree. */
+function readIncludeDirs(root: string): string[] {
+  let entries: unknown
+  try {
+    entries = JSON.parse(readFileSync(resolve(root, 'compile_commands.json'), 'utf8'))
+  } catch {
+    return []
+  }
+  if (!Array.isArray(entries)) return []
+  const dirs = new Set<string>()
+  for (const entry of entries) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const record = entry as { directory?: unknown; command?: unknown; arguments?: unknown }
+    const declared = typeof record.directory === 'string' ? record.directory.replaceAll(String.fromCharCode(92), '/') : '.'
+    const base = declared.startsWith('/') || /^[A-Za-z]:/.test(declared) ? declared : resolve(root, declared).replaceAll(String.fromCharCode(92), '/')
+    const args: string[] = Array.isArray(record.arguments)
+      ? record.arguments.filter((argument): argument is string => typeof argument === 'string')
+      : typeof record.command === 'string'
+        ? record.command.split(/\s+/)
+        : []
+    for (let index = 0; index < args.length; index += 1) {
+      const argument = args[index]
+      let value: string | undefined
+      if (argument === '-I' || argument === '-isystem') value = args[index + 1]
+      else if (argument.startsWith('-I')) value = argument.slice(2)
+      else if (argument.startsWith('-isystem')) value = argument.slice(8)
+      if (value === undefined || value === '') continue
+      const absolute = value.startsWith('/') || /^[A-Za-z]:/.test(value) ? value : base + '/' + value
+      const local = relative(root, absolute).replaceAll(String.fromCharCode(92), '/')
+      if (local.startsWith('..')) continue
+      dirs.add(local === '' ? '.' : local)
+    }
+  }
+  return [...dirs].sort()
+}
+
+
+/** The package roots this tree owns: `module` from `go.mod`, and the top-level names on disk. */
+function internalRootsOf(root: string, directories: string[]): string[] {
+  const roots = new Set<string>()
+  for (const directory of directories) {
+    const head = directory.split('/')[0]
+    if (head !== undefined && head !== '') roots.add(head)
+  }
+  try {
+    for (const line of readFileSync(resolve(root, 'go.mod'), 'utf8').split(String.fromCharCode(10)).map((entry) => entry.trim())) {
+      const match = /^module\s+(\S+)/.exec(line)
+      if (match?.[1] !== undefined) roots.add(match[1])
+    }
+  } catch {
+    // No go.mod: the top-level names are the whole set.
+  }
+  return [...roots].sort()
 }
 
 export function scanDependencyGraph(root: unknown): ScannedGraph {
@@ -561,7 +689,7 @@ export function scanDependencyGraph(root: unknown): ScannedGraph {
   }
   if (stat.isFile()) {
     const id = relative(resolve('/'), absolute).slice(1).replaceAll('\\', '/')
-    return { nodes: [id], edges: [], filesRead: 1, unresolved: [], packages: [], languages: [] }
+    return { nodes: [id], edges: [], filesRead: 1, unresolved: [], packages: [], dynamic: 0, languages: [] }
   }
   if (!stat.isDirectory()) {
     throw new OptionShapeError('STRUCTURE_OPTION_INVALID', 'repoPath must be a directory or a source file.')
@@ -604,26 +732,37 @@ export function scanDependencyGraph(root: unknown): ScannedGraph {
   const directories = [...new Set(files.map((id) => dirOf(id)).filter((id) => id !== ''))].sort()
   const byDotted = new Map<string, string>()
   for (const directory of directories) byDotted.set(directory.replaceAll('/', '.'), directory)
-  const index: Index = { files: fileSet, directories, byDotted, ...readAliases(absolute) }
+  const index: Index = {
+    files: fileSet,
+    directories,
+    byDotted,
+    ...readAliases(absolute),
+    workspaces: readWorkspaces(absolute),
+    includeDirs: readIncludeDirs(absolute),
+    internalRoots: internalRootsOf(absolute, directories),
+  }
 
   const edges: ScannedEdge[] = []
   const seen = new Set<string>()
   const unresolved: string[] = []
   const packages = new Set<string>()
   const nodeSet = new Set<string>()
+  let dynamic = 0
 
   for (const id of files) {
     const language = languageOf(id) as Language
-    const { local, external } = language.extract(contents.get(id) ?? '')
+    const { local, external, dynamic: dynamicHere } = language.extract(contents.get(id) ?? '')
+    dynamic += dynamicHere ?? 0
     const nodeOf = (fileId: string): string => (language.granularity === 'package' ? (dirOf(fileId) === '' ? '.' : dirOf(fileId)) : fileId)
     const from = nodeOf(id)
     nodeSet.add(from)
     for (const specifier of local) {
       const target = resolveSpecifier(language, id, specifier, index)
       if (target === undefined) {
-        // A package language names modules by a path this tree may not contain. That is an external
-        // dependency, not a broken reference, so it is counted rather than reported as unresolved.
-        if (language.granularity === 'package') {
+        // A package language names modules by a path this tree may or may not contain. When the path
+        // starts at a root this tree owns - the `go.mod` module, a top-level package directory - it is a
+        // broken reference and has to be reported; anything else is an external dependency.
+        if (language.granularity === 'package' && !isInternalSpecifier(specifier, index.internalRoots)) {
           const name = specifier.split(/[/.]/).filter(Boolean)[0]
           if (name !== undefined) packages.add(name)
         } else {
@@ -664,5 +803,5 @@ export function scanDependencyGraph(root: unknown): ScannedGraph {
     .sort((a, b) => b.files - a.files)
   edges.sort((a, b) => (a.from === b.from ? a.to.localeCompare(b.to) : a.from.localeCompare(b.to)))
   unresolved.sort()
-  return { nodes: [...nodeSet].sort(), edges, filesRead: files.length, unresolved, packages: [...packages].sort(), languages }
+  return { nodes: [...nodeSet].sort(), edges, filesRead: files.length, unresolved, packages: [...packages].sort(), dynamic, languages }
 }
