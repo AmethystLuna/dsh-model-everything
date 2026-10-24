@@ -4,6 +4,7 @@
 // A guide about raising usage is worthless if its counts are stale - the reader would size the wrong
 // surface. This is the same discipline the repository applies to its other generated maps.
 import { execFileSync } from 'node:child_process'
+import { readNormalised } from '../generated-text.mjs'
 import { readFileSync } from 'node:fs'
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -19,9 +20,9 @@ const test = (name, fn) => {
 }
 
 test('the usage map is the one the plugin and the host produce now', () => {
-  const before = readFileSync(repo + 'docs/usage/mindmap.mmd', 'utf8')
+  const before = readNormalised(repo + 'docs/usage/mindmap.mmd')
   execFileSync(process.execPath, [repo + 'docs/usage/generate-mindmap.mjs'], { encoding: 'utf8', timeout: 300_000 })
-  const after = readFileSync(repo + 'docs/usage/mindmap.mmd', 'utf8')
+  const after = readNormalised(repo + 'docs/usage/mindmap.mmd')
   if (before !== after) throw new Error('the map drifted: a surface cost, a tool count or a host fact moved')
 })
 

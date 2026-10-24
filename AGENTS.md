@@ -123,7 +123,9 @@ future reader needs to act, not a transcript.
 - **Version policy**: patch for fixes, docs, dependency and CI changes; minor for new
   features or new checks; major for breaking changes. Never bump because something
   changed. Every release names its target: `npm run bump -- <x.y.z>`.
-- **Compatibility is measured, never assumed.** `dsh.compatibility.dshReleases` gains a
+- **Compatibility is measured, never assumed.** `scripts/check-dsh-compat.mjs` is what says which release
+  still needs measuring: the `dsh-compatibility` workflow runs it weekly and opens an issue while one is
+  unmeasured. `dsh.compatibility.dshReleases` gains a
   release only after a round on it (install, mount, offline checks, uninstall). Until a
   release has been measured it stays `unknown`. The rounds themselves are recorded in
   [DSH-COMPATIBILITY.md](DSH-COMPATIBILITY.md) — one row per release, with what was

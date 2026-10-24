@@ -186,6 +186,16 @@ copied build, so they are evidence about the behaviour, not about the artifact.
 - **What it does not establish**: a live model session (the boot stops at AUTH), the loader tree beyond
   `--dump-config`, and any surface other than headless.
 
+## Who notices a new dsh release
+
+`scripts/check-dsh-compat.mjs` compares the releases published on npm with the keys of
+`dsh.compatibility.dshReleases` and names the ones at or above the newest measured release. The
+`dsh-compatibility` workflow runs it weekly and opens one issue while any release is unmeasured.
+
+It exists because the automation around dependencies has a deliberate gap: Dependabot updates the dev
+dependencies and never touches `peerDependencies`, since a range bump there would declare support for a
+release nothing has verified. 0.4.0 shipped a table that stopped one release short for exactly that reason.
+
 ## What is not established
 
 - Loader-level composition beyond `--dump-config`: the probe mounts the installed
