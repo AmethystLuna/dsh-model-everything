@@ -77,6 +77,11 @@ plugin is **reachable**, and that path has two traps, both met while testing thi
   the app reports `web boot: 1 entry did not activate` with the package name stuck at `loading`. Pack first
   (`npm pack`), install the tarball with `file:`, and check that the installed copy has no own
   `node_modules/@deepseek-ai`.
+- **A scratch profile must be created from the template the app needs.** `dsh plugin --profile <name> add`
+  on a name that does not exist yet creates a base-only profile: it has no web packages, so booting it
+  serves nothing and prints nothing. Create it from the template first -
+  `dsh --profile <name> --from-default-profile web --dump-config` - and then add the plugin. The app's own
+  flags follow `--profile <name>` directly; naming the app again (`... web --port N`) is an argument error.
 - **The running process keeps the module it already imported.** Node's ESM cache cannot be
   invalidated in-process, so a re-mounted plugin continues to serve the old code - the loader
   row is live, the files on disk are new, and the tools answer from the previous build. A
