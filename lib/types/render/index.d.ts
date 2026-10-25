@@ -1,0 +1,40 @@
+/**
+ * The renderer's front door: whatever notation arrived, one drawing comes out.
+ *
+ * Three containers read this - the tool card, the full-screen view and the sidebar whiteboard - and each of
+ * them wants the same two things: shapes to draw and markup to embed. Neither knows which notation produced
+ * them, and neither needs to.
+ *
+ * Pure apart from the optional file write, which is the CLI's whole job.
+ */
+import type { Diagram } from './model.js';
+import { type Canvas } from './paint.js';
+import type { Palette } from './palette.js';
+export type Notation = 'mermaid' | 'plantuml';
+export interface RenderInput {
+    /** The notation, or `auto` to read it off the first non-empty line. */
+    notation?: Notation | 'auto';
+    source: string;
+    title?: string;
+}
+export interface Rendered {
+    diagram: Diagram;
+    canvas: Canvas;
+    /** Ready to embed: an `<svg>` with a viewBox and no fixed pixel size of its own. */
+    markup: string;
+    /** Which notation the source turned out to be. */
+    notation: Notation;
+    /** Lines the parser refused, with their reason. Empty when the whole source was understood. */
+    refused: string[];
+    /** Shapes the SVG writer had no case for. Must be zero; reported rather than hidden. */
+    dropped: number;
+}
+/** Read the notation off the source: PlantUML starts with `@startuml` or `@startmindmap`-style markers. */
+export declare function detectNotation(source: string): Notation;
+export declare function render(input: RenderInput, overrides?: Partial<Palette>): Rendered;
+/** Write the drawing where a document can link to it. Returns the path and the byte count. */
+export declare function writeSvg(input: RenderInput, path: string, overrides?: Partial<Palette>): {
+    path: string;
+    bytes: number;
+    rendered: Rendered;
+};

@@ -18,3 +18,12 @@
       name: 'dsh-model-everything/gate'
       config:
         enabled: true
+
+# The third component draws. It carries no engine and no tools of its own beyond `diagram_render`, so a
+# deployment that only wants pictures of its Mermaid and PlantUML sources can leave the rows above disabled.
+# `enabled` is live: the Plugins page switch turns it off without a restart.
+- insert:
+    - id: dsh-model-everything-diagram
+      name: 'dsh-model-everything/diagram'
+      config:
+        enabled: true

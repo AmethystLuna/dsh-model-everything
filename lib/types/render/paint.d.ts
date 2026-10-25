@@ -19,7 +19,7 @@
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 import { type ColourRole, type Palette } from './palette.js';
-import type { Diagram, DiagramNode } from './viewmodel.js';
+import { type Diagram, type DiagramNode } from './model.js';
 export interface Point {
     x: number;
     y: number;

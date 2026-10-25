@@ -21,7 +21,7 @@
 
 import { rankStates } from './layout.js'
 import { palette, roleForVerdict, type ColourRole, type Palette } from './palette.js'
-import type { Diagram, DiagramNode } from './viewmodel.js'
+import { labelOf, type Diagram, type DiagramNode } from './model.js'
 
 export interface Point {
   x: number
@@ -188,7 +188,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}): {
       y: box.y,
       width: box.width,
       height: box.height,
-      label: node.id,
+      label: labelOf(node),
       colour: roleOfNode(node),
       initial: diagram.init === node.id,
     })
