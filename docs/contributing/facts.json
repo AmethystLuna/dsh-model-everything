@@ -74,6 +74,16 @@
   ],
   "provenance": [
     {
+      "path": "model-everything/references/architecture-domains.md",
+      "hasProvenance": true,
+      "citesSource": true
+    },
+    {
+      "path": "model-everything/references/architecture-views.md",
+      "hasProvenance": true,
+      "citesSource": true
+    },
+    {
       "path": "model-everything/references/automata.md",
       "hasProvenance": true,
       "citesSource": false

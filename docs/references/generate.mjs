@@ -21,12 +21,15 @@ const SOURCES = [
   { path: 'skills/model-everything-structure/references/structure-review-guide.md', group: 'structure' },
   { path: 'skills/model-everything-design/SKILL.md', group: 'structure' },
   { path: '.github/memory/design/design-review.md', group: 'structure' },
+  { path: 'skills/model-everything/references/architecture-views.md', group: 'architecture' },
+  { path: 'skills/model-everything/references/architecture-domains.md', group: 'architecture' },
 ]
 
 const GROUPS = {
   verification: 'Verification, model checking and concurrency',
   data: 'Data models and constraints',
   structure: 'Graph theory behind the structural reviews',
+  architecture: 'Architecture description, hierarchy and domains',
 }
 
 /**

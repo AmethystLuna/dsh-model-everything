@@ -62,6 +62,75 @@ on a finding has to know which one they are holding.
 - Newman & Girvan 2004
   <br>cited by skills/model-everything-structure/references/structure-review-guide.md
 
+## Architecture description, hierarchy and domains
+
+- Abrial, *Modeling in Event-B* (2010)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Brown, *The C4 Model for Visualising Software Architecture* (2018)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Codd, *A Relational Model of Data for Large Shared Data Banks*, Communications of the ACM (1970)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Dehghani, *Data Mesh* (2022)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Helland, *Idempotence Is Not a Medical Condition*, ACM Queue (2012)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Hennessy and Patterson, *Computer Architecture*
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Hoare, *Communicating Sequential Processes* (1985)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Hohpe and Woolf, *Enterprise Integration Patterns* (2003)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Huyen, *Designing Machine Learning Systems* (2022)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Kazman and Carriere, *Playing Detective: Reconstructing Software Architecture from Available Evidence* (1999)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Kimball and Ross, *The Data Warehouse Toolkit* (2013)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Kleppmann, *Designing Data-Intensive Applications* (2017)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Kopetz, *Real-Time Systems* (2011)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Kruchten, *The 4+1 View Model of Architecture*, IEEE Software (1995)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Lamport, *Specifying Systems* (2002)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Lamport, *The Part-Time Parliament* (1998)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Lamport, *Time, Clocks, and the Ordering of Events in a Distributed System*, Communications of the ACM (1978)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Leveson and Thomas, *STPA Handbook* (2018)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Liu and Layland, *Scheduling Algorithms for Multiprogramming in a Hard-Real-Time Environment*, Journal of the ACM (1973)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Martin, *Agile Software Development* (2002)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Milner, *Communication and Concurrency* (1989)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Murphy, Notkin and Sullivan, *Software Reflexion Models*, IEEE Transactions on Software Engineering (2001)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Nygard, *Documenting Architecture Decisions* (2011)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Nygard, *Release It!* (2007)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Ongaro and Ousterhout, *In Search of an Understandable Consensus Algorithm* (2014)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Perry and Wolf, *Foundations for the Study of Software Architecture* (1992)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Rozanski and Woods, *Software Systems Architecture* (2011)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Shostack, *Threat Modeling: Designing for Security* (2014)
+  <br>cited by skills/model-everything/references/architecture-domains.md
+- Simon, *The Architecture of Complexity* (1962)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Steward, *The Design Structure System* (1981)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Tagawa and Toda, *Methods for Visual Understanding of Hierarchical System Structures* (1981)
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Tamassia and Tollis, *Graph Drawing*
+  <br>cited by skills/model-everything/references/architecture-views.md
+- Tyree and Akerman, *Architecture Decisions: Demystifying Architecture*, IEEE Software (2005)
+  <br>cited by skills/model-everything/references/architecture-views.md
+
 ## External checkers this plugin translates into
 
 These are not cited as method sources; they are tools the exporter writes input for, so a stronger

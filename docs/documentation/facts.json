@@ -20,6 +20,14 @@
   ],
   "referenceFiles": [
     {
+      "path": "model-everything/references/architecture-domains.md",
+      "hasProvenance": true
+    },
+    {
+      "path": "model-everything/references/architecture-views.md",
+      "hasProvenance": true
+    },
+    {
       "path": "model-everything/references/automata.md",
       "hasProvenance": true
     },
@@ -65,6 +73,8 @@
     }
   ],
   "citedFiles": [
+    "skills/model-everything/references/architecture-domains.md",
+    "skills/model-everything/references/architecture-views.md",
     "skills/model-everything/references/automata.md",
     "skills/model-everything/references/dsh-model-schema.md",
     "skills/model-everything/references/logic-verification-guide.md",
