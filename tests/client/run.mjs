@@ -81,7 +81,7 @@ test('apply binds one view per tool name, keyed by the wire name', () => {
   for (const entry of registered) {
     if (entry.options.name !== 'tool.call.toolview') throw new Error('wrong slot: ' + String(entry.options.name))
     if (entry.options.key !== 'model_verify') throw new Error('wrong key: ' + String(entry.options.key))
-    if (entry.options.id !== manifest.name) throw new Error('wrong registrant: ' + String(entry.options.id))
+    if (entry.options.id !== undefined) throw new Error('a keyed slot declares only key; id would be ignored: ' + String(entry.options.id))
     if (typeof entry.component !== 'function') throw new Error('the view is not a component')
   }
 })

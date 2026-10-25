@@ -70,7 +70,9 @@ export default function factory(require: (name: string) => unknown): PluginShape
     inject: ['slots'],
     apply(ctx: SlotContext) {
       for (const name of TOOL_NAMES) {
-        ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: name, id: 'dsh-model-everything' }, viewFor(React)))
+        // Only the options a keyed slot declares: `key`. An extra `id` is not part of this slot's
+        // registration schema, and the working community reference (dsh-deepread) passes exactly this much.
+        ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: name }, viewFor(React)))
       }
     },
   }
