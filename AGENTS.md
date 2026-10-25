@@ -71,6 +71,12 @@ plugin is **reachable**, and that path has two traps, both met while testing thi
   previous build while the command reports success. Remove the bundle, then install it:
   `plugin_manager` with `action: remove_bundle` on the package name, then `install_bundle`
   with the `file:` spec.
+- **A directory install links the package, and a linked package resolves its peers from its own tree.**
+  `install_bundle` with a bare directory path records `link:`, so the plugin's `@deepseek-ai/*` imports
+  resolve from its development `node_modules` - a second cordis instance - and its entry never activates:
+  the app reports `web boot: 1 entry did not activate` with the package name stuck at `loading`. Pack first
+  (`npm pack`), install the tarball with `file:`, and check that the installed copy has no own
+  `node_modules/@deepseek-ai`.
 - **The running process keeps the module it already imported.** Node's ESM cache cannot be
   invalidated in-process, so a re-mounted plugin continues to serve the old code - the loader
   row is live, the files on disk are new, and the tools answer from the previous build. A
