@@ -7,7 +7,7 @@
  *
  * Pure, and tested: a wrong role is a wrong verdict shown as a shape.
  */
-export type ColourRole = 'pass' | 'findings' | 'fail' | 'undecided' | 'muted' | 'text' | 'edge';
+export type ColourRole = 'pass' | 'findings' | 'fail' | 'undecided' | 'muted' | 'text' | 'edge' | 'surface';
 export type Palette = Record<ColourRole, string>;
 export declare function palette(overrides?: Partial<Palette>): Palette;
 /**

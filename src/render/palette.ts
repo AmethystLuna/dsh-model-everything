@@ -8,7 +8,7 @@
  * Pure, and tested: a wrong role is a wrong verdict shown as a shape.
  */
 
-export type ColourRole = 'pass' | 'findings' | 'fail' | 'undecided' | 'muted' | 'text' | 'edge'
+export type ColourRole = 'pass' | 'findings' | 'fail' | 'undecided' | 'muted' | 'text' | 'edge' | 'surface'
 
 export type Palette = Record<ColourRole, string>
 
@@ -21,6 +21,8 @@ const DEFAULT_PALETTE: Palette = {
   muted: '#9aa3ad',
   text: '#1f2933',
   edge: '#6b7280',
+  // A box fill rather than a colour: the drawing must read on the card's own surface, light or dark.
+  surface: 'transparent',
 }
 
 export function palette(overrides: Partial<Palette> = {}): Palette {

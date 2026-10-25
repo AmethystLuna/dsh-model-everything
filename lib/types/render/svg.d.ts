@@ -2,16 +2,18 @@
  * Shapes to SVG markup.
  *
  * The one module that knows tags, so it is also the one place where a shape can silently disappear if a
- * writer forgets a case: `writer` returns undefined for an unknown kind, and the caller counts the drops
+ * writer forgets a case: the writer table has an entry per shape kind, and the caller counts the drops
  * instead of hiding them.
  *
- * Pure, and the output is asserted as text in the suite: escaping, geometry, and the caption.
+ * Three containers read this output - an inline card, a full-screen view, and a sidebar tab - so the markup
+ * carries no size of its own beyond its `viewBox`: the container decides how large the drawing is, and the
+ * same string serves a thumbnail and a whiteboard.
+ *
+ * Pure, and the output is asserted as text: escaping, geometry, arrowheads, wrapped captions.
  */
-import type { Palette } from './palette.js';
 import type { Canvas } from './paint.js';
-export interface Written {
+import type { Palette } from './palette.js';
+export declare function toSvg(canvas: Canvas, colours: Palette, label?: string): {
     markup: string;
-    /** Shapes the writer had no case for. Non-zero is a defect, and the suite requires zero. */
     dropped: number;
-}
-export declare function toSvg(canvas: Canvas, colours?: Palette, label?: string): Written;
+};

@@ -6,7 +6,7 @@
 // version of this code guessed wrong: the card said "no report yet" for a report that was right there.
 import { palette, roleForVerdict } from '../../lib/render/palette.js'
 import { rankStates } from '../../lib/render/layout.js'
-import { paintWith } from '../../lib/render/paint.js'
+import { paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 
@@ -233,8 +233,11 @@ test('a machine is painted as boxes, links and a caption', () => {
   if (links.length !== 2) throw new Error('links: ' + String(links.length))
   if (captions.length !== 1) throw new Error('captions: ' + String(captions.length))
   if (colours.pass === undefined) throw new Error('no palette returned')
-  if (canvas.width < 360) throw new Error('width: ' + String(canvas.width))
+  if (canvas.width < 240) throw new Error('width: ' + String(canvas.width))
   if (canvas.height <= 44) throw new Error('height: ' + String(canvas.height))
+  // The canvas must be wide enough for the drawing it holds, or the widest thing in it is clipped.
+  const right = Math.max(...boxes.map((box) => box.x + box.width))
+  if (canvas.width < right) throw new Error('the canvas is narrower than its boxes: ' + String(canvas.width) + ' < ' + String(right))
 })
 
 test('a link is painted only when both ends were placed', () => {
@@ -299,8 +302,8 @@ test('a muted state paints muted, and links leaving it follow', () => {
   })
   const byLabel = new Map(canvas.shapes.filter((shape) => shape.kind === 'box').map((box) => [box.label, box.colour]))
   if (colours[byLabel.get('m')] !== colours.muted) throw new Error('muted box: ' + String(byLabel.get('m')))
-  const link = canvas.shapes.find((shape) => shape.kind === 'link')
-  if (colours[link.colour] !== colours.muted) throw new Error('the link from a muted state is ' + String(link.colour))
+  const edge = canvas.shapes.find((shape) => shape.kind === 'link' || shape.kind === 'path')
+  if (colours[edge.colour] !== colours.muted) throw new Error('the edge from a muted state is ' + String(edge.colour))
 })
 
 test('a link leaving a failing state is painted in the failing colour', () => {
@@ -370,7 +373,7 @@ test('a shape with no writer is counted, not silently skipped', () => {
 test('the initial box is written with a heavier border', () => {
   const { canvas, colours } = paintWith(view())
   const { markup } = toSvg(canvas, colours)
-  if (!markup.includes('stroke-width="3"')) throw new Error('the initial state has no heavier border')
+  if (!markup.includes('stroke-width="2.5"')) throw new Error('the initial state has no heavier border')
 })
 
 test('an edge with no event writes no label element', () => {
@@ -382,7 +385,8 @@ test('an edge with no event writes no label element', () => {
     caption: 'pass',
   })
   const { markup } = toSvg(canvas, colours)
-  if (markup.includes('font-size="10"')) throw new Error('an empty label was written')
+  const labels = [...markup.matchAll(/<text x="[\d.]+" y="[\d.]+" font-size="10" fill="([^"]+)">([^<]*)<\/text>/g)].map((match) => match[2])
+  if (labels.includes('')) throw new Error('an empty label was written')
 })
 
 test('the geometry is written with at most two decimals', () => {
@@ -403,6 +407,266 @@ test('a model with no initial state carries none', () => {
 
 test('a model that declares an initial state carries it', () => {
   if (view().init !== 'idle') throw new Error('init: ' + String(view().init))
+})
+
+test('a row keeps the order breadth-first found it in, under the parent that discovered it', () => {
+  // `s` discovers `a` then `b`, so the row below holds a then b, each under its own parent.
+  const nodes = [{ id: 's', role: 'normal' }, { id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }]
+  const edges = [{ from: 's', event: '', to: 'a' }, { from: 's', event: '', to: 'b' }]
+  const ranked = rankStates(nodes, edges, 's')
+  if (JSON.stringify(ranked.rows) !== JSON.stringify([['s'], ['a', 'b']])) throw new Error('rows: ' + JSON.stringify(ranked.rows))
+})
+
+test('a back edge is routed on a channel clear of every box', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'go', to: 'b' },
+      { from: 'b', label: 'back', to: 'a' },
+    ],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  const routes = canvas.shapes.filter((shape) => shape.kind === 'path')
+  if (routes.length !== 1) throw new Error('routes: ' + String(routes.length))
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const right = Math.max(...boxes.map((box) => box.x + box.width))
+  for (const point of routes[0].points) {
+    if (point.x < right) throw new Error('the route crosses the boxes at x=' + String(point.x) + ' (right edge ' + String(right) + ')')
+  }
+  if (routes[0].points.length !== 4) throw new Error('points: ' + String(routes[0].points.length))
+})
+
+test('a self loop is a small loop, not a line to itself', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [{ from: 'a', label: 'again', to: 'a' }],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  const routes = canvas.shapes.filter((shape) => shape.kind === 'path')
+  if (routes.length !== 1) throw new Error('loops: ' + String(routes.length))
+  if (routes[0].points.length !== 4) throw new Error('a loop needs four corners, got ' + String(routes[0].points.length))
+  const box = canvas.shapes.find((shape) => shape.kind === 'box')
+  const maxX = Math.max(...routes[0].points.map((point) => point.x))
+  if (maxX - (box.x + box.width) > 40) throw new Error('the loop is not small: ' + String(maxX - (box.x + box.width)) + 'px out')
+})
+
+test('a long caption wraps and the canvas is widened to fit it', () => {
+  const caption = 'fail — S2_NO_TRANSITIONS: Non-terminal state done has no outgoing transitions, and a second sentence keeps going for a while to force a wrap.'
+  const diagram = { kind: 'none', title: 't', nodes: [], edges: [], caption }
+  const { canvas } = paintWith(diagram)
+  const shape = canvas.shapes.find((entry) => entry.kind === 'caption')
+  if (shape.lines.length < 2) throw new Error('lines: ' + String(shape.lines.length))
+  const longest = Math.max(...shape.lines.map((line) => line.length))
+  if (longest > 78) throw new Error('a line is longer than the wrap limit: ' + String(longest))
+  if (canvas.width < longest * 6.2) throw new Error('the canvas is narrower than its caption: ' + String(canvas.width))
+})
+
+test('a box grows with its label instead of clipping it', () => {
+  const short = paintWith({ kind: 'machine', title: 't', init: 'a', nodes: [{ id: 'a', role: 'normal' }], edges: [], caption: 'pass' })
+  const long = paintWith({ kind: 'machine', title: 't', init: 'a', nodes: [{ id: 'a-state-with-a-long-name', role: 'normal' }], edges: [], caption: 'pass' })
+  const shortBox = short.canvas.shapes.find((shape) => shape.kind === 'box')
+  const longBox = long.canvas.shapes.find((shape) => shape.kind === 'box')
+  if (longBox.width <= shortBox.width) throw new Error('width did not grow: ' + String(shortBox.width) + ' -> ' + String(longBox.width))
+  if (longBox.width > 220) throw new Error('the width cap is gone: ' + String(longBox.width))
+})
+
+test('every edge ends with an arrowhead', () => {
+  const { canvas, colours } = paintWith(view())
+  const markup = toSvg(canvas, colours).markup
+  const arrows = (markup.match(/<polygon points=/g) ?? []).length
+  const edges = canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path').length
+  if (arrows !== edges) throw new Error(String(edges) + ' edges but ' + String(arrows) + ' arrowheads')
+})
+
+test('an edge inside one row runs sideways, not diagonally', () => {
+  // Both lower states are one step from the start, so the edge between them is within its row.
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'left', to: 'b' },
+      { from: 'a', label: 'right', to: 'c' },
+      { from: 'b', label: 'swap', to: 'c' },
+    ],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  const sideways = canvas.shapes.filter((shape) => shape.kind === 'link' && shape.y1 === shape.y2)
+  if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
+})
+
+test('a back edge is written as a polyline with an arrow, not as a line', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'go', to: 'b' },
+      { from: 'b', label: 'back', to: 'a' },
+    ],
+    caption: 'pass',
+  }
+  const { canvas, colours } = paintWith(diagram)
+  const { markup, dropped } = toSvg(canvas, colours)
+  if (dropped !== 0) throw new Error('dropped: ' + String(dropped))
+  if (!markup.includes('<polyline points="')) throw new Error('the routed edge wrote no polyline')
+  if (!markup.includes('back')) throw new Error('the routed edge lost its label')
+})
+
+test('a diagram with no states is a title and a caption, nothing else', () => {
+  const { canvas } = paintWith({ kind: 'none', title: 't', nodes: [], edges: [], caption: 'no report yet' })
+  const kinds = canvas.shapes.map((shape) => shape.kind).sort()
+  if (JSON.stringify(kinds) !== JSON.stringify(['caption', 'title'])) throw new Error('shapes: ' + JSON.stringify(kinds))
+})
+
+test('a caption with no verdict separator still gets a colour', () => {
+  const { canvas, colours } = paintWith({ kind: 'none', title: 't', nodes: [], edges: [], caption: 'no report yet' })
+  const caption = canvas.shapes.find((shape) => shape.kind === 'caption')
+  if (colours[caption.colour] !== colours.undecided) throw new Error('caption role: ' + String(caption.colour))
+})
+
+test('a caption holding one very long token is broken instead of overflowing', () => {
+  const token = 'x'.repeat(200)
+  const { canvas } = paintWith({ kind: 'none', title: 't', nodes: [], edges: [], caption: token })
+  const caption = canvas.shapes.find((shape) => shape.kind === 'caption')
+  if (caption.lines.length < 2) throw new Error('lines: ' + String(caption.lines.length))
+  for (const line of caption.lines) if (line.length > 78) throw new Error('a line still overflows: ' + String(line.length))
+})
+
+test('several back edges take separate lanes instead of stacking on one', () => {
+  const nodes = ['a', 'b', 'c', 'd'].map((id) => ({ id, role: 'normal' }))
+  const edges = [
+    { from: 'a', label: 'toB', to: 'b' },
+    { from: 'a', label: 'toC', to: 'c' },
+    { from: 'a', label: 'toD', to: 'd' },
+    { from: 'b', label: 'b1', to: 'a' },
+    { from: 'c', label: 'c1', to: 'a' },
+    { from: 'd', label: 'd1', to: 'a' },
+  ]
+  const { canvas } = paintWith({ kind: 'machine', title: 't', init: 'a', nodes, edges, caption: 'pass' })
+  const lanes = canvas.shapes.filter((shape) => shape.kind === 'path').map((shape) => shape.points[1].x)
+  if (new Set(lanes).size < 2) throw new Error('every back edge shares one lane: ' + JSON.stringify(lanes))
+})
+
+test('an edge naming a state the model does not have is dropped by the painter, not drawn', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [{ from: 'a', label: 'ghost', to: 'missing' }],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  if (canvas.shapes.some((shape) => shape.kind === 'link' || shape.kind === 'path')) throw new Error('a dangling edge was painted')
+})
+
+test('the paint helper returns the canvas alone', () => {
+  const canvas = paint(view())
+  if (canvas.shapes.length === 0) throw new Error('no shapes')
+  if (canvas.width <= 0 || canvas.height <= 0) throw new Error('no size')
+})
+
+test('an edge whose source is missing is dropped too', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [{ from: 'ghost', label: 'x', to: 'a' }],
+    caption: 'pass',
+  }
+  if (paint(diagram).shapes.some((shape) => shape.kind === 'link' || shape.kind === 'path')) throw new Error('a sourceless edge was painted')
+})
+
+test('a one point path is written without an arrowhead and does not throw', () => {
+  const { markup, dropped } = toSvg({ width: 10, height: 10, shapes: [{ kind: 'path', points: [{ x: 1, y: 1 }], label: '', labelX: 0, labelY: 0, colour: 'edge' }] }, palette())
+  if (dropped !== 0) throw new Error('dropped: ' + String(dropped))
+  if (markup.includes('<polygon')) throw new Error('a point with no direction drew an arrow')
+  if (!markup.includes('<polyline')) throw new Error('the path itself is missing')
+})
+
+test('a zero length edge is written without an arrowhead', () => {
+  const { markup } = toSvg({ width: 10, height: 10, shapes: [{ kind: 'link', x1: 5, y1: 5, x2: 5, y2: 5, label: '', labelX: 0, labelY: 0, colour: 'edge' }] }, palette())
+  if (markup.includes('<polygon')) throw new Error('a zero length edge drew an arrow')
+})
+
+test('a wrapped caption writes one tspan per line', () => {
+  const { canvas, colours } = paintWith({ kind: 'none', title: 't', nodes: [], edges: [], caption: 'a '.repeat(90) })
+  const { markup } = toSvg(canvas, colours)
+  const spans = (markup.match(/<tspan/g) ?? []).length
+  const caption = canvas.shapes.find((shape) => shape.kind === 'caption')
+  if (spans !== caption.lines.length) throw new Error('spans: ' + String(spans) + ' lines: ' + String(caption.lines.length))
+  if (spans < 2) throw new Error('the caption did not wrap')
+})
+
+test('an empty caption is one blank line, not no lines', () => {
+  const { canvas } = paintWith({ kind: 'none', title: 't', nodes: [], edges: [], caption: '' })
+  const caption = canvas.shapes.find((shape) => shape.kind === 'caption')
+  if (JSON.stringify(caption.lines) !== JSON.stringify([''])) throw new Error('lines: ' + JSON.stringify(caption.lines))
+})
+
+test('a repeated state id is drawn once', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'a', role: 'error' }],
+    edges: [],
+    caption: 'pass',
+  }
+  const boxes = paint(diagram).shapes.filter((shape) => shape.kind === 'box')
+  if (boxes.length !== 1) throw new Error('boxes: ' + String(boxes.length))
+})
+
+test('an edge leaving a state nothing reaches still gets a row', () => {
+  // `island` is unreachable, so it is drawn in its own block and has no row of its own to read.
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'island', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'go', to: 'a' },
+      { from: 'island', label: 'out', to: 'a' },
+      { from: 'a', label: 'in', to: 'island' },
+    ],
+    caption: 'pass',
+  }
+  const shapes = paint(diagram).shapes
+  const routes = shapes.filter((shape) => shape.kind === 'path' || shape.kind === 'link')
+  if (routes.length !== 3) throw new Error('edges drawn: ' + String(routes.length))
+})
+
+test('a sideways edge that points left attaches to the left side of its source', () => {
+  // Both lower states share a row; `c` points back at `b`, which is to its left.
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'left', to: 'b' },
+      { from: 'a', label: 'right', to: 'c' },
+      { from: 'c', label: 'back', to: 'b' },
+    ],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  const sideways = canvas.shapes.filter((shape) => shape.kind === 'link' && shape.y1 === shape.y2)
+  if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
+  if (sideways[0].x2 >= sideways[0].x1) throw new Error('the leftward edge runs the wrong way: ' + String(sideways[0].x1) + ' -> ' + String(sideways[0].x2))
 })
 
 if (failures > 0) {

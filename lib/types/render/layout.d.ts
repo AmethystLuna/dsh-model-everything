@@ -1,18 +1,22 @@
 /**
- * Ranks for a machine: which row each state sits in.
+ * Ranks for a machine, and the order of states within each rank.
  *
- * Breadth-first from the initial state, which is the layout the reader expects and the one Sugiyama's
- * layered drawing asks for: edges mostly flow down, and a state's row is how far it is from the start. A
- * state nothing reaches goes in a last row of its own rather than being dropped - an unreachable state is
- * usually the finding.
+ * Breadth-first from the initial state decides the row: the layout a reader expects, and the one a layered
+ * drawing asks for - edges mostly flow down, and a state's row is how far it is from the start. A state
+ * nothing reaches goes in a block of its own rather than being dropped.
  *
- * Pure, and the whole of the layout for now: no crossing minimisation, no coordinate assignment.
+ * Within a row, states keep the order breadth-first found them in: a row is filled by walking the row above
+ * left to right, so a state already sits under the parent that discovered it. A barycentre pass was written
+ * and removed - with breadth-first insertion it could never move a state, so it was complexity without an
+ * observable effect.
+ *
+ * Pure, and asserted on the rows themselves.
  */
-import type { DiagramNode, DiagramEdge } from './viewmodel.js';
+import type { DiagramEdge, DiagramNode } from './viewmodel.js';
 export interface Ranked {
-    /** Row index per state id, in the order the rows should be drawn. */
+    /** The state ids of each row, top to bottom, already ordered left to right. */
     rows: string[][];
-    /** States that no edge reaches from the initial one. */
+    /** States no edge reaches from the initial one. */
     unreachable: string[];
 }
 export declare function rankStates(nodes: DiagramNode[], edges: DiagramEdge[], init: string | undefined): Ranked;

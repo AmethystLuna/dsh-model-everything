@@ -1,14 +1,30 @@
 /**
- * Shapes: the drawing as data, before any markup exists.
+ * Geometry: what a diagram turns into, in coordinates.
  *
- * A painter that emitted markup could only be tested by comparing strings; a painter that emits shapes can
- * be tested by asserting what is where. The SVG writer is the only module that knows about tags.
+ * A drawing has to survive three containers - inline in a conversation, full-screen, and a persistent
+ * sidebar tab - so nothing here knows about pixel size. It emits a content-sized canvas and lets the
+ * container scale it: the same numbers serve a 360px card and a 1200px whiteboard, because SVG scales and
+ * text is measured in the units the boxes are.
  *
- * Pure.
+ * The rules that make it readable, in the order they matter:
+ *
+ * - every state is a box of its own width, so a long id is not clipped by a fixed 120px;
+ * - a forward edge is a straight vertical line, because that is what reads as "next";
+ * - a back edge leaves to a side channel and returns from the same side, so it never crosses the boxes it
+ *   jumps over;
+ * - a self loop is a small loop on the right, not a line to itself;
+ * - an edge label sits beside its own segment, never on top of a box;
+ * - the caption is wrapped and the canvas is widened to fit it, so nothing is clipped at the right edge.
+ *
+ * Pure: a diagram in, shapes out, every decision assertable.
  */
 import { type ColourRole, type Palette } from './palette.js';
-import type { Diagram } from './viewmodel.js';
-export interface Box {
+import type { Diagram, DiagramNode } from './viewmodel.js';
+export interface Point {
+    x: number;
+    y: number;
+}
+export interface BoxShape {
     kind: 'box';
     x: number;
     y: number;
@@ -16,41 +32,51 @@ export interface Box {
     height: number;
     label: string;
     colour: ColourRole;
-    /** Drawn as a double border: the initial state. */
     initial: boolean;
 }
-export interface Link {
+export interface LinkShape {
     kind: 'link';
     x1: number;
     y1: number;
     x2: number;
     y2: number;
     label: string;
+    labelX: number;
+    labelY: number;
     colour: ColourRole;
 }
-export interface Caption {
+export interface PathShape {
+    kind: 'path';
+    points: Point[];
+    label: string;
+    labelX: number;
+    labelY: number;
+    colour: ColourRole;
+}
+export interface CaptionShape {
     kind: 'caption';
     x: number;
     y: number;
-    text: string;
+    lines: string[];
     colour: ColourRole;
 }
-export interface Title {
+export interface TitleShape {
     kind: 'title';
     x: number;
     y: number;
     text: string;
     colour: ColourRole;
 }
-export type Shape = Title | Box | Link | Caption;
+export type Shape = BoxShape | LinkShape | PathShape | CaptionShape | TitleShape;
 export interface Canvas {
     width: number;
     height: number;
     shapes: Shape[];
 }
-export declare function paint(diagram: Diagram, colours?: Palette): Canvas;
-/** The palette a canvas was painted with, so a writer can resolve a role without knowing the theme. */
+/** Which colour a box earns from its role. One mapping, used by every container. */
+export declare function roleOfNode(node: DiagramNode): ColourRole;
 export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>): {
     canvas: Canvas;
     colours: Palette;
 };
+export declare function paint(diagram: Diagram, overrides?: Partial<Palette>): Canvas;
