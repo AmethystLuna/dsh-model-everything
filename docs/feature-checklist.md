@@ -147,6 +147,7 @@ node tests/routing-map/run.mjs
 node tests/report-reading/run.mjs
 node tests/structure/run.mjs
 node tests/automaton/run.mjs
+node tests/render/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -194,6 +195,7 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
+| `render` | 38 | every verdict earns its own role |
 | `presentation` | 55 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
