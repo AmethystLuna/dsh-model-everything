@@ -164,7 +164,10 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     nodes: [...builder.nodes.values()],
     edges: builder.edges,
     ...(builder.groups.length === 0 ? {} : { groups: builder.groups }),
-    caption: refused.length === 0 ? 'plantuml' : 'plantuml, ' + String(refused.length) + ' line(s) refused',
+    caption:
+      'plantuml, ' + String(builder.nodes.size) + ' box' + (builder.nodes.size === 1 ? '' : 'es') + ', ' +
+      String(builder.edges.length) + ' arrow' + (builder.edges.length === 1 ? '' : 's') +
+      (refused.length === 0 ? '' : ', ' + String(refused.length) + ' line(s) refused'),
   }
   return { diagram, refused }
 }
