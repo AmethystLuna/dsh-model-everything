@@ -19,11 +19,10 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json",
-    "./client": "./client.js"
+    "./client": "./lib/client.js"
   },
   "files": [
     "lib",
-    "client.js",
     "src",
     "skills",
     "cordis.patch.yml",
@@ -76,7 +75,7 @@
     "bump": "node scripts/bump-version.mjs",
     "test:cards": "node tests/presentation/run.mjs && node tests/automaton/run.mjs && node tests/routing/run.mjs",
     "coverage": "c8 --reporter=text --exclude-after-remap=false npm run test:engine",
-    "test:engine": "npm run build && node tests/engine/run.mjs && node tests/design-engine/run.mjs && node tests/catalog/run.mjs && node tests/data-engine/run.mjs && node tests/concurrency/run.mjs && node tests/uml/run.mjs && node tests/apply-smoke.mjs && node tests/memory/run.mjs && node tests/skills/run.mjs && node tests/gate/run.mjs && node tests/skill-routing/run.mjs && node tests/toolset/run.mjs && node tests/principles/run.mjs && node tests/feature-checklist/run.mjs && node tests/usage/run.mjs && node tests/translation/run.mjs && node tests/documentation/run.mjs && node tests/contributing/run.mjs && node tests/routing-map/run.mjs && node tests/report-reading/run.mjs && node tests/structure/run.mjs && node tests/automaton/run.mjs && node tests/render/run.mjs && node tests/presentation/run.mjs && node tests/routing/run.mjs && node tests/tool-routing/run.mjs && node tests/tools/run.mjs && node tests/baseline/run.mjs && node tests/granularity/run.mjs && node tests/exporters/run.mjs && node tests/report-view/run.mjs && node tests/contracts/run.mjs && node tests/tool-boundary/run.mjs && node tests/negatives/run.mjs && node tests/external/run.mjs",
+    "test:engine": "npm run build && node tests/engine/run.mjs && node tests/design-engine/run.mjs && node tests/catalog/run.mjs && node tests/data-engine/run.mjs && node tests/concurrency/run.mjs && node tests/uml/run.mjs && node tests/apply-smoke.mjs && node tests/memory/run.mjs && node tests/skills/run.mjs && node tests/gate/run.mjs && node tests/skill-routing/run.mjs && node tests/toolset/run.mjs && node tests/principles/run.mjs && node tests/feature-checklist/run.mjs && node tests/usage/run.mjs && node tests/translation/run.mjs && node tests/documentation/run.mjs && node tests/contributing/run.mjs && node tests/routing-map/run.mjs && node tests/report-reading/run.mjs && node tests/structure/run.mjs && node tests/automaton/run.mjs && node tests/client/run.mjs && node tests/render/run.mjs && node tests/presentation/run.mjs && node tests/routing/run.mjs && node tests/tool-routing/run.mjs && node tests/tools/run.mjs && node tests/baseline/run.mjs && node tests/granularity/run.mjs && node tests/exporters/run.mjs && node tests/report-view/run.mjs && node tests/contracts/run.mjs && node tests/tool-boundary/run.mjs && node tests/negatives/run.mjs && node tests/external/run.mjs",
     "test:full": "npm run build && node tests/full-suite.mjs",
     "check": "npm run lint:md && npm run test:engine",
     "build:client": "node scripts/build-client.mjs"
