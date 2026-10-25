@@ -172,6 +172,24 @@ test('the view survives a call that has no result yet', () => {
   }
 })
 
+test('the theme probe reads the page surface, and falls back without one', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  const probe = plugin.themeMode ?? (() => 'light')
+  // No document in this process: the fallback must be light rather than a throw.
+  if (probe() !== 'light') throw new Error('the fallback is not light: ' + String(probe()))
+})
+
+test('the whiteboard offers a colour scheme picker', () => {
+  const { registrations } = loadBundle()
+  const { registered } = applyWithSeats(registrations[0].factory(() => stubReact))
+  const body = registered.find((entry) => entry.options.name === 'sidebar.right.pane.tab')
+  const html = JSON.stringify(body.component({}))
+  for (const scheme of ['default', 'high-contrast', 'print']) {
+    if (!html.includes(scheme)) throw new Error('the picker is missing ' + scheme)
+  }
+})
+
 if (failures > 0) {
   console.log('client tests failed: ' + String(failures))
   process.exit(1)

@@ -7,11 +7,11 @@
 
 import { writeFileSync } from 'node:fs'
 import { render, type RenderInput, type Rendered } from './index.js'
-import type { Palette } from './palette.js'
+import type { Palette, PaletteOptions } from './palette.js'
 
 /** Write the drawing where a document can link to it. Returns the path, the byte count and the render. */
-export function writeSvg(input: RenderInput, path: string, overrides: Partial<Palette> = {}): { path: string; bytes: number; rendered: Rendered } {
-  const rendered = render(input, overrides)
+export function writeSvg(input: RenderInput, path: string, overrides: Partial<Palette> = {}, options: PaletteOptions = {}): { path: string; bytes: number; rendered: Rendered } {
+  const rendered = render(input, overrides, options)
   writeFileSync(path, rendered.markup, 'utf8')
   return { path, bytes: rendered.markup.length, rendered }
 }

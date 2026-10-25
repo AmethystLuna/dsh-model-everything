@@ -20,7 +20,7 @@
  */
 
 import { rankStates } from './layout.js'
-import { palette, roleForVerdict, type ColourRole, type Palette } from './palette.js'
+import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramNode } from './model.js'
 
 export interface Point {
@@ -137,8 +137,8 @@ function captionRole(caption: string): ColourRole {
   return roleForVerdict(caption.split(' — ')[0] as string)
 }
 
-export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}): { canvas: Canvas; colours: Palette } {
-  const colours = palette(overrides)
+export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, options: PaletteOptions = {}): { canvas: Canvas; colours: Palette } {
+  const colours = palette(overrides, options)
   const shapes: Shape[] = []
 
   const ranked = rankStates(diagram.nodes, diagram.edges, diagram.init)

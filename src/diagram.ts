@@ -62,6 +62,11 @@ export const diagramRenderTool = defineTool({
       type: 'string',
       description: 'The heading drawn above the diagram. Defaults to the component configuration.',
     },
+    scheme: {
+      type: 'string',
+      enum: ['default', 'high-contrast', 'print'],
+      description: 'Colour scheme. Default: the standard light palette. print is greyscale, for a drawing that will be printed or embedded in a plain document.',
+    },
     out: {
       type: 'string',
       description: 'Write the SVG here and report the path. Relative paths resolve against the session workspace.',
@@ -92,7 +97,7 @@ export const diagramRenderTool = defineTool({
   },
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
-  async execute(args: { source?: unknown; notation?: unknown; title?: unknown; out?: unknown }) {
+  async execute(args: { source?: unknown; notation?: unknown; title?: unknown; out?: unknown; scheme?: unknown }) {
     const source = typeof args.source === 'string' ? args.source : ''
     if (source.trim() === '') {
       // One shape for every answer, so the output contract has nothing to special-case.
@@ -110,10 +115,11 @@ export const diagramRenderTool = defineTool({
     }
     const notation = args.notation === 'mermaid' || args.notation === 'plantuml' ? (args.notation as Notation) : 'auto'
     const title = typeof args.title === 'string' && args.title.trim() !== '' ? args.title.trim() : undefined
-    const rendered = render({ source, notation, ...(title === undefined ? {} : { title }) })
+    const scheme = args.scheme === 'high-contrast' || args.scheme === 'print' ? args.scheme : 'default'
+    const rendered = render({ source, notation, ...(title === undefined ? {} : { title }) }, {}, { scheme })
     const written =
       typeof args.out === 'string' && args.out.trim() !== ''
-        ? writeSvg({ source, notation, ...(title === undefined ? {} : { title }) }, args.out.trim())
+        ? writeSvg({ source, notation, ...(title === undefined ? {} : { title }) }, args.out.trim(), {}, { scheme })
         : undefined
 
     return {

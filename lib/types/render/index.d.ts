@@ -9,7 +9,7 @@
  */
 import type { Diagram } from './model.js';
 import { type Canvas } from './paint.js';
-import type { Palette } from './palette.js';
+import type { Palette, PaletteOptions } from './palette.js';
 export type Notation = 'mermaid' | 'plantuml';
 export interface RenderInput {
     /** The notation, or `auto` to read it off the first non-empty line. */
@@ -31,4 +31,4 @@ export interface Rendered {
 }
 /** Read the notation off the source: PlantUML starts with `@startuml` or `@startmindmap`-style markers. */
 export declare function detectNotation(source: string): Notation;
-export declare function render(input: RenderInput, overrides?: Partial<Palette>): Rendered;
+export declare function render(input: RenderInput, overrides?: Partial<Palette>, options?: PaletteOptions): Rendered;

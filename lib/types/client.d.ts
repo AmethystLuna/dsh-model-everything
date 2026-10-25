@@ -11,7 +11,7 @@
  * This module is not a page script: it exports the factory, and `scripts/build-client.mjs` wraps the
  * compiled output in `window.__ModuleLoader__.load(...)`, which is the loader contract itself.
  */
-import type { Palette } from './render/palette.js';
+import { type Palette, type PaletteMode } from './render/palette.js';
 export interface ReactLike {
     createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown;
     useState?: <T>(initial: T) => [T, (next: T) => void];
@@ -38,6 +38,14 @@ export interface ToolCallProps {
 }
 /** Tool names this package answers. A key that never dispatches simply never renders. */
 export declare const TOOL_NAMES: string[];
+/**
+ * Which surface the page is painting the drawing on.
+ *
+ * The host publishes its palette as private CSS variables, so naming them here would break on the next theme.
+ * The one fact that cannot drift is the rendered background: read it, and fall back to the media query, then
+ * to light. Never throws - a view that cannot read the document still draws.
+ */
+export declare function themeMode(): PaletteMode;
 /** The whiteboard's seat key, in both the tab registry and the body slot. */
 export declare const WHITEBOARD_ID = "model-everything-diagram";
 /** What the whiteboard opens with: a diagram the reader can edit rather than an empty box. */

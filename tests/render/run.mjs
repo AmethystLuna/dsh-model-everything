@@ -4,7 +4,7 @@
 // sits in, what shape is emitted, and what the markup says. The input is the shape the host actually hands a
 // tool view - a lazy arguments view plus content blocks once settled - because that shape is what the first
 // version of this code guessed wrong: the card said "no report yet" for a report that was right there.
-import { palette, roleForVerdict } from '../../lib/render/palette.js'
+import { palette, roleForVerdict, schemeNames } from '../../lib/render/palette.js'
 import { rankStates } from '../../lib/render/layout.js'
 import { paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
@@ -667,6 +667,52 @@ test('a sideways edge that points left attaches to the left side of its source',
   const sideways = canvas.shapes.filter((shape) => shape.kind === 'link' && shape.y1 === shape.y2)
   if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
   if (sideways[0].x2 >= sideways[0].x1) throw new Error('the leftward edge runs the wrong way: ' + String(sideways[0].x1) + ' -> ' + String(sideways[0].x2))
+})
+
+test('the dark surface gets its own palette', () => {
+  const light = palette()
+  const dark = palette({}, { mode: 'dark' })
+  if (light.background === dark.background) throw new Error('both surfaces share a background')
+  if (light.text === dark.text) throw new Error('both surfaces share a text colour')
+  // The dark surface must not paint a dark line on a dark page.
+  const luminance = (hex) => {
+    const value = hex.replace('#', '')
+    const [r, g, b] = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16))
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  }
+  if (luminance(dark.text) < 0.6) throw new Error('the dark text colour is not light enough: ' + dark.text)
+  if (luminance(dark.background) > 0.4) throw new Error('the dark background is not dark enough: ' + dark.background)
+  if (luminance(light.text) > 0.4) throw new Error('the light text colour is not dark enough: ' + light.text)
+})
+
+test('a scheme replaces the family, and an override still wins', () => {
+  const print = palette({}, { scheme: 'print' })
+  if (print.fail !== '#000000') throw new Error('print fail: ' + print.fail)
+  const overridden = palette({ fail: '#123456' }, { scheme: 'print', mode: 'dark' })
+  if (overridden.fail !== '#123456') throw new Error('the override lost: ' + overridden.fail)
+  const contrast = palette({}, { scheme: 'high-contrast' })
+  if (contrast.edge !== '#000000') throw new Error('high contrast edge: ' + contrast.edge)
+})
+
+test('the dark variant belongs to the default scheme only', () => {
+  const darkPrint = palette({}, { scheme: 'print', mode: 'dark' })
+  if (darkPrint.background !== '#ffffff') throw new Error('print follows the surface, which it should not: ' + darkPrint.background)
+})
+
+test('every scheme is offered by name', () => {
+  const names = schemeNames()
+  if (names.length !== 3) throw new Error('schemes: ' + names.join(','))
+  for (const name of names) {
+    const colours = palette({}, { scheme: name })
+    if (colours.background === undefined || colours.text === undefined) throw new Error('incomplete scheme: ' + name)
+  }
+})
+
+test('an unknown scheme name falls back to the default palette', () => {
+  // The value can arrive from a DOM control in the page, so the lookup is total rather than typed away.
+  const unknown = palette({}, { scheme: 'nonsense' })
+  const light = palette()
+  if (unknown.background !== light.background || unknown.text !== light.text) throw new Error('the fallback is not the default palette')
 })
 
 if (failures > 0) {

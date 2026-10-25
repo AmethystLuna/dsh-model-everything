@@ -18,7 +18,7 @@
  *
  * Pure: a diagram in, shapes out, every decision assertable.
  */
-import { type ColourRole, type Palette } from './palette.js';
+import { type ColourRole, type Palette, type PaletteOptions } from './palette.js';
 import { type Diagram, type DiagramNode } from './model.js';
 export interface Point {
     x: number;
@@ -75,7 +75,7 @@ export interface Canvas {
 }
 /** Which colour a box earns from its role. One mapping, used by every container. */
 export declare function roleOfNode(node: DiagramNode): ColourRole;
-export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>): {
+export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>, options?: PaletteOptions): {
     canvas: Canvas;
     colours: Palette;
 };
