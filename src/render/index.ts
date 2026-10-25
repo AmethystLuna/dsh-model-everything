@@ -5,10 +5,9 @@
  * them wants the same two things: shapes to draw and markup to embed. Neither knows which notation produced
  * them, and neither needs to.
  *
- * Pure apart from the optional file write, which is the CLI's whole job.
+ * Pure: no filesystem, because the same module is bundled into the page for the whiteboard.
  */
 
-import { writeFileSync } from 'node:fs'
 import { fromMermaid } from './from-mermaid.js'
 import { fromPlantUml } from './from-plantuml.js'
 import type { Diagram } from './model.js'
@@ -64,11 +63,4 @@ export function render(input: RenderInput, overrides: Partial<Palette> = {}): Re
     refused: parsed.refused,
     dropped: written.dropped,
   }
-}
-
-/** Write the drawing where a document can link to it. Returns the path and the byte count. */
-export function writeSvg(input: RenderInput, path: string, overrides: Partial<Palette> = {}): { path: string; bytes: number; rendered: Rendered } {
-  const rendered = render(input, overrides)
-  writeFileSync(path, rendered.markup, 'utf8')
-  return { path, bytes: rendered.markup.length, rendered }
 }

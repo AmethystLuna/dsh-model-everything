@@ -5,7 +5,8 @@
 // it does with nonsense (an empty drawing, not an exception).
 import { fromMermaid } from '../../lib/render/from-mermaid.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
-import { detectNotation, render, writeSvg } from '../../lib/render/index.js'
+import { detectNotation, render } from '../../lib/render/index.js'
+import { writeSvg } from '../../lib/render/write.js'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

@@ -13,7 +13,8 @@
 
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { render, writeSvg, type Notation } from './render/index.js'
+import { render, type Notation } from './render/index.js'
+import { writeSvg } from './render/write.js'
 
 /** The default a deployment inherits: on, because a component nobody knows about is a component nobody uses. */
 const DEFAULT_ENABLED = true

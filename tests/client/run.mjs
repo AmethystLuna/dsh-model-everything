@@ -34,8 +34,13 @@ function loadBundle() {
   return { path, registrations }
 }
 
+// A stub that keeps children, because the whiteboard nests its drawing inside a wrapper and a stub that
+// dropped children would report an empty board.
 const stubReact = {
-  createElement: (type, props) => ({ type, props }),
+  createElement: (type, props, ...children) => ({
+    type,
+    props: { ...(props ?? {}), ...(children.length === 0 ? {} : { children: children.length === 1 ? children[0] : children }) },
+  }),
 }
 
 test('the declared client export is the built bundle the loader can execute', () => {
@@ -64,26 +69,69 @@ test('the factory returns a plugin that injects the slot service', () => {
   if (typeof plugin.apply !== 'function') throw new Error('no apply')
 })
 
+/** A host that offers both seats, with the tab registry the sidebar expects. */
+function applyWithSeats(plugin) {
+  const registered = []
+  const tabs = []
+  plugin.apply({
+    slots: {
+      inject: (_slot, callback) => callback(),
+      register: (options, component) => registered.push({ options, component }),
+    },
+    get: (service) => (service === 'sidebarRightTabs' ? { register: (options) => tabs.push(options) } : undefined),
+  })
+  return { registered, tabs }
+}
+
 test('apply binds one view per tool name, keyed by the wire name', () => {
+  const { registrations } = loadBundle()
+  const { registered } = applyWithSeats(registrations[0].factory(() => stubReact))
+  const views = registered.filter((entry) => entry.options.name === 'tool.call.toolview')
+  if (views.length === 0) throw new Error('no tool view registered')
+  for (const entry of views) {
+    if (entry.options.key !== 'model_verify') throw new Error('wrong key: ' + String(entry.options.key))
+    if (entry.options.id !== undefined) throw new Error('a keyed slot declares only key; id would be ignored: ' + String(entry.options.id))
+    if (typeof entry.component !== 'function') throw new Error('the view is not a component')
+  }
+})
+
+test('the whiteboard takes a tab and a body in the right sidebar', () => {
+  const { registrations } = loadBundle()
+  const { registered, tabs } = applyWithSeats(registrations[0].factory(() => stubReact))
+  if (tabs.length !== 1) throw new Error('tab types registered: ' + String(tabs.length))
+  if (tabs[0].id === undefined || tabs[0].keepMounted !== true) throw new Error('the tab declaration is incomplete: ' + JSON.stringify(Object.keys(tabs[0])))
+  const bodies = registered.filter((entry) => entry.options.name === 'sidebar.right.pane.tab')
+  if (bodies.length !== 1) throw new Error('bodies: ' + String(bodies.length))
+  if (bodies[0].options.key !== tabs[0].id) throw new Error('the body key does not match the tab id: ' + String(bodies[0].options.key))
+  if (typeof bodies[0].component !== 'function') throw new Error('the whiteboard is not a component')
+})
+
+test('a host without the sidebar seat is left alone, not crashed', () => {
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   const registered = []
   plugin.apply({
     slots: {
       inject: (slot, callback) => {
-        if (slot !== 'tool.call.toolview') throw new Error('injected ' + slot)
+        if (slot === 'sidebar.right.pane.tab') return undefined
         callback()
       },
       register: (options, component) => registered.push({ options, component }),
     },
+    get: () => undefined,
   })
-  if (registered.length === 0) throw new Error('no view registered')
-  for (const entry of registered) {
-    if (entry.options.name !== 'tool.call.toolview') throw new Error('wrong slot: ' + String(entry.options.name))
-    if (entry.options.key !== 'model_verify') throw new Error('wrong key: ' + String(entry.options.key))
-    if (entry.options.id !== undefined) throw new Error('a keyed slot declares only key; id would be ignored: ' + String(entry.options.id))
-    if (typeof entry.component !== 'function') throw new Error('the view is not a component')
-  }
+  if (registered.some((entry) => entry.options.name === 'sidebar.right.pane.tab')) throw new Error('a body was registered without a seat')
+})
+
+test('the whiteboard draws what it is given, and says why when it refuses', () => {
+  const { registrations } = loadBundle()
+  const { registered } = applyWithSeats(registrations[0].factory(() => stubReact))
+  const body = registered.find((entry) => entry.options.name === 'sidebar.right.pane.tab')
+  const element = body.component({})
+  // No hooks on the stub, so the board renders its sample read-only: an svg plus the source box is enough.
+  const html = JSON.stringify(element)
+  if (!html.includes('<svg')) throw new Error('the whiteboard drew nothing')
+  if (!html.includes('textarea')) throw new Error('the whiteboard has no source box')
 })
 
 test('the view renders the machine as an svg element', () => {

@@ -1,9 +1,12 @@
 /**
  * The Client half: a lazy factory the page binds to this package's name.
  *
- * Everything that decides anything lives in `render/`; this file only turns shapes into React elements.
- * The loader hands the factory a `require` for baseline modules (React among them), so React is taken from
- * there and never bundled.
+ * Everything that decides anything lives in `render/`; this file only turns shapes into React elements and
+ * registers them where the page offers a seat. Two seats are used, and they fail independently:
+ *
+ * - `tool.call.toolview` replaces the card of a tool whose result this package can draw;
+ * - `sidebar.right.pane.tab` is the whiteboard: a tab that renders whatever the reader pastes, with no tool
+ *   and no host data at all, so it keeps working when the card seat does not.
  *
  * This module is not a page script: it exports the factory, and `scripts/build-client.mjs` wraps the
  * compiled output in `window.__ModuleLoader__.load(...)`, which is the loader contract itself.
@@ -11,12 +14,14 @@
 import type { Palette } from './render/palette.js';
 export interface ReactLike {
     createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown;
+    useState?: <T>(initial: T) => [T, (next: T) => void];
 }
 export interface SlotContext {
     slots: {
         inject: (slot: string, callback: () => unknown) => unknown;
         register: (options: Record<string, unknown>, component: unknown) => unknown;
     };
+    get?: (service: string) => unknown;
 }
 export interface PluginShape {
     inject: string[];
@@ -33,6 +38,10 @@ export interface ToolCallProps {
 }
 /** Tool names this package answers. A key that never dispatches simply never renders. */
 export declare const TOOL_NAMES: string[];
+/** The whiteboard's seat key, in both the tab registry and the body slot. */
+export declare const WHITEBOARD_ID = "model-everything-diagram";
+/** What the whiteboard opens with: a diagram the reader can edit rather than an empty box. */
+export declare const WHITEBOARD_SAMPLE: string;
 /**
  * The view for one tool name.
  *
@@ -41,4 +50,12 @@ export declare const TOOL_NAMES: string[];
  * pins with an injection case.
  */
 export declare function viewFor(React: ReactLike, overrides?: Partial<Palette>): (props: ToolCallProps) => unknown;
+/**
+ * The whiteboard: paste a diagram, get a drawing, zoom it.
+ *
+ * It holds no host data, which is the point: it is a place to think about a diagram while writing one, and
+ * it cannot be broken by a change to any tool's result shape. The source it draws is whatever is in its own
+ * box.
+ */
+export declare function whiteboardFor(React: ReactLike, overrides?: Partial<Palette>): () => unknown;
 export default function factory(require: (name: string) => unknown): PluginShape;
