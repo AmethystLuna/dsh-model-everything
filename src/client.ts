@@ -49,8 +49,9 @@ export const TOOL_NAMES: string[] = ['model_verify']
  */
 export function viewFor(React: ReactLike, overrides: Partial<Palette> = {}): (props: ToolCallProps) => unknown {
   return (props: ToolCallProps): unknown => {
-    const block = props.block ?? {}
-    const diagram = viewModel({ phase: props.phase, toolName: props.toolName, args: block.args, result: block.result })
+    // The whole block goes to the view model: the host shapes it differently per phase (a lazy arguments
+    // view while running, content blocks once settled), and only that module knows how to read it.
+    const diagram = viewModel({ phase: props.phase, toolName: props.toolName, block: props.block })
     const { canvas, colours } = paintWith(diagram, overrides)
     const written = toSvg(canvas, colours, diagram.kind === 'none' ? diagram.caption : diagram.title + ': ' + diagram.caption)
     return React.createElement('div', {

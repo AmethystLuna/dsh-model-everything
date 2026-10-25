@@ -1,16 +1,18 @@
 /**
  * What a tool card shows, reduced to a drawing.
  *
- * The input is what the host hands a settled tool view: the arguments that were sent and the result that
- * came back. Neither is trusted - a view runs during streaming too, when the result does not exist yet -
- * so every field is read defensively and an absent one removes a shape rather than throwing.
+ * The input is what the host hands a settled tool view: a phase and a block whose shape differs per phase.
+ * A settled call carries the paired call's arguments as a **lazy view** (`PartialArguments`) and the result
+ * as content blocks, so nothing here reads `block.args.model`: the view is asked, and the report text is
+ * parsed for the two facts a drawing needs. Every reader is total - an absent field removes a shape rather
+ * than throwing, because the same view renders during streaming.
  *
  * Pure. Everything decided here is a fact a test can assert: which nodes exist, which edges, why they are
  * coloured the way they are.
  */
 export interface DiagramNode {
     id: string;
-    /** The verdict or severity this node carries, when the report says something about it. */
+    /** What the report says about this node, when it says anything. */
     role: 'normal' | 'error' | 'warning' | 'muted';
 }
 export interface DiagramEdge {
@@ -28,9 +30,10 @@ export interface Diagram {
     /** One line under the drawing: what the report decided, in words the drawing cannot carry. */
     caption: string;
 }
-export declare function viewModel(input: {
+export interface ViewInput {
     phase?: unknown;
-    args?: unknown;
-    result?: unknown;
     toolName?: unknown;
-}): Diagram;
+    /** The whole block the host hands a view; its shape depends on the phase. */
+    block?: unknown;
+}
+export declare function viewModel(input: ViewInput): Diagram;
