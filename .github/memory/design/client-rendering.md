@@ -60,3 +60,28 @@ window.__ModuleLoader__.load({
 ## 探针
 
 `probe-client` 曾用于验证通道（20 行 SVG + 槽位注册），验证完毕已从 profile 卸载。要重验，按上面的四文件结构重装一次即可；文件仍在维护者的 scratch 目录里。
+
+## 未解：注册成功但 `active: false`
+
+把渲染器接进本包的客户端半之后，槽位表里出现的是
+
+```json
+{ "registrant": "Gb", "key": "model_verify", "id": "dsh-model-everything", "active": false }
+```
+
+即**注册成功、但未激活**：key 被占住，视图不渲染，通用行也不兜底——卡片位置什么都不显示。
+
+已经排除的：
+
+- bundle 契约（`exports["./client"]`、唯一入口、`factory` 返回 `{inject, apply}`）——`tests/client` 逐条断言且通过；
+- 宿主是否服务该 bundle——临时 web profile 的启动图里有我们的行，`GET /plugins/??dsh-model-everything/client.js` 返回 200，把返回的字节按页面契约执行能渲染出 SVG；
+- `dsh.client.inject` 的排序猜测——去掉 `inject` 后现象不变。
+
+仍待验证的（按可能性排序）：
+
+1. **`apply` 在客户端里抛错**：cordis 撤回该效果，留下未激活的墓碑注册。若如此，启动不报错（异常被吞），只有「设置 → 插件」页面的本地同步失败区会写出文字；
+2. **同一 `id` 已被宿主侧占用**：客户端注册用了包名，而包名可能已经是宿主行的 id，冲突导致不激活；
+3. **桌面端没有刷新入口**：每次改动都要整应用重启，且我看不到页面控制台；因此这条线应当只在能读日志的环境里推进（临时 web profile + 我自己的页面）。
+
+在生产 profile 里验证客户端半、连续三次失败之后已整体回滚到 npm 0.4.1（无客户端半）。渲染器代码与套件留在仓库里，默认不随包发布。
+
