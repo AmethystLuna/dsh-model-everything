@@ -168,6 +168,9 @@ What is kept is the **source file**; a rendered image is a by-product.
 | `model_automaton_verify` | Finite-word automata: empty language, trap states, reachability, and the equivalence or inclusion relation against another automaton, with the **shortest witness word** when it fails |
 | `model_edit` | Changes a model file by naming one change (add/remove a state, add/remove/update a transition, pointer set/remove): returns the structural diff and the difference in findings, so edit-verify-compare takes one call |
 | `report_diff` | Compares two reports: what a change added, removed or changed |
+| `diagram_render` | Source text to SVG: the drawable subset of Mermaid (flowchart, stateDiagram) and PlantUML (component, package, state). Layout, paint and output are all computed here; optionally writes a file and takes a colour scheme. A line it cannot draw is **refused with its line number**, never half-drawn |
+| `diagram_review` | Structural budgets: how wide each boundary is, how deep they nest, how many nodes the drawing holds. Every finding names its group, and the report also prints **what it measured**, so "nothing to check" cannot read as "checked and clean" |
+| `diagram_diff` | Structural difference between two drawings: boundaries added, removed, renamed or re-parented, and nodes that changed owner. It says what moved, never whether the move is better |
 
 `model_verify`, `model_datamodel_verify` and `model_design_review` also take `modelPath`: a JSON file in the workspace, in any formatting (indentation, a BOM and a trailing newline all parse). It is the alternative to an inline `model`; passing both is refused.
 
@@ -249,6 +252,16 @@ It registers its skills through the standard DSH filesystem skill provider and i
 |---|---|---|---|
 | `dsh-model-everything` | `dsh-model-everything` | every tool and skill | on |
 | Injected routing prompt | `dsh-model-everything-gate` | one routing message in the first model step of a session | on |
+| Drawing | `dsh-model-everything-diagram` | the three drawing tools, and the diagram whiteboard in the right sidebar | on |
+
+**Drawing** is the third component, kept apart on purpose: it carries no engine, so the two rows above can be
+off and it still draws. A deployment that only wants its Mermaid sources drawn installs the same package and
+enables this row alone.
+
+The whiteboard is a tab in the right sidebar: paste a source, get a drawing. It scales, switches colour scheme
+(`default`, `github`, `high-contrast`, `print`), follows the page's light or dark surface, and folds a group into
+one box when you click it. It reads no tool result at all, which is why a change on the tool side cannot break
+it.
 
 **Injected routing prompt** is the second component, switched on its own. It covers what text routing cannot: the catalog line is cut at 500 characters, and more to the point, a session that never decides to load a skill is never routed by anything.
 

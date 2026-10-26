@@ -156,6 +156,9 @@ DeepSeek Harness 原生插件。把设计与代码里**关于行为的断言**�
 | `model_automaton_verify` | 有限词自动机：空语言、陷阱状态、可达性，以及与另一台自动机的等价/包含关系；关系不成立时给出**最短反例词** |
 | `model_edit` | 按条改动模型文件（加/删状态、加/删/改迁移、指针 set/remove）：返回结构 diff 与发现 diff，一次调用完成「改—验—比」 |
 | `report_diff` | 两份报告比对：新增/消失/变化的发现 |
+| `diagram_render` | 图源 → SVG：Mermaid（flowchart / stateDiagram）与 PlantUML（component / package / state）的可画子集；排版、绘制、输出都由插件自己算，可写文件、可选配色方案。画不了的行**按行号拒绝**，不半画 |
+| `diagram_review` | 结构预算：每组多宽、嵌套多深、整图多少节点。每条发现点名是哪个组；报告同时打印**量到了什么**，所以「没东西可查」不会看起来像「查过且干净」 |
+| `diagram_diff` | 两份图的结构差异：边界新增/消失/改名/换父组、节点换归属。只判「变没变」，不判「好不好」 |
 
 `model_verify`、`model_datamodel_verify`、`model_design_review` 另收 `modelPath`：从工作区里的 JSON 文件读模型，缩进、BOM、尾随换行都不影响。它与内联的 `model` 二选一，两个都给会被拒绝。
 
@@ -234,6 +237,11 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-model-everything@
 |---|---|---|---|
 | `dsh-model-everything` | `dsh-model-everything` | 全部工具与技能 | 开 |
 | 提示词注入增强 | `dsh-model-everything-gate` | 会话第一条模型步注入一条路由提示 | 开 |
+| 画图 | `dsh-model-everything-diagram` | 三个画图工具，以及右栏的图白板 | 开 |
+
+**画图**是第三个组件，和平共处是刻意的：它**不带引擎**，关掉上面两行照样能画。一个只要「把 Mermaid 画出来」的部署，装同一个包、只留这一行就够。
+
+白板在右栏，是一个独立标签页：贴源码就出图，可缩放、可切配色方案（`default` / `github` / `high-contrast` / `print`），深浅色跟随页面；点一个分组框可以把它折成一个盒子，点第二次展开。它不读任何工具的结果，所以工具那一侧怎么改都影响不到它。
 
 **提示词注入增强**是第二个组件，单独开关。它补的是路由的短板：路由靠技能描述文字，而目录行截断在 500 字符；更要紧的是，一次会话如果压根没决定加载技能，就没有任何东西把它路由过去。
 
