@@ -13,7 +13,7 @@ the same evidence the same way; this is the copy for this package.
 | Node.js | v24.17.0 |
 | npm | 11.13.0 |
 | pnpm | 11.21.0 (rounds of 2026-10-16) · 11.28.5 (rounds of 2026-10-18, the host's current pnpm) |
-| Test date | 2026-10-16 (ten-release sweep) · 2026-10-18 (0.2.1-rc.2: mount, tool list, live scan) · 2026-10-18 (the published 0.1.0 artifact) |
+| Test date | 2026-10-16 (ten-release sweep) · 2026-10-18 (0.2.1-rc.2: mount, tool list, live scan) · 2026-10-18 (the published 0.1.0 artifact) · 2026-10-27 (0.2.1-rc.4: three rows, full round, plus the three drawing tools called from the installed copy) |
 | Package under test | `dsh-model-everything` 0.1.0 (bundle patch `cordis.patch.yml`, entry ids `dsh-model-everything` and `dsh-model-everything-gate`); published as `dsh-model-everything@0.1.0`, npm shasum `27687378…`, integrity `sha512-1Aai9…` |
 
 ## Method (one disposable dsh tree per version)
@@ -78,6 +78,7 @@ does not consult. The probe therefore runs from the dsh tree and lends the copy 
 | 0.2.1-rc.2 | 2026-10-18 | pass | pass (gate row `enabled: true`) | pass | pass | pass (`model_verify` + `model_interleaving_scan`) | pass |
 | 0.2.1-rc.2 | 2026-10-18 | pass | pass (`enabled: true`) | pass | pass | pass (`model_interleaving_scan`, 5 findings) | pass |
 | 0.2.1-rc.2 | 2026-10-18 | pass (by name, `^0.1.0`) | pass | pass (same bytes) | pass | pass (`model_verify` → `pass`) | pass |
+| 0.2.1-rc.4 | 2026-10-27 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass | pass | pass (`diagram_render` + `diagram_review` + `diagram_diff` from the installed copy) | pass |
 
 The last two rows are **the published artifact**. The first installed the tarball
 `npm pack` produced; the second let the profile resolve `dsh-model-everything` from
@@ -200,3 +201,11 @@ copied build, so they are evidence about the behaviour, not about the artifact.
 - **`0.2.1-rc.1` for this package.** It is absent from `dshReleases` because no
   round ran on it; an entry there is a claim about a round, not an inference from
   the neighbouring releases.
+
+### The 0.2.1-rc.4 round, and what it caught
+
+rc.4 validates a tool's `enum` before the handler runs. The drawing tool declared three colour schemes while the
+palette shipped four, so `scheme: "github"` was rejected as `INVALID_ARGS` before the renderer saw it - a defect
+the desktop build tolerated because nothing had asked for that scheme yet. The enum is now derived from the palette
+module, so the two cannot disagree again. That is the value of running the round on a real release: the argument
+validator is part of the host, and it changed.

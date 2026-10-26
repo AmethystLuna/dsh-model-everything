@@ -7,6 +7,7 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { render, type Notation } from './render/index.js'
+import { schemeNames, type PaletteScheme } from './render/palette.js'
 import { writeSvg } from './render/write.js'
 
 export const DIAGRAM_TOOL_NAME = 'diagram_render'
@@ -31,7 +32,7 @@ export const diagramRenderTool = defineTool({
     },
     scheme: {
       type: 'string',
-      enum: ['default', 'high-contrast', 'print'],
+      enum: schemeNames(),
       description: 'Colour scheme. Default: the standard light palette. print is greyscale, for a drawing that will be printed or embedded in a plain document.',
     },
     out: {
@@ -82,7 +83,9 @@ export const diagramRenderTool = defineTool({
     }
     const notation = args.notation === 'mermaid' || args.notation === 'plantuml' ? (args.notation as Notation) : 'auto'
     const title = typeof args.title === 'string' && args.title.trim() !== '' ? args.title.trim() : undefined
-    const scheme = args.scheme === 'high-contrast' || args.scheme === 'print' ? args.scheme : 'default'
+    // The argument validator has already held this to the shipped schemes; an unknown value falls back rather
+    // than throwing, because a stale deployment may still send one.
+    const scheme = schemeNames().includes(args.scheme as PaletteScheme) ? (args.scheme as PaletteScheme) : 'default'
     const rendered = render({ source, notation, ...(title === undefined ? {} : { title }) }, {}, { scheme })
     const written =
       typeof args.out === 'string' && args.out.trim() !== ''
