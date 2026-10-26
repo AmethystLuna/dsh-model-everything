@@ -6,6 +6,7 @@
 import { fromMermaid } from '../../lib/render/from-mermaid.js'
 import { collapse } from '../../lib/render/collapse.js'
 import { checkBudget } from '../../lib/render/budget.js'
+import { diffStructure } from '../../lib/render/diff.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
 import { detectNotation, render } from '../../lib/render/index.js'
 import { writeSvg } from '../../lib/render/write.js'
@@ -389,6 +390,58 @@ test('limits can be raised for a larger medium', () => {
   lines.push('  end')
   const { diagram } = fromMermaid(lines.join(String.fromCharCode(10)))
   if (checkBudget(diagram, { maxMembers: 12 }).verdict !== 'pass') throw new Error('a raised budget still failed')
+})
+
+test('an identical pair reports no change, and says what it compared', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '  end'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const report = diffStructure(diagram, diagram)
+  if (report.verdict !== 'pass') throw new Error('verdict: ' + report.verdict + ' ' + JSON.stringify(report.changes))
+  if (report.changes.length !== 0) throw new Error('changes: ' + JSON.stringify(report.changes))
+  if (report.measured.before.nodes !== 2 || report.measured.after.nodes !== 2) throw new Error('measured: ' + JSON.stringify(report.measured))
+})
+
+test('a boundary that moved inside another is reported as a move, with both sides named', () => {
+  const flat = ['graph TD', '  subgraph A', '    x[a] --> y[b]', '  end', '  subgraph B', '    z[c]', '  end'].join(String.fromCharCode(10))
+  const nested = ['graph TD', '  subgraph A', '    x[a] --> y[b]', '    subgraph B', '      z[c]', '    end', '  end'].join(String.fromCharCode(10))
+  const before = fromMermaid(flat).diagram
+  const after = fromMermaid(nested).diagram
+  const report = diffStructure(before, after)
+  const moved = report.changes.filter((change) => change.code === 'H4_GROUP_MOVED')
+  if (moved.length === 0) throw new Error('no move finding: ' + JSON.stringify(report.changes.map((change) => change.code)))
+  if (!moved[0].message.includes('B')) throw new Error('the move does not name the group: ' + moved[0].message)
+  if (report.verdict !== 'pass_with_findings') throw new Error('verdict: ' + report.verdict)
+})
+
+test('a node that changed owner is reported, and a new node is not a move', () => {
+  const before = fromMermaid(['graph TD', '  subgraph A', '    x[a] --> y[b]', '  end', '  subgraph B', '    z[c]', '  end'].join(String.fromCharCode(10))).diagram
+  const after = fromMermaid(['graph TD', '  subgraph A', '    x[a]', '  end', '  subgraph B', '    z[c] --> y[b]', '  end'].join(String.fromCharCode(10))).diagram
+  const report = diffStructure(before, after)
+  const regrouped = report.changes.filter((change) => change.code === 'H7_NODE_REGROUPED')
+  if (regrouped.length !== 1) throw new Error('regrouped: ' + JSON.stringify(report.changes.map((change) => change.code)))
+  if (!regrouped[0].message.includes('A') || !regrouped[0].message.includes('B')) throw new Error('message: ' + regrouped[0].message)
+  if (report.changes.some((change) => change.code === 'H5_NODE_ADDED')) throw new Error('an existing node was reported as new')
+})
+
+test('a rename is a rename when the id survived, and an add plus a remove when it did not', () => {
+  const before = fromMermaid(['graph TD', '  subgraph Core', '    a --> b', '  end'].join(String.fromCharCode(10))).diagram
+  const renamed = fromMermaid(['graph TD', '  subgraph Core 2', '    a --> b', '  end'].join(String.fromCharCode(10))).diagram
+  const sameId = diffStructure(before, renamed)
+  if (!sameId.changes.some((change) => change.code === 'H3_GROUP_RENAMED')) {
+    // The parser numbers groups by position, so a label change keeps the id: this is the rename case.
+    throw new Error('a label change was not reported as a rename: ' + JSON.stringify(sameId.changes.map((change) => change.code)))
+  }
+
+  const dropped = fromMermaid(['graph TD', '  a --> b'].join(String.fromCharCode(10))).diagram
+  const removed = diffStructure(before, dropped)
+  if (!removed.changes.some((change) => change.code === 'H2_GROUP_REMOVED')) throw new Error('no removal finding')
+})
+
+test('nothing on either side fails instead of reporting a clean comparison', () => {
+  const empty = fromMermaid('graph TD').diagram
+  const report = diffStructure(empty, empty)
+  if (report.verdict !== 'fail') throw new Error('verdict: ' + report.verdict)
+  if (!report.changes.some((change) => change.code === 'D0_NO_NODES')) throw new Error('no empty-comparison finding')
 })
 
 if (failures > 0) {

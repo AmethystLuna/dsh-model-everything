@@ -30,6 +30,8 @@ export declare const diagramRenderTool: import("@deepseek-ai/dsh-tools").ToolDef
 export declare function enabledOf(config: Config): boolean;
 export declare const DIAGRAM_REVIEW_TOOL_NAME = "diagram_review";
 export declare const diagramReviewTool: import("@deepseek-ai/dsh-tools").ToolDefinition;
+export declare const DIAGRAM_DIFF_TOOL_NAME = "diagram_diff";
+export declare const diagramDiffTool: import("@deepseek-ai/dsh-tools").ToolDefinition;
 export interface ComponentContext {
     tools: {
         register(definition: unknown): () => void;

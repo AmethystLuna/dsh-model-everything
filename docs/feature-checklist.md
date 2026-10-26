@@ -197,7 +197,7 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
-| `diagram` | 40 | a flowchart becomes boxes and labelled arrows |
+| `diagram` | 45 | a flowchart becomes boxes and labelled arrows |
 | `client` | 12 | the declared client export is the built bundle the loader can execute |
 | `render` | 89 | every verdict earns its own role |
 | `presentation` | 55 | the card keeps the verdict, the counts and the first error |
