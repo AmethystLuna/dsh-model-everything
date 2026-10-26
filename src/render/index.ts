@@ -27,6 +27,8 @@ export interface RenderInput {
 export interface Rendered {
   diagram: Diagram
   canvas: Canvas
+  /** The colours the drawing was made with, so a container can paint the same surface behind it. */
+  colours: Palette
   /** Ready to embed: an `<svg>` with a viewBox and no fixed pixel size of its own. */
   markup: string
   /** Which notation the source turned out to be. */
@@ -58,6 +60,7 @@ export function render(input: RenderInput, overrides: Partial<Palette> = {}, opt
   return {
     diagram: parsed.diagram,
     canvas,
+    colours,
     markup: written.markup,
     notation,
     refused: parsed.refused,

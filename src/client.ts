@@ -190,7 +190,7 @@ function whiteboardBody(React: ReactLike, overrides: Partial<Palette>, source: s
   }, drawn.refused.join('\n'))
   return React.createElement(
     'div',
-    { style: { background: drawn.canvas ? undefined : undefined, borderRadius: '6px' } },
+    { style: { background: drawn.colours.background, color: drawn.colours.text, borderRadius: '6px' } },
     React.createElement('div', { dangerouslySetInnerHTML: { __html: zoomed } }),
     refused,
   )

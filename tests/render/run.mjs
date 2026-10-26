@@ -730,6 +730,27 @@ test('an unknown scheme name falls back to the default palette', () => {
   if (unknown.background !== light.background || unknown.text !== light.text) throw new Error('the fallback is not the default palette')
 })
 
+test('the drawing carries its own surface, so no container decides its contrast', () => {
+  const { canvas, colours } = paintWith(view())
+  const { markup } = toSvg(canvas, colours)
+  // The first thing in the body is a full-bleed rectangle in the palette's background, before any shape.
+  const afterHeader = markup.slice(markup.indexOf('>') + 1)
+  const firstRect = /^<rect x="0" y="0" width="([\d.]+)" height="([\d.]+)" fill="([^"]+)"/.exec(afterHeader)
+  if (firstRect === null) throw new Error('no background rectangle: ' + afterHeader.slice(0, 80))
+  if (Number(firstRect[1]) !== canvas.width || Number(firstRect[2]) !== canvas.height) throw new Error('the background does not cover the canvas')
+  if (firstRect[3] !== colours.background) throw new Error('the background is ' + firstRect[3] + ', not the palette surface')
+})
+
+test('the background follows the scheme and the surface', () => {
+  const light = paintWith(view())
+  const dark = paintWith(view(), {}, { mode: 'dark' })
+  const lightMarkup = toSvg(light.canvas, light.colours).markup
+  const darkMarkup = toSvg(dark.canvas, dark.colours).markup
+  if (lightMarkup.includes(light.colours.background) === false) throw new Error('the light surface is missing')
+  if (light.colours.background === dark.colours.background) throw new Error('both surfaces share a background')
+  if (!darkMarkup.includes(dark.colours.background)) throw new Error('the dark surface is missing')
+})
+
 if (failures > 0) {
   console.log(NL + 'render tests failed: ' + String(failures))
   process.exit(1)

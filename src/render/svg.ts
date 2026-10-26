@@ -105,5 +105,10 @@ export function toSvg(canvas: Canvas, colours: Palette, label?: string): { marku
     '" width="' + n(canvas.width) + '" height="' + n(canvas.height) + '" role="img"' +
     (label === undefined ? '' : ' aria-label="' + escape(label) + '"') +
     ' font-family="system-ui, -apple-system, Segoe UI, sans-serif">'
-  return { markup: header + body.join('') + '</svg>', dropped }
+  // The surface is part of the drawing, not the container's business: a page that paints its own layers - a
+  // wallpaper, a themed panel - would otherwise change the contrast of a picture it knows nothing about.
+  const background =
+    '<rect x="0" y="0" width="' + n(canvas.width) + '" height="' + n(canvas.height) +
+    '" fill="' + colours.background + '" />'
+  return { markup: header + background + body.join('') + '</svg>', dropped }
 }
