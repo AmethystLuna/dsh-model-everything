@@ -55,7 +55,12 @@ for (const name of readdirSync(skillsRoot, { withFileTypes: true }).filter((entr
 }
 
 const entry = readFileSync(join(repoRoot, 'src/index.ts'), 'utf8')
-const modules = [...new Set([...entry.matchAll(/from '\.\/([a-z-]+)\.js'/g)].map((match) => match[1]).filter((name) => name === 'tool' || name.endsWith('-tool')))]
+// The main entry's tool modules, plus the diagram component's own entry: it is a second Loader row, so its
+// tools are registered from `lib/diagram.js` rather than from `lib/index.js`.
+const entries = [entry, readFileSync(join(repoRoot, 'lib/diagram.js'), 'utf8')]
+const modules = [...new Set(entries.flatMap((source) =>
+  [...source.matchAll(/from '\.\/([a-z-]+)\.js'/g)].map((match) => match[1]).filter((name) => name === 'tool' || name.endsWith('-tool')),
+))]
 const tools = []
 for (const module of modules) {
   const built = await import('file:///' + join(repoRoot, 'lib', module + '.js').replaceAll('\\', '/'))

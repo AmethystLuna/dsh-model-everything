@@ -64,11 +64,15 @@
       "count": 5
     },
     {
-      "file": "diagram.ts",
-      "count": 2
+      "file": "concurrency.ts",
+      "count": 1
     },
     {
-      "file": "concurrency.ts",
+      "file": "diagram-diff-tool.ts",
+      "count": 1
+    },
+    {
+      "file": "diagram-review-tool.ts",
       "count": 1
     },
     {

@@ -13,6 +13,38 @@ metadata:
 
 `cordis.patch.yml` 现在是三行，各带自己的开关：
 
+## 三个工具，一文件一个
+
+| 工具 | 文件 | 做什么 |
+|---|---|---|
+| `diagram_render` | `src/diagram-render-tool.ts` | 源码 → SVG，可写文件、选配色 |
+| `diagram_review` | `src/diagram-review-tool.ts` | 结构预算（宽 / 深 / 节点数），带 `measured` |
+| `diagram_diff` | `src/diagram-diff-tool.ts` | 两份结构差异（增删 / 改名 / 换父 / 换归属） |
+
+拆开不只是为了整齐：**文档生成器按 `*-tool` 约定发现工具**。堆在 `src/diagram.ts` 里时，`docs/routing-map.md`
+里找不到这三个工具；拆开后生成器扫到 `lib/diagram.js` 这一行，路由地图自动带上它们。
+
+## 层级：结构 + 规则 + 交互
+
+- **结构**：`DiagramGroup.parent` 由解析器填（它知道边界写在哪一层），布局只查表；手写模型没填时才退回成员集合推断，并有父不存在 / 成环 / 多组声明 三种守卫。
+- **规则**：`budget.ts` 判组宽、嵌套深度、节点总数；`measured` 与 `findings` 分开，避免「没东西可查」被读成「查过且干净」。
+- **交互**：`collapse.ts` 把折叠做成**模型变换**（组 → 一个盒子、边改指、内部边消失、父组收编），白板只负责点一下并把折叠集合交给 `render`。
+- **差异**：`diff.ts` 只判「变没变」，不判「好不好」；两边都空判 `fail`，因为空报告会和「无变化」长得一样。
+
+## 绘制与布局分开
+
+`paint.ts` 曾同时管「盒子放哪」和「线怎么连」（436 行）。现在：
+
+- `place.ts`：两种布局（分层 / 树）、分组树、守卫，以及 `nodeWidth` 这类几何；
+- `paint.ts`：走线、标签、题注，只从 `place` 拿坐标。
+
+收益是可断言的：改走线挪不动盒子，改嵌套挪不动线。
+
+## 一份模型
+
+`viewmodel.ts` 曾经自己声明一套 `Diagram` / `DiagramNode` / `DiagramEdge`，与 `model.ts` 重复；TypeScript 的
+结构类型让它们编译期看起来兼容，于是**谁都不报错**。现在只有 `model.ts` 一份，适配器只做「报告 → 模型」。
+
 | 行 | 内容 | 开关 |
 |---|---|---|
 | `dsh-model-everything` | 工具与技能 | 行本身 |

@@ -120,6 +120,9 @@ nothing else at that moment.
 
 | Tool | Owned by skill | First sentence (what the model reads first) |
 |---|---|---|
+| `diagram_diff` | `(none)` | "Compare the containment structure of two diagrams: which boundaries are new or gone, which were renamed, which moved inside another, and which nodes c" |
+| `diagram_render` | `(none)` | "Draw a diagram from its source text and get back SVG." |
+| `diagram_review` | `(none)` | "Review the structure of a diagram from its source text: how wide each boundary is, how deep they nest, and how many nodes the drawing holds, against b" |
 | `model_automaton_verify` | `model-everything` | "Decide a finite-word automaton: what it accepts, whether it is empty, whether a state is a trap, and whether its language equals, contains or is conta" |
 | `model_compose_verify` | `model-everything` | "Check two or more LogicModelV1 machines together." |
 | `model_datamodel_verify` | `model-everything-datamodel` | "Verify a data model and its migrations: keys, domains, referential integrity, migration completeness and the before/after regression." |
