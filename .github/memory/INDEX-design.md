@@ -17,6 +17,7 @@ metadata:
 | [client-rendering](design/client-rendering.md) | 客户端渲染通道已实测：槽位 `tool.call.toolview` 按工具名接管卡片、裸 JS 工厂与 props 契约、打包前提，以及为 100% 路径覆盖而定的模块划分 | 写渲染器、加客户端半、或怀疑「插件能不能画」之前 |
 | [architecture](design/architecture.md) | 记号语法引擎（记号表 / 图族表 / 能力矩阵）、图族模块契约、工具面按职责拆分与开闭点、schema 与命名约定、仅 dsh 的边界 | 加一个图族、改检测或能力判定、动工具参数与描述之前 |
 | [plugin-dev-spec](design/plugin-dev-spec.md) | dsh 插件开发规范的实测结论：bundle 与 patch 语义、一包多组件、配置 schema、技能注册、模型可见目录、商店元数据与 release 实测办法 | 改 cordis.patch.yml、动 package.json 的 dsh 块、加组件、动技能注册或 inspect provider、做发布挂载之前 |
+| [diagram-component](design/diagram-component.md) | 画图组件（第三个 loader 行）：中立模型与两个记法适配器、图自带底色与深浅色、白板的两段注册与轮询，以及它与卡片激活问题为何互不牵连 | 改渲染器、加一种记法、动白板或配色之前 |
 | [uml-check-coverage](design/uml-check-coverage.md) | UML 检查码的覆盖与编号：每条规范约束落在哪个模块、是实现了还是按设计拒绝，以及用例族与多层级复用同一段号码这一处编号冲突 | 报出或读到一个 `UML0xx` 码、判断哪个图族的哪些缺陷根本没检查、或想动检查码编号时 |
 | [design-review](design/design-review.md) | 设计审阅引擎（DES1-DES11）：三级发现（violation／signal／fact）、每码判据与所需词汇、可判与不可判的边界、原则出处，以及为什么不做社区发现与模块度 | 读到一个 `DES*` 码、判断某个设计原则能否被判定、或想给审阅加一条设计判据之前 |
 | [shared-locations](design/shared-locations.md) | 组合验证器自己判丢更新（C3/C4/C5）："同一状态上都被使能"作判据、锁名只证明两侧认同、以及这套判据证明不了什么 | 改 `runCompositionVerification` 的共享判定、给组合加字段、或判断一条丢更新该路由到哪里时 |
