@@ -144,7 +144,8 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [source, setSource] = useState(WHITEBOARD_SAMPLE)
     const [zoom, setZoom] = useState(1)
     const [scheme, setScheme] = useState<PaletteScheme>('default')
-    const drawn = drawSample(React, overrides, source, zoom, scheme)
+    const [fit, setFit] = useState(true)
+    const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme)
     const textarea = h('textarea', {
       value: source,
       spellcheck: false,
@@ -155,10 +156,11 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const controls = h(
       'div',
       { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 0', flexWrap: 'wrap' } },
-      h('button', { type: 'button', onClick: () => setZoom(Math.max(0.5, Math.round((Number(zoom) - 0.25) * 100) / 100)) }, '−'),
-      h('span', { style: { fontSize: '12px', opacity: 0.7 } }, String(Math.round(Number(zoom) * 100)) + '%'),
-      h('button', { type: 'button', onClick: () => setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) }, '+'),
-      h('button', { type: 'button', onClick: () => setZoom(1) }, 'reset'),
+      h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.max(0.5, Math.round((Number(zoom) - 0.25) * 100) / 100)) } }, '−'),
+      h('span', { style: { fontSize: '12px', opacity: 0.7 } }, fit ? 'fit' : String(Math.round(Number(zoom) * 100)) + '%'),
+      h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) } }, '+'),
+      h('button', { type: 'button', onClick: () => { setFit(false); setZoom(1) } }, 'reset'),
+      h('button', { type: 'button', title: 'Scale to the pane width', onClick: () => setFit(!fit) }, fit ? 'fit: on' : 'fit: off'),
       h(
         'select',
         {
@@ -170,7 +172,14 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
         ...schemeNames().map((name) => h('option', { value: name, selected: name === scheme }, name)),
       ),
     )
-    return h('div', { style: { padding: '8px', overflow: 'auto' } }, textarea, controls, drawn)
+    return h(
+      'div',
+      { style: { display: 'flex', flexDirection: 'column', gap: '4px', height: '100%', boxSizing: 'border-box', padding: '8px' } },
+      textarea,
+      controls,
+      // The drawing takes the rest of the pane and scrolls inside it, so an expanded tab uses its room.
+      h('div', { style: { flex: '1 1 auto', minHeight: '0', overflow: 'auto' } }, drawn),
+    )
   }
 }
 
@@ -184,7 +193,11 @@ function whiteboardBody(React: ReactLike, overrides: Partial<Palette>, source: s
     return React.createElement('p', { style: { fontSize: '12px', opacity: 0.7 } }, 'Paste Mermaid or PlantUML above.')
   }
   const drawn = render({ source: String(source) }, overrides, { mode: themeMode(), scheme })
-  const zoomed = drawn.markup.replace('<svg ', '<svg style="zoom: ' + String(zoom) + '" ')
+  // Zoom 0 is "fill the pane": the SVG scales to the width it is given, which is what an expanded tab wants.
+  const zoomed =
+    zoom === 0
+      ? drawn.markup.replace('<svg ', '<svg style="width: 100%; height: auto; display: block" ')
+      : drawn.markup.replace('<svg ', '<svg style="zoom: ' + String(zoom) + '; display: block" ')
   const refused = drawn.refused.length === 0 ? null : React.createElement('pre', {
     style: { fontSize: '11px', color: '#b7791f', whiteSpace: 'pre-wrap', margin: '6px 0' },
   }, drawn.refused.join('\n'))
