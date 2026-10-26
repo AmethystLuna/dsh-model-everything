@@ -16,6 +16,8 @@ export interface RenderInput {
     notation?: Notation | 'auto';
     source: string;
     title?: string;
+    /** Groups folded to a single box. Ids nobody declared are ignored. */
+    folded?: Iterable<string>;
 }
 export interface Rendered {
     diagram: Diagram;

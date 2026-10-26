@@ -63,6 +63,8 @@ export interface PathShape {
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
   kind: 'group'
+  /** The group's own id, so a container can fold it without guessing from the label. */
+  id: string
   x: number
   y: number
   width: number
@@ -353,7 +355,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   for (const group of groups) {
     const rect = groupRects.get(group.id)
     if (rect === undefined) continue
-    shapes.push({ kind: 'group', x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: group.label, colour: 'muted' })
+    shapes.push({ kind: 'group', id: group.id, x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: group.label, colour: 'muted' })
   }
 
   const drawn = new Set<string>()

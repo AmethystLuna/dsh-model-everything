@@ -30,10 +30,14 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
   // A boundary is a dashed rectangle with its name in the top-left corner, drawn under everything else.
   group: (shape, colours) => {
     const stroke = colours[shape.colour]
+    // The id travels in the markup so a container can fold a boundary by delegation, without re-deriving which
+    // group a click landed on from its position or its label.
     return (
+      '<g data-group-id="' + escape(shape.id) + '" style="cursor:pointer">' +
       '<rect x="' + n(shape.x) + '" y="' + n(shape.y) + '" width="' + n(shape.width) + '" height="' + n(shape.height) +
       '" rx="8" fill="none" stroke="' + stroke + '" stroke-width="1" stroke-dasharray="4 3" />' +
-      '<text x="' + n(shape.x + 6) + '" y="' + n(shape.y + 12) + '" font-size="10" fill="' + stroke + '">' + escape(shape.label) + '</text>'
+      '<text x="' + n(shape.x + 6) + '" y="' + n(shape.y + 12) + '" font-size="10" fill="' + stroke + '">' + escape(shape.label) + '</text>' +
+      '</g>'
     )
   },
   box: (shape, colours) => {

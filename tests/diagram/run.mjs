@@ -4,6 +4,7 @@
 // the right nodes and labels), what it refuses (a line number and a reason, never a silent drop), and what
 // it does with nonsense (an empty drawing, not an exception).
 import { fromMermaid } from '../../lib/render/from-mermaid.js'
+import { collapse } from '../../lib/render/collapse.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
 import { detectNotation, render } from '../../lib/render/index.js'
 import { writeSvg } from '../../lib/render/write.js'
@@ -220,6 +221,88 @@ test('a nested package records its parent', () => {
   if (inner === undefined || outer === undefined) throw new Error('a package is missing')
   if (inner.parent !== outer.id) throw new Error('Inner parent: ' + String(inner.parent))
   if (outer.members.includes('A')) throw new Error('Outer claimed Inner members: ' + outer.members.join(','))
+})
+
+test('folding a group replaces it with one box carrying its name and size', () => {
+  const source = ['graph TD', '  subgraph Core', '    a[API] --> b[Service]', '  end', '  b --> c[Report]'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const folded = collapse(diagram, ['subgraph-1'])
+  const ids = folded.nodes.map((node) => node.id).sort()
+  if (JSON.stringify(ids) !== JSON.stringify(['c', 'subgraph-1'])) throw new Error('nodes: ' + ids.join(','))
+  const box = folded.nodes.find((node) => node.id === 'subgraph-1')
+  if (box.label !== 'Core (2)') throw new Error('fold label: ' + String(box.label))
+  if (folded.groups !== undefined) throw new Error('the folded boundary is still a boundary')
+  // The edge into the fold now points at the fold, and the edge inside it is gone.
+  const edges = folded.edges.map((edge) => edge.from + '>' + edge.to).sort()
+  if (JSON.stringify(edges) !== JSON.stringify(['subgraph-1>c'])) throw new Error('edges: ' + edges.join(','))
+})
+
+test('folding the outer group takes its children with it', () => {
+  const source = [
+    'graph TD',
+    '  subgraph Outer',
+    '    subgraph Inner',
+    '      a --> b',
+    '    end',
+    '    b --> c',
+    '  end',
+  ].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const outer = (diagram.groups ?? []).find((group) => group.label === 'Outer')
+  const folded = collapse(diagram, [outer.id])
+  if (folded.nodes.length !== 1) throw new Error('nodes: ' + folded.nodes.map((node) => node.id).join(','))
+  if (folded.nodes[0].label !== 'Outer (3)') throw new Error('fold label: ' + String(folded.nodes[0].label))
+})
+
+test('folding a group inside another folded group is served by the outer one', () => {
+  const source = [
+    'graph TD',
+    '  subgraph Outer',
+    '    subgraph Inner',
+    '      a --> b',
+    '    end',
+    '  end',
+  ].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const ids = (diagram.groups ?? []).map((group) => group.id)
+  const folded = collapse(diagram, ids)
+  if (folded.nodes.length !== 1) throw new Error('nodes: ' + folded.nodes.map((node) => node.id).join(','))
+  if (!folded.nodes[0].label.startsWith('Outer')) throw new Error('the outer fold did not win: ' + String(folded.nodes[0].label))
+})
+
+test('folding nothing, or a name nobody declared, changes nothing', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '  end'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  if (collapse(diagram, []).nodes.length !== diagram.nodes.length) throw new Error('an empty fold set changed the drawing')
+  if (collapse(diagram, ['nope']).nodes.length !== diagram.nodes.length) throw new Error('an unknown fold changed the drawing')
+  if (collapse(diagram, ['nope']).caption !== diagram.caption) throw new Error('an unknown fold changed the caption')
+})
+
+test('the folded drawing still renders, and says it is folded', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '  end', '  b --> c'].join(String.fromCharCode(10))
+  const rendered = render({ source, folded: ['subgraph-1'] })
+  if (rendered.diagram.caption.includes('folded') === false) throw new Error('caption: ' + rendered.diagram.caption)
+  const boxes = rendered.canvas.shapes.filter((shape) => shape.kind === 'box')
+  if (boxes.length !== 2) throw new Error('boxes: ' + String(boxes.length))
+  if (!rendered.markup.includes('Core (2)')) throw new Error('the fold is not named in the drawing')
+})
+
+test('two edges into the same fold become one after folding', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '  end', '  x --> a', '  x --> b'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const fold = (diagram.groups ?? [])[0].id
+  const folded = collapse(diagram, [fold])
+  const edges = folded.edges.map((edge) => edge.from + '>' + edge.to)
+  if (JSON.stringify(edges) !== JSON.stringify(['x>' + fold])) throw new Error('edges: ' + edges.join(','))
+})
+
+test('an edge between two members of one fold disappears, and a self loop too', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '    a --> a', '  end', '  b --> out'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const fold = (diagram.groups ?? [])[0].id
+  const folded = collapse(diagram, [fold])
+  const edges = folded.edges.map((edge) => edge.from + '>' + edge.to)
+  if (edges.join(',') !== fold + '>out') throw new Error('edges: ' + edges.join(','))
 })
 
 if (failures > 0) {

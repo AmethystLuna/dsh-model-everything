@@ -145,7 +145,8 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [zoom, setZoom] = useState(1)
     const [scheme, setScheme] = useState<PaletteScheme>('default')
     const [fit, setFit] = useState(true)
-    const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme)
+    const [folded, setFolded] = useState<string[]>([])
+    const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme, folded)
     const textarea = h('textarea', {
       value: source,
       spellcheck: false,
@@ -161,6 +162,9 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) } }, '+'),
       h('button', { type: 'button', onClick: () => { setFit(false); setZoom(1) } }, 'reset'),
       h('button', { type: 'button', title: 'Scale to the pane width', onClick: () => setFit(!fit) }, fit ? 'fit: on' : 'fit: off'),
+      folded.length === 0
+        ? null
+        : h('button', { type: 'button', title: 'Unfold every group', onClick: () => setFolded([]) }, 'unfold ' + String(folded.length)),
       h(
         'select',
         {
@@ -178,21 +182,35 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       textarea,
       controls,
       // The drawing takes the rest of the pane and scrolls inside it, so an expanded tab uses its room.
-      h('div', { style: { flex: '1 1 auto', minHeight: '0', overflow: 'auto' } }, drawn),
+      h(
+        'div',
+        {
+          style: { flex: '1 1 auto', minHeight: '0', overflow: 'auto' },
+          // A boundary carries its id in the markup, so one listener on the container is enough: no per-rect
+          // handler, and the handling survives a re-render that replaced the whole SVG.
+          onClick: (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }) => {
+            const hit = event?.target?.closest?.('[data-group-id]')
+            const id = hit?.getAttribute?.('data-group-id')
+            if (typeof id !== 'string' || id === '') return
+            setFolded(folded.includes(id) ? folded.filter((entry) => entry !== id) : [...folded, id])
+          },
+        },
+        drawn,
+      ),
     )
   }
 }
 
-function drawSample(React: ReactLike, overrides: Partial<Palette>, source: string, zoom: number, scheme: PaletteScheme): unknown {
-  return whiteboardBody(React, overrides, source, zoom, scheme)
+function drawSample(React: ReactLike, overrides: Partial<Palette>, source: string, zoom: number, scheme: PaletteScheme, folded: string[] = []): unknown {
+  return whiteboardBody(React, overrides, source, zoom, scheme, folded)
 }
 
 /** Render one source at one zoom, or say why it could not be drawn. */
-function whiteboardBody(React: ReactLike, overrides: Partial<Palette>, source: string, zoom: number, scheme: PaletteScheme = 'default'): unknown {
+function whiteboardBody(React: ReactLike, overrides: Partial<Palette>, source: string, zoom: number, scheme: PaletteScheme = 'default', folded: string[] = []): unknown {
   if (String(source).trim() === '') {
     return React.createElement('p', { style: { fontSize: '12px', opacity: 0.7 } }, 'Paste Mermaid or PlantUML above.')
   }
-  const drawn = render({ source: String(source) }, overrides, { mode: themeMode(), scheme })
+  const drawn = render({ source: String(source), folded }, overrides, { mode: themeMode(), scheme })
   // Zoom 0 is "fill the pane": the SVG scales to the width it is given, which is what an expanded tab wants.
   const zoomed =
     zoom === 0

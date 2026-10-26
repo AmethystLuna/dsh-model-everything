@@ -9,6 +9,7 @@
  */
 
 import { fromMermaid } from './from-mermaid.js'
+import { collapse } from './collapse.js'
 import { fromPlantUml } from './from-plantuml.js'
 import type { Diagram } from './model.js'
 import { paintWith, type Canvas } from './paint.js'
@@ -22,6 +23,8 @@ export interface RenderInput {
   notation?: Notation | 'auto'
   source: string
   title?: string
+  /** Groups folded to a single box. Ids nobody declared are ignored. */
+  folded?: Iterable<string>
 }
 
 export interface Rendered {
@@ -55,10 +58,11 @@ export function render(input: RenderInput, overrides: Partial<Palette> = {}, opt
     notation === 'plantuml'
       ? fromPlantUml(input.source, input.title ?? 'plantuml')
       : fromMermaid(input.source, input.title ?? 'mermaid')
-  const { canvas, colours } = paintWith(parsed.diagram, overrides, options)
-  const written = toSvg(canvas, colours, parsed.diagram.title + ': ' + parsed.diagram.caption)
+  const diagram = input.folded === undefined ? parsed.diagram : collapse(parsed.diagram, input.folded)
+  const { canvas, colours } = paintWith(diagram, overrides, options)
+  const written = toSvg(canvas, colours, diagram.title + ': ' + diagram.caption)
   return {
-    diagram: parsed.diagram,
+    diagram,
     canvas,
     colours,
     markup: written.markup,

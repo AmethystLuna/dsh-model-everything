@@ -56,6 +56,8 @@ export interface PathShape {
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
     kind: 'group';
+    /** The group's own id, so a container can fold it without guessing from the label. */
+    id: string;
     x: number;
     y: number;
     width: number;
