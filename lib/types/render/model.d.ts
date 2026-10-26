@@ -25,8 +25,19 @@ export interface DiagramEdge {
 export interface DiagramGroup {
     id: string;
     label: string;
-    /** The nodes drawn inside it. A group is a box around boxes, not a box itself. */
+    /**
+     * The nodes declared directly inside it: a group is a box around boxes, and its own members are the ones a
+     * source named there. A node inside a nested group is that group's member, not this one's.
+     */
     members: string[];
+    /**
+     * The group that contains this one, when the source said so.
+     *
+     * Only a parser can know this - nesting is a property of where the text put the boundary - so the layout does
+     * not guess it. Left absent, the painter falls back to inferring containment from member sets, which is the
+     * best a hand-written model can offer.
+     */
+    parent?: string;
 }
 export interface Diagram {
     kind: 'machine' | 'graph' | 'none';

@@ -833,6 +833,255 @@ test('a subgraph in mermaid reaches the drawing as a boundary', () => {
   if (group.label !== 'Core') throw new Error('label: ' + group.label)
 })
 
+test('a nested group sits inside its parent', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['a', 'b', 'c'] },
+      { id: 'inner', label: 'Inner', members: ['b', 'c'] },
+    ],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const outer = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Outer')
+  const inner = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Inner')
+  if (outer === undefined || inner === undefined) throw new Error('a boundary is missing')
+  const inside = inner.x >= outer.x && inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  if (!inside) throw new Error('the nested boundary escaped its parent')
+})
+
+test('a group stacks its members inside its own boundary', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [{ from: 'a', label: 'next', to: 'b' }],
+    groups: [{ id: 'g', label: 'Both', members: ['a', 'b'] }],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const group = canvas.shapes.find((shape) => shape.kind === 'group')
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  for (const box of boxes) {
+    if (box.x < group.x || box.y < group.y || box.x + box.width > group.x + group.width || box.y + box.height > group.y + group.height) {
+      throw new Error('a member was placed outside its own group')
+    }
+  }
+  // Stacked, not side by side: the second member starts below the first.
+  const [first, second] = [...boxes].sort((left, right) => left.y - right.y)
+  if (second.y <= first.y + first.height) throw new Error('members are not stacked')
+})
+
+test('a member claimed by two groups belongs to the first', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'first', label: 'First', members: ['a'] },
+      { id: 'second', label: 'Second', members: ['a', 'b'] },
+    ],
+    caption: 'graph',
+  }
+  const boxes = paintWith(diagram).canvas.shapes.filter((shape) => shape.kind === 'box')
+  if (boxes.length !== 2) throw new Error('a state was drawn ' + String(boxes.length) + ' times')
+})
+
+test('a diagram without groups still lays out in ranks', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'x', to: 'b' },
+      { from: 'a', label: 'y', to: 'c' },
+    ],
+    caption: 'pass',
+  }
+  const boxes = paintWith(diagram).canvas.shapes.filter((shape) => shape.kind === 'box')
+  const rows = new Map()
+  for (const box of boxes) rows.set(box.y, (rows.get(box.y) ?? 0) + 1)
+  if (rows.size !== 2) throw new Error('rows: ' + String(rows.size))
+})
+
+test('two groups that overlap without containing each other are siblings, not nested', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'left', label: 'Left', members: ['a', 'b'] },
+      { id: 'right', label: 'Right', members: ['b', 'c'] },
+    ],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const groups = canvas.shapes.filter((shape) => shape.kind === 'group')
+  if (groups.length !== 2) throw new Error('boundaries: ' + String(groups.length))
+  // Neither boundary may sit entirely inside the other: they overlap over `b`, which is not containment.
+  const [first, second] = groups
+  const inside = (inner, outer) => inner.x >= outer.x && inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  if (inside(first, second) || inside(second, first)) throw new Error('an overlapping group was drawn as nested')
+})
+
+test('a boundary whose members are all unknown is not drawn', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['a', 'ghost'] },
+      { id: 'inner', label: 'Inner', members: ['ghost'] },
+    ],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const labels = canvas.shapes.filter((shape) => shape.kind === 'group').map((shape) => shape.label)
+  if (labels.includes('Inner')) throw new Error('a boundary with no real member was drawn')
+  if (!labels.includes('Outer')) throw new Error('the boundary that does have a member was dropped')
+})
+
+test('a nested boundary inside an empty one is dropped with its parent', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'empty', label: 'Empty', members: ['ghost'] },
+      { id: 'child', label: 'Child', members: ['ghost', 'a'] },
+    ],
+    caption: 'graph',
+  }
+  const labels = paintWith(diagram).canvas.shapes.filter((shape) => shape.kind === 'group').map((shape) => shape.label)
+  if (!labels.includes('Child')) throw new Error('the boundary with a real member was dropped: ' + labels.join(','))
+})
+
+test('a declared parent wins over an inferred one', () => {
+  // `inner`'s members are not a subset of `outer`'s, so inference could not place it; the source did.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['a'] },
+      { id: 'inner', label: 'Inner', members: ['b'], parent: 'outer' },
+    ],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const outer = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Outer')
+  const inner = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Inner')
+  if (outer === undefined || inner === undefined) throw new Error('a boundary is missing')
+  const inside = inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  if (!inside) throw new Error('the declared child was not drawn inside its parent')
+})
+
+test('a parent that does not exist is ignored, not fatal', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'g', label: 'Orphan', members: ['a'], parent: 'nowhere' }],
+    caption: 'graph',
+  }
+  const groups = paintWith(diagram).canvas.shapes.filter((shape) => shape.kind === 'group')
+  if (groups.length !== 1) throw new Error('boundaries: ' + String(groups.length))
+})
+
+test('a parent cycle is broken instead of recursing forever', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'x', label: 'X', members: ['a'], parent: 'y' },
+      { id: 'y', label: 'Y', members: ['b'], parent: 'x' },
+    ],
+    caption: 'graph',
+  }
+  const groups = paintWith(diagram).canvas.shapes.filter((shape) => shape.kind === 'group')
+  if (groups.length !== 2) throw new Error('boundaries: ' + String(groups.length))
+})
+
+test('an overlapping boundary of a different size is not a container', () => {
+  // `left` is smaller than `right` but not contained in it, so the subset test must reject rather than nest.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }, { id: 'd', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'left', label: 'Left', members: ['a', 'b'] },
+      { id: 'right', label: 'Right', members: ['b', 'c', 'd'] },
+    ],
+    caption: 'graph',
+  }
+  const groups = paintWith(diagram).canvas.shapes.filter((shape) => shape.kind === 'group')
+  if (groups.length !== 2) throw new Error('boundaries: ' + String(groups.length))
+  const [first, second] = groups
+  const inside = (inner, outer) => inner.x >= outer.x && inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  if (inside(first, second) || inside(second, first)) throw new Error('an overlapping boundary was nested')
+})
+
+test('the tightest of several would-be containers wins', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: ['a', 'b', 'c', 'd'].map((id) => ({ id, role: 'normal' })),
+    edges: [],
+    groups: [
+      { id: 'large', label: 'Large', members: ['a', 'b', 'c', 'd'] },
+      { id: 'big', label: 'Big', members: ['a', 'b', 'c'] },
+      { id: 'mid', label: 'Mid', members: ['a', 'b'] },
+    ],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const large = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Large')
+  const big = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Big')
+  const mid = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Mid')
+  if (large === undefined || big === undefined || mid === undefined) throw new Error('a boundary is missing')
+  const inside = (inner, outer) => inner.x >= outer.x && inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  if (!inside(mid, big)) throw new Error('mid is not inside big')
+  if (!inside(big, large)) throw new Error('big is not inside large')
+})
+
+test('the inference picks the tightest container when two would do', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'big', label: 'Big', members: ['a', 'b', 'c'] },
+      { id: 'mid', label: 'Mid', members: ['a', 'b'] },
+    ],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const big = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Big')
+  const mid = canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Mid')
+  if (big === undefined || mid === undefined) throw new Error('a boundary is missing')
+  const inside = (inner, outer) => inner.x >= outer.x && inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
+  if (!inside(mid, big)) throw new Error('the tighter boundary was not nested in the looser one')
+})
+
 if (failures > 0) {
   console.log(NL + 'render tests failed: ' + String(failures))
   process.exit(1)

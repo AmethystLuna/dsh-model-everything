@@ -188,6 +188,40 @@ test('a refused source still produces a drawing and reports what it refused', ()
   if (!rendered.diagram.caption.includes('refused')) throw new Error('caption: ' + rendered.diagram.caption)
 })
 
+test('a nested subgraph records its parent and keeps its own members', () => {
+  const source = [
+    'graph TD',
+    '  subgraph Platform',
+    '    subgraph Core',
+    '      a[API] --> b[Service]',
+    '    end',
+    '    b --> cache[(Cache)]',
+    '  end',
+    '  cache --> db[(Store)]',
+  ].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source, 'nested')
+  const groups = diagram.groups ?? []
+  const core = groups.find((group) => group.label === 'Core')
+  const platform = groups.find((group) => group.label === 'Platform')
+  if (core === undefined || platform === undefined) throw new Error('a boundary is missing: ' + groups.map((group) => group.label).join(','))
+  if (core.parent !== platform.id) throw new Error('Core parent: ' + String(core.parent))
+  if (platform.parent !== undefined) throw new Error('Platform should be a root: ' + String(platform.parent))
+  // Direct members only: the outer boundary must not claim what the inner one holds.
+  if (core.members.length !== 2) throw new Error('Core members: ' + core.members.join(','))
+  if (!platform.members.includes('cache')) throw new Error('Platform lost its own member: ' + platform.members.join(','))
+  if (platform.members.includes('a') || platform.members.includes('b')) throw new Error('Platform claimed its child group members: ' + platform.members.join(','))
+})
+
+test('a nested package records its parent', () => {
+  const source = ['@startuml', 'package "Outer" {', '  package "Inner" {', '    [A] --> [B]', '  }', '  [B] --> [C]', '}', '@enduml'].join(String.fromCharCode(10))
+  const { diagram } = fromPlantUml(source)
+  const inner = (diagram.groups ?? []).find((group) => group.label === 'Inner')
+  const outer = (diagram.groups ?? []).find((group) => group.label === 'Outer')
+  if (inner === undefined || outer === undefined) throw new Error('a package is missing')
+  if (inner.parent !== outer.id) throw new Error('Inner parent: ' + String(inner.parent))
+  if (outer.members.includes('A')) throw new Error('Outer claimed Inner members: ' + outer.members.join(','))
+})
+
 if (failures > 0) {
   console.log('diagram tests failed: ' + String(failures))
   process.exit(1)

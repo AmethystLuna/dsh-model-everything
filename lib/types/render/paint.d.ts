@@ -3,18 +3,18 @@
  *
  * A drawing has to survive three containers - inline in a conversation, full-screen, and a persistent
  * sidebar tab - so nothing here knows about pixel size. It emits a content-sized canvas and lets the
- * container scale it: the same numbers serve a 360px card and a 1200px whiteboard, because SVG scales and
- * text is measured in the units the boxes are.
+ * container scale it: the same numbers serve a 360px card and a 1200px whiteboard.
  *
- * The rules that make it readable, in the order they matter:
+ * Two placements, chosen by the source:
  *
- * - every state is a box of its own width, so a long id is not clipped by a fixed 120px;
- * - a forward edge is a straight vertical line, because that is what reads as "next";
- * - a back edge leaves to a side channel and returns from the same side, so it never crosses the boxes it
- *   jumps over;
- * - a self loop is a small loop on the right, not a line to itself;
- * - an edge label sits beside its own segment, never on top of a box;
- * - the caption is wrapped and the canvas is widened to fit it, so nothing is clipped at the right edge.
+ * - **layered** (no groups): breadth-first rows, forward edges dropping straight down, back edges on a side
+ *   channel clear of every box, self loops as small loops. The shape a state machine wants.
+ * - **tree** (groups present): a group is a block, its members stack inside it, a nested group is a block
+ *   inside its parent, and the top level stacks. The shape an architecture diagram wants, because a package
+ *   whose members float somewhere else on the page is not showing containment at all.
+ *
+ * Edges are placed from where the boxes ended up, so neither placement needs to tell the edge code which one
+ * ran: "below" is a straight line, "beside" is horizontal, "above" routes around.
  *
  * Pure: a diagram in, shapes out, every decision assertable.
  */
@@ -53,13 +53,6 @@ export interface PathShape {
     labelY: number;
     colour: ColourRole;
 }
-export interface CaptionShape {
-    kind: 'caption';
-    x: number;
-    y: number;
-    lines: string[];
-    colour: ColourRole;
-}
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
     kind: 'group';
@@ -68,6 +61,13 @@ export interface GroupShape {
     width: number;
     height: number;
     label: string;
+    colour: ColourRole;
+}
+export interface CaptionShape {
+    kind: 'caption';
+    x: number;
+    y: number;
+    lines: string[];
     colour: ColourRole;
 }
 export interface TitleShape {

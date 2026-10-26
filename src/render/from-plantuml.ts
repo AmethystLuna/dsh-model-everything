@@ -46,11 +46,12 @@ function ensure(builder: Builder, id: string, label?: string): void {
   const existing = builder.nodes.get(id)
   if (existing === undefined) {
     builder.nodes.set(id, { id, role: 'normal', ...(label === undefined ? {} : { label }) })
-    for (const group of builder.open) if (!group.members.includes(id)) group.members.push(id)
+    // Membership is decided where the node is first written: the innermost open boundary.
+    const innermost = builder.open[builder.open.length - 1]
+    if (innermost !== undefined && !innermost.members.includes(id)) innermost.members.push(id)
     return
   }
   if (label !== undefined && (existing.label === undefined || existing.label === '')) existing.label = label
-  for (const group of builder.open) if (!group.members.includes(id)) group.members.push(id)
 }
 
 /** A component reference: `[text]`, `X`, or a quoted name. Returns the id and the label it carried. */
@@ -90,7 +91,11 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
 
     if (line === '}') {
       const closing = builder.open.pop()
-      if (closing !== undefined) builder.groups.push(closing)
+      if (closing !== undefined) {
+        const container = builder.open[builder.open.length - 1]
+        if (container !== undefined) closing.parent = container.id
+        builder.groups.push(closing)
+      }
       return
     }
 

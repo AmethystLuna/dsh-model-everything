@@ -53,14 +53,18 @@ interface Builder {
   nodes: Map<string, DiagramNode>
   edges: DiagramEdge[]
   groups: DiagramGroup[]
-  subgraph?: DiagramGroup
+  /** The boundaries currently open, outermost first. */
+  open: DiagramGroup[]
 }
 
 function ensure(builder: Builder, id: string, label?: string): void {
   const existing = builder.nodes.get(id)
   if (existing === undefined) {
     builder.nodes.set(id, { id, role: 'normal', ...(label === undefined ? {} : { label }) })
-    builder.subgraph?.members.push(id)
+    // Membership is decided where the node is first written: the innermost open boundary. Naming it again
+    // later from an outer boundary does not move it - the outer boundary holds it through `parent`.
+    const innermost = builder.open[builder.open.length - 1]
+    if (innermost !== undefined && !innermost.members.includes(id)) innermost.members.push(id)
     return
   }
   if (label !== undefined && (existing.label === undefined || existing.label === '')) existing.label = label
@@ -77,7 +81,7 @@ function nodeFrom(token: string): { id: string; label?: string } | undefined {
 export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
-  const builder: Builder = { nodes: new Map(), edges: [], groups: [] }
+  const builder: Builder = { nodes: new Map(), edges: [], groups: [], open: [] }
   let mode: 'none' | 'graph' | 'state' = 'none'
   let startId: string | undefined
   let endCount = 0
@@ -110,14 +114,18 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       return
     }
     if (/^subgraph\b/.test(lower)) {
-      const label = line.replace(/^subgraph\b/, '').trim().replace(/^["']|["']$/g, '')
+      const label = line.replace(/^subgraph\b/i, '').trim().replace(/^["']|["']$/g, '')
       const id = 'subgraph-' + String(++endCount)
-      builder.subgraph = { id, label: label === '' ? id : label, members: [] }
+      builder.open.push({ id, label: label === '' ? id : label, members: [] })
       return
     }
     if (lower === 'end') {
-      if (builder.subgraph !== undefined) builder.groups.push(builder.subgraph)
-      builder.subgraph = undefined
+      const closed = builder.open.pop()
+      if (closed !== undefined) {
+        const container = builder.open[builder.open.length - 1]
+        if (container !== undefined) closed.parent = container.id
+        builder.groups.push(closed)
+      }
       return
     }
 
