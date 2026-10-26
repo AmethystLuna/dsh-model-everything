@@ -1,9 +1,9 @@
 /**
- * Verdict to colour, in the two schemes the page can be in, plus the schemes a reader may prefer.
+ * Verdict to colour, in the two surfaces the page can be in, and in the scheme a reader prefers.
  *
  * A drawing is read before it is parsed, so the first thing it says is the answer. The roles are named rather
- * than coloured: a scheme maps a role to a value, and the values are chosen so the drawing survives both
- * surfaces this plugin renders on - a light page and a dark one - without the reader changing anything.
+ * than coloured: a scheme maps a role to a value, and every scheme is chosen so the drawing survives both a
+ * light and a dark page - the reader never has to fix a palette to read a result.
  *
  * The mode is read at render time from the page's own background (see `client.ts`). The host publishes its
  * palette as CSS variables whose names are private to it, and a drawing that hard-coded them would break on
@@ -15,8 +15,8 @@ export type ColourRole = 'pass' | 'findings' | 'fail' | 'undecided' | 'muted' | 
 export type Palette = Record<ColourRole, string>;
 /** Which surface the drawing will sit on. */
 export type PaletteMode = 'light' | 'dark';
-/** A named set of colours, for a reader who wants more than the default. */
-export type PaletteScheme = 'default' | 'high-contrast' | 'print';
+/** A named set of colours. A scheme with both variants follows the page; one with only light does not. */
+export type PaletteScheme = 'default' | 'github' | 'high-contrast' | 'print';
 export interface PaletteOptions {
     mode?: PaletteMode;
     scheme?: PaletteScheme;
@@ -24,9 +24,10 @@ export interface PaletteOptions {
 /**
  * Resolve a palette.
  *
- * `overrides` win over everything, so a caller can retheme one role without inventing a scheme. The scheme
- * picks the base; the mode swaps in the dark variant, and only `default` has one - high-contrast and print
- * are what they say they are, on purpose.
+ * `overrides` win over everything, so a caller can retheme one role without inventing a scheme. A scheme with
+ * a dark variant follows the surface; one without stays as declared - high-contrast and print are what they
+ * say they are, on purpose. An unknown name falls back to the default palette rather than throwing, because
+ * the value can arrive from a DOM control.
  */
 export declare function palette(overrides?: Partial<Palette>, options?: PaletteOptions): Palette;
 /**

@@ -34,6 +34,8 @@ export interface SlotContext {
 export interface PluginShape {
   inject: string[]
   apply: (ctx: SlotContext) => void
+  /** The whiteboard mount, with its scheduler injectable. `apply` calls this with the default. */
+  mount: (ctx: SlotContext, options?: MountOptions) => unknown
 }
 
 /** A settled tool call, as the host hands it to a view. */
@@ -194,6 +196,64 @@ function whiteboardBody(React: ReactLike, overrides: Partial<Palette>, source: s
   )
 }
 
+
+/** How long to wait for the optional services, and how often. A page that never offers them registers nothing. */
+const SIDEBAR_POLL_MS = 250
+const SIDEBAR_POLL_ATTEMPTS = 40
+
+interface SidebarTabsService {
+  register?: (options: Record<string, unknown>) => unknown
+}
+
+export interface MountOptions {
+  /** Injected so the suite can drive the poll without waiting. Defaults to `setTimeout`. */
+  schedule?: (run: () => void, delay: number) => unknown
+}
+
+/**
+ * Register the whiteboard tab once the sidebar's optional services are ready.
+ *
+ * The slot can be declared before `sidebarRightTabs` exists - the host composes services and seats in an
+ * order this plugin does not control - and a single `ctx.get` there is a race that loses the tab silently.
+ * So it polls, like the reference implementation does, and stops after a bounded number of attempts.
+ */
+export function mountWhiteboard(React: ReactLike, ctx: SlotContext, options: MountOptions = {}): unknown {
+  const schedule =
+    options.schedule ??
+    ((run: () => void, delay: number) => {
+      // A host (or a test sandbox) without timers simply gets no retry, rather than an exception.
+      const timer = (globalThis as unknown as { setTimeout?: (f: () => void, ms: number) => unknown }).setTimeout
+      return typeof timer === 'function' ? timer(run, delay) : undefined
+    })
+  let attempts = 0
+
+  const attempt = (): unknown => {
+    attempts += 1
+    const tabs = typeof ctx.get === 'function' ? (ctx.get('sidebarRightTabs') as SidebarTabsService | undefined) : undefined
+    if (tabs === undefined || typeof tabs.register !== 'function') {
+      if (attempts < SIDEBAR_POLL_ATTEMPTS) schedule(attempt, SIDEBAR_POLL_MS)
+      return undefined
+    }
+    tabs.register({
+      id: WHITEBOARD_ID,
+      kind: 'panel',
+      keepMounted: true,
+      title: () => 'Diagram',
+      guide: [
+        {
+          id: 'diagram-whiteboard',
+          order: 120,
+          title: () => 'Diagram',
+          description: () => 'Paste Mermaid or PlantUML and read the drawing',
+        },
+      ],
+    })
+    return ctx.slots.register({ name: 'sidebar.right.pane.tab', key: WHITEBOARD_ID }, whiteboardFor(React))
+  }
+
+  return attempt()
+}
+
 export default function factory(require: (name: string) => unknown): PluginShape {
   // Captured under a plain name: a static `require('react')` would be rewritten by the bundler and then
   // resolve against a scope the factory body does not have. A call through this alias stays a call.
@@ -201,6 +261,7 @@ export default function factory(require: (name: string) => unknown): PluginShape
   const React = hostRequire('react') as ReactLike
   return {
     inject: ['slots'],
+    mount: (ctx: SlotContext, options: MountOptions = {}) => mountWhiteboard(React, ctx, options),
     apply(ctx: SlotContext) {
       for (const name of TOOL_NAMES) {
         // Only the options a keyed slot declares: `key`. An extra `id` is not part of this slot's
@@ -209,25 +270,7 @@ export default function factory(require: (name: string) => unknown): PluginShape
       }
       // The whiteboard seat only exists on a host with the official right sidebar. Presence of the slot is
       // the capability check: if the callback never runs, this host has no sidebar and nothing is lost.
-      ctx.slots.inject('sidebar.right.pane.tab', () => {
-        const tabs = typeof ctx.get === 'function' ? (ctx.get('sidebarRightTabs') as { register?: (options: Record<string, unknown>) => unknown } | undefined) : undefined
-        if (tabs === undefined || typeof tabs.register !== 'function') return
-        tabs.register({
-          id: WHITEBOARD_ID,
-          kind: 'panel',
-          keepMounted: true,
-          title: () => 'Diagram',
-          guide: [
-            {
-              id: 'diagram-whiteboard',
-              order: 120,
-              title: () => 'Diagram',
-              description: () => 'Paste Mermaid or PlantUML and read the drawing',
-            },
-          ],
-        })
-        return ctx.slots.register({ name: 'sidebar.right.pane.tab', key: WHITEBOARD_ID }, whiteboardFor(React))
-      })
+      ctx.slots.inject('sidebar.right.pane.tab', () => mountWhiteboard(React, ctx))
     },
   }
 }

@@ -185,9 +185,38 @@ test('the whiteboard offers a colour scheme picker', () => {
   const { registered } = applyWithSeats(registrations[0].factory(() => stubReact))
   const body = registered.find((entry) => entry.options.name === 'sidebar.right.pane.tab')
   const html = JSON.stringify(body.component({}))
-  for (const scheme of ['default', 'high-contrast', 'print']) {
+  for (const scheme of ['default', 'github', 'high-contrast', 'print']) {
     if (!html.includes(scheme)) throw new Error('the picker is missing ' + scheme)
   }
+})
+
+test('the whiteboard tab is registered once the sidebar service appears later', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  const tabs = []
+  const registered = []
+  let seen = 0
+  let pending = null
+  plugin.mount(
+    {
+      slots: {
+        inject: () => undefined,
+        register: (options) => registered.push(options),
+      },
+      get: (service) => {
+        if (service !== 'sidebarRightTabs') return undefined
+        seen += 1
+        // The host composes seats before services: the first look misses, the second finds it.
+        return seen < 2 ? undefined : { register: (options) => tabs.push(options) }
+      },
+    },
+    { schedule: (run) => { pending = run } },
+  )
+  if (tabs.length !== 0) throw new Error('the tab was registered before the service existed')
+  if (typeof pending !== 'function') throw new Error('no retry was scheduled')
+  pending()
+  if (tabs.length !== 1) throw new Error('tabs after the retry: ' + String(tabs.length))
+  if (!registered.some((options) => options.name === 'sidebar.right.pane.tab')) throw new Error('the body was never registered')
 })
 
 if (failures > 0) {

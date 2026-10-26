@@ -26,6 +26,8 @@ export interface SlotContext {
 export interface PluginShape {
     inject: string[];
     apply: (ctx: SlotContext) => void;
+    /** The whiteboard mount, with its scheduler injectable. `apply` calls this with the default. */
+    mount: (ctx: SlotContext, options?: MountOptions) => unknown;
 }
 /** A settled tool call, as the host hands it to a view. */
 export interface ToolCallProps {
@@ -66,4 +68,16 @@ export declare function viewFor(React: ReactLike, overrides?: Partial<Palette>):
  * box.
  */
 export declare function whiteboardFor(React: ReactLike, overrides?: Partial<Palette>): () => unknown;
+export interface MountOptions {
+    /** Injected so the suite can drive the poll without waiting. Defaults to `setTimeout`. */
+    schedule?: (run: () => void, delay: number) => unknown;
+}
+/**
+ * Register the whiteboard tab once the sidebar's optional services are ready.
+ *
+ * The slot can be declared before `sidebarRightTabs` exists - the host composes services and seats in an
+ * order this plugin does not control - and a single `ctx.get` there is a race that loses the tab silently.
+ * So it polls, like the reference implementation does, and stops after a bounded number of attempts.
+ */
+export declare function mountWhiteboard(React: ReactLike, ctx: SlotContext, options?: MountOptions): unknown;
 export default function factory(require: (name: string) => unknown): PluginShape;

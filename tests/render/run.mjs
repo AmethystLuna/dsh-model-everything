@@ -694,18 +694,33 @@ test('a scheme replaces the family, and an override still wins', () => {
   if (contrast.edge !== '#000000') throw new Error('high contrast edge: ' + contrast.edge)
 })
 
-test('the dark variant belongs to the default scheme only', () => {
-  const darkPrint = palette({}, { scheme: 'print', mode: 'dark' })
-  if (darkPrint.background !== '#ffffff') throw new Error('print follows the surface, which it should not: ' + darkPrint.background)
-})
 
-test('every scheme is offered by name', () => {
+
+test('every scheme is offered by name, and github is one of them', () => {
   const names = schemeNames()
-  if (names.length !== 3) throw new Error('schemes: ' + names.join(','))
+  if (!names.includes('github')) throw new Error('schemes: ' + names.join(','))
   for (const name of names) {
     const colours = palette({}, { scheme: name })
     if (colours.background === undefined || colours.text === undefined) throw new Error('incomplete scheme: ' + name)
   }
+})
+
+test('the github scheme follows the surface with its own values', () => {
+  const light = palette({}, { scheme: 'github' })
+  const dark = palette({}, { scheme: 'github', mode: 'dark' })
+  // Primer's own foregrounds, not ours: the point of a named scheme is that it is recognisably that product.
+  if (light.text !== '#1f2328') throw new Error('github light text: ' + light.text)
+  if (dark.text !== '#e6edf3') throw new Error('github dark text: ' + dark.text)
+  if (light.pass !== '#1a7f37') throw new Error('github light pass: ' + light.pass)
+  if (dark.fail !== '#f85149') throw new Error('github dark fail: ' + dark.fail)
+  if (light.background === dark.background) throw new Error('the github scheme does not follow the surface')
+})
+
+test('a scheme with only one variant keeps it on the dark surface', () => {
+  const printDark = palette({}, { scheme: 'print', mode: 'dark' })
+  if (printDark.background !== '#ffffff') throw new Error('print followed the surface: ' + printDark.background)
+  const contrastDark = palette({}, { scheme: 'high-contrast', mode: 'dark' })
+  if (contrastDark.text !== '#000000') throw new Error('high contrast followed the surface: ' + contrastDark.text)
 })
 
 test('an unknown scheme name falls back to the default palette', () => {
