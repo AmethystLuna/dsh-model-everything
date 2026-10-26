@@ -69,6 +69,36 @@ A card **saves no tokens**: the model still gets the full text.
 | Concurrency / synchrony / async | Mines claims about how work is executed (thread-safe, locks, interrupts, async/await, the event loop) and routes each to a tool that can decide it. It proves nothing itself |
 | Export | Exports a verified model as input for UPPAAL, TLA+, PRISM or SPIN |
 | Reports | Report body rendering, baseline comparison (`report_diff`), hash specification. Every report also carries a summary for a UI - verdict, the first finding, the next step - while the model still gets the full text |
+| Architecture visualisation | Draws a source directly (the drawable Mermaid / PlantUML subset), measures its structure against budgets, and compares two designs by containment. Parent/child grouping is first-class: nested boundaries, folding, light and dark palettes, and a sidebar whiteboard |
+
+## Architecture visualisation
+
+Drawing is not decoration here; it is how a design gets read. Three questions, kept apart because they are
+different questions:
+
+| You want | Tool | It answers | It does not answer |
+|---|---|---|---|
+| The source drawn | `diagram_render` | What the drawing looks like | Whether the system it draws is right |
+| Whether the drawing is too dense | `diagram_review` | How wide each boundary is, how deep they nest, how many nodes | Whether those boundaries should exist |
+| What changed between two designs | `diagram_diff` | Which boundary appeared, vanished, was renamed or re-parented, and which component changed owner | Whether the change is an improvement |
+
+**Parent/child grouping is first-class.** Mermaid `subgraph` and PlantUML `package` both read as boundaries,
+boundaries nest, and the layout stacks a group's members inside it and wraps a parent around its children -
+because a layered diagram whose members float outside their package is not showing containment at all. Clicking a
+boundary folds it into one box and clicking again unfolds it; folding is a transform on the model, not a mode of
+the painter, so the edges re-aim at the box.
+
+**A line it cannot draw is refused with its line number.** Sequence diagrams, class diagrams, Gantt charts, the
+`click`/`classDef` directives and PlantUML's `actor`/`note` are all refused by line. A sequence diagram that
+quietly lost its lifelines looks complete, and that is worse than no drawing.
+
+**Light and dark follow the page.** The rendered background decides which palette is used, and four schemes are
+available (`default`, `github`, `high-contrast`, `print`); the surface is painted inside the SVG, so a re-skinned
+container cannot change a picture's contrast. The right sidebar carries a whiteboard tab as well: paste a source,
+get the drawing, with no tool result involved.
+
+It **does not prove the design is right**: a tidy drawing is a readable model, and the judgement stays with
+`model_verify` and `uml_structure_verify`.
 
 ## Typical uses
 
