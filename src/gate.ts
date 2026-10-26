@@ -68,6 +68,7 @@ const SKILL_ROWS: Record<string, string> = {
   'model-everything-design': 'layering, responsibilities, substitutability, interface width',
   'model-everything-datamodel': 'a schema, a migration, a data guarantee',
   'model-everything-interleaving': 'thread-safe, lock-free, ISR, async interleaving; a shared location is decided, the rest is routed',
+  'model-everything-diagram': 'drawing, sizing or diffing a diagram from its source text',
   'model-everything-report-reading': 'reading a report this plugin returned',
 }
 
@@ -108,11 +109,11 @@ export function renderGateText(skills: string[] = shippedSkills(), extraGuidance
   const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '` |')
   const extra = extraGuidance.trim()
   return `<EXTREMELY_IMPORTANT>
-Before answering anything about code, a design or a diagram: load the skill whose row matches, and let its tool decide. Do not answer from memory first.
+Before answering anything about code, a design or a diagram: load the skill whose row matches and let its tool decide. Do not answer from memory.
 
-Plugin dsh-model-everything is active. It checks claims about designs and code: facts against the source, behaviour as an executable model, structure as a graph.
+dsh-model-everything is active: it checks claims about designs and code - facts against the source, behaviour as a model, structure as a graph.
 
-**Unsure which row applies?** Load \`model-everything\` first: it owns the doctrine, the model schema and the routing to its siblings.
+**Unsure which row applies?** Load \`model-everything\` first: it owns the doctrine, the schema and the routing to its siblings.
 
 | The request | The skill |
 | --- | --- |
@@ -120,22 +121,23 @@ ${rows.join('\n')}
 
 **Tools** (dsh):
 
-- \`model_verify\` — one state machine: structural checks, adversarial probes, budgets, deadlines, before/after regression.
+- \`model_verify\` — one state machine: structural checks, adversarial probes, budgets, deadlines, regression.
 - \`model_compose_verify\` — two or more machines: deadlock, a rendezvous that never fires, and - with \`shared\` + \`accesses\` - an unordered write (C4) or a non-atomic update (C5).
-- \`model_datamodel_verify\` — a data model and its migration: keys, domains, migration coverage, copy consistency, rollback symmetry.
-- \`model_design_review\` — a design against its own declarations: layering, boundaries, substitutability, interface width. The graph's shape is reported, not judged.
-- \`model_interleaving_scan\` — finds claims about threads, synchronization, async and interrupts, names the family, and routes each to the tool that decides it. It proves nothing about any of them.
-- \`model_export\` — UPPAAL, TLA+, PRISM or SPIN input from a verified model. It exports; it does not check the target tool.
-- \`uml_render\`, \`uml_parse\`, \`uml_review\` — draw a model, read a diagram into one, audit one. Round-trip fidelity is measured, never assumed.
+- \`model_datamodel_verify\` — a data model and its migration: keys, domains, coverage, copy consistency, rollback symmetry.
+- \`model_design_review\` — a design against its own declarations: layering, boundaries, substitutability, interface width. Graph shape is reported, not judged.
+- \`model_interleaving_scan\` — finds claims about threads, async and interrupts, names the family and routes each to what decides it. It proves nothing itself.
+- \`model_export\` — UPPAAL, TLA+, PRISM or SPIN input from a model. It exports; it does not check the target.
+- \`uml_render\`, \`uml_parse\`, \`uml_review\` — draw a model, read a diagram into one, audit one. Round-trip fidelity is measured.
 - \`uml_explain_labels\` — the accepted label and comment forms for one notation.
 - \`uml_structure_verify\` — dependency review of a structure drawing, one level or several. It audits the drawing, not the code.
+- \`diagram_render\`, \`diagram_review\`, \`diagram_diff\` — draw, size and compare a Mermaid or PlantUML source. Undrawable lines are refused by number.
 - \`report_diff\` — baseline against current: what a change added, removed or changed.
 
-**Read a report**: gate on \`verdict\` (\`pass\`, \`pass_with_findings\`, \`fail\`), never on \`ok\`. \`verdictReason\` says why and \`nextSteps\` says what to do. \`ran\` says whether it executed, \`checksRun\` how much it examined: a \`skip\` is not a \`pass\`, and a code ending \`_UNDECIDED\` means the search hit its limit and decided nothing. Keys starting with \`_\` are notes: ignored, and left out of the model hash.
+**Read a report**: gate on \`verdict\`, never on \`ok\`. \`verdictReason\` says why and \`nextSteps\` says what to do. \`ran\` says whether it executed, \`checksRun\` how much it examined: a \`skip\` is not a \`pass\`, and a code ending \`_UNDECIDED\` means the search hit its limit and decided nothing. Keys starting with \`_\` are notes: ignored, and left out of the model hash.
 
-**When a tool refuses, or is not there.** Read its \`errorCode\` and fix the input before retrying; if the tool is not registered in this deployment, say so and use the general method. A check that nothing ran is not a passing check.${extra === '' ? '' : '\n\n' + extra}
+**When a tool refuses or is absent.** Read its \`errorCode\` and fix the input; if it is not registered here, say so and use the general method. A check that nothing ran is not a passing check.${extra === '' ? '' : '\n\n' + extra}
 
-The rule again, because it is the one that gets skipped: before answering anything about code, a design or a diagram, load the skill whose routing applies and let its tool decide - a claim you can check is not a claim you may answer from memory.
+The rule again, because it is the one that gets skipped: load the skill whose routing applies and let its tool decide - a claim you can check is not one you may answer from memory.
 </EXTREMELY_IMPORTANT>`
 }
 

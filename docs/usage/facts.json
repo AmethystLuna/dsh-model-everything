@@ -5,8 +5,8 @@
     "resourceHint": "Load referenced resources only as needed.\"];\n\tswitch (base.kind) {\n\t\tcase \"directory\""
   },
   "surfaces": {
-    "catalog": 3381,
-    "bodies": 78839,
+    "catalog": 3677,
+    "bodies": 84716,
     "references": 177052,
     "referenceFiles": 13,
     "toolChars": 30357,

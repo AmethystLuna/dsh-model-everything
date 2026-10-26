@@ -85,6 +85,10 @@
         {
           "utterance": "our schema diagram shows USER ||--o{ ORDER - do the entities line up?",
           "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "make a clean svg of this sequence diagram source",
+          "expected": "model-everything-diagram"
         }
       ]
     },
@@ -288,6 +292,10 @@
         {
           "utterance": "does the ER diagram's cardinality match the schema we actually have?",
           "expected": "model-everything-datamodel"
+        },
+        {
+          "utterance": "make a clean svg of this sequence diagram source",
+          "expected": "model-everything-diagram"
         }
       ]
     },
@@ -448,6 +456,45 @@
         {
           "utterance": "draw the checkout flow as a state diagram",
           "expected": "model-everything-uml"
+        }
+      ]
+    },
+    {
+      "skill": "model-everything-diagram",
+      "triggers": [
+        {
+          "utterance": "draw this mermaid flowchart for me",
+          "expected": "model-everything-diagram"
+        },
+        {
+          "utterance": "render this plantuml component diagram to svg",
+          "expected": "model-everything-diagram"
+        },
+        {
+          "utterance": "is this diagram too dense to read - how many boxes per package",
+          "expected": "model-everything-diagram"
+        },
+        {
+          "utterance": "what changed structurally between these two architecture diagrams",
+          "expected": "model-everything-diagram"
+        },
+        {
+          "utterance": "this mermaid subgraph lost its edges when I pasted it, can you draw it",
+          "expected": "model-everything-diagram"
+        }
+      ],
+      "nearMisses": [
+        {
+          "utterance": "here is our component diagram, check the dependency cycles and layering",
+          "expected": "model-everything-structure"
+        },
+        {
+          "utterance": "draw this retry flow as a state diagram and check the guard",
+          "expected": "model-everything-uml"
+        },
+        {
+          "utterance": "does this mermaid state machine ever deadlock",
+          "expected": "model-everything"
         }
       ]
     }

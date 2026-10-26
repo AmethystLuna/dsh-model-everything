@@ -1,5 +1,5 @@
 {
-  "catalogChars": 3381,
+  "catalogChars": 3677,
   "catalogRows": [
     {
       "skill": "model-everything",
@@ -15,6 +15,11 @@
       "skill": "model-everything-design",
       "chars": 478,
       "body": 8525
+    },
+    {
+      "skill": "model-everything-diagram",
+      "chars": 272,
+      "body": 5877
     },
     {
       "skill": "model-everything-interleaving",
@@ -97,13 +102,13 @@
     }
   ],
   "perTurn": {
-    "chars": 33738,
-    "tokens": 8435
+    "chars": 34034,
+    "tokens": 8509
   },
   "routing": {
-    "rowsWithSibling": 7,
-    "rowsWithNonGoal": 7,
-    "rowCount": 7,
+    "rowsWithSibling": 8,
+    "rowsWithNonGoal": 8,
+    "rowCount": 8,
     "toolsWithSibling": 14,
     "toolsWithNonGoal": 14,
     "toolCount": 14,
