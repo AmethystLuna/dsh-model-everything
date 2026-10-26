@@ -1,4 +1,4 @@
-# Modeling / Automated Review for Designs and Code (dsh-model-everything)
+# Modeling, Architecture Visualisation and Automated Review (dsh-model-everything)
 
 <p align="center"><strong>English</strong> · <a href="README.md">中文</a></p>
 
@@ -11,11 +11,14 @@
 
 Abstract what a design or a piece of code claims into a model and let an engine run it: findings carry citations and hashes, so they can be recomputed and compared. The conclusion comes from a run rather than from reasoning it out: thinking it through becomes running it.
 
+The same models can be **drawn**: an architecture source renders directly, parent and child boundaries fold, the structure is measured against budgets, and two designs are compared by containment.
+
 A native DeepSeek Harness plugin. It turns the assertions a design makes **about behaviour** into models that can be run, reviewed and exported:
 
 - **Check a claim**: against the source, cited to `file:line`.
 - **Run a model**: state machines, protocols, composed machines and data models become executable, and an engine runs them.
 - **Review a diagram**: read as a model, reviewed as a model, reconciled with it.
+- **Draw the architecture**: a Mermaid or PlantUML source becomes a drawing - nested boundaries, folding, light and dark - while `diagram_review` measures the structure and `diagram_diff` compares two versions.
 - **Compare a refactor**: a model before and after, with the two reports side by side.
 - **Leave a record**: conclusions fixed into a report with hashes, recomputable and comparable and exportable.
 

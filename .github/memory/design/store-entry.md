@@ -39,8 +39,8 @@ url: https://github.com/AmethystLuna/dsh-model-everything
 name: AmethystLuna/dsh-model-everything
 category: dev
 description:
-  en: 'Turns what a design, plan or document claims into a model and decides it: UML diagrams rendered, read and reviewed; state machines, protocols and data models checked as models; migrations tested for coverage and rollback symmetry; concurrency claims mined and routed to the checker that can decide them; dependency graphs audited; reports diffed.'
-  zh: '把设计、计划或文档里的声称抽成模型再判定：UML 图渲染、读取与审查；状态机、协议与数据模型按模型判定；迁移检查覆盖与回滚对称；并发声称挖掘后分派给能判定它的工具；依赖图审查；报告对比。'
+  en: 'Turns what a design, plan or document claims into a model and decides it, and draws the architecture it describes: a Mermaid or PlantUML source rendered with nested, foldable boundaries and measured against structure budgets, two designs compared by containment; UML diagrams read and reviewed; state machines, protocols and data models checked as models; migrations tested for coverage and rollback symmetry; concurrency claims mined and routed to the checker that can decide them; dependency graphs audited; reports diffed.'
+  zh: '把设计、计划或文档里的声称抽成模型再判定，并把其中的架构画出来：Mermaid / PlantUML 源码直接渲染，父子分组可嵌套可折叠，结构按预算量度，两版设计按包含关系比对；UML 图读取与审查；状态机、协议与数据模型按模型判定；迁移检查覆盖与回滚对称；并发声称挖掘后分派给能判定它的工具；依赖图审查；报告对比。'
 ```
 
 **`SUBMISSION_PATCH_AMBIGUOUS` 的成因（值得记）：** 它的 `bundle-patch-contract.mjs` 把每行的 `name` 当**包身份**——正则只接受 `name` 或 `@scope/name`。我们的第二个组件是**同一个包**的子路径导出（`name: 'dsh-model-everything/gate'`，`exports` 里的 `./gate`，配 `gate/package.json` 与 `gate/locale/*` 给它自己的卡片名），于是被判「身份存疑」。平台本身认这个子路径：装完 `--dump-config` 两行都在、门禁行 `enabled: true`、整棵树加载通过。**所以这不是我们的清单写错，是校验器的模型里「一行 = 一个包」。** 有三种走法：让它接受「同一 patch 已声明包的子路径」；或并成一行、用 `config` 选组件（代价：第二个组件失去独立卡片名）；或不改、由人工审阅放行。已按第三种提问，别在没定之前改包结构。
