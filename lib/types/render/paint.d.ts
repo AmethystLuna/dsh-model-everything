@@ -60,6 +60,16 @@ export interface CaptionShape {
     lines: string[];
     colour: ColourRole;
 }
+/** A boundary around several states: a package, a layer, a subgraph. */
+export interface GroupShape {
+    kind: 'group';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    label: string;
+    colour: ColourRole;
+}
 export interface TitleShape {
     kind: 'title';
     x: number;
@@ -67,7 +77,7 @@ export interface TitleShape {
     text: string;
     colour: ColourRole;
 }
-export type Shape = BoxShape | LinkShape | PathShape | CaptionShape | TitleShape;
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape;
 export interface Canvas {
     width: number;
     height: number;

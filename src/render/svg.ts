@@ -27,6 +27,15 @@ const escape = (value: string): string =>
 type Writer<K extends Shape['kind']> = (shape: Extract<Shape, { kind: K }>, colours: Palette) => string
 
 const writers: { [K in Shape['kind']]: Writer<K> } = {
+  // A boundary is a dashed rectangle with its name in the top-left corner, drawn under everything else.
+  group: (shape, colours) => {
+    const stroke = colours[shape.colour]
+    return (
+      '<rect x="' + n(shape.x) + '" y="' + n(shape.y) + '" width="' + n(shape.width) + '" height="' + n(shape.height) +
+      '" rx="8" fill="none" stroke="' + stroke + '" stroke-width="1" stroke-dasharray="4 3" />' +
+      '<text x="' + n(shape.x + 6) + '" y="' + n(shape.y + 12) + '" font-size="10" fill="' + stroke + '">' + escape(shape.label) + '</text>'
+    )
+  },
   box: (shape, colours) => {
     const stroke = colours[shape.colour]
     const width = shape.initial ? 2.5 : 1

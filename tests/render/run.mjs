@@ -9,6 +9,7 @@ import { rankStates } from '../../lib/render/layout.js'
 import { paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
+import { render } from '../../lib/render/index.js'
 
 let failures = 0
 const test = (name, body) => {
@@ -749,6 +750,87 @@ test('the background follows the scheme and the surface', () => {
   if (lightMarkup.includes(light.colours.background) === false) throw new Error('the light surface is missing')
   if (light.colours.background === dark.colours.background) throw new Error('both surfaces share a background')
   if (!darkMarkup.includes(dark.colours.background)) throw new Error('the dark surface is missing')
+})
+
+test('a group is drawn as a boundary around its members', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'in', to: 'b' },
+      { from: 'b', label: 'out', to: 'c' },
+    ],
+    groups: [{ id: 'g1', label: 'Core', members: ['a', 'b'] }],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  const group = canvas.shapes.find((shape) => shape.kind === 'group')
+  if (group === undefined) throw new Error('no group was drawn')
+  if (group.label !== 'Core') throw new Error('label: ' + group.label)
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const inside = (id) => {
+    const box = boxes.find((entry) => entry.label === id)
+    return box.x >= group.x && box.y >= group.y && box.x + box.width <= group.x + group.width && box.y + box.height <= group.y + group.height
+  }
+  if (!inside('a') || !inside('b')) throw new Error('a member is outside its group boundary')
+  // A boundary is a bounding box, so it can span a column its members do not occupy; what it must not do is
+  // contain a box that is not in the group.
+  const outside = boxes.find((entry) => entry.label === 'c')
+  const contained = outside.x >= group.x && outside.y >= group.y &&
+    outside.x + outside.width <= group.x + group.width && outside.y + outside.height <= group.y + group.height
+  if (contained) throw new Error('a non-member is inside the boundary')
+})
+
+test('a group is painted before the boxes, so it sits behind them', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'g1', label: 'Only', members: ['a'] }],
+    caption: 'graph',
+  }
+  const kinds = paintWith(diagram).canvas.shapes.map((shape) => shape.kind)
+  if (kinds.indexOf('group') > kinds.indexOf('box')) throw new Error('the boundary is painted over its member: ' + kinds.join(','))
+})
+
+test('an empty group is not drawn, because it claims a containment nobody stated', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'g1', label: 'Empty', members: ['ghost'] }],
+    caption: 'graph',
+  }
+  const { canvas } = paintWith(diagram)
+  if (canvas.shapes.some((shape) => shape.kind === 'group')) throw new Error('an empty boundary was drawn')
+})
+
+test('a group is written as a dashed boundary with its name, and its label is escaped', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'g1', label: '<Core & Edge>', members: ['a'] }],
+    caption: 'graph',
+  }
+  const { canvas, colours } = paintWith(diagram)
+  const { markup, dropped } = toSvg(canvas, colours)
+  if (dropped !== 0) throw new Error('dropped: ' + String(dropped))
+  if (!markup.includes('stroke-dasharray="4 3"')) throw new Error('the boundary is not dashed')
+  if (markup.includes('<Core')) throw new Error('the group label reached the markup unescaped')
+  if (!markup.includes('&lt;Core &amp; Edge&gt;')) throw new Error('the group label is missing')
+})
+
+test('a subgraph in mermaid reaches the drawing as a boundary', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '  end', '  b --> c'].join(String.fromCharCode(10))
+  const rendered = render({ source })
+  const group = rendered.canvas.shapes.find((shape) => shape.kind === 'group')
+  if (group === undefined) throw new Error('the subgraph produced no boundary')
+  if (group.label !== 'Core') throw new Error('label: ' + group.label)
 })
 
 if (failures > 0) {
