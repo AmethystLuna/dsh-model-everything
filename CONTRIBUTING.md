@@ -40,7 +40,7 @@ would change is agreed and reproducible.
 
 ### What to say about the judgement
 
-- **Which check changes, by its code.** Codes are declared across 15 source files, most of them in
+- **Which check changes, by its code.** Codes are declared across 16 source files, most of them in
   the data engine. A proposal that names the code is a proposal a maintainer can act on.
 - **Whether it changes a verdict or adds a signal.** This is the load-bearing distinction: only the
   violation level decides a verdict. A check that is useful but not decisive belongs at signal level,

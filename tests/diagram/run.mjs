@@ -5,6 +5,7 @@
 // it does with nonsense (an empty drawing, not an exception).
 import { fromMermaid } from '../../lib/render/from-mermaid.js'
 import { collapse } from '../../lib/render/collapse.js'
+import { checkBudget } from '../../lib/render/budget.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
 import { detectNotation, render } from '../../lib/render/index.js'
 import { writeSvg } from '../../lib/render/write.js'
@@ -303,6 +304,91 @@ test('an edge between two members of one fold disappears, and a self loop too', 
   const folded = collapse(diagram, [fold])
   const edges = folded.edges.map((edge) => edge.from + '>' + edge.to)
   if (edges.join(',') !== fold + '>out') throw new Error('edges: ' + edges.join(','))
+})
+
+test('a wide boundary fails its budget and names itself', () => {
+  const lines = ['graph TD', '  subgraph Wide']
+  for (let index = 0; index < 9; index += 1) lines.push('    n' + String(index) + '[node ' + String(index) + ']')
+  lines.push('  end')
+  const { diagram } = fromMermaid(lines.join(String.fromCharCode(10)))
+  const report = checkBudget(diagram)
+  if (report.verdict !== 'fail') throw new Error('verdict: ' + report.verdict)
+  const wide = report.findings.find((finding) => finding.code === 'B1_GROUP_TOO_WIDE')
+  if (wide === undefined) throw new Error('no width finding: ' + JSON.stringify(report.findings.map((finding) => finding.code)))
+  if (!wide.message.includes('Wide')) throw new Error('the finding does not name the group: ' + wide.message)
+  if (wide.group === undefined) throw new Error('the finding carries no group id')
+})
+
+test('a boundary inside the budget passes, and the measurement proves it was checked', () => {
+  const source = ['graph TD', '  subgraph Core', '    a --> b', '  end', '  b --> c'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const report = checkBudget(diagram)
+  if (report.verdict !== 'pass') throw new Error('verdict: ' + report.verdict + ' findings: ' + JSON.stringify(report.findings))
+  if (report.measured.nodes !== 3) throw new Error('measured nodes: ' + String(report.measured.nodes))
+  if (report.measured.groups !== 1) throw new Error('measured groups: ' + String(report.measured.groups))
+  if (report.measured.widest?.size !== 2) throw new Error('widest: ' + JSON.stringify(report.measured.widest))
+})
+
+test('a boundary around one thing is a warning, not an error', () => {
+  const source = ['graph TD', '  subgraph Alone', '    a[Only]', '  end'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const report = checkBudget(diagram)
+  const single = report.findings.find((finding) => finding.code === 'B4_SINGLE_MEMBER')
+  if (single === undefined) throw new Error('no single-member finding')
+  if (single.severity !== 'warning') throw new Error('severity: ' + single.severity)
+  if (report.verdict !== 'pass_with_findings') throw new Error('verdict: ' + report.verdict)
+})
+
+test('nesting deeper than the budget fails, and the depth is measured', () => {
+  const source = [
+    'graph TD',
+    '  subgraph One',
+    '    subgraph Two',
+    '      subgraph Three',
+    '        subgraph Four',
+    '          a --> b',
+    '        end',
+    '      end',
+    '    end',
+    '  end',
+  ].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const report = checkBudget(diagram, { maxDepth: 2 })
+  if (report.findings.every((finding) => finding.code !== 'B2_TOO_DEEP')) throw new Error('no depth finding')
+  if (report.measured.deepest < 4) throw new Error('deepest: ' + String(report.measured.deepest))
+})
+
+test('too many nodes is a whole-drawing finding, without a group', () => {
+  const lines = ['graph TD']
+  for (let index = 0; index < 12; index += 1) lines.push('  n' + String(index) + '[node ' + String(index) + ']')
+  const { diagram } = fromMermaid(lines.join(String.fromCharCode(10)))
+  const report = checkBudget(diagram, { maxNodes: 5 })
+  const tooMany = report.findings.find((finding) => finding.code === 'B5_TOO_MANY_NODES')
+  if (tooMany === undefined) throw new Error('no node-count finding')
+  if (tooMany.group !== undefined) throw new Error('a whole-drawing finding named a group')
+})
+
+test('an empty boundary is reported as an error, because the drawing cannot show it', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'g', label: 'Hollow', members: ['ghost'] }],
+    caption: 'graph',
+  }
+  const report = checkBudget(diagram)
+  const empty = report.findings.find((finding) => finding.code === 'B3_EMPTY_GROUP')
+  if (empty === undefined) throw new Error('no empty-group finding: ' + JSON.stringify(report.findings.map((finding) => finding.code)))
+  if (report.verdict !== 'fail') throw new Error('verdict: ' + report.verdict)
+})
+
+test('limits can be raised for a larger medium', () => {
+  const lines = ['graph TD', '  subgraph Wide']
+  for (let index = 0; index < 9; index += 1) lines.push('    n' + String(index) + '[node ' + String(index) + ']')
+  lines.push('  end')
+  const { diagram } = fromMermaid(lines.join(String.fromCharCode(10)))
+  if (checkBudget(diagram, { maxMembers: 12 }).verdict !== 'pass') throw new Error('a raised budget still failed')
 })
 
 if (failures > 0) {

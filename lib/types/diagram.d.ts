@@ -28,6 +28,8 @@ export declare const DIAGRAM_TOOL_NAME = "diagram_render";
 export declare const diagramRenderTool: import("@deepseek-ai/dsh-tools").ToolDefinition;
 /** Read the switch as a boolean, whichever shape this host produced. */
 export declare function enabledOf(config: Config): boolean;
+export declare const DIAGRAM_REVIEW_TOOL_NAME = "diagram_review";
+export declare const diagramReviewTool: import("@deepseek-ai/dsh-tools").ToolDefinition;
 export interface ComponentContext {
     tools: {
         register(definition: unknown): () => void;
