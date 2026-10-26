@@ -9,6 +9,7 @@ import { rankStates } from '../../lib/render/layout.js'
 import { paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
+import { emptyDiagram, labelOf } from '../../lib/render/model.js'
 import { render } from '../../lib/render/index.js'
 
 let failures = 0
@@ -1080,6 +1081,22 @@ test('the inference picks the tightest container when two would do', () => {
   const inside = (inner, outer) => inner.x >= outer.x && inner.y >= outer.y &&
     inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
   if (!inside(mid, big)) throw new Error('the tighter boundary was not nested in the looser one')
+})
+
+test('an empty diagram is the drawing that has nothing to draw', () => {
+  const empty = emptyDiagram('t', 'nothing here')
+  if (empty.kind !== 'none') throw new Error('kind: ' + empty.kind)
+  if (empty.nodes.length !== 0 || empty.edges.length !== 0) throw new Error('an empty diagram carries shapes')
+  if (empty.caption !== 'nothing here') throw new Error('caption: ' + empty.caption)
+  const { canvas } = paintWith(empty)
+  if (canvas.shapes.some((shape) => shape.kind === 'box')) throw new Error('boxes appeared from nowhere')
+})
+
+test('a node draws its label when a notation gave one, and its id when it did not', () => {
+  if (labelOf({ id: 'a', role: 'normal' }) !== 'a') throw new Error('id was not used')
+  if (labelOf({ id: 'a', label: 'Alpha', role: 'normal' }) !== 'Alpha') throw new Error('label was ignored')
+  // An empty label is not a label: the id is what identifies the box.
+  if (labelOf({ id: 'a', label: '', role: 'normal' }) !== 'a') throw new Error('an empty label was used')
 })
 
 if (failures > 0) {

@@ -10,26 +10,7 @@
  * Pure. Everything decided here is a fact a test can assert: which nodes exist, which edges, why they are
  * coloured the way they are.
  */
-export interface DiagramNode {
-    id: string;
-    /** What the report says about this node, when it says anything. */
-    role: 'normal' | 'error' | 'warning' | 'muted';
-}
-export interface DiagramEdge {
-    from: string;
-    to: string;
-    label: string;
-}
-export interface Diagram {
-    kind: 'machine' | 'graph' | 'none';
-    /** The state the machine starts in, when the model declared one. */
-    init?: string;
-    title: string;
-    nodes: DiagramNode[];
-    edges: DiagramEdge[];
-    /** One line under the drawing: what the report decided, in words the drawing cannot carry. */
-    caption: string;
-}
+import type { Diagram } from './model.js';
 export interface ViewInput {
     phase?: unknown;
     toolName?: unknown;

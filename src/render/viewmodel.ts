@@ -11,29 +11,6 @@
  * coloured the way they are.
  */
 
-export interface DiagramNode {
-  id: string
-  /** What the report says about this node, when it says anything. */
-  role: 'normal' | 'error' | 'warning' | 'muted'
-}
-
-export interface DiagramEdge {
-  from: string
-  to: string
-  label: string
-}
-
-export interface Diagram {
-  kind: 'machine' | 'graph' | 'none'
-  /** The state the machine starts in, when the model declared one. */
-  init?: string
-  title: string
-  nodes: DiagramNode[]
-  edges: DiagramEdge[]
-  /** One line under the drawing: what the report decided, in words the drawing cannot carry. */
-  caption: string
-}
-
 const record = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 
@@ -120,6 +97,8 @@ function blame(nodes: DiagramNode[], report: { message?: string }): DiagramNode[
   if (named.length === 0) return nodes
   return nodes.map((node) => (named.includes(node.id) ? { ...node, role: 'error' as const } : node))
 }
+
+import type { Diagram, DiagramEdge, DiagramNode } from './model.js'
 
 export interface ViewInput {
   phase?: unknown

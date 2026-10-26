@@ -444,6 +444,88 @@ test('nothing on either side fails instead of reporting a clean comparison', () 
   if (!report.changes.some((change) => change.code === 'D0_NO_NODES')) throw new Error('no empty-comparison finding')
 })
 
+test('a bare state line is a declaration, not a refusal', () => {
+  const { diagram, refused } = fromMermaid(['stateDiagram-v2', '  state Idle', '  state Busy', '  Idle --> Busy'].join(String.fromCharCode(10)))
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  if (JSON.stringify(diagram.nodes.map((node) => node.id).sort()) !== JSON.stringify(['Busy', 'Idle'])) throw new Error('nodes: ' + diagram.nodes.map((node) => node.id).join(','))
+})
+
+test('an unreadable arrow and an unreadable line are both refused with their line numbers', () => {
+  const source = ['graph TD', '  a[One] --> b[Two]', '  a -->', '  not a diagram line at all'].join(String.fromCharCode(10))
+  const { refused } = fromMermaid(source)
+  if (refused.length < 1) throw new Error('nothing was refused')
+  for (const line of refused) if (!/^line \d+:/.test(line)) throw new Error('no line number: ' + line)
+})
+
+test('a plantuml quoted alias, a dotted arrow and a no-op pair are read without complaint', () => {
+  const source = ['@startuml', 'component "Web UI" as ui', 'database "Store" as db', 'ui ..> db', '[*] --> [*]', '@enduml'].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const ui = diagram.nodes.find((node) => node.id === 'ui')
+  if (ui?.label !== 'Web UI') throw new Error('alias label: ' + String(ui?.label))
+  if (diagram.edges[0]?.dashed !== true) throw new Error('the dotted arrow is not dashed')
+})
+
+test('a plantuml line it cannot draw is refused with its line number', () => {
+  const { refused } = fromPlantUml(['@startuml', 'A --> B', 'note right: not drawn here', '@enduml'].join(String.fromCharCode(10)))
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].startsWith('line 3:')) throw new Error('wrong line: ' + refused[0])
+})
+
+test('folding two groups says so, and folding everything leaves no boundary', () => {
+  const source = ['graph TD', '  subgraph A', '    a --> b', '  end', '  subgraph B', '    c --> d', '  end'].join(String.fromCharCode(10))
+  const { diagram } = fromMermaid(source)
+  const ids = (diagram.groups ?? []).map((group) => group.id)
+  const both = collapse(diagram, ids)
+  if (!both.caption.includes('2 groups folded')) throw new Error('caption: ' + both.caption)
+  if (both.groups !== undefined) throw new Error('a boundary survived folding everything')
+  const one = collapse(diagram, [ids[0]])
+  if (!one.caption.includes('1 group folded')) throw new Error('caption: ' + one.caption)
+})
+
+test('the diff reports a node appearing, a boundary appearing and one disappearing', () => {
+  // Hand-built sides: a parsed source numbers its groups by position, so adding one renumbers ids and turns
+  // every "added" into a rename. The diff is about ids, so the fixture has to hold them still.
+  const before = {
+    kind: 'graph', title: 't', caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [{ from: 'a', label: '', to: 'b' }],
+    groups: [
+      { id: 'outer', label: 'Outer', members: [] },
+      { id: 'inner', label: 'Inner', members: ['a', 'b'], parent: 'outer' },
+    ],
+  }
+  const after = {
+    kind: 'graph', title: 't', caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [{ from: 'a', label: '', to: 'b' }],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['a', 'b'] },
+      { id: 'fresh', label: 'Fresh', members: ['c'] },
+    ],
+  }
+  const codes = diffStructure(before, after).changes.map((change) => change.code)
+  for (const expected of ['H1_GROUP_ADDED', 'H2_GROUP_REMOVED', 'H5_NODE_ADDED', 'H7_NODE_REGROUPED']) {
+    if (!codes.includes(expected)) throw new Error('missing ' + expected + ': ' + codes.join(','))
+  }
+})
+
+test('a node that left its group is reported against the top level', () => {
+  const before = fromMermaid(['graph TD', '  subgraph Core', '    a --> b', '  end'].join(String.fromCharCode(10))).diagram
+  const after = fromMermaid(['graph TD', '  subgraph Core', '    b', '  end', '  a'].join(String.fromCharCode(10))).diagram
+  const report = diffStructure(before, after)
+  const moved = report.changes.find((change) => change.code === 'H7_NODE_REGROUPED')
+  if (moved === undefined) throw new Error('no move: ' + report.changes.map((change) => change.code).join(','))
+  if (!moved.message.includes('no group')) throw new Error('the destination is not the top level: ' + moved.message)
+})
+
+test('the render entry takes an explicit notation as readily as auto', () => {
+  const explicit = render({ source: '@startuml\nA --> B\n@enduml', notation: 'plantuml' })
+  if (explicit.notation !== 'plantuml') throw new Error('notation: ' + explicit.notation)
+  const auto = render({ source: '@startuml\nA --> B\n@enduml' })
+  if (auto.notation !== 'plantuml') throw new Error('auto did not detect plantuml: ' + auto.notation)
+})
+
 if (failures > 0) {
   console.log('diagram tests failed: ' + String(failures))
   process.exit(1)

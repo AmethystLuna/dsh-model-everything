@@ -13,7 +13,7 @@
  * Pure, and asserted on the rows themselves.
  */
 
-import type { DiagramEdge, DiagramNode } from './viewmodel.js'
+import type { DiagramEdge, DiagramNode } from './model.js'
 
 export interface Ranked {
   /** The state ids of each row, top to bottom, already ordered left to right. */
