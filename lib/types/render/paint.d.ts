@@ -5,16 +5,12 @@
  * sidebar tab - so nothing here knows about pixel size. It emits a content-sized canvas and lets the
  * container scale it: the same numbers serve a 360px card and a 1200px whiteboard.
  *
- * Two placements, chosen by the source:
- *
- * - **layered** (no groups): breadth-first rows, forward edges dropping straight down, back edges on a side
- *   channel clear of every box, self loops as small loops. The shape a state machine wants.
- * - **tree** (groups present): a group is a block, its members stack inside it, a nested group is a block
- *   inside its parent, and the top level stacks. The shape an architecture diagram wants, because a package
- *   whose members float somewhere else on the page is not showing containment at all.
- *
- * Edges are placed from where the boxes ended up, so neither placement needs to tell the edge code which one
- * ran: "below" is a straight line, "beside" is horizontal, "above" routes around.
+ * The drawing is placed by the layered pipeline (`place.ts`), which also says which lane a long edge reserved.
+ * Edges are drawn from where the boxes ended up, in two ways only: a long edge follows its lane as one polyline,
+ * and everything else goes through the orthogonal router. Which side of a box an edge leaves by is read off the
+ * route, not picked by comparing the boxes' centres: a route between two rows arrives vertically, so the endpoint
+ * is snapped onto the top or bottom perimeter in the direction the route approaches, and two edges on the same
+ * side take separate points along it.
  *
  * Pure: a diagram in, shapes out, every decision assertable.
  */

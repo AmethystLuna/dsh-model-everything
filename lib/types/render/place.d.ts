@@ -1,16 +1,18 @@
 /**
  * Where the boxes go.
  *
- * Two placements, chosen by the source:
+ * The drawing is placed by the layered pipeline, in the order the mature implementations run it: cycle breaking turns
+ * the graph into a DAG, layering gives every box a row, dummy nodes give every long edge a lane, ordering reduces the
+ * crossings, and coordinate assignment decides the x of each lane and box. This module composes those stages; it does
+ * not decide any of them itself. Each stage is a pure module next door, so it can be asserted without a canvas.
  *
- * - **layered** (no groups): breadth-first rows, centred, no containment - the shape a state machine wants.
- * - **tree** (groups present): a group is a block, its members stack inside it, a nested group is a block inside
- *   its parent, and the top level stacks - the shape an architecture diagram wants, because a package whose
- *   members float somewhere else on the page is not showing containment at all.
+ * Two decompositions sit around the pipeline. A level - the top of the drawing, or the inside of a boundary - is
+ * split into weakly connected components, each laid out on its own and then packed onto the page, so a wide
+ * subgraph cannot squeeze an unrelated one. A boundary is a node in its parent's layer whose size is whatever its
+ * contents need, and its inside is laid out by the same pipeline; that is how nesting is drawn.
  *
- * Split out of the painter so the two questions stay separate: this module decides positions, `paint.ts` decides
- * what to draw between them. A change to edge routing cannot move a box, and a change to nesting cannot move a
- * line.
+ * What comes out is geometry only: a box per node, a rectangle per boundary, and - for a long edge - the lane its
+ * dummies reserved, so the painter can draw one polyline through it instead of searching around the boxes.
  */
 import { type Measured as TextBox } from './text.js';
 import type { Diagram, DiagramNode } from './model.js';
@@ -21,20 +23,30 @@ export type Box = {
     width: number;
     height: number;
 };
-/** What a placement returns: every box, every drawn boundary, and how wide the content is. */
+/** A point in the drawing's own coordinates. */
+export interface Point {
+    x: number;
+    y: number;
+}
+/** The lane a long edge's dummies reserved, in layout order: from the layout source down to the layout target. */
+export interface Lane {
+    points: Point[];
+    /** True when the layout runs opposite to the source's arrow, so the painter walks the lane backwards. */
+    reversed: boolean;
+}
+/** What a placement returns: every box, every drawn boundary, every reserved lane, and how wide the content is. */
 export interface Placement {
     boxes: Map<string, Box>;
     groupRects: Map<string, Box>;
     width: number;
+    lanes: Map<number, Lane>;
+    /** Edges whose two ends ended up in different wrapped columns: they are read across, not down. */
+    across: Set<number>;
 }
-/** Geometry constants shared by both placements. */
+/** Geometry constants in one place: a container with different proportions changes these, not the rules. */
 export declare const MARGIN = 20;
 /** The text a node will draw, measured from its label - the id is what the source called it, not what it says. */
 export declare function textOf(node: DiagramNode): TextBox;
-/**
- * Place every box of a diagram.
- *
- * The choice of placement is a property of the source, not of the caller: a drawing that declares boundaries is
- * read as containers and gets the tree; one that does not is read as a machine and gets the ranks.
- */
 export declare function place(diagram: Diagram, top: number): Placement;
+/** The aspect ratio of a placement, for the tests that check a drawing is a page and not a strip. */
+export declare function placementAspect(placement: Placement): number;

@@ -95,16 +95,25 @@ export function anchor(box: Obstacle, side: Side): Point {
   }
 }
 
-/** Which side of `from` faces `to`, and which side of `to` faces `from`. */
-export function facingSides(from: Obstacle, to: Obstacle): { exit: Side; entry: Side } {
-  const fromCx = from.x + from.width / 2
+/**
+ * Which side of `from` an edge leaves by, and which side of `to` it arrives at.
+ *
+ * The side is a property of the drawing, not of the distance between two centres. A layered drawing puts its boxes
+ * in horizontal rows, and an edge between two rows approaches vertically: out of the bottom, into the top, and the
+ * other way round for an edge drawn against the flow. Only two boxes in the same row are joined sideways, and then
+ * the direction of travel decides which side.
+ *
+ * This replaces the old rule, which compared the two centres' dx and dy and picked the larger axis - so an edge
+ * between two rows left through a box's side as soon as the target was far enough sideways, which is the hook a
+ * top-down drawing is read as a defect.
+ */
+export function approachSides(from: Obstacle, to: Obstacle): { exit: Side; entry: Side } {
   const fromCy = from.y + from.height / 2
-  const toCx = to.x + to.width / 2
   const toCy = to.y + to.height / 2
-  const dx = toCx - fromCx
-  const dy = toCy - fromCy
-  if (Math.abs(dy) >= Math.abs(dx)) return dy >= 0 ? { exit: 'bottom', entry: 'top' } : { exit: 'top', entry: 'bottom' }
-  return dx >= 0 ? { exit: 'right', entry: 'left' } : { exit: 'left', entry: 'right' }
+  if (Math.abs(toCy - fromCy) > 0.5) return toCy > fromCy ? { exit: 'bottom', entry: 'top' } : { exit: 'top', entry: 'bottom' }
+  const fromCx = from.x + from.width / 2
+  const toCx = to.x + to.width / 2
+  return toCx >= fromCx ? { exit: 'right', entry: 'left' } : { exit: 'left', entry: 'right' }
 }
 
 interface Candidate {
@@ -148,7 +157,7 @@ export function routeEdge(
   obstacles: Obstacle[],
   anchors?: Ports,
 ): { points: Point[]; routed: boolean } {
-  const sides = facingSides(from, to)
+  const sides = approachSides(from, to)
   const exitSide = anchors?.exitSide ?? sides.exit
   const entrySide = anchors?.entrySide ?? sides.entry
   const exit = anchors?.exit ?? anchor(from, exitSide)
@@ -235,4 +244,27 @@ export function simplify(points: Point[]): Point[] {
   }
   out.push(points[points.length - 1])
   return out
+}
+
+/**
+ * Where a line lands on a shape, given where it comes from.
+ *
+ * This is the rule a drawing tool uses: the endpoint is not a fixed point, it is the perimeter point in the
+ * direction the line arrives from. A line arriving from above lands on the top edge, one arriving from the left
+ * lands on the left edge - so a side connection happens when the route genuinely comes from the side, rather than
+ * being chosen up front by a distance formula.
+ */
+export function snapToPerimeter(box: Obstacle, from: Point): Point {
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  const dx = from.x - cx
+  const dy = from.y - cy
+  // Which side the ray crosses first, by comparing the normalised offsets against the half-extents.
+  const scaleX = dx === 0 ? Infinity : box.width / 2 / Math.abs(dx)
+  const scaleY = dy === 0 ? Infinity : box.height / 2 / Math.abs(dy)
+  const scale = Math.min(scaleX, scaleY)
+  if (scale === Infinity) return { x: cx, y: cy }
+  const x = cx + dx * scale
+  const y = cy + dy * scale
+  return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
 }

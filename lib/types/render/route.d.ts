@@ -33,8 +33,19 @@ export declare function normalOf(side: Side): Point;
 export declare function crossesBox(x1: number, y1: number, x2: number, y2: number, box: Obstacle): boolean;
 /** The point on a side of a box, in the middle of that side. */
 export declare function anchor(box: Obstacle, side: Side): Point;
-/** Which side of `from` faces `to`, and which side of `to` faces `from`. */
-export declare function facingSides(from: Obstacle, to: Obstacle): {
+/**
+ * Which side of `from` an edge leaves by, and which side of `to` it arrives at.
+ *
+ * The side is a property of the drawing, not of the distance between two centres. A layered drawing puts its boxes
+ * in horizontal rows, and an edge between two rows approaches vertically: out of the bottom, into the top, and the
+ * other way round for an edge drawn against the flow. Only two boxes in the same row are joined sideways, and then
+ * the direction of travel decides which side.
+ *
+ * This replaces the old rule, which compared the two centres' dx and dy and picked the larger axis - so an edge
+ * between two rows left through a box's side as soon as the target was far enough sideways, which is the hook a
+ * top-down drawing is read as a defect.
+ */
+export declare function approachSides(from: Obstacle, to: Obstacle): {
     exit: Side;
     entry: Side;
 };
@@ -57,3 +68,12 @@ export declare function routeEdge(from: Obstacle, to: Obstacle, obstacles: Obsta
 };
 /** Drop the points in the middle of a straight run: three collinear points are one segment. */
 export declare function simplify(points: Point[]): Point[];
+/**
+ * Where a line lands on a shape, given where it comes from.
+ *
+ * This is the rule a drawing tool uses: the endpoint is not a fixed point, it is the perimeter point in the
+ * direction the line arrives from. A line arriving from above lands on the top edge, one arriving from the left
+ * lands on the left edge - so a side connection happens when the route genuinely comes from the side, rather than
+ * being chosen up front by a distance formula.
+ */
+export declare function snapToPerimeter(box: Obstacle, from: Point): Point;

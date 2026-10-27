@@ -1,152 +1,111 @@
 /**
  * Where the boxes go.
  *
- * Two placements, chosen by the source:
+ * The drawing is placed by the layered pipeline, in the order the mature implementations run it: cycle breaking turns
+ * the graph into a DAG, layering gives every box a row, dummy nodes give every long edge a lane, ordering reduces the
+ * crossings, and coordinate assignment decides the x of each lane and box. This module composes those stages; it does
+ * not decide any of them itself. Each stage is a pure module next door, so it can be asserted without a canvas.
  *
- * - **layered** (no groups): breadth-first rows, centred, no containment - the shape a state machine wants.
- * - **tree** (groups present): a group is a block, its members stack inside it, a nested group is a block inside
- *   its parent, and the top level stacks - the shape an architecture diagram wants, because a package whose
- *   members float somewhere else on the page is not showing containment at all.
+ * Two decompositions sit around the pipeline. A level - the top of the drawing, or the inside of a boundary - is
+ * split into weakly connected components, each laid out on its own and then packed onto the page, so a wide
+ * subgraph cannot squeeze an unrelated one. A boundary is a node in its parent's layer whose size is whatever its
+ * contents need, and its inside is laid out by the same pipeline; that is how nesting is drawn.
  *
- * Split out of the painter so the two questions stay separate: this module decides positions, `paint.ts` decides
- * what to draw between them. A change to edge routing cannot move a box, and a change to nesting cannot move a
- * line.
+ * What comes out is geometry only: a box per node, a rectangle per boundary, and - for a long edge - the lane its
+ * dummies reserved, so the painter can draw one polyline through it instead of searching around the boxes.
  */
 
-import { rankStates } from './layout.js'
+import { aspectOf, packRectangles, weakComponents } from './components.js'
+import { assignCoordinates } from './coords.js'
+import { breakCycles } from './cycle-break.js'
+import { addDummies } from './dummy.js'
+import { layer } from './layer.js'
+import { seedOrder, type LayoutEdge, type LayoutGraph } from './layout.js'
+import { order } from './order.js'
 import { measure, MIN_NODE_WIDTH, type Measured as TextBox } from './text.js'
+import { planBands } from './wrap.js'
 import type { Diagram, DiagramGroup, DiagramNode } from './model.js'
 
 /** Geometry of one placed box, before anything is drawn. */
 export type Box = { x: number; y: number; width: number; height: number }
 
-/** What a placement returns: every box, every drawn boundary, and how wide the content is. */
+/** A point in the drawing's own coordinates. */
+export interface Point {
+  x: number
+  y: number
+}
+
+/** The lane a long edge's dummies reserved, in layout order: from the layout source down to the layout target. */
+export interface Lane {
+  points: Point[]
+  /** True when the layout runs opposite to the source's arrow, so the painter walks the lane backwards. */
+  reversed: boolean
+}
+
+/** What a placement returns: every box, every drawn boundary, every reserved lane, and how wide the content is. */
 export interface Placement {
   boxes: Map<string, Box>
   groupRects: Map<string, Box>
   width: number
+  lanes: Map<number, Lane>
+  /** Edges whose two ends ended up in different wrapped columns: they are read across, not down. */
+  across: Set<number>
 }
 
-/** Geometry constants shared by both placements. */
+/** Geometry constants in one place: a container with different proportions changes these, not the rules. */
 export const MARGIN = 20
-const ROW_GAP = 34
-/** Two rows with a labelled edge between them need room for the label, or it lands on a box. */
-const LABELLED_ROW_GAP = 52
-/** The same rule between two blocks stacked inside a boundary. */
-const LABELLED_BLOCK_GAP = 32
-/** A row is at least tall enough for one line plus padding. */
-const ROW_MIN_HEIGHT = 34
-const COLUMN_GAP = 30
+/** The strip between two layers: room for a route and, when the level has labels, for one to sit in. */
+const LAYER_GAP = 44
+const LABELLED_LAYER_GAP = 54
+/** The space between two boxes in one layer. */
+const NODE_GAP = 30
+/** Two components are two drawings on one page, so they get a wider gap than two boxes. */
+const COMPONENT_GAP = 30
 /** A boundary's inner padding and the strip its name sits in. */
 const GROUP_PADDING = 10
 const GROUP_HEADER = 16
-/** Between two blocks stacked inside a boundary, and between two top-level blocks. */
-const BLOCK_GAP = 14
 
 /** The text a node will draw, measured from its label - the id is what the source called it, not what it says. */
 export function textOf(node: DiagramNode): TextBox {
   return measure(node.label !== undefined && node.label !== '' ? node.label : node.id)
 }
 
+/** One thing placed at a level: a box, or a boundary whose size came from its own contents. */
+interface Entity {
+  id: string
+  group: boolean
+  width: number
+  height: number
+}
 
+/** The geometry of one level (the page, or one boundary's inside) relative to its own top-left corner. */
+interface LevelLayout {
+  width: number
+  height: number
+  items: Map<string, { box: Box; group: boolean }>
+  lanes: Map<number, Lane>
+  across: Set<number>
+}
 
-/** The layered placement: breadth-first rows, centred, no containment. */
-function placeByRanks(diagram: Diagram, nodes: DiagramNode[], top: number): Placement {
-  const nodeById = new Map(nodes.map((node) => [node.id, node] as const))
-  const sizeOf = (id: string): TextBox => textOf(nodeById.get(id) as DiagramNode)
-  const ranked = rankStates(diagram.nodes, diagram.edges, diagram.init)
-  const rows: string[][] = [...ranked.rows]
-  if (ranked.unreachable.length > 0) rows.push(ranked.unreachable)
-
-  // Barycentre ordering: a node sits under the mean position of the nodes that point at it. Two sweeps - down and
-  // up - are what a layered drawing needs to stop long edges crossing; the rows are then centred as a whole.
-  const parents = new Map<string, string[]>()
-  const childrenOf = new Map<string, string[]>()
-  for (const edge of diagram.edges) {
-    if (!nodeById.has(edge.from) || !nodeById.has(edge.to)) continue
-    parents.set(edge.to, [...(parents.get(edge.to) ?? []), edge.from])
-    childrenOf.set(edge.from, [...(childrenOf.get(edge.from) ?? []), edge.to])
-  }
-  const position = new Map<string, number>()
-  const seed = (): void => {
-    for (const row of rows) row.forEach((id, index) => position.set(id, index))
-  }
-  const sweep = (neighbours: Map<string, string[]>, from: number, to: number): void => {
-    const step = from < to ? 1 : -1
-    for (let index = from; index !== to + step; index += step) {
-      const row = rows[index]
-      const scored = row.map((id) => {
-        const near = neighbours.get(id) ?? []
-        const mean = near.length === 0 ? (position.get(id) ?? 0) : near.reduce((total, other) => total + (position.get(other) ?? 0), 0) / near.length
-        return { id, mean }
-      })
-      scored.sort((left, right) => left.mean - right.mean)
-      scored.forEach((entry, order) => position.set(entry.id, order))
-      rows[index] = scored.map((entry) => entry.id)
-    }
-  }
-  seed()
-  // One row has nothing to order against, and an empty drawing has no row at all.
-  if (rows.length > 1) {
-    sweep(parents, 1, rows.length - 1)
-    sweep(childrenOf, rows.length - 2, 0)
-  }
-
-  const boxes = new Map<string, Box>()
-  let widest = 0
-  // The row's height is its tallest label, and the next row starts below it: a fixed row height is what made a
-  // wrapped label overlap the box beneath it.
-  let y = top
-  // A diagram whose edges carry text gets the taller gap throughout: row-to-row labels are the common case and
-  // estimating them per pair would mean reading the edges here, which is the painter's question.
-  const gap = diagram.edges.some((edge) => edge.label !== '') ? LABELLED_ROW_GAP : ROW_GAP
-  // Measure first: a column of rows can be far taller than it is wide, and a drawing nobody can see in one screen
-  // is not laid out, only stacked. Bands are the relay - the column is cut where it is longest and the pieces stand
-  // side by side, so the aspect ratio stays close to a page.
-  const rowSizes = rows.map((row) => row.map(sizeOf))
-  const rowHeights = rowSizes.map((sizes) => Math.max(ROW_MIN_HEIGHT, ...sizes.map((size) => size.height)))
-  const rowWidths = rowSizes.map((sizes) => sizes.reduce((total, size) => total + size.width, 0) + Math.max(0, sizes.length - 1) * COLUMN_GAP)
-  const columnWidth = Math.max(1, ...rowWidths)
-  const totalHeight = rowHeights.reduce((total, height) => total + height + gap, 0)
-  // A band is only worth it when there is a real column to break: three rows and a wide page read better stacked.
-  const target = columnWidth * 2.2
-  const bands = rows.length < 4 ? 1 : Math.max(1, Math.min(rows.length, Math.ceil(totalHeight / target)))
-
-  rows.forEach((row, index) => {
-    const sizes = rowSizes[index]
-    let x = 0
-    // Where the band starts: the rows are split evenly, and every band starts at the top.
-    const band = Math.min(bands - 1, Math.floor((index * bands) / rows.length))
-    const firstRowOfBand = Math.ceil((band * rows.length) / bands)
-    const bandOffset = rowHeights.slice(firstRowOfBand, index).reduce((total, height) => total + height + gap, 0)
-    if (band > 0 && index === firstRowOfBand) y = top
-    const bandX = band * (columnWidth + COLUMN_GAP * 2)
-    row.forEach((id, position) => {
-      boxes.set(id, { x: x + bandX, y: top + bandOffset, width: sizes[position].width, height: sizes[position].height })
-      x += sizes[position].width + COLUMN_GAP
-    })
-    widest = Math.max(widest, bandX + rowWidths[index])
-  })
-  rows.forEach((row) => {
-    const rowWidth = row.reduce((total, id) => total + (boxes.get(id) as Box).width, 0) + Math.max(0, row.length - 1) * COLUMN_GAP
-    const offset = (widest - rowWidth) / 2
-    for (const id of row) (boxes.get(id) as Box).x += offset + MARGIN
-  })
-  return { boxes, groupRects: new Map(), width: widest + MARGIN * 2 }
+/** Which group each id belongs to, and which group contains which. */
+interface GroupTree {
+  /** The group a node is drawn inside, when it is drawn inside one at all. */
+  owner: Map<string, string>
+  /** The group a group is drawn inside. */
+  parentOf: Map<string, string>
+  children: Map<string, string[]>
+  roots: string[]
 }
 
 /**
- * Which group each id belongs to, and which group contains which.
+ * Read membership and containment off the model, which is data and can be wrong.
  *
- * Membership is read from `members`; containment is read from `parent`, because only the parser knows where a
- * boundary was written. A model assembled by hand may omit `parent`, and then containment is inferred from
- * member sets - the tightest superset wins - which is the best such a model can offer.
- *
- * Guards, because a model is data and data can be wrong: a parent that does not exist is ignored, a group that
- * contains itself or closes a cycle is treated as a root, and a member claimed by two groups belongs to the
- * tightest one, so a nested boundary is not drawn around nothing.
+ * Membership is read from `members`; containment from `parent`, because only the parser knows where a boundary was
+ * written - a hand-written model may omit it, and then the tightest member-set that contains this one is the best
+ * guess available. Guards, because a model is data: a parent that does not exist is ignored, a group that contains
+ * itself or closes a cycle is treated as a root, and a member claimed by two groups belongs to the tightest one.
  */
-function groupTree(groups: DiagramGroup[]): { owner: Map<string, string>; children: Map<string, string[]>; roots: string[] } {
+function groupTree(groups: DiagramGroup[]): GroupTree {
   const byId = new Map(groups.map((group) => [group.id, group] as const))
 
   const owner = new Map<string, string>()
@@ -207,107 +166,337 @@ function groupTree(groups: DiagramGroup[]): { owner: Map<string, string>; childr
     if (parent === undefined) roots.push(group.id)
     else children.set(parent, [...(children.get(parent) ?? []), group.id])
   }
-  return { owner, children, roots }
+  return { owner, parentOf, children, roots }
 }
 
-interface Measured {
-  width: number
-  height: number
-}
+/** One weakly connected component of a level, placed on its own. */
+interface Piece extends LevelLayout {}
 
-/** The tree placement: a boundary is a block, its contents stack inside it, the top level stacks. */
-function placeByGroups(diagram: Diagram, nodes: DiagramNode[], top: number): Placement {
-  const groups = diagram.groups as DiagramGroup[]
+export function place(diagram: Diagram, top: number): Placement {
+  const groups = diagram.groups ?? []
+  const nodes: DiagramNode[] = []
+  const seenNode = new Set<string>()
+  for (const node of diagram.nodes) {
+    if (seenNode.has(node.id)) continue
+    seenNode.add(node.id)
+    nodes.push(node)
+  }
   const nodeById = new Map(nodes.map((node) => [node.id, node] as const))
-  const byId = new Map(groups.map((group) => [group.id, group] as const))
-  const { owner, children, roots } = groupTree(groups)
+  const groupById = new Map(groups.map((group) => [group.id, group] as const))
+  const tree = groupTree(groups)
 
-  // Nodes that belong to no group, and the first-seen order that keeps a source's own ordering visible.
-  const order = new Map(nodes.map((node, index) => [node.id, index] as const))
-  const loose = nodes.filter((node) => !owner.has(node.id)).map((node) => node.id)
+  // The order the source wrote things in: the fallback order wherever connectivity says nothing.
+  const appearance = new Map<string, number>()
+  for (const node of nodes) if (!appearance.has(node.id)) appearance.set(node.id, appearance.size)
+  for (const group of groups) if (!appearance.has(group.id)) appearance.set(group.id, appearance.size)
 
-  const nodeIds = new Set(nodes.map((node) => node.id))
-  const rawContents = (groupId: string): string[] => {
-    const group = byId.get(groupId) as DiagramGroup
-    const own = [...new Set(group.members)].filter((member) => owner.get(member) === groupId && nodeIds.has(member))
-    const nested = children.get(groupId) ?? []
-    return [...own, ...nested]
-  }
-  // A boundary with nothing inside it is not drawn: an empty box claims a containment the source never stated.
-  const contents = (groupId: string): string[] => rawContents(groupId).filter((child) => !byId.has(child) || rawContents(child).length > 0)
-
-  const blockGap = diagram.edges.some((edge) => edge.label !== '') ? LABELLED_BLOCK_GAP : BLOCK_GAP
-  const measure = (id: string): Measured => {
-    if (!byId.has(id)) return textOf(nodeById.get(id) as DiagramNode)
-    const items = contents(id)
-    const sizes = items.map(measure)
-    return {
-      width: Math.max(MIN_NODE_WIDTH, ...sizes.map((size) => size.width)) + GROUP_PADDING * 2,
-      height: GROUP_HEADER + GROUP_PADDING * 2 + sizes.reduce((total, size) => total + size.height, 0) + Math.max(0, items.length - 1) * blockGap,
+  const visible = new Set<string>()
+  const asked = new Map<string, boolean>()
+  const isVisible = (id: string): boolean => {
+    const known = asked.get(id)
+    if (known !== undefined) return known
+    const group = groupById.get(id)
+    if (group === undefined) {
+      asked.set(id, false)
+      return false
     }
-  }
-
-  const boxes = new Map<string, Box>()
-  const groupRects = new Map<string, Box>()
-
-  const place = (id: string, x: number, y: number): Measured => {
-    const size = measure(id)
-    if (!byId.has(id)) {
-      boxes.set(id, { x, y, width: size.width, height: size.height })
-      return size
-    }
-    groupRects.set(id, { x, y, width: size.width, height: size.height })
-    let cursor = y + GROUP_HEADER + GROUP_PADDING
-    const inner = size.width - GROUP_PADDING * 2
-    // Connectivity first, declaration order only as a tie-break: a child that is reached from the child above it
-    // belongs under it, and stacking by declaration order is what made a group's edges cross each other.
-    const affinity = (child: string): number => {
-      const partners = new Set<string>()
-      for (const edge of diagram.edges) {
-        if (edge.from === child) partners.add(edge.to)
-        if (edge.to === child) partners.add(edge.from)
+    let found = false
+    for (const member of group.members) {
+      if (tree.owner.get(member) === id && nodeById.has(member)) {
+        found = true
+        break
       }
-      const near = [...partners].filter((other) => other !== child && firstIndex(other) !== undefined)
-      if (near.length === 0) return firstIndex(child)
-      return near.reduce((total, other) => total + firstIndex(other), 0) / near.length
     }
-    const ordered = [...contents(id)].sort((left, right) => affinity(left) - affinity(right) || firstIndex(left) - firstIndex(right))
-    for (const child of ordered) {
-      const childSize = measure(child)
-      place(child, x + GROUP_PADDING + (inner - childSize.width) / 2, cursor)
-      cursor += childSize.height + blockGap
+    if (!found) {
+      for (const child of tree.children.get(id) ?? []) {
+        if (isVisible(child)) {
+          found = true
+          break
+        }
+      }
     }
+    asked.set(id, found)
+    if (found) visible.add(id)
+    return found
+  }
+  // Every group is asked, not only the roots: a nested group's visibility is what tells its parent it has contents.
+  for (const group of groups) isVisible(group.id)
+
+  const directNodes = (scope: string): string[] => nodes.filter((node) => tree.owner.get(node.id) === scope).map((node) => node.id)
+  const directGroups = (scope: string): string[] => (tree.children.get(scope) ?? []).filter((child) => visible.has(child))
+
+  const firstIndexCache = new Map<string, number>()
+  const firstIndexOf = (id: string): number => {
+    const cached = firstIndexCache.get(id)
+    if (cached !== undefined) return cached
+    if (nodeById.has(id)) return appearance.get(id) as number
+    const members = (groupById.get(id) as DiagramGroup).members
+      .filter((member) => tree.owner.get(member) === id && nodeById.has(member))
+      .map((member) => appearance.get(member) as number)
+    const children = directGroups(id).map(firstIndexOf)
+    const all = [...members, ...children]
+    const found = all.length === 0 ? (appearance.get(id) ?? Number.MAX_SAFE_INTEGER) : Math.min(...all)
+    firstIndexCache.set(id, found)
+    return found
+  }
+
+  /** Which group or node a diagram node is drawn as, at one level; `undefined` when it is outside that level. */
+  const entityAt = (scope: string | undefined, nodeId: string): string | undefined => {
+    if (!nodeById.has(nodeId)) return undefined
+    const group = tree.owner.get(nodeId)
+    if (scope === undefined) {
+      if (group === undefined || !visible.has(group)) return nodeId
+      let cursor = group
+      while (tree.parentOf.has(cursor)) cursor = tree.parentOf.get(cursor) as string
+      return cursor
+    }
+    if (group === scope) return nodeId
+    if (group === undefined) return undefined
+    return tree.parentOf.get(group) === scope && visible.has(group) ? group : undefined
+  }
+
+  const groupSizes = new Map<string, { width: number; height: number }>()
+  const groupLayouts = new Map<string, LevelLayout>()
+  const measureGroup = (id: string): { width: number; height: number } => {
+    const cached = groupSizes.get(id)
+    if (cached !== undefined) return cached
+    const inside = buildLevel(id)
+    const size = {
+      width: Math.max(MIN_NODE_WIDTH, inside.width) + GROUP_PADDING * 2,
+      height: inside.height + GROUP_HEADER + GROUP_PADDING * 2,
+    }
+    groupSizes.set(id, size)
+    groupLayouts.set(id, inside)
     return size
   }
 
-  // Top level: loose nodes and root groups, in the order the source named them.
-  const visibleRoots = roots.filter((id) => contents(id).length > 0)
-  // A block takes the earliest position of anything inside it, so a group is drawn where its first member was
-  // named - not after every loose node, which put a downstream box above the packages it depends on.
-  const firstIndex = (id: string): number => {
-    // `order` holds every node, and a block is only ever asked about when it has contents.
-    if (!byId.has(id)) return order.get(id) as number
-    return Math.min(...contents(id).map(firstIndex))
+  const entityOf = (id: string): Entity => {
+    const node = nodeById.get(id)
+    if (node !== undefined) {
+      const text = textOf(node)
+      return { id, group: false, width: text.width, height: text.height }
+    }
+    const size = measureGroup(id)
+    return { id, group: true, width: size.width, height: size.height }
   }
-  const topItems = [...loose, ...visibleRoots].sort((left, right) => firstIndex(left) - firstIndex(right))
-  const sizes = topItems.map(measure)
-  const width = Math.max(MIN_NODE_WIDTH, ...sizes.map((size) => size.width))
-  let cursor = top
-  for (const item of topItems) {
-    const size = measure(item)
-    place(item, MARGIN + (width - size.width) / 2, cursor)
-    cursor += size.height + blockGap
+
+  const entitiesIn = (scope: string | undefined): Entity[] => {
+    const found: Entity[] = []
+    if (scope === undefined) {
+      for (const node of nodes) {
+        const group = tree.owner.get(node.id)
+        if (group === undefined || !visible.has(group)) found.push(entityOf(node.id))
+      }
+      for (const root of tree.roots) if (visible.has(root)) found.push(entityOf(root))
+    } else {
+      for (const id of directNodes(scope)) found.push(entityOf(id))
+      for (const id of directGroups(scope)) found.push(entityOf(id))
+    }
+    return found.sort((left, right) => firstIndexOf(left.id) - firstIndexOf(right.id))
   }
-  return { boxes, groupRects, width: width + MARGIN * 2 }
+
+  const edgesIn = (scope: string | undefined): LayoutEdge[] => {
+    const found: LayoutEdge[] = []
+    diagram.edges.forEach((edge, index) => {
+      if (edge.from === edge.to) return
+      const from = entityAt(scope, edge.from)
+      const to = entityAt(scope, edge.to)
+      if (from === undefined || to === undefined || from === to) return
+      found.push({ index, from, to })
+    })
+    return found
+  }
+
+  /** The entity that holds the initial state at this level, which is where layer zero is pinned. */
+  const pinnedAt = (scope: string | undefined): string | undefined => {
+    if (diagram.init === undefined) return undefined
+    const entity = entityAt(scope, diagram.init)
+    return entity === diagram.init || (entity !== undefined && groupById.has(entity)) ? entity : undefined
+  }
+
+  /**
+   * Lay out one weakly connected component: the pipeline, unshortened.
+   *
+   * A component has its own layers, its own ordering and its own coordinates. Nothing outside it can move it.
+   */
+  const layoutPiece = (entities: Entity[], edges: LayoutEdge[], pinned: string | undefined, seed: Map<string, number>): Piece => {
+    const byId = new Map(entities.map((entity) => [entity.id, entity] as const))
+    const graph: LayoutGraph = {
+      nodes: entities.map((entity) => ({ id: entity.id, width: entity.width, height: entity.height })),
+      edges,
+      ...(pinned === undefined ? {} : { init: pinned }),
+    }
+    const broken = breakCycles(graph)
+    const layered = layer(graph, broken.edges)
+    const augmented = addDummies(layered, broken.edges)
+    const ordered = order(augmented.layers, augmented.chains, seed)
+    const gap = edges.some((edge) => (diagram.edges[edge.index]?.label ?? '') !== '') ? LABELLED_LAYER_GAP : LAYER_GAP
+    const coordinates = assignCoordinates(
+      {
+        layers: ordered.layers,
+        chains: augmented.chains,
+        sizeOf: (id) => {
+          const entity = byId.get(id)
+          return entity === undefined ? { width: 0, height: 0 } : { width: entity.width, height: entity.height }
+        },
+        chainOf: augmented.chainOf,
+      },
+      { gap: NODE_GAP, layerGap: gap },
+    )
+    const bands = planBands(coordinates.layerWidth, coordinates.layerHeight, gap)
+    const bandOfLayer = new Array<number>(coordinates.layerHeight.length).fill(0)
+    bands.bands.forEach((band, index) => {
+      for (let depth = band.first; depth <= band.last; depth += 1) bandOfLayer[depth] = index
+    })
+    const layerTop: number[] = []
+    for (const band of bands.bands) {
+      let y = 0
+      for (let depth = band.first; depth <= band.last; depth += 1) {
+        layerTop[depth] = y
+        y += (coordinates.layerHeight[depth] as number) + gap
+      }
+    }
+
+    const items = new Map<string, { box: Box; group: boolean }>()
+    ordered.layers.forEach((row, depth) => {
+      const shift = (bands.bands[bandOfLayer[depth]] as { offsetX: number }).offsetX
+      const top = layerTop[depth]
+      const rowHeight = coordinates.layerHeight[depth]
+      for (const id of row) {
+        const entity = byId.get(id)
+        if (entity === undefined) continue
+        const centre = coordinates.x.get(id) ?? 0
+        items.set(id, {
+          box: {
+            x: centre + shift - entity.width / 2,
+            y: top + (rowHeight - entity.height) / 2,
+            width: entity.width,
+            height: entity.height,
+          },
+          group: entity.group,
+        })
+      }
+    })
+
+    // A lane is only worth reserving when both ends are boxes: a lane that ends on a boundary has no box to arrive
+    // at, and one that crosses a band boundary is two lanes with different column offsets. Those edges get the
+    // router instead.
+    const lanes = new Map<number, Lane>()
+    for (const chain of augmented.chains) {
+      if (chain.path.length <= 2) continue
+      const start = byId.get(chain.path[0])
+      const end = byId.get(chain.path[chain.path.length - 1])
+      if (start === undefined || end === undefined || start.group || end.group) continue
+      const fromLayer = layered.layerOf.get(chain.path[0])
+      const toLayer = layered.layerOf.get(chain.path[chain.path.length - 1])
+      if (fromLayer === undefined || toLayer === undefined) continue
+      if (bandOfLayer[fromLayer] !== bandOfLayer[toLayer]) continue
+      const lane = augmented.chainOf.get(chain.path[1])
+      if (lane === undefined) continue
+      const laneX = coordinates.x.get(lane)
+      if (laneX === undefined) continue
+      const shift = (bands.bands[bandOfLayer[fromLayer]] as { offsetX: number }).offsetX
+      const points: Point[] = []
+      for (let depth = fromLayer; depth < toLayer; depth += 1) {
+        points.push({ x: laneX + shift, y: (layerTop[depth] as number) + (coordinates.layerHeight[depth] as number) + gap / 2 })
+      }
+      lanes.set(chain.index, { points, reversed: broken.reversed.has(chain.index) })
+    }
+
+    // An edge whose ends sit in two different columns is read across the page, not down it: the painter draws it
+    // out of the side of one box and into the side of the other, which is where a wrapped reading order turns.
+    const across = new Set<number>()
+    for (const edge of edges) {
+      const from = layered.layerOf.get(edge.from)
+      const to = layered.layerOf.get(edge.to)
+      if (from === undefined || to === undefined) continue
+      if (bandOfLayer[from] !== bandOfLayer[to]) across.add(edge.index)
+    }
+
+    let right = 0
+    let bottom = 0
+    for (const entry of items.values()) {
+      right = Math.max(right, entry.box.x + entry.box.width)
+      bottom = Math.max(bottom, entry.box.y + entry.box.height)
+    }
+    return { width: right, height: bottom, items, lanes, across }
+  }
+
+  const cache = new Map<string, LevelLayout>()
+  function buildLevel(scope: string | undefined): LevelLayout {
+    const key = scope ?? ''
+    const cached = cache.get(key)
+    if (cached !== undefined) return cached
+    const entities = entitiesIn(scope)
+    if (entities.length === 0) {
+      const empty: LevelLayout = { width: 0, height: 0, items: new Map(), lanes: new Map(), across: new Set() }
+      cache.set(key, empty)
+      return empty
+    }
+    const edges = edgesIn(scope)
+    const pinned = pinnedAt(scope)
+    const seed = seedOrder({ nodes: entities.map((entity) => ({ id: entity.id, width: entity.width, height: entity.height })), edges, ...(pinned === undefined ? {} : { init: pinned }) })
+    const components = weakComponents(entities, edges)
+    const pieces: Piece[] = []
+    for (const members of components) {
+      const inside = new Set(members)
+      const pieceEntities = entities.filter((entity) => inside.has(entity.id))
+      const pieceEdges = edges.filter((edge) => inside.has(edge.from) && inside.has(edge.to))
+      const pin = pinned !== undefined && inside.has(pinned) ? pinned : undefined
+      pieces.push(layoutPiece(pieceEntities, pieceEdges, pin, seed))
+    }
+    const packed = packRectangles(pieces.map((piece) => ({ width: piece.width, height: piece.height })), { gap: COMPONENT_GAP })
+    const layout: LevelLayout = { width: packed.width, height: packed.height, items: new Map(), lanes: new Map(), across: new Set() }
+    pieces.forEach((piece, index) => {
+      for (const edgeIndex of piece.across) layout.across.add(edgeIndex)
+      const at = packed.placements[index]
+      for (const [id, item] of piece.items) {
+        layout.items.set(id, { box: { x: item.box.x + at.x, y: item.box.y + at.y, width: item.box.width, height: item.box.height }, group: item.group })
+      }
+      for (const [edgeIndex, lane] of piece.lanes) {
+        layout.lanes.set(edgeIndex, { points: lane.points.map((point) => ({ x: point.x + at.x, y: point.y + at.y })), reversed: lane.reversed })
+      }
+    })
+    cache.set(key, layout)
+    return layout
+  }
+
+  const root = buildLevel(undefined)
+  const boxes = new Map<string, Box>()
+  const groupRects = new Map<string, Box>()
+  const lanes = new Map<number, Lane>()
+  const across = new Set<number>()
+  const placeLevel = (layout: LevelLayout, originX: number, originY: number): void => {
+    for (const edgeIndex of layout.across) across.add(edgeIndex)
+    for (const [id, item] of layout.items) {
+      const box = { x: originX + item.box.x, y: originY + item.box.y, width: item.box.width, height: item.box.height }
+      if (item.group) {
+        groupRects.set(id, box)
+        const inside = groupLayouts.get(id) as LevelLayout
+        placeLevel(inside, box.x + (box.width - inside.width) / 2, box.y + GROUP_HEADER + GROUP_PADDING)
+        continue
+      }
+      boxes.set(id, box)
+    }
+    for (const [edgeIndex, lane] of layout.lanes) {
+      lanes.set(edgeIndex, { points: lane.points.map((point) => ({ x: point.x + originX, y: point.y + originY })), reversed: lane.reversed })
+    }
+  }
+  placeLevel(root, MARGIN, top)
+
+  let right = MARGIN
+  for (const box of boxes.values()) right = Math.max(right, box.x + box.width)
+  for (const box of groupRects.values()) right = Math.max(right, box.x + box.width)
+  return { boxes, groupRects, width: right + MARGIN, lanes, across }
 }
 
-/**
- * Place every box of a diagram.
- *
- * The choice of placement is a property of the source, not of the caller: a drawing that declares boundaries is
- * read as containers and gets the tree; one that does not is read as a machine and gets the ranks.
- */
-export function place(diagram: Diagram, top: number): Placement {
-  const groups = diagram.groups ?? []
-  return groups.length > 0 ? placeByGroups(diagram, diagram.nodes, top) : placeByRanks(diagram, diagram.nodes, top)
+/** The aspect ratio of a placement, for the tests that check a drawing is a page and not a strip. */
+export function placementAspect(placement: Placement): number {
+  let right = 0
+  let bottom = 0
+  for (const box of [...placement.boxes.values(), ...placement.groupRects.values()]) {
+    right = Math.max(right, box.x + box.width)
+    bottom = Math.max(bottom, box.y + box.height)
+  }
+  return aspectOf(right, bottom)
 }

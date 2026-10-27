@@ -11,7 +11,7 @@ import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
 import { LINE_HEIGHT, MAX_LINE_CHARS, TEXT_PADDING, MAX_NODE_WIDTH, explicitLines, measure, textWidth, wrapLine } from '../../lib/render/text.js'
-import { anchor, crossesBox, facingSides, routeEdge, simplify } from '../../lib/render/route.js'
+import { anchor, approachSides, crossesBox, routeEdge, simplify } from '../../lib/render/route.js'
 import { render } from '../../lib/render/index.js'
 
 let failures = 0
@@ -488,8 +488,9 @@ test('every edge ends with an arrowhead', () => {
   if (arrows !== edges) throw new Error(String(edges) + ' edges but ' + String(arrows) + ' arrowheads')
 })
 
-test('an edge inside one row runs sideways, not diagonally', () => {
-  // Both lower states are one step from the start, so the edge between them is within its row.
+test('an edge between two rows leaves a horizontal side, whichever side of the page the target is on', () => {
+  // The side is the route's approach direction, not the distance between the two centres: the drawing is layered
+  // downwards, so a state two rows down is still entered from the top even when it sits far to one side.
   const diagram = {
     kind: 'machine',
     title: 't',
@@ -503,8 +504,49 @@ test('an edge inside one row runs sideways, not diagonally', () => {
     caption: 'pass',
   }
   const { canvas } = paintWith(diagram)
-  const sideways = canvas.shapes.filter((shape) => shape.kind === 'link' && shape.y1 === shape.y2)
-  if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
+  const boxes = new Map(canvas.shapes.filter((shape) => shape.kind === 'box').map((box) => [box.label, box]))
+  const endsOf = new Map([
+    ['left', ['a', 'b']],
+    ['right', ['a', 'c']],
+    ['swap', ['b', 'c']],
+  ])
+  const pointsOf = (shape) =>
+    shape.kind === 'link' ? [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }] : shape.points
+  for (const shape of canvas.shapes.filter((entry) => entry.kind === 'link' || entry.kind === 'path')) {
+    const [from, to] = endsOf.get(shape.label)
+    const points = pointsOf(shape)
+    const source = boxes.get(from)
+    const target = boxes.get(to)
+    const first = points[0]
+    const last = points[points.length - 1]
+    if (first.y !== source.y && first.y !== source.y + source.height) {
+      throw new Error(shape.label + ' leaves through a vertical side at y=' + String(first.y))
+    }
+    if (last.y !== target.y && last.y !== target.y + target.height) {
+      throw new Error(shape.label + ' arrives through a vertical side at y=' + String(last.y))
+    }
+  }
+})
+
+test('an edge between adjacent rows is a straight vertical drop when the boxes allow one', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'a',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [
+      { from: 'a', label: 'one', to: 'b' },
+      { from: 'b', label: 'two', to: 'c' },
+    ],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  const links = canvas.shapes.filter((shape) => shape.kind === 'link')
+  if (links.length !== 2) throw new Error('links: ' + String(links.length))
+  for (const link of links) {
+    if (link.x1 !== link.x2) throw new Error('a drop is not vertical: ' + String(link.x1) + ' -> ' + String(link.x2))
+    if (!(link.y2 > link.y1)) throw new Error('a forward edge points back up the page')
+  }
 })
 
 test('an edge that has to go around a box is written as a polyline, not a line', () => {
@@ -640,28 +682,29 @@ test('an edge leaving a state nothing reaches still gets a row', () => {
   if (routes.length !== 3) throw new Error('edges drawn: ' + String(routes.length))
 })
 
-test('a sideways edge runs between the facing sides of its two boxes', () => {
-  // Both lower states share a row and one points back at the other; the barycentre pass decides which is on the
-  // left, so the assertion is about the sides each end attaches to, not about which box that turns out to be.
-  const diagram = {
-    kind: 'machine',
-    title: 't',
-    init: 'a',
-    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
-    edges: [
-      { from: 'a', label: 'left', to: 'b' },
-      { from: 'a', label: 'right', to: 'c' },
-      { from: 'c', label: 'back', to: 'b' },
-    ],
-    caption: 'pass',
+test('every drawn segment is axis-aligned, on every kind of drawing', () => {
+  // The invariant the whole router rests on: a diagonal reads as a connection that skips the rows it crosses.
+  const sources = [
+    ['graph TD', '  a[Gateway] --> b[Auth]', '  a --> c[Order service]', '  a --> d[Stock]', '  c --> e[(Orders)]', '  d --> e', '  a -->|probe| e'].join(String.fromCharCode(10)),
+    ['graph TD', '  subgraph Ingest', '    a[Gateway] --> b[Auth]', '    b --> c[Order service]', '  end', '  subgraph Fulfil', '    c --> d[(Orders)]', '    d --> e[Warehouse]', '  end', '  e --> f[Reconcile]', '  f -->|drift| a'].join(String.fromCharCode(10)),
+  ]
+  for (const source of sources) {
+    const { canvas } = paintWith(render({ source }).diagram)
+    for (const shape of canvas.shapes) {
+      if (shape.kind === 'link') {
+        if (Math.abs(shape.x1 - shape.x2) > 0.5 && Math.abs(shape.y1 - shape.y2) > 0.5) throw new Error('a link is diagonal')
+        continue
+      }
+      if (shape.kind !== 'path') continue
+      for (let index = 0; index + 1 < shape.points.length; index += 1) {
+        const from = shape.points[index]
+        const to = shape.points[index + 1]
+        if (Math.abs(from.x - to.x) > 0.5 && Math.abs(from.y - to.y) > 0.5) {
+          throw new Error('a path segment is diagonal: ' + JSON.stringify(from) + ' -> ' + JSON.stringify(to))
+        }
+      }
+    }
   }
-  const { canvas } = paintWith(diagram)
-  const sideways = canvas.shapes.filter((shape) => shape.kind === 'link' && shape.y1 === shape.y2)
-  if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
-  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
-  const touching = (x, y) => boxes.some((box) => (x === box.x || x === box.x + box.width) && y > box.y && y < box.y + box.height)
-  if (!touching(sideways[0].x1, sideways[0].y1)) throw new Error('the edge does not leave the side of its source: ' + String(sideways[0].x1))
-  if (!touching(sideways[0].x2, sideways[0].y2)) throw new Error('the edge does not arrive at the side of its target: ' + String(sideways[0].x2))
 })
 
 test('the dark surface gets its own palette', () => {
@@ -1230,8 +1273,8 @@ test('the route leaves the side that faces the target and arrives at the side th
   const from = { x: 0, y: 0, width: 100, height: 40 }
   const right = { x: 300, y: 0, width: 100, height: 40 }
   const below = { x: 0, y: 300, width: 100, height: 40 }
-  if (facingSides(from, right).exit !== 'right' || facingSides(from, right).entry !== 'left') throw new Error('horizontal sides')
-  if (facingSides(from, below).exit !== 'bottom' || facingSides(from, below).entry !== 'top') throw new Error('vertical sides')
+  if (approachSides(from, right).exit !== 'right' || approachSides(from, right).entry !== 'left') throw new Error('horizontal sides')
+  if (approachSides(from, below).exit !== 'bottom' || approachSides(from, below).entry !== 'top') throw new Error('vertical sides')
   const exit = anchor(from, 'bottom')
   if (exit.x !== 50 || exit.y !== 40) throw new Error('bottom anchor: ' + JSON.stringify(exit))
 })
