@@ -9,14 +9,17 @@
  * Supported:
  *
  * - `@startuml` / `@enduml` (optional) and `title ...`;
- * - `component X`, `component "text" as X`, `[text] as X`, `[text]`;
- * - `package "text" { ... }`, `node`, `folder`, `cloud`, `database` - a group, closed by `}`;
- * - `X --> Y`, `X ---> Y`, `X ..> Y`, `X --> Y : label`, arrow either direction;
- * - `state X`, `state "text" as X`, and `[*] --> X` for a start marker;
+ * - elements: `component`, `node`, `rectangle`, `artifact` and `state` (a rectangle), `database` and
+ *   `entity` (a cylinder), `usecase` (an ellipse), `[text]`, each with a `"text"` label and `as` alias;
+ * - boundaries: `package`, `folder`, `node`, `component`, `rectangle` and `artifact` blocks, closed by `}`;
+ * - arrows, either direction: association `-->`/`<--`, dependency `..>`/`<..`, generalisation `--|>`/`<|--`,
+ *   realisation `..|>`/`<|..`, composition `*--`/`--*`, aggregation `o--`/`--o`, labelled after `:`;
+ * - `[*] --> X` for a start marker;
  * - `'` comments and `skinparam`/`!theme` directives.
  *
- * Refused, by name: `sequence`, `actor`, `participant`, `usecase`, `class`, `object`, `note`, `legend`,
- * `alt`/`opt`/`loop`/`par` and any other fragment keyword.
+ * Refused, by line and by name: the element keywords this renderer has no symbol for (`actor`, `class`,
+ * `cloud`, ...), the diagram kinds it does not draw (`sequence`), and an edge it cannot draw as written (a
+ * line with no arrow end, a mark at both ends, a dotted diamond).
  */
 import { type Diagram } from './model.js';
 export interface Parsed {

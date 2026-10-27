@@ -150,6 +150,130 @@ test('an empty plantuml file is an empty drawing', () => {
   if (fromPlantUml('@startuml\n@enduml').diagram.kind !== 'none') throw new Error('drew from an empty file')
 })
 
+test('each element keyword draws the symbol it names', () => {
+  const source = [
+    '@startuml',
+    'database "Store" as store',
+    'entity "Ledger" as ledger',
+    'component "API" as api',
+    'node "Worker" as worker',
+    'rectangle "Cache" as cache',
+    'artifact "Build" as build',
+    'usecase "Check out" as checkout',
+    '[Order Service]',
+    'state Idle',
+    '@enduml',
+  ].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const shapes = new Map(diagram.nodes.map((node) => [node.id, node.shape]))
+  const expected = new Map([
+    ['store', 'cylinder'],
+    ['ledger', 'cylinder'],
+    ['api', 'rect'],
+    ['worker', 'rect'],
+    ['cache', 'rect'],
+    ['build', 'rect'],
+    ['checkout', 'circle'],
+    ['Order Service', 'rect'],
+    ['Idle', 'rect'],
+  ])
+  for (const [id, shape] of expected) {
+    if (shapes.get(id) !== shape) throw new Error(id + ' is ' + String(shapes.get(id)) + ', expected ' + shape)
+  }
+})
+
+test('a boundary keyword opens a boundary, and its direct members are the ones written there', () => {
+  const source = [
+    '@startuml',
+    'package "Core" {',
+    '  node "Worker" {',
+    '    component "Queue reader" as reader',
+    '  }',
+    '  component "API" as api',
+    '}',
+    '@enduml',
+  ].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const groups = diagram.groups ?? []
+  const core = groups.find((group) => group.label === 'Core')
+  const worker = groups.find((group) => group.label === 'Worker')
+  if (core === undefined || worker === undefined) throw new Error('a boundary is missing: ' + groups.map((group) => group.label).join(','))
+  if (!core.members.includes('api') || core.members.includes('reader')) throw new Error('Core members: ' + core.members.join(','))
+  if (!worker.members.includes('reader')) throw new Error('Worker members: ' + worker.members.join(','))
+  if (worker.parent !== core.id) throw new Error('Worker parent: ' + String(worker.parent))
+  // The block keyword is a boundary, not a box of its own.
+  if (diagram.nodes.some((node) => node.id === 'Worker' || node.id === 'Core')) throw new Error('a boundary keyword became a node')
+})
+
+test('an element keyword this renderer does not draw is refused with its line and a reason', () => {
+  for (const [keyword, line] of [['actor', 'actor User'], ['class', 'class Order'], ['cloud', 'cloud Network']]) {
+    const { refused } = fromPlantUml(['@startuml', line, 'A --> B', '@enduml'].join(String.fromCharCode(10)))
+    if (refused.length !== 1) throw new Error(keyword + ' refused: ' + JSON.stringify(refused))
+    if (!refused[0].startsWith('line 2:')) throw new Error(keyword + ' has no line number: ' + refused[0])
+    if (!refused[0].includes('`' + keyword + '`: ')) throw new Error(keyword + ' has no reason: ' + refused[0])
+  }
+})
+
+test('each arrow type is read in both directions, and points the way the source says', () => {
+  const source = [
+    '@startuml',
+    'A --> B : calls',
+    'C <-- D',
+    'E ..> F',
+    'G <.. H',
+    'I <|-- J',
+    'K --|> L',
+    'M <|.. N',
+    'O ..|> P',
+    'Q *-- R',
+    'S --* T',
+    'U o-- V',
+    'W --o X',
+    '@enduml',
+  ].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const check = (from, to, arrow, dashed, label) => {
+    const edge = diagram.edges.find((entry) => entry.from === from && entry.to === to)
+    if (edge === undefined) throw new Error('no edge ' + from + '>' + to)
+    if (edge.arrow !== arrow) throw new Error(from + '>' + to + ' is ' + String(edge.arrow) + ', expected ' + arrow)
+    if ((edge.dashed === true) !== dashed) throw new Error(from + '>' + to + ' dashed: ' + String(edge.dashed))
+    if (label !== undefined && edge.label !== label) throw new Error(from + '>' + to + ' label: ' + edge.label)
+  }
+  // Association: the end it points at is the target.
+  check('A', 'B', 'association', false, 'calls')
+  check('D', 'C', 'association', false)
+  // Dependency: the same arrow on a dashed line.
+  check('E', 'F', 'dependency', true)
+  check('H', 'G', 'dependency', true)
+  // Generalisation: `A <|-- B` means B generalises to A, so the triangle is at A and the edge runs B -> A.
+  check('J', 'I', 'generalization', false)
+  check('K', 'L', 'generalization', false)
+  // Realisation is a generalisation on a dashed line.
+  check('N', 'M', 'realization', true)
+  check('O', 'P', 'realization', true)
+  // The diamond marks the source, so a diamond written on the right swaps the ends.
+  check('Q', 'R', 'composition', false)
+  check('T', 'S', 'composition', false)
+  check('U', 'V', 'aggregation', false)
+  check('X', 'W', 'aggregation', false)
+})
+
+test('an edge it cannot draw as written is refused by line, not drawn as another arrow', () => {
+  const source = ['@startuml', 'A -- B', 'C *--> D', 'E *.. F', '@enduml'].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 3) throw new Error('refused: ' + JSON.stringify(refused))
+  if (diagram.edges.length !== 0) throw new Error('a refused edge was drawn: ' + JSON.stringify(diagram.edges))
+  const lines = refused.map((entry) => entry.slice(0, entry.indexOf(': ')))
+  if (JSON.stringify(lines) !== JSON.stringify(['line 2', 'line 3', 'line 4'])) throw new Error('lines: ' + lines.join(','))
+  for (const entry of refused) {
+    const reason = entry.slice(entry.indexOf(': ') + 2)
+    if (reason.trim() === '') throw new Error('a refusal without a reason: ' + entry)
+  }
+})
+
 // ----------------------------------------------------------------------------------------------- the entry
 
 test('the notation is detected from the first meaningful line', () => {

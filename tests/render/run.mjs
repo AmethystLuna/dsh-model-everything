@@ -571,6 +571,18 @@ test('a dashed mermaid edge is drawn dashed, because the painter now keeps the f
   if (solid.markup.includes('stroke-dasharray')) throw new Error('a solid edge gained a dash')
 })
 
+test('a plantuml source reaches the svg with the head its arrow stated', () => {
+  const association = render({ source: '@startuml\nA --> B\n@enduml' })
+  const generalisation = render({ source: '@startuml\nA <|-- B\n@enduml' })
+  if (generalisation.diagram.edges[0].from !== 'B' || generalisation.diagram.edges[0].to !== 'A') {
+    throw new Error('the generalisation runs the wrong way: ' + JSON.stringify(generalisation.diagram.edges[0]))
+  }
+  if (association.markup === generalisation.markup) throw new Error('the two arrows draw the same head')
+  if (!headsOf(generalisation.markup).some((head) => head.attrs.includes('stroke='))) {
+    throw new Error('the generalisation head is not hollow')
+  }
+})
+
 
 test('an edge between two rows leaves a horizontal side, whichever side of the page the target is on', () => {
   // The side is the route's approach direction, not the distance between the two centres: the drawing is layered
