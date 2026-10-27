@@ -1,19 +1,42 @@
 /**
- * Ranks for a machine, and the order of states within each rank.
+ * The graph the layout stages agree on, and the order they start from.
  *
- * Breadth-first from the initial state decides the row: the layout a reader expects, and the one a layered
- * drawing asks for - edges mostly flow down, and a state's row is how far it is from the start. A state
- * nothing reaches goes in a block of its own rather than being dropped.
+ * A layout stage has no business knowing what a diagram is: it sees boxes with a size and edges
+ * between them. That is what `LayoutGraph` is, and it is the whole vocabulary the pipeline shares -
+ * cycle breaking reads it, layering writes layers, ordering and coordinate assignment read those.
  *
- * Within a row, states are ordered by the mean position of their predecessors - the barycentre pass - because a
- * graph is not a tree: a node with several parents has to sit between them, and a row that keeps the order the
- * walk found it in draws two long edges crossing for no reason. Two sweeps are enough for a drawing this size;
- * a third has never moved anything in the fixtures.
+ * `rankStates` stays: it is the breadth-first order a source's own reading suggests, and it seeds
+ * the ordering stage with the discovery order instead of whatever order the parser happened to
+ * collect. It no longer decides which row a state is in - `layer.ts` does that now - so the rows it
+ * returns are only a first guess at the left-to-right order.
  *
- * Pure, and asserted on the rows themselves.
+ * Pure, and asserted on the answer itself.
  */
 
 import type { DiagramEdge, DiagramNode } from './model.js'
+
+/** A box to place: an id, and the space its text needs. */
+export interface LayoutNode {
+  id: string
+  width: number
+  height: number
+}
+
+/** An edge to draw: which two boxes it joins, and which diagram edge it came from. */
+export interface LayoutEdge {
+  /** The index in the diagram's own edge list, so the drawing can report a lane back for it. */
+  index: number
+  from: string
+  to: string
+}
+
+/** One level of a nested drawing: what is placed together in a single pass of the pipeline. */
+export interface LayoutGraph {
+  nodes: LayoutNode[]
+  edges: LayoutEdge[]
+  /** The box that must stay on layer zero, when the source named one. */
+  init?: string
+}
 
 export interface Ranked {
   /** The state ids of each row, top to bottom, already ordered left to right. */
@@ -22,7 +45,11 @@ export interface Ranked {
   unreachable: string[]
 }
 
-export function rankStates(nodes: DiagramNode[], edges: DiagramEdge[], init: string | undefined): Ranked {
+export function rankStates(
+  nodes: ReadonlyArray<{ id: string }>,
+  edges: ReadonlyArray<{ from: string; to: string }>,
+  init: string | undefined,
+): Ranked {
   const ids = nodes.map((node) => node.id)
   const known = new Set(ids)
   const start = init !== undefined && known.has(init) ? init : ids[0]
@@ -34,6 +61,7 @@ export function rankStates(nodes: DiagramNode[], edges: DiagramEdge[], init: str
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge.to])
     incoming.set(edge.to, [...(incoming.get(edge.to) ?? []), edge.from])
   }
+  void incoming
 
   const depth = new Map<string, number>()
   if (start !== undefined) {
@@ -60,3 +88,23 @@ export function rankStates(nodes: DiagramNode[], edges: DiagramEdge[], init: str
 
   return { rows, unreachable: ids.filter((id) => !depth.has(id)) }
 }
+
+/**
+ * The left-to-right seed the ordering stage starts from.
+ *
+ * Breadth-first discovery is what a reader expects a drawing to follow, so it is a better first
+ * guess than the order the parser collected. A state nothing reaches has no discovery order and
+ * keeps the order it was written in, after everything that was reached.
+ */
+export function seedOrder(graph: LayoutGraph): Map<string, number> {
+  const ranked = rankStates(graph.nodes, graph.edges, graph.init)
+  const order = new Map<string, number>()
+  let index = 0
+  for (const row of ranked.rows) for (const id of row) order.set(id, index++)
+  for (const id of ranked.unreachable) order.set(id, index++)
+  return order
+}
+
+/** Re-exported so a stage module can name the diagram shape without importing the model itself. */
+export type DiagramNodeLike = Pick<DiagramNode, 'id'>
+export type DiagramEdgeLike = Pick<DiagramEdge, 'from' | 'to'>
