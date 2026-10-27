@@ -32,6 +32,8 @@ export interface Obstacle {
 }
 /** The four sides a route may leave a box from. */
 export type Side = 'top' | 'bottom' | 'left' | 'right';
+/** The length of the straight run an edge takes before it is allowed to turn. */
+export declare const ROUTE_STUB = 16;
 /** The outward normal of a side: the direction an edge leaves along. */
 export declare function normalOf(side: Side): Point;
 /** A segment crossing a box at all, with a little slack so a route does not shave a corner. */

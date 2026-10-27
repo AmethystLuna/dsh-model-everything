@@ -1753,21 +1753,14 @@ test('a route never crosses the box it was routed around, however it got there',
   }
 })
 
-test('a rendered drawing carries no edge through a box', () => {
-  const source = [
-    'graph TD',
-    '  a[Gateway] --> b[Auth service]',
-    '  a --> c[Order service]',
-    '  a --> d[Stock service]',
-    '  c --> e[(Orders)]',
-    '  d --> e',
-    '  a -->|health probe, every 30s| e',
-  ].join(String.fromCharCode(10))
-  const { canvas } = paintWith(render({ source }).diagram)
+/** Every place an edge passes through a box it does not attach to.
+ *
+ * A port may sit inside its own box's bounding box: a symbol need not fill it, and a cylinder's cap apex is inside.
+ * So a segment that starts or ends strictly inside a box is that edge attaching to it; every other segment has to
+ * clear every box, including the two the edge joins.
+ */
+const boxCrossings = (canvas) => {
   const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
-  // A port may sit inside its own box's bounding box: a symbol need not fill it, and a cylinder's cap apex is
-  // inside. So a segment that starts or ends strictly inside a box is that edge attaching to it; every other
-  // segment has to clear every box, including the two the edge joins.
   const attaches = (point, box) =>
     point.x > box.x + 0.5 && point.x < box.x + box.width - 0.5 && point.y > box.y + 0.5 && point.y < box.y + box.height - 0.5
   const crossings = []
@@ -1791,6 +1784,21 @@ test('a rendered drawing carries no edge through a box', () => {
       }
     }
   }
+  return crossings
+}
+
+test('a rendered drawing carries no edge through a box', () => {
+  const source = [
+    'graph TD',
+    '  a[Gateway] --> b[Auth service]',
+    '  a --> c[Order service]',
+    '  a --> d[Stock service]',
+    '  c --> e[(Orders)]',
+    '  d --> e',
+    '  a -->|health probe, every 30s| e',
+  ].join(String.fromCharCode(10))
+  const { canvas } = paintWith(render({ source }).diagram)
+  const crossings = boxCrossings(canvas)
   if (crossings.length > 0) throw new Error(crossings.join('; '))
 })
 
@@ -1937,42 +1945,196 @@ const endsOfRoute = (shape) => {
   return [points[0], points[points.length - 1]]
 }
 
-test('a diamond has four legal points, so two edges on one side take the vertex', () => {
-  const diagram = {
-    kind: 'machine',
-    title: 't',
-    init: 'd',
-    caption: 'pass',
-    nodes: [{ id: 'd', role: 'normal', shape: 'diamond' }, { id: 'x', role: 'normal' }, { id: 'y', role: 'normal' }],
-    edges: [{ from: 'd', label: 'yes', to: 'x' }, { from: 'd', label: 'no', to: 'y' }],
-  }
-  const { canvas } = paintWith(diagram)
+// The policy these cases hold: a symbol with discrete points gives every edge end a point of its own, and only when
+// the four are taken does an edge share one. A symbol with a run keeps spreading along the run. So the cases below
+// come in pairs - a diamond and a rectangle on the same four branches - and the fallback and the tie-break have cases
+// of their own, because a rule that always shares and a rule that never shares would each pass half of them.
+
+/** Which vertex of a diamond a point is, by the order `diamondCorners` returns: top, right, bottom, left. */
+const cornerAt = (corners, point) => corners.findIndex((corner) => Math.hypot(corner.x - point.x, corner.y - point.y) <= 0.01)
+
+/** The side a diamond vertex belongs to, by the same order. */
+const SIDES_BY_CORNER = ['top', 'right', 'bottom', 'left']
+
+/**
+ * Does the route meet this vertex square to the side it belongs to, coming from that side's outside?
+ *
+ * The neighbouring point on the route is `away`: the second point for a port an edge leaves by, the second-to-last for
+ * one it arrives at. Both have to lie outside the symbol - an edge that meets a right vertex from above is a line
+ * glued to the side, whatever the port's coordinate says.
+ */
+const meetsSquare = (corners, port, away) => {
+  const at = cornerAt(corners, port)
+  if (at === -1) return false
+  const dx = away.x - port.x
+  const dy = away.y - port.y
+  const side = SIDES_BY_CORNER[at]
+  if (side === 'right') return dx > 0.01 && Math.abs(dy) <= 0.01
+  if (side === 'left') return dx < -0.01 && Math.abs(dy) <= 0.01
+  if (side === 'top') return dy < -0.01 && Math.abs(dx) <= 0.01
+  return dy > 0.01 && Math.abs(dx) <= 0.01
+}
+
+/** A machine whose one source is a diamond (or a rectangle, for the contrast) with branches out to boxes in a row. */
+const branchDiagram = (shape, targets) => ({
+  kind: 'machine',
+  title: 't',
+  init: 'd',
+  caption: 'pass',
+  nodes: [{ id: 'd', role: 'normal', ...(shape === 'rect' ? {} : { shape }) }, ...targets.map((id) => ({ id, role: 'normal' }))],
+  edges: targets.map((id, index) => ({ from: 'd', label: 'branch ' + String(index + 1), to: id })),
+})
+
+test('a diamond with two labelled branches leaves by two different vertices', () => {
+  // The case that named the rule: a decision's two branches used to leave one vertex and fan apart a few points later,
+  // so the two lines coincided exactly where a reader looks first, at the outline of the decision.
+  const { canvas } = paintWith(branchDiagram('diamond', ['x', 'y']))
   const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
   if (diamond.shape !== 'diamond') throw new Error('the fixture did not draw a diamond')
   const corners = diamondCorners(diamond)
   const routes = routesOf(canvas)
   if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
   const anchors = routes.map((shape) => endsOfRoute(shape)[0])
-  for (const anchor of anchors) {
-    // A vertex, and nothing else: the four points are the only places the side meets the outline.
-    if (distanceToDiamond(diamond, anchor) > 0.01) {
-      throw new Error('a port is not on the diamond: ' + JSON.stringify(anchor))
-    }
-    if (!corners.some((corner) => Math.hypot(corner.x - anchor.x, corner.y - anchor.y) <= 0.01)) {
-      throw new Error('a port sits between two vertices: ' + JSON.stringify(anchor))
-    }
-  }
-  // Both edges leave the bottom side, and the bottom side's one legal point is the bottom vertex.
-  const bottom = corners[2]
-  for (const anchor of anchors) {
-    if (Math.hypot(anchor.x - bottom.x, anchor.y - bottom.y) > 0.01) {
-      throw new Error('a bottom-side port is not the bottom vertex: ' + JSON.stringify(anchor))
+  for (const [index, anchor] of anchors.entries()) {
+    // A vertex, and nothing else: the four points are the only places a side meets the outline.
+    if (distanceToDiamond(diamond, anchor) > 0.01) throw new Error('a port is not on the diamond: ' + JSON.stringify(anchor))
+    if (cornerAt(corners, anchor) === -1) throw new Error('a port sits between two vertices: ' + JSON.stringify(anchor))
+    const points = routePointsOf(routes[index])
+    if (!meetsSquare(corners, anchor, points[1])) {
+      throw new Error('the edge does not leave its vertex square to that side: ' + JSON.stringify(points.slice(0, 3)))
     }
   }
-  // The shared vertex is where the fan starts: the two edges are not one line drawn twice.
-  if (JSON.stringify(routePointsOf(routes[0])) === JSON.stringify(routePointsOf(routes[1]))) {
-    throw new Error('two statements about one diamond are drawn as one edge')
+  // Two vertices, and two lines: not one line that the fan splits after the outline.
+  if (cornerAt(corners, anchors[0]) === cornerAt(corners, anchors[1])) {
+    throw new Error('the two branches leave one vertex: ' + JSON.stringify(anchors))
   }
+  if (sharesSegment(segmentsOfShape(routes[0]), segmentsOfShape(routes[1]))) throw new Error('the two branches share a segment')
+  // The labels name the branches, and each sits on the line it names.
+  const labels = routes.map((shape) => shape.label)
+  if (JSON.stringify(labels) !== JSON.stringify(['branch 1', 'branch 2'])) throw new Error('labels: ' + JSON.stringify(labels))
+  for (const shape of routes) {
+    if (distanceToRoute(shape, { x: shape.labelX, y: shape.labelY }) > 2) throw new Error('label "' + shape.label + '" is off its own edge')
+  }
+})
+
+test('a diamond with four outgoing edges uses all four vertices', () => {
+  // Four branches and four points, so every branch gets one. One of them has to leave by the point that is left - the
+  // top one, toward a target below - and that is the case where the route has to go round its own symbol instead of
+  // through it.
+  const { canvas } = paintWith(branchDiagram('diamond', ['far left', 'near left', 'near right', 'far right']))
+  const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  const corners = diamondCorners(diamond)
+  const routes = routesOf(canvas)
+  if (routes.length !== 4) throw new Error('edges drawn: ' + String(routes.length))
+  const used = routes.map((shape) => cornerAt(corners, endsOfRoute(shape)[0]))
+  if (used.some((at) => at === -1)) throw new Error('a port is not a vertex: ' + JSON.stringify(used))
+  if (new Set(used).size !== 4) throw new Error('the four branches did not take four vertices: ' + JSON.stringify(used))
+  for (const [index, shape] of routes.entries()) {
+    const points = routePointsOf(shape)
+    if (!meetsSquare(corners, points[0], points[1])) {
+      throw new Error('a branch does not leave its vertex square to that side: ' + JSON.stringify(points.slice(0, 3)))
+    }
+  }
+  // The point that faces away from its target is still a port on the outline, and the route round it crosses nothing.
+  const crossings = boxCrossings(canvas)
+  if (crossings.length > 0) throw new Error(crossings.join('; '))
+})
+
+test('a fifth edge on a diamond shares a point, and the fallback is the side it approaches by', () => {
+  // Four points and five branches: the fifth has nowhere of its own to go, so the old rule applies to it - the side
+  // the route approaches by, whose point it shares with whichever branch already holds it - and the two still fan
+  // apart after the port. Sharing is the fallback, and it is asserted rather than left to be assumed.
+  const { canvas } = paintWith(branchDiagram('diamond', ['a1', 'a2', 'a3', 'a4', 'a5']))
+  const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  const corners = diamondCorners(diamond)
+  const routes = routesOf(canvas)
+  if (routes.length !== 5) throw new Error('edges drawn: ' + String(routes.length))
+  const used = routes.map((shape) => cornerAt(corners, endsOfRoute(shape)[0]))
+  if (used.some((at) => at === -1)) throw new Error('a port is not a vertex: ' + JSON.stringify(used))
+  if (new Set(used).size !== 4) throw new Error('the fifth branch did not fall back: ' + JSON.stringify(used))
+  const shared = used.find((at, index) => used.indexOf(at) !== index)
+  // Every target is below the diamond, so the side the route approaches by is the bottom one, and the shared point is
+  // its vertex rather than one of the three that a scored branch took.
+  if (shared !== SIDES_BY_CORNER.indexOf('bottom')) throw new Error('the fallback took a point that was free: ' + JSON.stringify(used))
+  const pair = routes.filter((shape, index) => used[index] === shared)
+  if (pair.length !== 2) throw new Error('the shared point is held by ' + String(pair.length) + ' edges')
+  const [first, second] = pair.map((shape) => routePointsOf(shape))
+  // One point, two lines: they leave together and part, which is the fan the sharing rule is named for.
+  if (JSON.stringify(first) === JSON.stringify(second)) throw new Error('the two edges sharing a point are drawn as one line')
+  const parts = first.some((point, at) => second[at] === undefined || point.x !== second[at].x || point.y !== second[at].y)
+  if (!parts) throw new Error('the two edges sharing a point never part')
+})
+
+test('a circle with two edges uses two different cardinal points', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'hub',
+    caption: 'pass',
+    nodes: [
+      { id: 'hub', role: 'normal', shape: 'circle' },
+      { id: 'x', role: 'normal' },
+      { id: 'y', role: 'normal' },
+    ],
+    edges: [{ from: 'hub', label: 'one', to: 'x' }, { from: 'hub', label: 'two', to: 'y' }],
+  }
+  const { canvas } = paintWith(diagram)
+  const hub = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'hub')
+  if (hub.shape !== 'circle') throw new Error('the fixture did not draw a circle')
+  const centre = { x: hub.x + hub.width / 2, y: hub.y + hub.height / 2 }
+  const cardinals = [
+    { x: centre.x, y: hub.y },
+    { x: hub.x + hub.width, y: centre.y },
+    { x: centre.x, y: hub.y + hub.height },
+    { x: hub.x, y: centre.y },
+  ]
+  const routes = routesOf(canvas)
+  if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
+  const anchors = routes.map((shape) => endsOfRoute(shape)[0])
+  const used = anchors.map((anchor) => cardinals.findIndex((cardinal) => Math.hypot(cardinal.x - anchor.x, cardinal.y - anchor.y) <= 0.01))
+  if (used.some((at) => at === -1)) throw new Error('a port is not a cardinal point: ' + JSON.stringify(anchors))
+  if (used[0] === used[1]) throw new Error('the two edges share a cardinal point: ' + JSON.stringify(anchors))
+})
+
+test('a rectangle with four outgoing edges still spreads them along one side', () => {
+  // The contrast to the four-vertex case: a rectangle has a run on its side and no points, so its four branches stay
+  // on the side the route leaves by and are spaced along it. Nothing about the discrete rule reaches a symbol that
+  // has no points to give.
+  const { canvas } = paintWith(branchDiagram('rect', ['far left', 'near left', 'near right', 'far right']))
+  const source = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  if (source.shape !== undefined) throw new Error('the fixture drew a symbol instead of a rectangle')
+  const ends = routesOf(canvas).map((shape) => endsOfRoute(shape)[0])
+  if (ends.length !== 4) throw new Error('edges drawn: ' + String(ends.length))
+  for (const end of ends) {
+    if (Math.abs(end.y - (source.y + source.height)) > 0.01) throw new Error('a port left the bottom side: ' + JSON.stringify(end))
+    if (end.x <= source.x || end.x >= source.x + source.width) throw new Error('a port is on the box corner, not the side: ' + JSON.stringify(end))
+  }
+  if (new Set(ends.map((end) => end.x)).size !== 4) throw new Error('the four ports are not four places: ' + JSON.stringify(ends.map((end) => end.x)))
+})
+
+test('two edges that tie for a point keep the order they were written in', () => {
+  // Mirror-image targets score the bottom vertex equally - the same drop, the same sideways distance either way - so
+  // the rule has to say which edge keeps it: the one written first, and the later edge takes the side nearest its own
+  // target. This is what makes the assignment deterministic, and it is the only reason edge order is read at all.
+  const cornersOf = (canvas) => {
+    const box = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+    return diamondCorners(box)
+  }
+  const first = paintWith({ ...branchDiagram('diamond', ['l', 'r']) }).canvas
+  const swapped = paintWith({
+    ...branchDiagram('diamond', ['l', 'r']),
+    edges: [{ from: 'd', label: 'branch 1', to: 'r' }, { from: 'd', label: 'branch 2', to: 'l' }],
+  }).canvas
+  const bottom = SIDES_BY_CORNER.indexOf('bottom')
+  const right = SIDES_BY_CORNER.indexOf('right')
+  const left = SIDES_BY_CORNER.indexOf('left')
+  const usedIn = (canvas) => routesOf(canvas).map((shape) => cornerAt(cornersOf(canvas), endsOfRoute(shape)[0]))
+  const written = usedIn(first)
+  const reversed = usedIn(swapped)
+  if (written[0] !== bottom) throw new Error('the first edge did not keep the point the two tie for: ' + JSON.stringify(written))
+  if (written[1] !== right) throw new Error('the later edge did not take the side nearest its target: ' + JSON.stringify(written))
+  if (reversed[0] !== bottom) throw new Error('rewriting the edges moved the tied point off the first one: ' + JSON.stringify(reversed))
+  if (reversed[1] !== left) throw new Error('the later edge did not take the side nearest its target: ' + JSON.stringify(reversed))
 })
 
 test('a circle has four legal points, so four edges land on the ellipse cardinal points', () => {
@@ -2010,15 +2172,19 @@ test('a circle has four legal points, so four edges land on the ellipse cardinal
   const used = new Set()
   routes.forEach((shape, index) => {
     const edge = diagram.edges[index]
-    for (const [id, point] of [[edge.from, endsOfRoute(shape)[0]], [edge.to, endsOfRoute(shape)[1]]]) {
+    const points = routePointsOf(shape)
+    for (const [id, point, away] of [[edge.from, points[0], points[1]], [edge.to, points[points.length - 1], points[points.length - 2]]]) {
       if (id !== 'hub') continue
       const at = cardinals.findIndex((cardinal) => Math.hypot(cardinal.x - point.x, cardinal.y - point.y) <= 0.01)
       if (at === -1) throw new Error('a port is not an ellipse cardinal point: ' + JSON.stringify(point))
+      // And the line meets the ellipse square to that cardinal point, from outside it: four points used, and used as
+      // sides rather than as coordinates on one side.
+      if (!meetsSquare(cardinals, point, away)) throw new Error('an edge does not meet its cardinal point square: ' + JSON.stringify(points.slice(-3)))
       used.add(at)
     }
   })
-  // Two edges arrive at the top and two leave the bottom, and each pair shares its cardinal point.
-  if (!used.has(0) || !used.has(2)) throw new Error('the fixture no longer exercises the top and bottom cardinals: ' + JSON.stringify([...used]))
+  // Two edges arrive at the top and two leave the bottom, and each of the four cardinals is in use.
+  if (used.size !== 4) throw new Error('the four cardinals are not all in use: ' + JSON.stringify([...used]))
 })
 
 test('a wrapped column edge meets a circle at the left and right cardinal points', () => {

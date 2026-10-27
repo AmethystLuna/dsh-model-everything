@@ -11,6 +11,7 @@
  */
 
 import type { Box, Point } from './place.js'
+import type { NodeShape } from './model.js'
 
 /** A cubic Bezier, as the writer draws a curve and the painter reads a point from it. */
 export interface Cubic {
@@ -56,6 +57,22 @@ export function diamondPoints(box: Box): [Point, Point, Point, Point] {
     { x: box.x + box.width / 2, y: box.y + box.height },
     { x: box.x, y: box.y + box.height / 2 },
   ]
+}
+
+/**
+ * Does this symbol meet each of its four sides at exactly one point?
+ *
+ * A diamond's side midpoints are its four vertices, and an ellipse's are its four cardinal points: both offer one legal
+ * port per side and no run to spread along. Every other symbol offers a run on at least one side - a rectangle along
+ * its whole side, a hexagon along the flat between its cut corners, a stadium between its end caps, a cylinder along
+ * its straight flank - so a port there has a place to sit rather than a point to take.
+ *
+ * This is the distinction the painter needs: a node with one legal point per side can give its edges a point each,
+ * and a node with a run can only give them places along it. The two points the discrete shapes offer are the same
+ * four points of the box, which is why one answer serves both.
+ */
+export function hasDiscretePorts(shape: NodeShape | undefined): boolean {
+  return shape === 'diamond' || shape === 'circle'
 }
 
 /** How much of each end of a hexagon the corner cuts away. */

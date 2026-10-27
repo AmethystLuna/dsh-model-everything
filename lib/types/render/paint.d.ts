@@ -10,9 +10,13 @@
  * and everything else goes through the orthogonal router. Which side of a box an edge leaves by is read off the
  * route, not picked by comparing the boxes' centres: a route between two rows arrives vertically, so the endpoint
  * is snapped onto the top or bottom perimeter in the direction the route approaches. Where along that side it sits
- * follows the symbol: a rectangle spreads its ports along the side, a diamond has four legal points and no side at
- * all, and a cylinder's top port sits on its cap curve. Two edges that want the same point share it, and their
- * routes fan apart from there.
+ * follows the symbol: a rectangle spreads its ports along the side, a cylinder's top port sits on its cap curve, and a
+ * diamond or a circle has four legal points and no side to spread along at all.
+ *
+ * A symbol with discrete points gives each of its edges a point of its own: the point whose outward normal faces the
+ * box at the other end is the one that edge takes, and an edge only shares a point when all four are spoken for. A
+ * node with a run on its side keeps doing what it always did, because there the ports are places on the run and not
+ * points at all. Sharing is the fallback, not the rule: two labelled branches of a decision leave by two vertices.
  *
  * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of the edge's longest straight
  * run, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when

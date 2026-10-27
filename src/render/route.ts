@@ -40,7 +40,7 @@ export type Side = 'top' | 'bottom' | 'left' | 'right'
 const LANE_GAP = 10
 
 /** The length of the straight run an edge takes before it is allowed to turn. */
-const STUB = 16
+export const ROUTE_STUB = 16
 
 /** The outward normal of a side: the direction an edge leaves along. */
 export function normalOf(side: Side): Point {
@@ -156,6 +156,18 @@ export interface Ports {
   entrySide: Side
 }
 
+/**
+ * Does this port face away from the box the edge is heading for?
+ *
+ * A side is usually picked from the direction of travel, so its outward normal points at the other box. A discrete
+ * port may break that: when the four points of a diamond are taken, the last edge leaves by the one that is left, and
+ * that side can face the wrong way. The route then has to come back round the box it just left.
+ */
+function facesAway(side: Side, port: Point, other: Obstacle): boolean {
+  const normal = normalOf(side)
+  return normal.x * (other.x + other.width / 2 - port.x) + normal.y * (other.y + other.height / 2 - port.y) < 0
+}
+
 export function routeEdge(
   from: Obstacle,
   to: Obstacle,
@@ -168,15 +180,22 @@ export function routeEdge(
   const exit = anchors?.exit ?? anchor(from, exitSide)
   const entry = anchors?.entry ?? anchor(to, entrySide)
 
-  // The stub: an edge leaves square to its side and arrives square to the target's side. Without it a route may
+  // The stub: an edge leaves square to its side and arrives square at the target's side. Without it a route may
   // slide sideways out of a box, which is what made the line look like it was glued to whatever box was nearest.
   const others = obstacles.filter((box) => box !== from && box !== to)
+  // A port that faces away from its target makes the box it belongs to an obstacle of its own: the route has to wrap
+  // round that box, and a search that does not know this cuts straight through it. It is an obstacle only then, so
+  // every route whose sides point the way it travels is decided exactly as it was.
+  const own: Obstacle[] = []
+  if (facesAway(exitSide, exit, to)) own.push(from)
+  if (facesAway(entrySide, entry, from)) own.push(to)
+  const blockers = own.length === 0 ? others : [...others, ...own]
   // A stub that lands inside another box is no stub: keep the plain anchors and let the search decide.
-  const blockedStub = (point: Point): boolean => others.some((box) => point.x > box.x && point.x < box.x + box.width && point.y > box.y && point.y < box.y + box.height)
+  const blockedStub = (point: Point): boolean => blockers.some((box) => point.x > box.x && point.x < box.x + box.width && point.y > box.y && point.y < box.y + box.height)
   const outNormal = normalOf(exitSide)
   const inNormal = normalOf(entrySide)
-  let exitStub = { x: exit.x + outNormal.x * STUB, y: exit.y + outNormal.y * STUB }
-  let entryStub = { x: entry.x + inNormal.x * STUB, y: entry.y + inNormal.y * STUB }
+  let exitStub = { x: exit.x + outNormal.x * ROUTE_STUB, y: exit.y + outNormal.y * ROUTE_STUB }
+  let entryStub = { x: entry.x + inNormal.x * ROUTE_STUB, y: entry.y + inNormal.y * ROUTE_STUB }
   if (blockedStub(exitStub) || blockedStub(entryStub)) {
     exitStub = exit
     entryStub = entry
@@ -186,16 +205,16 @@ export function routeEdge(
   // A straight line is only offered when it is axis-aligned and clear. A diagonal is clear often enough and still
   // wrong: in a layered drawing it reads as a connection that skips the layers it crosses.
   const axisAligned = Math.abs(exitStub.x - entryStub.x) < 0.5 || Math.abs(exitStub.y - entryStub.y) < 0.5
-  if (axisAligned && !others.some((box) => crossesBox(exitStub.x, exitStub.y, entryStub.x, entryStub.y, box))) {
+  if (axisAligned && !blockers.some((box) => crossesBox(exitStub.x, exitStub.y, entryStub.x, entryStub.y, box))) {
     return { points: simplify(straight), routed: false }
   }
 
   // The grid: one axis is x-lane values, the other y-lane values, and the routes are their intersections.
-  const xs = lanes(others, [exitStub.x, entryStub.x])
-  const ys = lanes(others, [exitStub.y, entryStub.y])
+  const xs = lanes(blockers, [exitStub.x, entryStub.x])
+  const ys = lanes(blockers, [exitStub.y, entryStub.y])
 
   const blocked = (x1: number, y1: number, x2: number, y2: number): boolean =>
-    others.some((box) => crossesBox(x1, y1, x2, y2, box))
+    blockers.some((box) => crossesBox(x1, y1, x2, y2, box))
 
   const start: Candidate = { point: exitStub, axis: -1, cost: 0, bends: 0, path: exitStub === exit ? [exit] : [exit, exitStub] }
   const queue: Candidate[] = [start]
