@@ -488,6 +488,90 @@ test('every edge ends with an arrowhead', () => {
   if (arrows !== edges) throw new Error(String(edges) + ' edges but ' + String(arrows) + ' arrowheads')
 })
 
+// -------------------------------------------------------------------------------------- edge heads and dashes
+
+/** One edge between two rectangles, so the head is the only polygon the drawing holds. */
+const edgeDiagram = (edge) => ({
+  kind: 'machine',
+  title: 't',
+  init: 'a',
+  nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+  edges: [{ from: 'a', label: '', to: 'b', ...edge }],
+  caption: 'pass',
+})
+
+const edgeMarkup = (edge) => {
+  const { canvas, colours } = paintWith(edgeDiagram(edge))
+  return toSvg(canvas, colours).markup
+}
+
+/** Every head polygon in a drawing, as its corner list and the attributes after it. */
+const headsOf = (markup) =>
+  [...markup.matchAll(/<polygon points="([^"]+)"([^>]*)>/g)].map((match) => ({ corners: match[1].split(' '), attrs: match[2] }))
+
+/** The source end of the one line in a drawing, to check which end a mark sits on. */
+const sourceOf = (markup) => {
+  const line = /<(?:line|polyline)[^>]*(?:x1="([\d.]+)" y1="([\d.]+)"|points="([\d.]+),([\d.]+))/.exec(markup)
+  if (line === null) throw new Error('no line in: ' + markup)
+  return (line[1] ?? line[3]) + ',' + (line[2] ?? line[4])
+}
+
+test('the painter keeps the arrow and the dash an edge states', () => {
+  const { canvas } = paintWith(edgeDiagram({ arrow: 'generalization', dashed: true }))
+  const route = canvas.shapes.find((shape) => shape.kind === 'link' || shape.kind === 'path')
+  if (route?.arrow !== 'generalization') throw new Error('the arrow did not reach the shape: ' + String(route?.arrow))
+  if (route?.dashed !== true) throw new Error('the dash did not reach the shape')
+})
+
+test('a generalisation head is hollow, so it differs from the association head', () => {
+  const association = headsOf(edgeMarkup({}))
+  const generalization = headsOf(edgeMarkup({ arrow: 'generalization' }))
+  if (association.length !== 1 || generalization.length !== 1) throw new Error('heads: ' + String(association.length) + '/' + String(generalization.length))
+  if (association[0].corners.length !== 3 || generalization[0].corners.length !== 3) throw new Error('a head is not a triangle')
+  if (association[0].attrs.includes('stroke=')) throw new Error('the association head gained an outline')
+  if (!generalization[0].attrs.includes('stroke=')) throw new Error('the generalisation head is not drawn as an outline')
+  if (association[0].attrs === generalization[0].attrs) throw new Error('the two heads are written the same way')
+  if (edgeMarkup({}) === edgeMarkup({ arrow: 'generalization' })) throw new Error('the two arrows draw the same picture')
+})
+
+test('a composition and an aggregation put a diamond at the source, filled and hollow', () => {
+  for (const [name, arrow] of [['composition', 'composition'], ['aggregation', 'aggregation']]) {
+    const markup = edgeMarkup({ arrow })
+    const heads = headsOf(markup)
+    if (heads.length !== 1) throw new Error(name + ' heads: ' + String(heads.length))
+    if (heads[0].corners.length !== 4) throw new Error(name + ' head is not a diamond')
+    if (heads[0].corners[0] !== sourceOf(markup)) throw new Error(name + ' diamond is not at the source')
+    const filled = name === 'composition'
+    if (!heads[0].attrs.includes(filled ? 'fill="#6b7280"' : 'fill="#ffffff"')) {
+      throw new Error(name + ' fill: ' + heads[0].attrs)
+    }
+  }
+})
+
+test('a dependency and a realisation are dashed, and an association is solid', () => {
+  if (edgeMarkup({}).includes('stroke-dasharray')) throw new Error('an association was drawn dashed')
+  for (const arrow of ['dependency', 'realization']) {
+    if (!edgeMarkup({ arrow, dashed: true }).includes('stroke-dasharray="4 3"')) throw new Error(arrow + ' is drawn solid')
+  }
+})
+
+test('a mermaid edge states no arrow, and a mermaid drawing is unchanged', () => {
+  const source = ['graph TD', '  a[Start] --> b{Check}', '  b -->|yes| c[Done]'].join(String.fromCharCode(10))
+  const rendered = render({ source })
+  if (rendered.diagram.edges.some((edge) => edge.arrow !== undefined)) throw new Error('a Mermaid edge gained an arrow type')
+  const golden =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 283" width="240" height="283" role="img" aria-label="mermaid: graph, 3 boxes, 2 arrows" font-family="system-ui, -apple-system, Segoe UI, sans-serif"><rect x="0" y="0" width="240" height="283" fill="#ffffff" /><rect x="20" y="46" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="63.5">Start</tspan></text><polygon points="64,127,108,140.5,64,154,20,140.5" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="144.5">Check</tspan></text><rect x="20" y="208" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="225.5">Done</tspan></text><line x1="64" y1="73" x2="64" y2="127" stroke="#6b7280" stroke-width="1" /><polygon points="64,127 60.8,120 67.2,120" fill="#6b7280" /><line x1="64" y1="154" x2="64" y2="208" stroke="#6b7280" stroke-width="1" /><polygon points="64,208 60.8,201 67.2,201" fill="#6b7280" /><text x="64" y="181" font-size="10" fill="#9aa3ad">yes</text><text x="20" y="32" font-size="12" fill="#1f2933">mermaid</text><text x="20" y="262" font-size="10" text-anchor="middle" fill="#6b7280"><tspan x="20" dy="0">graph, 3 boxes, 2 arrows</tspan></text></svg>'
+  if (rendered.markup !== golden) throw new Error('the Mermaid drawing changed: ' + rendered.markup)
+})
+
+test('a dashed mermaid edge is drawn dashed, because the painter now keeps the field', () => {
+  const dashed = render({ source: 'graph TD\n  a -.-> b' })
+  if (!dashed.markup.includes('stroke-dasharray="4 3"')) throw new Error('a dashed Mermaid edge is still solid')
+  const solid = render({ source: 'graph TD\n  a --> b' })
+  if (solid.markup.includes('stroke-dasharray')) throw new Error('a solid edge gained a dash')
+})
+
+
 test('an edge between two rows leaves a horizontal side, whichever side of the page the target is on', () => {
   // The side is the route's approach direction, not the distance between the two centres: the drawing is layered
   // downwards, so a state two rows down is still entered from the top even when it sits far to one side.

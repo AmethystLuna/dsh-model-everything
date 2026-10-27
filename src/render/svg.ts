@@ -30,6 +30,7 @@ function boxText(shape: { x: number; y: number; width: number; height: number; l
 
 
 import type { Canvas, Shape } from './paint.js'
+import type { EdgeArrow } from './model.js'
 import type { Palette } from './palette.js'
 
 /** One decimal place is enough at any zoom, and it keeps the markup readable. */
@@ -103,10 +104,18 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
   },
   link: (shape, colours) => {
     const stroke = colours[shape.colour]
-    const arrow = arrowHead(shape.x1, shape.y1, shape.x2, shape.y2, stroke)
+    const marks = edgeMarks(
+      { x: shape.x1, y: shape.y1 },
+      { x: shape.x2, y: shape.y2 },
+      { x: shape.x1, y: shape.y1 },
+      { x: shape.x2, y: shape.y2 },
+      shape.arrow,
+      stroke,
+      colours.background,
+    )
     return (
       '<line x1="' + n(shape.x1) + '" y1="' + n(shape.y1) + '" x2="' + n(shape.x2) + '" y2="' + n(shape.y2) +
-      '" stroke="' + stroke + '" stroke-width="1" />' + arrow + edgeLabel(shape.label, shape.labelX, shape.labelY, colours)
+      '" stroke="' + stroke + '" stroke-width="1"' + dash(shape) + ' />' + marks + edgeLabel(shape.label, shape.labelX, shape.labelY, colours)
     )
   },
   path: (shape, colours) => {
@@ -114,9 +123,12 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
     const points = shape.points.map((point) => n(point.x) + ',' + n(point.y)).join(' ')
     const last = shape.points[shape.points.length - 1]
     const before = shape.points[shape.points.length - 2] ?? last
+    const first = shape.points[0]
+    const after = shape.points[1] ?? first
     return (
-      '<polyline points="' + points + '" fill="none" stroke="' + stroke + '" stroke-width="1" stroke-linejoin="round" />' +
-      arrowHead(before.x, before.y, last.x, last.y, stroke) + edgeLabel(shape.label, shape.labelX, shape.labelY, colours)
+      '<polyline points="' + points + '" fill="none" stroke="' + stroke + '" stroke-width="1" stroke-linejoin="round"' + dash(shape) + ' />' +
+      edgeMarks(first, after, before, last, shape.arrow, stroke, colours.background) +
+      edgeLabel(shape.label, shape.labelX, shape.labelY, colours)
     )
   },
   title: (shape, colours) => {
@@ -131,19 +143,82 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
   },
 }
 
-/** A small filled triangle at the end of a segment, pointing along it. */
-function arrowHead(x1: number, y1: number, x2: number, y2: number, stroke: string): string {
-  const length = Math.hypot(x2 - x1, y2 - y1)
-  if (length < 1) return ''
-  const ux = (x2 - x1) / length
-  const uy = (y2 - y1) / length
+/** The dash pattern a route's source stated, or nothing for a solid line. */
+function dash(shape: { dashed?: boolean }): string {
+  return shape.dashed === true ? ' stroke-dasharray="4 3"' : ''
+}
+
+interface At {
+  x: number
+  y: number
+}
+
+/**
+ * The marks at an edge's two ends.
+ *
+ * `source`/`sourceNext` give the direction the line leaves the source, and `targetPrev`/`target` the direction it
+ * arrives at the target: the two ends of a polyline run in different directions. An edge with no arrow field keeps
+ * the plain arrow it has always been drawn with. A composition or an aggregation moves the mark to the source; a
+ * dependency and a realisation are told apart by the line, not by the head.
+ */
+function edgeMarks(source: At, sourceNext: At, targetPrev: At, target: At, arrow: EdgeArrow | undefined, stroke: string, background: string): string {
+  if (arrow === 'composition' || arrow === 'aggregation') {
+    return diamond(source, sourceNext, stroke, arrow === 'composition' ? stroke : background)
+  }
+  if (arrow === 'generalization' || arrow === 'realization') {
+    return hollowTriangle(targetPrev, target, stroke, background)
+  }
+  return arrowHead(targetPrev.x, targetPrev.y, target.x, target.y, stroke)
+}
+
+/** The tip and the two base corners of a head that points from `from` to `to`. */
+function tipAndBase(from: At, to: At): { tip: string; left: string; right: string } | undefined {
+  const length = Math.hypot(to.x - from.x, to.y - from.y)
+  if (length < 1) return undefined
+  const ux = (to.x - from.x) / length
+  const uy = (to.y - from.y) / length
   const size = 7
   const half = 3.2
-  const baseX = x2 - ux * size
-  const baseY = y2 - uy * size
-  const left = n(baseX - uy * half) + ',' + n(baseY + ux * half)
-  const right = n(baseX + uy * half) + ',' + n(baseY - ux * half)
-  return '<polygon points="' + n(x2) + ',' + n(y2) + ' ' + left + ' ' + right + '" fill="' + stroke + '" />'
+  const baseX = to.x - ux * size
+  const baseY = to.y - uy * size
+  return {
+    tip: n(to.x) + ',' + n(to.y),
+    left: n(baseX - uy * half) + ',' + n(baseY + ux * half),
+    right: n(baseX + uy * half) + ',' + n(baseY - ux * half),
+  }
+}
+
+/** A small filled triangle at the end of a segment, pointing along it. */
+function arrowHead(x1: number, y1: number, x2: number, y2: number, stroke: string): string {
+  const points = tipAndBase({ x: x1, y: y1 }, { x: x2, y: y2 })
+  if (points === undefined) return ''
+  return '<polygon points="' + points.tip + ' ' + points.left + ' ' + points.right + '" fill="' + stroke + '" />'
+}
+
+/** The open triangle a generalisation or a realisation ends in: the surface shows through it. */
+function hollowTriangle(from: At, to: At, stroke: string, background: string): string {
+  const points = tipAndBase(from, to)
+  if (points === undefined) return ''
+  return (
+    '<polygon points="' + points.tip + ' ' + points.left + ' ' + points.right +
+    '" fill="' + background + '" stroke="' + stroke + '" stroke-width="1" />'
+  )
+}
+
+/** The diamond a composition or an aggregation puts at its source, pointing back along the line. */
+function diamond(at: At, next: At, stroke: string, fill: string): string {
+  const length = Math.hypot(next.x - at.x, next.y - at.y)
+  if (length < 1) return ''
+  const ux = (next.x - at.x) / length
+  const uy = (next.y - at.y) / length
+  const size = 12
+  const half = 4
+  const back = { x: at.x + ux * size, y: at.y + uy * size }
+  const middle = { x: at.x + (ux * size) / 2, y: at.y + (uy * size) / 2 }
+  const left = { x: middle.x - uy * half, y: middle.y + ux * half }
+  const right = { x: middle.x + uy * half, y: middle.y - ux * half }
+  const points = [at, left, back, right].map((point) => n(point.x) + ',' + n(point.y)).join(' ')
+  return '<polygon points="' + points + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1" />'
 }
 
 /** An edge label, or nothing when the edge carries no event. */

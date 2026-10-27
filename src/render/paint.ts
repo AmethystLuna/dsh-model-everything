@@ -20,7 +20,7 @@ import { PORT_INSET } from './channels.js'
 import { approachSides, crossesBox, routeEdge, simplify, type Ports, type Side } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
-import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type NodeShape } from './model.js'
+import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 
 export interface Point {
   x: number
@@ -52,6 +52,10 @@ export interface LinkShape {
   labelX: number
   labelY: number
   colour: ColourRole
+  /** A dashed line, when the notation distinguished one. */
+  dashed?: boolean
+  /** The arrow the source edge stated. Undefined means the plain arrow every edge has been drawn with. */
+  arrow?: EdgeArrow
 }
 
 export interface PathShape {
@@ -61,6 +65,8 @@ export interface PathShape {
   labelX: number
   labelY: number
   colour: ColourRole
+  dashed?: boolean
+  arrow?: EdgeArrow
 }
 
 /** A boundary around several states: a package, a layer, a subgraph. */
@@ -476,6 +482,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       labelX: spot.x + textWidth(edge.label) / 2,
       labelY: spot.y,
       colour,
+      ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
+      ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
     })
   }
 
@@ -502,6 +510,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       labelX: spot.x + textWidth(edge.label) / 2,
       labelY: spot.y,
       colour,
+      ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
+      ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
     })
   }
 
@@ -539,6 +549,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         labelX: x + 20,
         labelY: y,
         colour,
+        ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
+        ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
       })
       continue
     }

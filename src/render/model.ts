@@ -23,12 +23,26 @@ export interface DiagramNode {
   shape?: NodeShape
 }
 
+/**
+ * What an edge's head means, when the notation distinguished it.
+ *
+ * The painter draws the meaning: a plain arrow for an association, a hollow triangle for a generalisation or a
+ * realisation, a filled diamond at the source for a composition, a hollow one for an aggregation, and a dashed
+ * line for the two dependency-flavoured kinds.
+ */
+export type EdgeArrow = 'association' | 'dependency' | 'generalization' | 'realization' | 'composition' | 'aggregation'
+
 export interface DiagramEdge {
   from: string
   to: string
   label: string
   /** A dashed edge, for notations that distinguish one. */
   dashed?: boolean
+  /**
+   * The arrow the notation stated. Absent means the plain arrow every edge has been drawn with: a Mermaid edge
+   * states no arrow type, so it carries no field and is drawn exactly as before.
+   */
+  arrow?: EdgeArrow
 }
 
 export interface DiagramGroup {

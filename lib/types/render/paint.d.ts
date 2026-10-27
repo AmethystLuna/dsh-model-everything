@@ -15,7 +15,7 @@
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 import { type ColourRole, type Palette, type PaletteOptions } from './palette.js';
-import { type Diagram, type DiagramNode, type NodeShape } from './model.js';
+import { type Diagram, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js';
 export interface Point {
     x: number;
     y: number;
@@ -44,6 +44,10 @@ export interface LinkShape {
     labelX: number;
     labelY: number;
     colour: ColourRole;
+    /** A dashed line, when the notation distinguished one. */
+    dashed?: boolean;
+    /** The arrow the source edge stated. Undefined means the plain arrow every edge has been drawn with. */
+    arrow?: EdgeArrow;
 }
 export interface PathShape {
     kind: 'path';
@@ -52,6 +56,8 @@ export interface PathShape {
     labelX: number;
     labelY: number;
     colour: ColourRole;
+    dashed?: boolean;
+    arrow?: EdgeArrow;
 }
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
