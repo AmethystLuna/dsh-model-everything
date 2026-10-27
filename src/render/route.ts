@@ -183,7 +183,7 @@ export function routeEdge(
   const blocked = (x1: number, y1: number, x2: number, y2: number): boolean =>
     others.some((box) => crossesBox(x1, y1, x2, y2, box))
 
-  const start: Candidate = { point: exitStub, axis: -1, cost: 0, bends: 0, path: [exit] }
+  const start: Candidate = { point: exitStub, axis: -1, cost: 0, bends: 0, path: exitStub === exit ? [exit] : [exit, exitStub] }
   const queue: Candidate[] = [start]
   const best = new Map<string, number>()
   const key = (point: Point): string => String(Math.round(point.x)) + ',' + String(Math.round(point.y))

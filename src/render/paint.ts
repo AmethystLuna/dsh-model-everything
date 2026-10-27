@@ -20,7 +20,7 @@
  */
 
 import { MARGIN, place, textOf, type Box } from './place.js'
-import { anchor, facingSides, routeEdge, type Ports, type Side } from './route.js'
+import { anchor, facingSides, normalOf, routeEdge, simplify, type Ports, type Side } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramGroup, type DiagramNode, type NodeShape } from './model.js'
@@ -300,25 +300,34 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const facing = diagram.edges.map((edge) => {
     const source = boxes.get(edge.from)
     const target = boxes.get(edge.to)
-    if (source === undefined || target === undefined || edge.from === edge.to) return undefined
-    if (Math.abs(target.y - source.y) < NODE_HEIGHT / 2) return facingSides(source, target)
-    return target.y > source.y
-      ? { exit: 'bottom' as const, entry: 'top' as const }
-      : { exit: 'top' as const, entry: 'bottom' as const }
+    return source === undefined || target === undefined || edge.from === edge.to ? undefined : facingSides(source, target)
   })
-  const slots = new Map<string, number>()
-  const counts = new Map<string, number>()
+  // Which edges sit on which side, keyed by box and side, with the coordinate of the far end as the sort key: a
+  // port's slot then follows the box it points at, left to right (or top to bottom) along the side.
+  const byPort = new Map<string, Array<{ index: number; sort: number }>>()
+  const remember = (key: string, index: number, sort: number): void => {
+    byPort.set(key, [...(byPort.get(key) ?? []), { index, sort }])
+  }
   for (const [index, entry] of facing.entries()) {
     if (entry === undefined) continue
-    for (const key of [diagram.edges[index].from + ':' + entry.exit, diagram.edges[index].to + ':' + entry.entry]) {
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
+    const edge = diagram.edges[index]
+    const from = boxes.get(edge.from) as Box
+    const to = boxes.get(edge.to) as Box
+    const horizontalSide = entry.exit === 'top' || entry.exit === 'bottom'
+    remember(edge.from + ':' + entry.exit, index, horizontalSide ? to.x + to.width / 2 : to.y + to.height / 2)
+    remember(edge.to + ':' + entry.entry, index, horizontalSide ? from.x + from.width / 2 : from.y + from.height / 2)
   }
-  const portOf = (boxId: string, side: Side): Point => {
+  const counts = new Map<string, number>()
+  const slots = new Map<string, number>()
+  for (const [key, list] of byPort) {
+    const ordered = [...list].sort((left, right) => left.sort - right.sort || left.index - right.index)
+    counts.set(key, ordered.length)
+    ordered.forEach((entry, slot) => slots.set(key + ':' + String(entry.index), slot))
+  }
+  const portOf = (boxId: string, side: Side, edgeIndex: number): Point => {
     const box = boxes.get(boxId) as Box
     const key = boxId + ':' + side
-    const index = slots.get(key) ?? 0
-    slots.set(key, index + 1)
+    const index = slots.get(key + ':' + String(edgeIndex)) ?? 0
     const spread = (index - ((counts.get(key) ?? 1) - 1) / 2) * 20
     const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value))
     if (side === 'top') return { x: box.x + clamp(box.width / 2 + spread, 10, box.width - 10), y: box.y }
@@ -331,8 +340,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (entry === undefined) continue
     const edge = diagram.edges[index]
     anchorsFor.set(index, {
-      exit: portOf(edge.from, entry.exit),
-      entry: portOf(edge.to, entry.entry),
+      exit: portOf(edge.from, entry.exit, index),
+      entry: portOf(edge.to, entry.entry, index),
       exitSide: entry.exit,
       entrySide: entry.entry,
     })
@@ -406,6 +415,30 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const entry = anchors?.entry ?? anchor(target, sides.entry)
     const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal, segments)
     labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+    if (Math.abs(exit.x - entry.x) > 0.5 && Math.abs(exit.y - entry.y) > 0.5) {
+      // Off both axes: go out along the exit's normal, across, and in along the entry's normal.
+      const out = normalOf(sides.exit)
+      const into = normalOf(sides.entry)
+      const a = { x: exit.x + out.x * 16, y: exit.y + out.y * 16 }
+      const b = { x: entry.x + into.x * 16, y: entry.y + into.y * 16 }
+      const corner = out.x !== 0 ? { x: b.x, y: a.y } : { x: a.x, y: b.y }
+      const points = simplify([exit, a, corner, b, entry])
+      for (let index = 0; index + 1 < points.length; index += 1) {
+        segments.push({ x1: points[index].x, y1: points[index].y, x2: points[index + 1].x, y2: points[index + 1].y })
+      }
+      const spot = placeLabel(edge.label, points[Math.floor(points.length / 2) - 1], points[Math.floor(points.length / 2)], boxList, labelRects, ordinal, segments)
+      labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+      shapes.push({
+        kind: 'path',
+        points,
+        label: edge.label,
+        labelX: spot.x + textWidth(edge.label) / 2,
+        labelY: spot.y,
+        colour,
+      })
+      continue
+    }
+
     segments.push({ x1: exit.x, y1: exit.y, x2: entry.x, y2: entry.y })
     shapes.push({
       kind: 'link',
