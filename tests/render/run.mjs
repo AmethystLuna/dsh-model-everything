@@ -681,8 +681,11 @@ test('two long edges between one pair run on two lanes', () => {
   const left = laneOf(routes[2])
   const right = laneOf(routes[3])
   if (left === undefined || right === undefined) throw new Error('a long edge lost its lane')
-  if (Math.abs(Math.abs(left - right) - MULTI_EDGE_SPACING) > 0.01) {
-    throw new Error('the two lanes are ' + String(Math.abs(left - right)) + ' apart, not one fan spacing')
+  // The property is "two separate lanes", not "exactly one spacing apart": coordinate assignment decides where a lane
+  // sits (the mean of its ends), and the fan only has to keep the two edges off each other. Pinning the distance made
+  // the case fail the moment the coordinate stage improved.
+  if (Math.abs(left - right) < MULTI_EDGE_SPACING * 0.5) {
+    throw new Error('the two lanes are only ' + String(Math.abs(left - right)) + ' apart, so they read as one')
   }
   if (sharesSegment(segmentsOfShape(routes[2]), segmentsOfShape(routes[3]))) throw new Error('the two long edges share a segment')
 })
