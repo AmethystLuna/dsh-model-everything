@@ -16,7 +16,7 @@
  */
 
 import { MARGIN, place, textOf, type Box } from './place.js'
-import { approachSides, normalOf, routeEdge, simplify, snapToPerimeter, type Ports, type Side } from './route.js'
+import { approachSides, routeEdge, simplify, snapToPerimeter, type Ports, type Side } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type NodeShape } from './model.js'

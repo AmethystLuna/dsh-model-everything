@@ -13,8 +13,6 @@
  * Pure, and asserted on the answer itself.
  */
 
-import type { DiagramEdge, DiagramNode } from './model.js'
-
 /** A box to place: an id, and the space its text needs. */
 export interface LayoutNode {
   id: string
@@ -55,13 +53,10 @@ export function rankStates(
   const start = init !== undefined && known.has(init) ? init : ids[0]
 
   const outgoing = new Map<string, string[]>()
-  const incoming = new Map<string, string[]>()
   for (const edge of edges) {
     if (!known.has(edge.from) || !known.has(edge.to)) continue
     outgoing.set(edge.from, [...(outgoing.get(edge.from) ?? []), edge.to])
-    incoming.set(edge.to, [...(incoming.get(edge.to) ?? []), edge.from])
   }
-  void incoming
 
   const depth = new Map<string, number>()
   if (start !== undefined) {
@@ -104,7 +99,3 @@ export function seedOrder(graph: LayoutGraph): Map<string, number> {
   for (const id of ranked.unreachable) order.set(id, index++)
   return order
 }
-
-/** Re-exported so a stage module can name the diagram shape without importing the model itself. */
-export type DiagramNodeLike = Pick<DiagramNode, 'id'>
-export type DiagramEdgeLike = Pick<DiagramEdge, 'from' | 'to'>

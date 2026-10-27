@@ -170,7 +170,7 @@ function groupTree(groups: DiagramGroup[]): GroupTree {
 }
 
 /** One weakly connected component of a level, placed on its own. */
-interface Piece extends LevelLayout {}
+type Piece = LevelLayout
 
 export function place(diagram: Diagram, top: number): Placement {
   const groups = diagram.groups ?? []
@@ -353,13 +353,13 @@ export function place(diagram: Diagram, top: number): Placement {
       let y = 0
       for (let depth = band.first; depth <= band.last; depth += 1) {
         layerTop[depth] = y
-        y += (coordinates.layerHeight[depth] as number) + gap
+        y += coordinates.layerHeight[depth] + gap
       }
     }
 
     const items = new Map<string, { box: Box; group: boolean }>()
     ordered.layers.forEach((row, depth) => {
-      const shift = (bands.bands[bandOfLayer[depth]] as { offsetX: number }).offsetX
+      const shift = bands.bands[bandOfLayer[depth]].offsetX
       const top = layerTop[depth]
       const rowHeight = coordinates.layerHeight[depth]
       for (const id of row) {
@@ -395,10 +395,10 @@ export function place(diagram: Diagram, top: number): Placement {
       if (lane === undefined) continue
       const laneX = coordinates.x.get(lane)
       if (laneX === undefined) continue
-      const shift = (bands.bands[bandOfLayer[fromLayer]] as { offsetX: number }).offsetX
+      const shift = bands.bands[bandOfLayer[fromLayer]].offsetX
       const points: Point[] = []
       for (let depth = fromLayer; depth < toLayer; depth += 1) {
-        points.push({ x: laneX + shift, y: (layerTop[depth] as number) + (coordinates.layerHeight[depth] as number) + gap / 2 })
+        points.push({ x: laneX + shift, y: layerTop[depth] + coordinates.layerHeight[depth] + gap / 2 })
       }
       lanes.set(chain.index, { points, reversed: broken.reversed.has(chain.index) })
     }

@@ -12,7 +12,6 @@
  *
  * Pure, and asserted on the answer itself.
  */
-import type { DiagramEdge, DiagramNode } from './model.js';
 /** A box to place: an id, and the space its text needs. */
 export interface LayoutNode {
     id: string;
@@ -53,6 +52,3 @@ export declare function rankStates(nodes: ReadonlyArray<{
  * keeps the order it was written in, after everything that was reached.
  */
 export declare function seedOrder(graph: LayoutGraph): Map<string, number>;
-/** Re-exported so a stage module can name the diagram shape without importing the model itself. */
-export type DiagramNodeLike = Pick<DiagramNode, 'id'>;
-export type DiagramEdgeLike = Pick<DiagramEdge, 'from' | 'to'>;

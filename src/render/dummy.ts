@@ -45,7 +45,7 @@ export function addDummies(layering: Layering, edges: LayoutEdge[]): Augmented {
     }
     const from = layering.layerOf.get(edge.from)
     const to = layering.layerOf.get(edge.to)
-    if (from === undefined || to === undefined || to <= from + 0) {
+    if (from === undefined || to === undefined || to <= from) {
       chains.push({ index: edge.index, path: [edge.from, edge.to] })
       continue
     }
