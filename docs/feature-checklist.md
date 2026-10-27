@@ -208,7 +208,7 @@ And the gates around it:
 | `client` | 12 | the declared client export is the built bundle the loader can execute |
 | `render` | 119 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
-| `layering` | 10 | a chain is one row per box |
+| `layering` | 16 | a chain is one row per box |
 | `ordering` | 8 | two edges that end in opposite order cross, and two in the same order do not |
 | `coords` | 5 | a box with one parent sits under it, and two of them straddle it evenly |
 | `channels` | 8 | two long edges crossing one gap get one lane each, in the order of their dummies |
