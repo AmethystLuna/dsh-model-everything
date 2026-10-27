@@ -16,6 +16,11 @@
  *
  * A route is only computed for an edge that needs it: the cheap straight segment is tried first, and routing is the
  * fallback. That keeps the common case - a box directly above another - at two points and no search.
+ *
+ * The layered painter mostly does not ask: an edge between two rows and an edge with a lane are both built from the
+ * channel stage's answer, because a route searched on its own cannot know which lanes the other edges already hold.
+ * What is left for this router is the drawing the layers do not describe - an edge across two wrapped columns, an
+ * edge one of whose ends is a boundary - and the fallback when a channel route would meet a box.
  */
 import type { Point } from './paint.js';
 /** A rectangle an edge may not cross. */
@@ -68,12 +73,3 @@ export declare function routeEdge(from: Obstacle, to: Obstacle, obstacles: Obsta
 };
 /** Drop the points in the middle of a straight run: three collinear points are one segment. */
 export declare function simplify(points: Point[]): Point[];
-/**
- * Where a line lands on a shape, given where it comes from.
- *
- * This is the rule a drawing tool uses: the endpoint is not a fixed point, it is the perimeter point in the
- * direction the line arrives from. A line arriving from above lands on the top edge, one arriving from the left
- * lands on the left edge - so a side connection happens when the route genuinely comes from the side, rather than
- * being chosen up front by a distance formula.
- */
-export declare function snapToPerimeter(box: Obstacle, from: Point): Point;

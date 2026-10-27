@@ -16,7 +16,8 @@
  */
 
 import { MARGIN, place, textOf, type Box } from './place.js'
-import { approachSides, routeEdge, simplify, snapToPerimeter, type Ports, type Side } from './route.js'
+import { PORT_INSET } from './channels.js'
+import { approachSides, crossesBox, routeEdge, simplify, type Ports, type Side } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type NodeShape } from './model.js'
@@ -93,6 +94,13 @@ export interface TitleShape {
 
 export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape
 
+/** Which side of each box an edge leaves by and arrives at, and, for a long edge, the lane x it meets there. */
+interface Facing {
+  exit: Side
+  entry: Side
+  at?: number
+}
+
 export interface Canvas {
   width: number
   height: number
@@ -105,6 +113,32 @@ const CAPTION_CHARS = 78
 const CAPTION_LINE = 15
 const CAPTION_GAP = 16
 const CAPTION_CHAR_WIDTH = 6.2
+
+/** The closest two ports on one side may sit, so two edges never leave from the same pixel. */
+const PORT_SEPARATION = 14
+
+/**
+ * Spread the ports of one side along it: each stays as close to the point it asked for as the gap to its neighbours
+ * allows, and the whole row is kept on the box.
+ *
+ * This is the same monotone fit coordinate assignment uses on x, applied to one side of one box: a forward pass that
+ * keeps every port at least `PORT_SEPARATION` to the right of the one before it, then a backward pass that pulls the
+ * row back onto the box without closing those gaps.
+ */
+function packPorts(wanted: number[], low: number, high: number): number[] {
+  const placed: number[] = []
+  let previous = low - PORT_SEPARATION
+  for (const value of wanted) {
+    previous = Math.min(high, Math.max(value, previous + PORT_SEPARATION))
+    placed.push(previous)
+  }
+  let next = high + PORT_SEPARATION
+  for (let index = placed.length - 1; index >= 0; index -= 1) {
+    next = Math.max(low, Math.min(placed[index], next - PORT_SEPARATION))
+    placed[index] = next
+  }
+  return placed
+}
 
 /** Which colour a box earns from its role. One mapping, used by every container. */
 export function roleOfNode(node: DiagramNode): ColourRole {
@@ -286,45 +320,59 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
   // Ports. The side comes from the route, not from comparing the two boxes' centres: a layered drawing runs
   // downwards, so an edge between two rows leaves the bottom and arrives at the top, and a back edge does the
-  // opposite. Where along the side the port sits follows the box it points at, so an edge between two rows is a
-  // straight drop whenever the two sides overlap; two edges that want the same place are spaced apart, so two
-  // ports never share a pixel.
-  // A long edge that follows a reserved lane decides its own ends, so it takes no slot on a side: letting it claim
-  // one would push the short edges around a port nothing is ever drawn at.
-  const facing = diagram.edges.map((edge, index) => {
+  // opposite. Where along the side the port sits follows the drawing: a long edge takes the point its lane meets, so
+  // the lane leaves and arrives square on, and a short edge points at the box it joins. Two edges that want the same
+  // place are spaced apart, so two ports never share a pixel.
+  const facing = diagram.edges.map((edge, index): Facing | undefined => {
     const source = boxes.get(edge.from)
     const target = boxes.get(edge.to)
     if (source === undefined || target === undefined || edge.from === edge.to) return undefined
-    if ((placement.lanes.get(index)?.points.length ?? 0) > 0) return undefined
     // A wrapped drawing is read in columns: the edge from the bottom of one column to the top of the next leaves
     // and arrives at the side, which is the direction that reading order travels.
-    if (placement.across.has(index)) {
-      return target.x + target.width / 2 >= source.x + source.width / 2
+    const sides = placement.across.has(index)
+      ? target.x + target.width / 2 >= source.x + source.width / 2
         ? { exit: 'right' as Side, entry: 'left' as Side }
         : { exit: 'left' as Side, entry: 'right' as Side }
-    }
-    return approachSides(source, target)
+      : approachSides(source, target)
+    const lane = placement.lanes.get(index)
+    if (lane === undefined || lane.points.length === 0) return sides
+    // A lane runs down the page, so its ends face the rows above and below wherever the box centres are.
+    const down = target.y > source.y
+    return { exit: down ? 'bottom' : 'top', entry: down ? 'top' : 'bottom', at: lane.points[0].x }
   })
   const wanted = new Map<string, number>()
   const slotKey = (boxId: string, side: Side, index: number): string => boxId + ':' + side + ':' + String(index)
+  /** Where a port may sit on one side: `corner` relaxes the margin, because a side that is crowded uses its corners. */
+  const bounds = (box: Box, vertical: boolean, corner: boolean): { low: number; high: number } => {
+    const inset = corner ? 2 : vertical ? PORT_INSET : 8
+    return vertical
+      ? { low: box.x + inset, high: box.x + box.width - inset }
+      : { low: box.y + inset, high: box.y + box.height - inset }
+  }
+  const clampTo = (box: Box, vertical: boolean, value: number, corner: boolean): number => {
+    const span = bounds(box, vertical, corner)
+    return Math.min(span.high, Math.max(span.low, value))
+  }
   for (const [index, entry] of facing.entries()) {
     if (entry === undefined) continue
     const edge = diagram.edges[index]
     const from = boxes.get(edge.from) as Box
     const to = boxes.get(edge.to) as Box
     const vertical = entry.exit === 'bottom' || entry.exit === 'top'
-    const low = (box: Box): number => (vertical ? box.x + 10 : box.y + 8)
-    const high = (box: Box): number => (vertical ? box.x + box.width - 10 : box.y + box.height - 8)
     const middle = (box: Box): number => (vertical ? box.x + box.width / 2 : box.y + box.height / 2)
     const fromMiddle = middle(from)
     const toMiddle = middle(to)
     // Both ports sit on one line - and the edge is a straight run - when the source's middle falls on the target's
     // side; otherwise the line is the target's middle clamped into the source's side, which is as close to a straight
-    // run as a box that does not overlap the other allows.
+    // run as a box that does not overlap the other allows. A long edge asks for the point its own lane meets instead,
+    // and takes the corner nearest it when the lane runs outside the box: that edge turns anyway, and a straight edge
+    // made to give up its port would gain two bends for nothing.
+    const corner = entry.at !== undefined
+    const target = bounds(to, vertical, false)
     const chosen =
-      fromMiddle >= low(to) && fromMiddle <= high(to) ? fromMiddle : Math.min(high(from), Math.max(low(from), toMiddle))
-    wanted.set(slotKey(edge.from, entry.exit, index), chosen)
-    wanted.set(slotKey(edge.to, entry.entry, index), chosen)
+      entry.at ?? (fromMiddle >= target.low && fromMiddle <= target.high ? fromMiddle : clampTo(from, vertical, toMiddle, false))
+    wanted.set(slotKey(edge.from, entry.exit, index), clampTo(from, vertical, chosen, corner))
+    wanted.set(slotKey(edge.to, entry.entry, index), clampTo(to, vertical, chosen, corner))
   }
   const sides = new Map<string, Array<{ index: number; wanted: number }>>()
   for (const [index, entry] of facing.entries()) {
@@ -339,19 +387,42 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       { index, wanted: wanted.get(slotKey(edge.to, entry.entry, index)) as number },
     ])
   }
-  const placedPort = new Map<string, number>()
-  for (const [key, list] of sides) {
-    const [boxId, side] = key.split(':') as [string, Side]
-    const box = boxes.get(boxId) as Box
-    const vertical = side === 'bottom' || side === 'top'
-    const low = vertical ? box.x + 10 : box.y + 8
-    const high = vertical ? box.x + box.width - 10 : box.y + box.height - 8
-    let previous = low - 14
-    for (const entry of [...list].sort((left, right) => left.wanted - right.wanted || left.index - right.index)) {
-      const position = Math.min(high, Math.max(low, Math.max(entry.wanted, previous + 14)))
-      placedPort.set(slotKey(boxId, side, entry.index), position)
-      previous = position
+  // Pack every side, then hand each entry the position its exit was given: a pair that faced each other sat on one x
+  // before packing, and an edge the packing had to move should keep its straight run rather than gain two bends.
+  let placedPort = new Map<string, number>()
+  for (let round = 0; round < 3; round += 1) {
+    placedPort = new Map<string, number>()
+    for (const [key, list] of sides) {
+      const [boxId, side] = key.split(':') as [string, Side]
+      const box = boxes.get(boxId) as Box
+      const vertical = side === 'bottom' || side === 'top'
+      const span = bounds(box, vertical, true)
+      const order = [...list].sort((left, right) => left.wanted - right.wanted || left.index - right.index)
+      const packed = packPorts(
+        order.map((entry) => clampTo(box, vertical, entry.wanted, true)),
+        span.low,
+        span.high,
+      )
+      order.forEach((entry, at) => placedPort.set(slotKey(boxId, side, entry.index), packed[at]))
     }
+    let moved = false
+    for (const [index, entry] of facing.entries()) {
+      if (entry === undefined) continue
+      const edge = diagram.edges[index]
+      const vertical = entry.exit === 'bottom' || entry.exit === 'top'
+      if (!vertical) continue
+      const exit = placedPort.get(slotKey(edge.from, entry.exit, index)) as number
+      if (Math.abs(exit - (placedPort.get(slotKey(edge.to, entry.entry, index)) as number)) < 0.01) continue
+      // Only an entry that can reach the exit's x asks for it: a box that does not span it keeps its own point.
+      const target = boxes.get(edge.to) as Box
+      if (Math.abs(clampTo(target, true, exit, true) - exit) > 0.01) continue
+      for (const slot of sides.get(edge.to + ':' + entry.entry) as Array<{ index: number; wanted: number }>) {
+        if (slot.index !== index) continue
+        slot.wanted = exit
+        moved = true
+      }
+    }
+    if (!moved) break
   }
   const portOf = (boxId: string, side: Side, edgeIndex: number): Point => {
     const box = boxes.get(boxId) as Box
@@ -408,6 +479,45 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     })
   }
 
+  /** Two points are a line and more of them are a polyline; both carry the label and join the collision set. */
+  const paintRoute = (edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
+    if (points.length > 2) {
+      paintPath(edge, points, colour)
+      return
+    }
+    const exit = points[0]
+    const entry = points[points.length - 1]
+    const ordinal = labelsFrom.get(edge.from) ?? 0
+    labelsFrom.set(edge.from, ordinal + 1)
+    const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal, segments)
+    labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+    segments.push({ x1: exit.x, y1: exit.y, x2: entry.x, y2: entry.y })
+    shapes.push({
+      kind: 'link',
+      x1: exit.x,
+      y1: exit.y,
+      x2: entry.x,
+      y2: entry.y,
+      label: edge.label,
+      labelX: spot.x + textWidth(edge.label) / 2,
+      labelY: spot.y,
+      colour,
+    })
+  }
+
+  /** Does any segment of this route pass through a box other than its own two ends? */
+  const clearOfBoxes = (points: Point[], from: Box, to: Box): boolean => {
+    for (let index = 0; index + 1 < points.length; index += 1) {
+      const start = points[index]
+      const end = points[index + 1]
+      for (const box of boxList) {
+        if (box === from || box === to) continue
+        if (crossesBox(start.x, start.y, end.x, end.y, box)) return false
+      }
+    }
+    return true
+  }
+
   for (const [edgeIndex, edge] of diagram.edges.entries()) {
     const source = boxes.get(edge.from)
     const target = boxes.get(edge.to)
@@ -433,62 +543,40 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       continue
     }
 
-    // A long edge follows the lane its dummies reserved: one polyline through the corridor points, so the edge does
-    // not have to be searched around every box it passes. Anything else goes through the orthogonal router.
+    const anchors = anchorsFor.get(edgeIndex)
+
+    // A long edge follows the lane the channel stage gave it: down the exit stub, across to the lane's x on the run
+    // the gap was assigned, down the lane, and across to the entry stub. The spine carries one point per gap, so the
+    // two runs are the places where a port and the lane disagree, and everything between them is one straight drop.
     const lane = placement.lanes.get(edgeIndex)
-    if (lane !== undefined && lane.points.length > 0) {
+    if (lane !== undefined && lane.points.length > 0 && anchors !== undefined) {
       const waypoints = lane.reversed ? [...lane.points].reverse() : lane.points
-      const first = waypoints[0]
-      const last = waypoints[waypoints.length - 1]
-      const startSide: Side = first.y < source.y + source.height / 2 ? 'top' : 'bottom'
-      const endSide: Side = last.y > target.y + target.height / 2 ? 'bottom' : 'top'
-      // The lane leaves along the side's normal and the endpoint is the perimeter point that approach meets, so a
-      // lane always starts and ends on the box rather than at a centre that happens to sit inside it.
-      const start = snapToPerimeter(source, {
-        x: source.x + source.width / 2,
-        y: startSide === 'top' ? source.y - 1 : source.y + source.height + 1,
-      })
-      const end = snapToPerimeter(target, {
-        x: target.x + target.width / 2,
-        y: endSide === 'top' ? target.y - 1 : target.y + target.height + 1,
-      })
-      const points: Point[] = [start]
-      let previous = start
+      const points: Point[] = [anchors.exit]
+      let previous = anchors.exit
       for (const waypoint of waypoints) {
         if (Math.abs(previous.x - waypoint.x) > 0.5 && Math.abs(previous.y - waypoint.y) > 0.5) points.push({ x: previous.x, y: waypoint.y })
         points.push(waypoint)
         previous = waypoint
       }
-      if (Math.abs(previous.x - end.x) > 0.5 && Math.abs(previous.y - end.y) > 0.5) points.push({ x: end.x, y: previous.y })
-      points.push(end)
+      if (Math.abs(previous.x - anchors.entry.x) > 0.5 && Math.abs(previous.y - anchors.entry.y) > 0.5) points.push({ x: anchors.entry.x, y: previous.y })
+      points.push(anchors.entry)
       paintPath(edge, simplify(points), colour)
       continue
     }
 
-    const anchors = anchorsFor.get(edgeIndex)
-    const route = routeEdge(source, target, boxList, anchors)
-    if (route.points.length <= 2) {
-      const exit = route.points[0]
-      const entry = route.points[route.points.length - 1]
-      const ordinal = labelsFrom.get(edge.from) ?? 0
-      labelsFrom.set(edge.from, ordinal + 1)
-      const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal, segments)
-      labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
-      segments.push({ x1: exit.x, y1: exit.y, x2: entry.x, y2: entry.y })
-      shapes.push({
-        kind: 'link',
-        x1: exit.x,
-        y1: exit.y,
-        x2: entry.x,
-        y2: entry.y,
-        label: edge.label,
-        labelX: spot.x + textWidth(edge.label) / 2,
-        labelY: spot.y,
-        colour,
-      })
-      continue
+    // Two rows with nothing between them: the edge is the two-bend run the channel stage stacked, which cannot cross
+    // a box because the whole run sits in the empty strip between the rows. A wrapped drawing puts columns side by
+    // side, so a run that would still meet a box is handed to the router instead.
+    const runY = placement.runs.get(edgeIndex)
+    if (runY !== undefined && anchors !== undefined) {
+      const points = simplify([anchors.exit, { x: anchors.exit.x, y: runY }, { x: anchors.entry.x, y: runY }, anchors.entry])
+      if (clearOfBoxes(points, source, target)) {
+        paintRoute(edge, points, colour)
+        continue
+      }
     }
-    paintPath(edge, route.points, colour)
+
+    paintRoute(edge, routeEdge(source, target, boxList, anchors).points, colour)
   }
 
   shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12, text: diagram.title, colour: 'text' })

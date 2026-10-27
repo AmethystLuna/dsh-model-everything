@@ -30,6 +30,7 @@ export interface Point {
 }
 /** The lane a long edge's dummies reserved, in layout order: from the layout source down to the layout target. */
 export interface Lane {
+    /** One point per gap the edge crosses, at the lane's own x: it keeps its own order, and the painter walks it. */
     points: Point[];
     /** True when the layout runs opposite to the source's arrow, so the painter walks the lane backwards. */
     reversed: boolean;
@@ -40,6 +41,8 @@ export interface Placement {
     groupRects: Map<string, Box>;
     width: number;
     lanes: Map<number, Lane>;
+    /** The height of the one horizontal run an edge between two adjacent rows needs. */
+    runs: Map<number, number>;
     /** Edges whose two ends ended up in different wrapped columns: they are read across, not down. */
     across: Set<number>;
 }

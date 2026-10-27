@@ -4,13 +4,14 @@
  * The layers are rows and the order inside them is settled; the only freedom left is the x of each box. Three
  * properties make a drawing readable, and this module is built around them:
  *
- * - A box wants to sit under the mean of its neighbours. That is the least-squares answer to "point at what you are
- *   connected to", and it is what makes the drawing look balanced rather than left-packed.
- * - A long edge's dummies share one x. They are one lane, not three points, so they are one variable here: the
- *   placeholder ids of one chain all read and write the same entry.
+ * - A box wants to sit under the mean of the boxes it is connected to. That is the least-squares answer to "point at
+ *   what you are connected to", and it is what makes the drawing look balanced rather than left-packed.
  * - Nothing overlaps. A mean that would push two boxes into each other is not a placement, so each layer's desired
  *   positions are projected onto the nearest positions that keep the boxes apart (isotonic regression, which is a
  *   monotone fit and therefore exactly "keep the order and the minimum gap"). Rows are then separated by a fixed gap.
+ * - A long edge's dummies share one x. They are one lane, not three points, so they are one variable here: the
+ *   placeholder ids of one chain all read and write the same entry. That value is a proposal for the channel stage,
+ *   not a promise: a lane is moved to a free corridor where routing needs it, and a box is never moved out of a lane.
  *
  * The projection is done a layer at a time, alternating down and up, until the means stop moving. Brandes-Kopf gets
  * the same three properties out of a more careful alignment; this relaxation is the simpler equivalent the drawing
@@ -124,7 +125,9 @@ export function assignCoordinates(input: CoordInput, options: CoordOptions): Coo
       if (ends.length === 0) return read(id)
       return ends.reduce((total, end) => total + read(end), 0) / ends.length
     }
-    const near = neighbours.get(id) ?? []
+    // A dummy is a routing artifact, not a neighbour: letting a phantom lane pull a box off the mean of the boxes it
+    // actually connects to is what strands a box between two corridors, with no straight edge to either.
+    const near = (neighbours.get(id) ?? []).filter((other) => !isDummy(other))
     if (near.length === 0) return read(id)
     return near.reduce((total, other) => total + read(other), 0) / near.length
   }
@@ -144,27 +147,22 @@ export function assignCoordinates(input: CoordInput, options: CoordOptions): Coo
     }
   }
 
-  // The means move a lane a little in every layer it crosses. One lane is one value, so the proposals are averaged
-  // and then each layer is repaired against that value: a box may need to move out of a lane that settled under it.
+  // The last sweep left every box at the mean of the boxes it connects to, and those are the values the boxes keep.
+  // A lane is one value across every row it crosses, and each row it passes through proposed one: the proposal is
+  // their average. It stays a proposal - the channel stage moves a lane that lands on a box, because a box is what a
+  // reader looks at and a lane is what routing needs.
   const proposals = new Map<string, number[]>()
-  const projected = new Map<string, number>()
   for (const layer of layers) {
-    const placed = project(
-      layer.map((id) => desiredOf(id)),
-      separationIn(layer),
-    )
-    layer.forEach((id, index) => {
-      projected.set(id, placed[index])
-      if (!isDummy(id)) return
+    for (const id of layer) {
+      if (!isDummy(id)) continue
       const lane = laneOf(id)
-      proposals.set(lane, [...(proposals.get(lane) ?? []), placed[index]])
-    })
+      proposals.set(lane, [...(proposals.get(lane) ?? []), read(id)])
+    }
   }
   for (const [lane, values] of proposals) x.set(lane, values.reduce((total, value) => total + value, 0) / values.length)
-  for (const [id, value] of projected) if (!isDummy(id)) x.set(id, value)
 
+  // The row's order and its gap survive the repair; a lane in the row does not move a box out of the way.
   for (const layer of layers) {
-    const lanes = layer.filter((id) => isDummy(id)).map((id) => read(id)).sort((left, right) => left - right)
     let cursor = -Infinity
     for (const id of layer) {
       if (isDummy(id)) {
@@ -172,11 +170,7 @@ export function assignCoordinates(input: CoordInput, options: CoordOptions): Coo
         continue
       }
       const width = widthOf(id)
-      let centre = Math.max(projected.get(id) as number, cursor + width / 2)
-      for (const lane of lanes) {
-        if (lane <= centre - width / 2 - gap / 2 || lane >= centre + width / 2 + gap / 2) continue
-        centre = Math.max(centre, lane + gap / 2 + width / 2)
-      }
+      const centre = Math.max(x.get(id) as number, cursor + width / 2)
       x.set(id, centre)
       cursor = centre + width / 2 + gap
     }
