@@ -12,7 +12,8 @@
  * what to draw between them. A change to edge routing cannot move a box, and a change to nesting cannot move a
  * line.
  */
-import type { Diagram } from './model.js';
+import { type Measured as TextBox } from './text.js';
+import type { Diagram, DiagramNode } from './model.js';
 /** Geometry of one placed box, before anything is drawn. */
 export type Box = {
     x: number;
@@ -28,8 +29,8 @@ export interface Placement {
 }
 /** Geometry constants shared by both placements. */
 export declare const MARGIN = 20;
-/** A box wide enough for its label, clamped so a long id cannot dominate the page. */
-export declare const nodeWidth: (label: string) => number;
+/** The text a node will draw, measured from its label - the id is what the source called it, not what it says. */
+export declare function textOf(node: DiagramNode): TextBox;
 /**
  * Place every box of a diagram.
  *

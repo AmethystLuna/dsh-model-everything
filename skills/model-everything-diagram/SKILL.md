@@ -21,6 +21,7 @@ question is what the picture shows.
 | "is this diagram too dense", "how deep do the packages nest" | `diagram_review`: group width, nesting depth and node count against budgets you set, plus **what it measured** |
 | "what changed between these two diagrams", "did this package move" | `diagram_diff`: boundaries added, removed, renamed or re-parented, and nodes that changed owner |
 | A source in a notation the plugin does not draw | Refused with the line number; `diagram_render` still draws everything else and reports what it skipped |
+| A label with a hard line break, or one too long for its box | `<br>`, `<br/>` and a real newline end a line; anything longer than the drawing's line width wraps. The box is sized from the lines it draws, and edge labels move clear of boxes rather than printing on top of them |
 | A diagram already in a file, to link from a document | `diagram_render` with `out`, then link the SVG |
 
 ## The two notations, and where each one stops

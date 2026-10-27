@@ -30,7 +30,9 @@ export interface BoxShape {
     y: number;
     width: number;
     height: number;
+    /** The lines to draw, already wrapped; `label` keeps the whole text for anything that reads the shape. */
     label: string;
+    lines: string[];
     colour: ColourRole;
     initial: boolean;
 }

@@ -19,7 +19,8 @@
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 
-import { MARGIN, place, type Box } from './place.js'
+import { MARGIN, place, textOf, type Box } from './place.js'
+import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramGroup, type DiagramNode } from './model.js'
 
@@ -34,7 +35,9 @@ export interface BoxShape {
   y: number
   width: number
   height: number
+  /** The lines to draw, already wrapped; `label` keeps the whole text for anything that reads the shape. */
   label: string
+  lines: string[]
   colour: ColourRole
   initial: boolean
 }
@@ -148,6 +151,91 @@ function captionRole(caption: string): ColourRole {
   return roleForVerdict(caption.split(' — ')[0] as string)
 }
 
+
+/**
+ * Where an edge's label goes.
+ *
+ * A label dropped at the midpoint lands on a box as soon as the two ends are not vertically aligned - the defect a
+ * reader sees as "text on top of a box". Graphviz solves it by making the label a node the layout must make room
+ * for; without a layout that can do that, the label walks along its own edge and takes the first position that is
+ * clear of every box, falling back to the midpoint when the whole edge is crowded.
+ */
+function placeLabel(
+  label: string,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  boxes: Iterable<Box>,
+  placed: Array<{ x: number; y: number; width: number; height: number }> = [],
+  ordinal = 0,
+  offsets: Array<{ t: number; dx: number }> = [
+    { t: 0.5, dx: 0 },
+    { t: 0.5, dx: 26 },
+    { t: 0.5, dx: -26 },
+    { t: 0.42, dx: 26 },
+    { t: 0.58, dx: -26 },
+    { t: 0.5, dx: 52 },
+    { t: 0.5, dx: -52 },
+    { t: 0.5, dx: 100 },
+    { t: 0.5, dx: -100 },
+    { t: 0.82, dx: 0 },
+    { t: 0.18, dx: 0 },
+    { t: 0.3, dx: 0 },
+    { t: 0.7, dx: 0 },
+  ],
+): { x: number; y: number } {
+  const width = textWidth(label)
+  const height = 12
+  const hits = (x: number, y: number, w: number, other: { x: number; y: number; width: number; height: number }): boolean =>
+    x - w / 2 < other.x + other.width + 3 && x + w / 2 > other.x - 3 && y < other.y + other.height + 3 && y + height > other.y - 3
+  const clear = (x: number, y: number, w: number): boolean => {
+    for (const box of boxes) if (hits(x, y, w, box)) return false
+    for (const earlier of placed) if (hits(x, y, w, earlier)) return false
+    return true
+  }
+  // A second label on the same source moves along and down: the two describe different branches of one decision,
+  // and stacking them is what made them unreadable.
+  const centre = (x: number, y: number): { x: number; y: number } => ({ x: x - width / 2, y })
+  for (const candidate of offsets) {
+    const x = from.x + (to.x - from.x) * candidate.t + candidate.dx
+    const y = from.y + (to.y - from.y) * candidate.t + ordinal * 14
+    if (clear(x, y, width)) return centre(x, y)
+  }
+  return centre(from.x + (to.x - from.x) * 0.5, from.y + (to.y - from.y) * 0.5)
+}
+
+
+/** The furthest right and bottom point any shape reaches. */
+function drawnExtent(shapes: Shape[]): { width: number; height: number } {
+  let width = 0
+  let height = 0
+  const consider = (x: number, y: number): void => {
+    if (x > width) width = x
+    if (y > height) height = y
+  }
+  for (const shape of shapes) {
+    switch (shape.kind) {
+      case 'box':
+      case 'group':
+        consider(shape.x + shape.width, shape.y + shape.height)
+        break
+      case 'link':
+        consider(Math.max(shape.x1, shape.x2), Math.max(shape.y1, shape.y2))
+        if (shape.label !== '') consider(shape.labelX + textWidth(shape.label), shape.labelY + 12)
+        break
+      case 'path': {
+        for (const point of shape.points) consider(point.x, point.y)
+        if (shape.label !== '') consider(shape.labelX + textWidth(shape.label), shape.labelY + 12)
+        break
+      }
+      case 'caption':
+      case 'title':
+        consider(textWidth((shape as { lines?: string[]; text?: string }).lines?.[0] ?? '') + shape.x, shape.y + 12)
+        break
+    }
+  }
+  return { width, height }
+}
+
 export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, options: PaletteOptions = {}): { canvas: Canvas; colours: Palette } {
   const colours = palette(overrides, options)
   const shapes: Shape[] = []
@@ -165,11 +253,16 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   const drawn = new Set<string>()
+  // A Map iterator is consumed by the first pass: collision checks need a list.
+  const boxList = Array.from(boxes.values())
+  const labelRects: Array<{ x: number; y: number; width: number; height: number }> = []
+  const labelsFrom = new Map<string, number>()
   for (const node of diagram.nodes) {
     // A state id may repeat in a malformed model: the first placement wins and the repeat is skipped.
     if (drawn.has(node.id)) continue
     const box = boxes.get(node.id) as Box
     drawn.add(node.id)
+    const text = textOf(node)
     shapes.push({
       kind: 'box',
       x: box.x,
@@ -177,6 +270,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       width: box.width,
       height: box.height,
       label: labelOf(node),
+      lines: text.lines,
       colour: roleOfNode(node),
       initial: diagram.init === node.id,
     })
@@ -218,7 +312,11 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       const y1 = source.y + source.height
       const x2 = target.x + target.width / 2
       const y2 = target.y
-      shapes.push({ kind: 'link', x1, y1, x2, y2, label: edge.label, labelX: (x1 + x2) / 2 + 7, labelY: (y1 + y2) / 2, colour })
+      const ordinal = labelsFrom.get(edge.from) ?? 0
+      labelsFrom.set(edge.from, ordinal + 1)
+      const spot = placeLabel(edge.label, { x: x1, y: y1 }, { x: x2, y: y2 }, boxList, labelRects, ordinal)
+      labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+      shapes.push({ kind: 'link', x1, y1, x2, y2, label: edge.label, labelX: spot.x + textWidth(edge.label) / 2, labelY: spot.y, colour })
       continue
     }
 
@@ -227,6 +325,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       const left = target.x
       const y = source.y + source.height / 2
       const forward = right <= left
+      const spot = placeLabel(edge.label, { x: right, y }, { x: left, y }, boxList, labelRects)
+      labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
       shapes.push({
         kind: 'link',
         x1: forward ? right : source.x,
@@ -234,8 +334,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         x2: forward ? left : target.x + target.width,
         y2: y,
         label: edge.label,
-        labelX: (right + left) / 2,
-        labelY: y - 7,
+        labelX: spot.x,
+        labelY: spot.y - 7,
         colour,
       })
       continue
@@ -282,7 +382,13 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   shapes.push({ kind: 'caption', x: MARGIN, y: captionTop, lines: captionLines, colour: captionRole(diagram.caption) })
   const height = captionTop + captionLines.length * CAPTION_LINE + MARGIN / 2
 
-  return { canvas: { width: Math.round(width), height: Math.round(height), shapes }, colours }
+  // Everything drawn counts, including the parts that leave the box grid: an edge routed beside the drawing and a
+  // label wider than the gap between two boxes were both cut off at the right edge.
+  const extent = drawnExtent(shapes)
+  const canvasWidth = Math.max(width, extent.width + MARGIN)
+  const canvasHeight = Math.max(height, extent.height + MARGIN)
+
+  return { canvas: { width: Math.round(canvasWidth), height: Math.round(canvasHeight), shapes }, colours }
 }
 
 export function paint(diagram: Diagram, overrides: Partial<Palette> = {}): Canvas {

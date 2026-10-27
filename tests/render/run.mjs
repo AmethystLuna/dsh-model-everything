@@ -10,6 +10,7 @@ import { paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
+import { LINE_HEIGHT, MAX_LINE_CHARS, TEXT_PADDING, MAX_NODE_WIDTH, explicitLines, measure, textWidth, wrapLine } from '../../lib/render/text.js'
 import { render } from '../../lib/render/index.js'
 
 let failures = 0
@@ -1097,6 +1098,118 @@ test('a node draws its label when a notation gave one, and its id when it did no
   if (labelOf({ id: 'a', label: 'Alpha', role: 'normal' }) !== 'Alpha') throw new Error('label was ignored')
   // An empty label is not a label: the id is what identifies the box.
   if (labelOf({ id: 'a', label: '', role: 'normal' }) !== 'a') throw new Error('an empty label was used')
+})
+
+test('a break in a label is a line end, in every spelling a source uses', () => {
+  for (const spelling of ['a<br>b', 'a<br/>b', 'a<br />b', 'a\nb']) {
+    const lines = explicitLines(spelling)
+    if (lines.length !== 2 || lines[0] !== 'a' || lines[1] !== 'b') throw new Error(spelling + ' -> ' + JSON.stringify(lines))
+  }
+})
+
+test('a long label wraps instead of running off its box', () => {
+  const measured = measure('Attach order to the existing account')
+  if (measured.lines.length < 2) throw new Error('not wrapped: ' + JSON.stringify(measured.lines))
+  for (const line of measured.lines) {
+    if (line.length > MAX_LINE_CHARS) throw new Error('line over the limit: ' + line)
+  }
+  // The box is sized for the longest line it actually draws, not for the whole label.
+  if (measured.width > MAX_NODE_WIDTH) throw new Error('width over the maximum: ' + String(measured.width))
+  if (measured.height !== measured.lines.length * LINE_HEIGHT + TEXT_PADDING) throw new Error('height: ' + String(measured.height))
+})
+
+test('a word with no space in it is broken rather than allowed to overflow', () => {
+  const lines = wrapLine('a'.repeat(MAX_LINE_CHARS + 5))
+  if (lines.length !== 2) throw new Error('lines: ' + JSON.stringify(lines.length))
+  if (lines.some((line) => line.length > MAX_LINE_CHARS)) throw new Error('a piece is longer than the limit')
+})
+
+test('the box follows the text: two lines are taller than one, and a longer label is wider', () => {
+  const one = measure('Notify the warehouse')
+  const two = measure('Notify the warehouse<br/>and the carrier')
+  if (!(two.height > one.height)) throw new Error('height did not grow: ' + String(one.height) + ' -> ' + String(two.height))
+  if (!(two.width >= one.width)) throw new Error('width shrank')
+})
+
+test('a rendered drawing keeps its text inside its boxes', () => {
+  const source = [
+    'graph TD',
+    '  a[Order intake service<br/>validates and enqueues] --> b{Is the customer already known?}',
+    '  b -->|yes, existing account| c[Attach order to the existing account]',
+    '  b -->|no, new customer| d[Create an account then attach]',
+  ].join(String.fromCharCode(10))
+  const { canvas } = paintWith(render({ source }).diagram)
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  for (const box of boxes) {
+    if (box.lines === undefined || box.lines.length === 0) throw new Error('a box has no lines: ' + box.label)
+    const widest = Math.max(...box.lines.map((line) => textWidth(line)))
+    if (widest > box.width + 1) throw new Error('"' + box.label + '" needs ' + String(Math.round(widest)) + ' but its box is ' + String(Math.round(box.width)))
+    if (box.lines.length * LINE_HEIGHT > box.height) throw new Error('"' + box.label + '" has more lines than its box holds')
+  }
+})
+
+test('an edge label is not drawn on top of a box', () => {
+  const source = [
+    'graph TD',
+    '  subgraph Ingest',
+    '    a[Order intake service] --> b{Is the customer known?}',
+    '    b -->|yes, existing account| c[Attach to the account]',
+    '    b -->|no, new customer| d[Create an account]',
+    '  end',
+  ].join(String.fromCharCode(10))
+  const { canvas } = paintWith(render({ source }).diagram)
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const labels = canvas.shapes.filter((shape) => (shape.kind === 'link' || shape.kind === 'path') && shape.label !== '')
+  for (const label of labels) {
+    const width = textWidth(label.label)
+    const left = label.labelX - width / 2
+    for (const box of boxes) {
+      const overlaps = left < box.x + box.width && left + width > box.x && label.labelY < box.y + box.height && label.labelY + 12 > box.y
+      if (overlaps) {
+        throw new Error('label "' + label.label + '" lands on box "' + String(box.label) + '"')
+      }
+    }
+  }
+})
+
+test('the canvas covers what was drawn, including an edge that runs beside the boxes', () => {
+  const source = [
+    'graph TD',
+    '  a[First] --> b[Second]',
+    '  b --> c[Third]',
+    '  c -->|drift found, reconciling| a',
+  ].join(String.fromCharCode(10))
+  const { canvas } = paintWith(render({ source }).diagram)
+  for (const shape of canvas.shapes) {
+    if (shape.kind === 'box' || shape.kind === 'group') {
+      if (shape.x + shape.width > canvas.width) throw new Error('a box reaches past the canvas')
+      continue
+    }
+    if (shape.kind === 'path') {
+      for (const point of shape.points) {
+        if (point.x > canvas.width) throw new Error('a path leaves the canvas at ' + String(point.x) + ' of ' + String(canvas.width))
+      }
+      if (shape.label !== '' && shape.labelX + textWidth(shape.label) / 2 > canvas.width) throw new Error('a path label leaves the canvas')
+    }
+  }
+})
+
+test('a label that is only a break draws an empty line, not a crash', () => {
+  const lines = explicitLines('a<br>')
+  if (lines.length !== 2 || lines[1] !== '') throw new Error('trailing break: ' + JSON.stringify(lines))
+  if (wrapLine('').join('') !== '') throw new Error('an empty line did not stay empty')
+  // A line of nothing but spaces has no word to wrap: it collapses to one empty line rather than disappearing.
+  const blank = wrapLine('    ')
+  if (blank.length !== 1 || blank[0] !== '') throw new Error('blank line: ' + JSON.stringify(blank))
+})
+
+test('a box written without pre-wrapped lines still draws its label', () => {
+  const { markup } = toSvg({
+    width: 200,
+    height: 80,
+    shapes: [{ kind: 'box', x: 10, y: 10, width: 120, height: 34, label: 'Single line', colour: 'normal', initial: false }],
+  }, palette())
+  if (!markup.includes('<tspan') || !markup.includes('Single line')) throw new Error('the label was not drawn')
 })
 
 if (failures > 0) {

@@ -199,7 +199,7 @@ And the gates around it:
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 53 | a flowchart becomes boxes and labelled arrows |
 | `client` | 12 | the declared client export is the built bundle the loader can execute |
-| `render` | 91 | every verdict earns its own role |
+| `render` | 100 | every verdict earns its own role |
 | `presentation` | 55 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

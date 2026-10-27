@@ -91,6 +91,11 @@ because a layered diagram whose members float outside their package is not showi
 boundary folds it into one box and clicking again unfolds it; folding is a transform on the model, not a mode of
 the painter, so the edges re-aim at the box.
 
+**Text is measured before a box is placed.** A `<br>` or `<br/>` in a label is a hard break and a long label wraps;
+a box is sized from the lines it actually draws, and a row is as tall as its tallest box. An edge label walks along
+its own edge and steps aside when the line is occupied - the same idea as Graphviz making a label a dummy node the
+layout must leave room for. **Text first, geometry second**, so overflow is not a matter of luck.
+
 **A line it cannot draw is refused with its line number.** Sequence diagrams, class diagrams, Gantt charts, the
 `click`/`classDef` directives and PlantUML's `actor`/`note` are all refused by line. A sequence diagram that
 quietly lost its lifelines looks complete, and that is worse than no drawing.

@@ -14,6 +14,7 @@
  */
 
 import { rankStates } from './layout.js'
+import { measure, MIN_NODE_WIDTH, type Measured as TextBox } from './text.js'
 import type { Diagram, DiagramGroup, DiagramNode } from './model.js'
 
 /** Geometry of one placed box, before anything is drawn. */
@@ -28,39 +29,53 @@ export interface Placement {
 
 /** Geometry constants shared by both placements. */
 export const MARGIN = 20
-const NODE_HEIGHT = 34
-const ROW_GAP = 58
+const ROW_GAP = 34
+/** Two rows with a labelled edge between them need room for the label, or it lands on a box. */
+const LABELLED_ROW_GAP = 52
+/** The same rule between two blocks stacked inside a boundary. */
+const LABELLED_BLOCK_GAP = 32
+/** A row is at least tall enough for one line plus padding. */
+const ROW_MIN_HEIGHT = 34
 const COLUMN_GAP = 30
-const MIN_NODE_WIDTH = 88
-const MAX_NODE_WIDTH = 220
-const CHAR_WIDTH = 7.2
 /** A boundary's inner padding and the strip its name sits in. */
 const GROUP_PADDING = 10
 const GROUP_HEADER = 16
 /** Between two blocks stacked inside a boundary, and between two top-level blocks. */
 const BLOCK_GAP = 14
 
-/** A box wide enough for its label, clamped so a long id cannot dominate the page. */
-export const nodeWidth = (label: string): number => Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, label.length * CHAR_WIDTH + 26))
+/** The text a node will draw, measured from its label - the id is what the source called it, not what it says. */
+export function textOf(node: DiagramNode): TextBox {
+  return measure(node.label !== undefined && node.label !== '' ? node.label : node.id)
+}
 
 
 
 /** The layered placement: breadth-first rows, centred, no containment. */
 function placeByRanks(diagram: Diagram, nodes: DiagramNode[], top: number): Placement {
+  const nodeById = new Map(nodes.map((node) => [node.id, node] as const))
+  const sizeOf = (id: string): TextBox => textOf(nodeById.get(id) as DiagramNode)
   const ranked = rankStates(diagram.nodes, diagram.edges, diagram.init)
   const rows: string[][] = [...ranked.rows]
   if (ranked.unreachable.length > 0) rows.push(ranked.unreachable)
 
   const boxes = new Map<string, Box>()
   let widest = 0
-  rows.forEach((row, index) => {
-    const widths = row.map((id) => nodeWidth(id))
-    widest = Math.max(widest, widths.reduce((total, width) => total + width, 0) + Math.max(0, row.length - 1) * COLUMN_GAP)
+  // The row's height is its tallest label, and the next row starts below it: a fixed row height is what made a
+  // wrapped label overlap the box beneath it.
+  let y = top
+  // A diagram whose edges carry text gets the taller gap throughout: row-to-row labels are the common case and
+  // estimating them per pair would mean reading the edges here, which is the painter's question.
+  const gap = diagram.edges.some((edge) => edge.label !== '') ? LABELLED_ROW_GAP : ROW_GAP
+  rows.forEach((row) => {
+    const sizes = row.map(sizeOf)
+    const rowHeight = Math.max(ROW_MIN_HEIGHT, ...sizes.map((size) => size.height))
+    widest = Math.max(widest, sizes.reduce((total, size) => total + size.width, 0) + Math.max(0, row.length - 1) * COLUMN_GAP)
     let x = 0
     row.forEach((id, position) => {
-      boxes.set(id, { x, y: top + index * (NODE_HEIGHT + ROW_GAP), width: widths[position], height: NODE_HEIGHT })
-      x += widths[position] + COLUMN_GAP
+      boxes.set(id, { x, y, width: sizes[position].width, height: sizes[position].height })
+      x += sizes[position].width + COLUMN_GAP
     })
+    y += rowHeight + gap
   })
   rows.forEach((row) => {
     const rowWidth = row.reduce((total, id) => total + (boxes.get(id) as Box).width, 0) + Math.max(0, row.length - 1) * COLUMN_GAP
@@ -153,6 +168,7 @@ interface Measured {
 /** The tree placement: a boundary is a block, its contents stack inside it, the top level stacks. */
 function placeByGroups(diagram: Diagram, nodes: DiagramNode[], top: number): Placement {
   const groups = diagram.groups as DiagramGroup[]
+  const nodeById = new Map(nodes.map((node) => [node.id, node] as const))
   const byId = new Map(groups.map((group) => [group.id, group] as const))
   const { owner, children, roots } = groupTree(groups)
 
@@ -170,13 +186,14 @@ function placeByGroups(diagram: Diagram, nodes: DiagramNode[], top: number): Pla
   // A boundary with nothing inside it is not drawn: an empty box claims a containment the source never stated.
   const contents = (groupId: string): string[] => rawContents(groupId).filter((child) => !byId.has(child) || rawContents(child).length > 0)
 
+  const blockGap = diagram.edges.some((edge) => edge.label !== '') ? LABELLED_BLOCK_GAP : BLOCK_GAP
   const measure = (id: string): Measured => {
-    if (!byId.has(id)) return { width: nodeWidth(id), height: NODE_HEIGHT }
+    if (!byId.has(id)) return textOf(nodeById.get(id) as DiagramNode)
     const items = contents(id)
     const sizes = items.map(measure)
     return {
       width: Math.max(MIN_NODE_WIDTH, ...sizes.map((size) => size.width)) + GROUP_PADDING * 2,
-      height: GROUP_HEADER + GROUP_PADDING * 2 + sizes.reduce((total, size) => total + size.height, 0) + Math.max(0, items.length - 1) * BLOCK_GAP,
+      height: GROUP_HEADER + GROUP_PADDING * 2 + sizes.reduce((total, size) => total + size.height, 0) + Math.max(0, items.length - 1) * blockGap,
     }
   }
 
@@ -186,7 +203,7 @@ function placeByGroups(diagram: Diagram, nodes: DiagramNode[], top: number): Pla
   const place = (id: string, x: number, y: number): Measured => {
     const size = measure(id)
     if (!byId.has(id)) {
-      boxes.set(id, { x, y, width: size.width, height: NODE_HEIGHT })
+      boxes.set(id, { x, y, width: size.width, height: size.height })
       return size
     }
     groupRects.set(id, { x, y, width: size.width, height: size.height })
@@ -196,7 +213,7 @@ function placeByGroups(diagram: Diagram, nodes: DiagramNode[], top: number): Pla
     for (const child of ordered) {
       const childSize = measure(child)
       place(child, x + GROUP_PADDING + (inner - childSize.width) / 2, cursor)
-      cursor += childSize.height + BLOCK_GAP
+      cursor += childSize.height + blockGap
     }
     return size
   }
@@ -217,7 +234,7 @@ function placeByGroups(diagram: Diagram, nodes: DiagramNode[], top: number): Pla
   for (const item of topItems) {
     const size = measure(item)
     place(item, MARGIN + (width - size.width) / 2, cursor)
-    cursor += size.height + BLOCK_GAP
+    cursor += size.height + blockGap
   }
   return { boxes, groupRects, width: width + MARGIN * 2 }
 }

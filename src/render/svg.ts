@@ -12,6 +12,23 @@
  * Pure, and the output is asserted as text: escaping, geometry, arrowheads, wrapped captions.
  */
 
+/**
+ * A box's label, one `tspan` per line.
+ *
+ * The lines were wrapped before the box was placed, so the text fits by construction; a single `<text>` with the
+ * whole label is what used to overflow the box and print on top of its neighbours.
+ */
+function boxText(shape: { x: number; y: number; width: number; height: number; label: string; lines?: string[] }, stroke: string): string {
+  const lines = shape.lines === undefined || shape.lines.length === 0 ? [shape.label] : shape.lines
+  const lineHeight = 15
+  const first = shape.y + shape.height / 2 - ((lines.length - 1) * lineHeight) / 2 + 4
+  const spans = lines
+    .map((line, index) => '<tspan x="' + n(shape.x + shape.width / 2) + '" y="' + n(first + index * lineHeight) + '">' + escape(line) + '</tspan>')
+    .join('')
+  return '<text font-size="11" text-anchor="middle" fill="' + stroke + '">' + spans + '</text>'
+}
+
+
 import type { Canvas, Shape } from './paint.js'
 import type { Palette } from './palette.js'
 
@@ -46,8 +63,7 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
     return (
       '<rect x="' + n(shape.x) + '" y="' + n(shape.y) + '" width="' + n(shape.width) + '" height="' + n(shape.height) +
       '" rx="6" fill="' + colours.surface + '" stroke="' + stroke + '" stroke-width="' + n(width) + '" />' +
-      '<text x="' + n(shape.x + shape.width / 2) + '" y="' + n(shape.y + shape.height / 2 + 4) +
-      '" font-size="11" text-anchor="middle" fill="' + stroke + '">' + escape(shape.label) + '</text>'
+      boxText(shape, stroke)
     )
   },
   link: (shape, colours) => {
@@ -76,7 +92,7 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
     const lines = shape.lines
       .map((line, index) => '<tspan x="' + n(shape.x) + '" dy="' + (index === 0 ? 0 : 15) + '">' + escape(line) + '</tspan>')
       .join('')
-    return '<text x="' + n(shape.x) + '" y="' + n(shape.y + 11) + '" font-size="10" fill="' + colour + '">' + lines + '</text>'
+    return '<text x="' + n(shape.x) + '" y="' + n(shape.y + 11) + '" font-size="10" text-anchor="middle" fill="' + colour + '">' + lines + '</text>'
   },
 }
 
