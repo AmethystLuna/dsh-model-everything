@@ -421,7 +421,7 @@ export function place(diagram: Diagram, top: number): Placement {
         layerHeight: coordinates.layerHeight,
         laneX: laneProposal,
       },
-      { gap, clearance: LANE_CLEARANCE, spacing: LANE_SPACING },
+      { clearance: LANE_CLEARANCE, spacing: LANE_SPACING },
     )
     const lanes = new Map<number, Lane>()
     for (const chain of augmented.chains) {

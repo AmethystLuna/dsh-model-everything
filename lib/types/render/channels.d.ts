@@ -42,8 +42,6 @@ export interface ChannelInput {
     laneX: ReadonlyMap<string, number>;
 }
 export interface ChannelOptions {
-    /** The empty strip between two rows. */
-    gap: number;
     /** How far a lane stays from a box in a row it crosses. */
     clearance: number;
     /** The narrowest two lanes sharing a gap may be. */

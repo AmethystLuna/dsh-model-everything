@@ -46,8 +46,6 @@ export interface ChannelInput {
 }
 
 export interface ChannelOptions {
-  /** The empty strip between two rows. */
-  gap: number
   /** How far a lane stays from a box in a row it crosses. */
   clearance: number
   /** The narrowest two lanes sharing a gap may be. */
@@ -276,11 +274,12 @@ export function assignChannels(input: ChannelInput, options: ChannelOptions): Ch
     want(Math.min(from, to), chain.index, Math.min(ports.from, ports.to))
   }
 
-  const midOf = (gap: number): number => ((layerY[gap] ?? 0) + (layerHeight[gap] ?? 0) + (layerY[gap + 1] ?? 0)) / 2
+  // A gap always has a row below it, so its strip is bounded: one stack per gap, inside that strip.
+  const midOf = (gap: number): number => (layerY[gap] + layerHeight[gap] + layerY[gap + 1]) / 2
   const heightOf = new Map<number, Map<number, number>>()
   for (const [gap, list] of stacks) {
-    const top = (layerY[gap] ?? 0) + (layerHeight[gap] ?? 0)
-    const bottom = layerY[gap + 1] ?? top + options.gap
+    const top = layerY[gap] + layerHeight[gap]
+    const bottom = layerY[gap + 1]
     const pad = Math.min(8, Math.max(1, (bottom - top) / 3))
     const lo = top + pad
     const hi = Math.max(lo, bottom - pad)
@@ -302,9 +301,9 @@ export function assignChannels(input: ChannelInput, options: ChannelOptions): Ch
   }
   const runs = new Map<number, number>()
   for (const [edge, heights] of heightOf) {
+    // A long edge's heights belong to its lane; an edge between two rows has the one run it asked for.
     if (lanes.has(edge)) continue
-    const y = [...heights.values()][0]
-    if (y !== undefined) runs.set(edge, y)
+    runs.set(edge, [...heights.values()][0])
   }
   return { lanes, runs }
 }

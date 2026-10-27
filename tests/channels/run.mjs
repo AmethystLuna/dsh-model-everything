@@ -107,7 +107,7 @@ const channelsFor = ({ ids, pairs }) => {
       layerHeight: coordinates.layerHeight,
       laneX: coordinates.x,
     },
-    { gap: LAYER_GAP, clearance: CLEARANCE, spacing: SPACING },
+    { clearance: CLEARANCE, spacing: SPACING },
   )
   // What each lane joins, and the rows it passes through: what an assertion about a lane needs to know.
   const lanes = [...plan.lanes.entries()].map(([edge, lane]) => {
@@ -167,7 +167,7 @@ test('two lanes that want the same x are separated, and the box stays between th
         ['#e1', 60],
       ]),
     },
-    { gap: LAYER_GAP, clearance: CLEARANCE, spacing: SPACING },
+    { clearance: CLEARANCE, spacing: SPACING },
   )
   const lanes = [...plan.lanes.values()].sort((left, right) => left.x - right.x)
   if (lanes.length !== 2) throw new Error('lanes: ' + String(lanes.length))
