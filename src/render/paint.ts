@@ -289,6 +289,11 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const placement = place(diagram, topOffset)
   const { boxes, groupRects } = placement
 
+  // An edge may end on a boundary instead of a box: the boundary's rectangle is then the port surface, and
+  // the arrow head lands on its border. A group is not a member box, so every lookup that used to ask only
+  // `boxes` asks this instead.
+  const endBox = (id: string): Box | undefined => boxes.get(id) ?? groupRects.get(id)
+
   // Boundaries first, so everything else is painted on top of them.
   for (const group of groups) {
     const rect = groupRects.get(group.id)
@@ -330,8 +335,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   // the lane leaves and arrives square on, and a short edge points at the box it joins. Two edges that want the same
   // place are spaced apart, so two ports never share a pixel.
   const facing = diagram.edges.map((edge, index): Facing | undefined => {
-    const source = boxes.get(edge.from)
-    const target = boxes.get(edge.to)
+    const source = endBox(edge.from)
+    const target = endBox(edge.to)
     if (source === undefined || target === undefined || edge.from === edge.to) return undefined
     // A wrapped drawing is read in columns: the edge from the bottom of one column to the top of the next leaves
     // and arrives at the side, which is the direction that reading order travels.
@@ -362,8 +367,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   for (const [index, entry] of facing.entries()) {
     if (entry === undefined) continue
     const edge = diagram.edges[index]
-    const from = boxes.get(edge.from) as Box
-    const to = boxes.get(edge.to) as Box
+    const from = endBox(edge.from) as Box
+    const to = endBox(edge.to) as Box
     const vertical = entry.exit === 'bottom' || entry.exit === 'top'
     const middle = (box: Box): number => (vertical ? box.x + box.width / 2 : box.y + box.height / 2)
     const fromMiddle = middle(from)
@@ -400,7 +405,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     placedPort = new Map<string, number>()
     for (const [key, list] of sides) {
       const [boxId, side] = key.split(':') as [string, Side]
-      const box = boxes.get(boxId) as Box
+      const box = endBox(boxId) as Box
       const vertical = side === 'bottom' || side === 'top'
       const span = bounds(box, vertical, true)
       const order = [...list].sort((left, right) => left.wanted - right.wanted || left.index - right.index)
@@ -420,7 +425,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       const exit = placedPort.get(slotKey(edge.from, entry.exit, index)) as number
       if (Math.abs(exit - (placedPort.get(slotKey(edge.to, entry.entry, index)) as number)) < 0.01) continue
       // Only an entry that can reach the exit's x asks for it: a box that does not span it keeps its own point.
-      const target = boxes.get(edge.to) as Box
+      const target = endBox(edge.to) as Box
       if (Math.abs(clampTo(target, true, exit, true) - exit) > 0.01) continue
       for (const slot of sides.get(edge.to + ':' + entry.entry) as Array<{ index: number; wanted: number }>) {
         if (slot.index !== index) continue
@@ -431,7 +436,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (!moved) break
   }
   const portOf = (boxId: string, side: Side, edgeIndex: number): Point => {
-    const box = boxes.get(boxId) as Box
+    const box = endBox(boxId) as Box
     const vertical = side === 'bottom' || side === 'top'
     const coordinate = placedPort.get(slotKey(boxId, side, edgeIndex)) ?? (vertical ? box.x + box.width / 2 : box.y + box.height / 2)
     if (side === 'top') return { x: coordinate, y: box.y }
@@ -529,10 +534,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   for (const [edgeIndex, edge] of diagram.edges.entries()) {
-    const source = boxes.get(edge.from)
-    const target = boxes.get(edge.to)
+    const source = endBox(edge.from)
+    const target = endBox(edge.to)
     if (source === undefined || target === undefined) continue
-    const colour = roleById.get(edge.from) as ColourRole
+    const colour = roleById.get(edge.from) ?? 'muted'
 
     if (edge.from === edge.to) {
       const x = source.x + source.width

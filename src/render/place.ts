@@ -249,16 +249,28 @@ export function place(diagram: Diagram, top: number): Placement {
   }
 
   /** Which group or node a diagram node is drawn as, at one level; `undefined` when it is outside that level. */
-  const entityAt = (scope: string | undefined, nodeId: string): string | undefined => {
-    if (!nodeById.has(nodeId)) return undefined
-    const group = tree.owner.get(nodeId)
+  const entityAt = (scope: string | undefined, id: string): string | undefined => {
+    // An edge may name a boundary instead of a box: it attaches to the boundary's own rectangle. A group is
+    // an entity at the level it is drawn in, and a nested group belongs to its outermost drawn ancestor there.
+    const boundary = groupById.get(id)
+    if (boundary !== undefined) {
+      if (!visible.has(id)) return undefined
+      if (scope === undefined) {
+        let cursor = id
+        while (tree.parentOf.has(cursor)) cursor = tree.parentOf.get(cursor) as string
+        return cursor
+      }
+      return tree.parentOf.get(id) === scope ? id : undefined
+    }
+    if (!nodeById.has(id)) return undefined
+    const group = tree.owner.get(id)
     if (scope === undefined) {
-      if (group === undefined || !visible.has(group)) return nodeId
+      if (group === undefined || !visible.has(group)) return id
       let cursor = group
       while (tree.parentOf.has(cursor)) cursor = tree.parentOf.get(cursor) as string
       return cursor
     }
-    if (group === scope) return nodeId
+    if (group === scope) return id
     if (group === undefined) return undefined
     return tree.parentOf.get(group) === scope && visible.has(group) ? group : undefined
   }

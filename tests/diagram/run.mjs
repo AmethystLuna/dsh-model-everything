@@ -214,6 +214,92 @@ test('a boundary keyword opens a boundary, and its direct members are the ones w
   if (diagram.nodes.some((node) => node.id === 'Worker' || node.id === 'Core')) throw new Error('a boundary keyword became a node')
 })
 
+test('an edge that names a declared package attaches to the boundary, not a second box', () => {
+  const source = ['@startuml', 'package Web {', '  component UI', '}', 'Web <|-- Mobile', '@enduml'].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  // `Web` is the block's name, not an element the source declared: only UI and Mobile are boxes.
+  if (JSON.stringify(ids(diagram)) !== JSON.stringify(['Mobile', 'UI'])) throw new Error('nodes: ' + ids(diagram).join(','))
+  const web = (diagram.groups ?? []).find((group) => group.label === 'Web')
+  if (web === undefined) throw new Error('the Web boundary is missing')
+  const edge = diagram.edges.find((entry) => entry.from === 'Mobile')
+  if (edge === undefined || edge.to !== web.id) throw new Error('edge: ' + JSON.stringify(diagram.edges))
+  if (edge.arrow !== 'generalization') throw new Error('arrow: ' + String(edge.arrow))
+})
+
+test('an edge into a package rectangle ends on the boundary border', () => {
+  const source = ['@startuml', 'package Web {', '  component UI', '}', 'Web <|-- Mobile', '@enduml'].join(String.fromCharCode(10))
+  const rendered = render({ notation: 'plantuml', source })
+  const web = rendered.canvas.shapes.find((shape) => shape.kind === 'group' && shape.label === 'Web')
+  if (web === undefined) throw new Error('the Web boundary is not drawn')
+  const edge = rendered.canvas.shapes.find((shape) => (shape.kind === 'link' || shape.kind === 'path') && shape.arrow === 'generalization')
+  if (edge === undefined) throw new Error('no generalisation edge: ' + rendered.canvas.shapes.map((shape) => shape.kind).join(','))
+  const head = edge.kind === 'link'
+    ? { x: edge.x2, y: edge.y2 }
+    : edge.points[edge.points.length - 1]
+  const onBorder =
+    (Math.abs(head.x - web.x) < 0.01 || Math.abs(head.x - (web.x + web.width)) < 0.01) && head.y >= web.y - 0.01 && head.y <= web.y + web.height + 0.01 ||
+    (Math.abs(head.y - web.y) < 0.01 || Math.abs(head.y - (web.y + web.height)) < 0.01) && head.x >= web.x - 0.01 && head.x <= web.x + web.width + 0.01
+  if (!onBorder) throw new Error('the arrow head is not on the boundary: ' + JSON.stringify(head) + ' vs ' + JSON.stringify({ x: web.x, y: web.y, width: web.width, height: web.height }))
+  // The block's name is the boundary's label, not a second box on top of it.
+  if (rendered.canvas.shapes.some((shape) => shape.kind === 'box' && shape.label === 'Web')) throw new Error('an invented Web box is drawn')
+})
+
+test('an edge written the other way round names the same boundary', () => {
+  const source = ['@startuml', 'package Web {', '  component UI', '}', 'Mobile --|> Web', '@enduml'].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const web = (diagram.groups ?? []).find((group) => group.label === 'Web')
+  const edge = diagram.edges.find((entry) => entry.from === 'Mobile')
+  if (web === undefined || edge === undefined || edge.to !== web.id) throw new Error('edge: ' + JSON.stringify(diagram.edges))
+  if (edge.arrow !== 'generalization') throw new Error('arrow: ' + String(edge.arrow))
+})
+
+test('a block reached through its alias is the boundary, not a box of the alias name', () => {
+  const source = ['@startuml', 'package "Web Tier" as web {', '  component UI', '}', 'web <|-- Mobile', '@enduml'].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  if (JSON.stringify(ids(diagram)) !== JSON.stringify(['Mobile', 'UI'])) throw new Error('nodes: ' + ids(diagram).join(','))
+  const web = (diagram.groups ?? []).find((group) => group.id === 'web')
+  if (web === undefined) throw new Error('the aliased boundary is missing')
+  const edge = diagram.edges.find((entry) => entry.from === 'Mobile')
+  if (edge === undefined || edge.to !== 'web') throw new Error('edge: ' + JSON.stringify(diagram.edges))
+})
+
+test('a name that is not a declared block stays a normal element', () => {
+  // An undeclared name is an implicit element, which PlantUML also allows.
+  const implicit = fromPlantUml(['@startuml', 'Mobile --> Web', '@enduml'].join(String.fromCharCode(10)))
+  if (implicit.refused.length !== 0) throw new Error('refused: ' + implicit.refused.join('; '))
+  if (JSON.stringify(ids(implicit.diagram)) !== JSON.stringify(['Mobile', 'Web'])) throw new Error('nodes: ' + ids(implicit.diagram).join(','))
+  if (implicit.diagram.groups !== undefined) throw new Error('an undeclared name became a boundary: ' + JSON.stringify(implicit.diagram.groups))
+  // A name declared as an element is a box for the same reason, even when the edge writes it first.
+  const declared = fromPlantUml(['@startuml', 'component Web', 'Mobile --> Web', '@enduml'].join(String.fromCharCode(10)))
+  if (JSON.stringify(ids(declared.diagram)) !== JSON.stringify(['Mobile', 'Web'])) throw new Error('declared nodes: ' + ids(declared.diagram).join(','))
+  if (declared.diagram.groups !== undefined) throw new Error('a declared element became a boundary: ' + JSON.stringify(declared.diagram.groups))
+  const edge = declared.diagram.edges.find((entry) => entry.from === 'Mobile')
+  if (edge === undefined || edge.to !== 'Web') throw new Error('edge: ' + JSON.stringify(declared.diagram.edges))
+})
+
+test('an edge between two boundaries is refused by line, not attached to a member box', () => {
+  const source = [
+    '@startuml',
+    'package A {',
+    '  component X',
+    '}',
+    'package B {',
+    '  component Y',
+    '}',
+    'A --> B',
+    '@enduml',
+  ].join(String.fromCharCode(10))
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].startsWith('line 8:')) throw new Error('wrong line: ' + refused[0])
+  if (!refused[0].includes('boundaries, not elements')) throw new Error('no boundary reason: ' + refused[0])
+  if (diagram.edges.length !== 0) throw new Error('a refused boundary edge was drawn: ' + JSON.stringify(diagram.edges))
+  if (JSON.stringify(ids(diagram)) !== JSON.stringify(['X', 'Y'])) throw new Error('nodes: ' + ids(diagram).join(','))
+})
+
 test('an element keyword this renderer does not draw is refused with its line and a reason', () => {
   for (const [keyword, line] of [['actor', 'actor User'], ['class', 'class Order'], ['cloud', 'cloud Network']]) {
     const { refused } = fromPlantUml(['@startuml', line, 'A --> B', '@enduml'].join(String.fromCharCode(10)))
