@@ -1314,6 +1314,50 @@ test('a target walled in on every side keeps its edge rather than losing it', ()
   if (route.points.length !== 2) throw new Error('the edge was not kept: ' + JSON.stringify(route.points))
 })
 
+test('a long chain is wrapped into columns instead of one endless drop', () => {
+  const nodes = []
+  const edges = []
+  for (let index = 0; index < 12; index += 1) nodes.push({ id: 'n' + String(index), role: 'normal' })
+  for (let index = 0; index + 1 < nodes.length; index += 1) edges.push({ from: 'n' + String(index), label: '', to: 'n' + String(index + 1) })
+  const { canvas } = paintWith({ kind: 'graph', title: 't', nodes, edges, caption: 'pass' })
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const columns = new Set(boxes.map((box) => Math.round(box.x)))
+  if (columns.size < 2) throw new Error('a twelve-step chain was left in one column')
+  if (canvas.height > canvas.width * 3) throw new Error('the drawing is still a strip: ' + String(canvas.width) + 'x' + String(canvas.height))
+})
+
+test('three rows are left as one column, because a short stack reads better stacked', () => {
+  const nodes = [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }]
+  const edges = [{ from: 'a', label: '', to: 'b' }, { from: 'b', label: '', to: 'c' }]
+  const { canvas } = paintWith({ kind: 'graph', title: 't', nodes, edges, caption: 'pass' })
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  if (new Set(boxes.map((box) => Math.round(box.x))).size !== 1) throw new Error('a three-row drawing was wrapped')
+})
+
+test('a boundary orders its children by what connects to them, not by where they were written', () => {
+  // `later` is written first but only `first` connects to the node above the group, so `first` has to come first.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [
+      { id: 'top', role: 'normal' },
+      { id: 'later', role: 'normal' },
+      { id: 'first', role: 'normal' },
+    ],
+    edges: [
+      { from: 'top', label: '', to: 'first' },
+      { from: 'first', label: '', to: 'later' },
+    ],
+    groups: [{ id: 'g', label: 'Package', members: ['later', 'first'] }],
+    caption: 'pass',
+  }
+  const { canvas } = paintWith(diagram)
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const first = boxes.find((box) => box.label === 'first')
+  const later = boxes.find((box) => box.label === 'later')
+  if (first.y >= later.y) throw new Error('the connected child was not placed above the unrelated one')
+})
+
 if (failures > 0) {
   console.log(NL + 'render tests failed: ' + String(failures))
   process.exit(1)
