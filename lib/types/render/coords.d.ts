@@ -1,21 +1,35 @@
 /**
- * Coordinate assignment: how far right each box sits.
+ * Coordinate assignment: how far right each box sits. Brandes-Kopf.
  *
  * The layers are rows and the order inside them is settled; the only freedom left is the x of each box. Three
- * properties make a drawing readable, and this module is built around them:
+ * properties make a drawing readable:
  *
- * - A box wants to sit under the mean of the boxes it is connected to. That is the least-squares answer to "point at
- *   what you are connected to", and it is what makes the drawing look balanced rather than left-packed.
- * - Nothing overlaps. A mean that would push two boxes into each other is not a placement, so each layer's desired
- *   positions are projected onto the nearest positions that keep the boxes apart (isotonic regression, which is a
- *   monotone fit and therefore exactly "keep the order and the minimum gap"). Rows are then separated by a fixed gap.
- * - A long edge's dummies share one x. They are one lane, not three points, so they are one variable here: the
- *   placeholder ids of one chain all read and write the same entry. That value is a proposal for the channel stage,
- *   not a promise: a lane is moved to a free corridor where routing needs it, and a box is never moved out of a lane.
+ * - A box sits over what it is connected to, and a chain of boxes sits on one vertical line. Brandes and Kopf get
+ *   this by *aligning*: every box is offered the median of its neighbours in the layer just above (or just below) and
+ *   is joined to that neighbour's block when the join crosses no other edge. A block is then one node of a smaller
+ *   graph, and a box that aligned downwards through five rows comes out as one straight segment.
+ * - Nothing overlaps, and the empty strip between two boxes in a row is the same everywhere. The blocks are compacted
+ *   against each other by the least distance their rows allow, which is a longest path over the block graph: a block
+ *   sits as far left as the block to its left permits, and no further.
+ * - The drawing is balanced rather than packed to one side. Aligning downwards alone would lean everything left, so
+ *   the same two passes are run from the bottom up, and each pair is run once more mirrored left to right. The four
+ *   layouts are then averaged. Averaging is a convex combination, and the separation constraints are linear, so the
+ *   average of four layouts that keep the boxes apart also keeps them apart - the balance is free of overlaps by
+ *   construction. A pass that starts at the top and one that starts at the bottom compact their blocks from opposite
+ *   ends, so each side is first slid onto the origin of the first pass of that side, and only then averaged.
  *
- * The projection is done a layer at a time, alternating down and up, until the means stop moving. Brandes-Kopf gets
- * the same three properties out of a more careful alignment; this relaxation is the simpler equivalent the drawing
- * can explain: every iteration sets a box to the mean of its neighbours, then repairs the overlaps that mean created.
+ * Three things this module owes the rest of the pipeline rather than the paper:
+ *
+ * - A long edge's dummies share one x. They are one lane, not one point per row, so each lane is collapsed to the mean
+ *   of the x its two ends want - the straight drop a reader follows. Collapsing can put a lane where a box already is,
+ *   so the last pass spends the lane's space: boxes are pushed right past it and never the other way, and a row keeps
+ *   the width its placeholders were given, which is the width a corridor needs when the lane has to go around a box.
+ *   The lane is a proposal either way - the channel stage moves a lane into a free corridor when routing needs it, and
+ *   a box never moves for a lane.
+ * - A lane is not a neighbour to be aligned with. A box that aligned itself to a lane passing through its row would be
+ *   pulled off the boxes it does connect to, which is how a decision with one long edge comes out as a staircase. Lanes
+ *   are placed by the compaction and then by the channel stage, which is where a lane belongs.
+ * - The empty strip between two rows is the caller's, not this module's: the y of a row is a running sum with one gap.
  *
  * Pure: layers and chains in, coordinates out.
  */
