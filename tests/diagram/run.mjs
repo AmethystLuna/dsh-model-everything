@@ -192,6 +192,9 @@ test('a boundary keyword opens a boundary, and its direct members are the ones w
     '  }',
     '  component "API" as api',
     '}',
+    'folder "Docs" {',
+    '  component "Guide" as guide',
+    '}',
     '@enduml',
   ].join(String.fromCharCode(10))
   const { diagram, refused } = fromPlantUml(source)
@@ -199,9 +202,13 @@ test('a boundary keyword opens a boundary, and its direct members are the ones w
   const groups = diagram.groups ?? []
   const core = groups.find((group) => group.label === 'Core')
   const worker = groups.find((group) => group.label === 'Worker')
-  if (core === undefined || worker === undefined) throw new Error('a boundary is missing: ' + groups.map((group) => group.label).join(','))
+  const docs = groups.find((group) => group.label === 'Docs')
+  if (core === undefined || worker === undefined || docs === undefined) {
+    throw new Error('a boundary is missing: ' + groups.map((group) => group.label).join(','))
+  }
   if (!core.members.includes('api') || core.members.includes('reader')) throw new Error('Core members: ' + core.members.join(','))
   if (!worker.members.includes('reader')) throw new Error('Worker members: ' + worker.members.join(','))
+  if (!docs.members.includes('guide')) throw new Error('Docs members: ' + docs.members.join(','))
   if (worker.parent !== core.id) throw new Error('Worker parent: ' + String(worker.parent))
   // The block keyword is a boundary, not a box of its own.
   if (diagram.nodes.some((node) => node.id === 'Worker' || node.id === 'Core')) throw new Error('a boundary keyword became a node')
