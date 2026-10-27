@@ -14,12 +14,15 @@
  * - boundaries: `package`, `folder`, `node`, `component`, `rectangle` and `artifact` blocks, closed by `}`;
  * - arrows, either direction: association `-->`/`<--`, dependency `..>`/`<..`, generalisation `--|>`/`<|--`,
  *   realisation `..|>`/`<|..`, composition `*--`/`--*`, aggregation `o--`/`--o`, labelled after `:`;
+ * - an edge end that names a declared block attaches to that block's rectangle, the way an external
+ *   dependency on a package is drawn; a name that is not a declared block is an implicit element;
  * - `[*] --> X` for a start marker;
  * - `'` comments and `skinparam`/`!theme` directives.
  *
  * Refused, by line and by name: the element keywords this renderer has no symbol for (`actor`, `class`,
  * `cloud`, ...), the diagram kinds it does not draw (`sequence`), and an edge it cannot draw as written (a
- * line with no arrow end, a mark at both ends, a dotted diamond).
+ * line with no arrow end, a mark at both ends, a dotted diamond, an edge between two boundaries, or an edge
+ * into a boundary that is nested or empty).
  */
 import { type Diagram } from './model.js';
 export interface Parsed {
