@@ -232,7 +232,7 @@ export function assignChannels(input: ChannelInput, options: ChannelOptions): Ch
       byGap.set(gap, [...(byGap.get(gap) ?? []), { entry, index }])
     }
   }
-  for (const [, list] of byGap) list.sort((left, right) => left.index - right.index || left.entry.edge - right.entry.edge)
+  for (const [, list] of byGap) list.sort((left, right) => left.index - right.index)
   for (let round = 0; round < 4; round += 1) {
     let moved = false
     for (const [, list] of byGap) {

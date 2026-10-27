@@ -285,7 +285,6 @@ function placeLabel(
   const dx = to.x - from.x
   const dy = to.y - from.y
   const length = Math.abs(dx) + Math.abs(dy)
-  if (length < 1) return spotAt(middle.x, middle.y)
   const ux = dx / length
   const uy = dy / length
   // The walk is bounded so the label's own rectangle stays on the run that names it: a mask that hangs off the
@@ -430,12 +429,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const source = endBox(edge.from)
     const target = endBox(edge.to)
     if (source === undefined || target === undefined || edge.from === edge.to) return undefined
-    // A wrapped drawing is read in columns: the edge from the bottom of one column to the top of the next leaves
-    // and arrives at the side, which is the direction that reading order travels.
+    // A wrapped drawing is read in columns: the edge from one column to the next leaves and arrives at the side,
+    // which is the direction that reading order travels. A column is always to the right of the one before it.
     const sides = placement.across.has(index)
-      ? target.x + target.width / 2 >= source.x + source.width / 2
-        ? { exit: 'right' as Side, entry: 'left' as Side }
-        : { exit: 'left' as Side, entry: 'right' as Side }
+      ? { exit: 'right' as Side, entry: 'left' as Side }
       : approachSides(source, target)
     const lane = placement.lanes.get(index)
     if (lane === undefined || lane.points.length === 0) return sides
@@ -464,9 +461,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const base = (lead.points[0] as Point).x
     const taken = new Set<number>()
     for (const index of list) {
-      const lane = placement.lanes.get(index)
-      if (lane === undefined || lane.points.length === 0) continue
-      const own = (lane.points[0] as Point).x
+      const lane = placement.lanes.get(index) as { points: Point[] }
+      const own = lane.points[0].x
       const offset = fanOf.get(index) ?? 0
       const edge = diagram.edges[index] as DiagramEdge
       const from = endBox(edge.from) as Box
@@ -620,8 +616,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (!moved) break
   }
   const portOf = (boxId: string, side: Side, edgeIndex: number): Point => {
-    const span = spanOf(boxId, side, false)
-    const coordinate = placedPort.get(slotKey(boxId, side, edgeIndex)) ?? (span.low + span.high) / 2
+    const coordinate = placedPort.get(slotKey(boxId, side, edgeIndex)) as number
     return pointOn(boxId, side, coordinate)
   }
   const anchorsFor = new Map<number, Ports>()
@@ -705,19 +700,6 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     routes.push(shape)
   }
 
-  /** Does any segment of this route pass through a box other than its own two ends? */
-  const clearOfBoxes = (points: Point[], from: Box, to: Box): boolean => {
-    for (let index = 0; index + 1 < points.length; index += 1) {
-      const start = points[index]
-      const end = points[index + 1]
-      for (const box of boxList) {
-        if (box === from || box === to) continue
-        if (crossesBox(start.x, start.y, end.x, end.y, box)) return false
-      }
-    }
-    return true
-  }
-
   for (const [edgeIndex, edge] of diagram.edges.entries()) {
     const source = endBox(edge.from)
     const target = endBox(edge.to)
@@ -770,16 +752,12 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       continue
     }
 
-    // Two rows with nothing between them: the edge is the two-bend run the channel stage stacked, which cannot cross
-    // a box because the whole run sits in the empty strip between the rows. A wrapped drawing puts columns side by
-    // side, so a run that would still meet a box is handed to the router instead.
+    // Two rows with nothing between them: the edge is the two-bend run the channel stage stacked. A run sits in the
+    // empty strip between its own two rows and inside its own component's column, so it cannot meet a box.
     const runY = placement.runs.get(edgeIndex)
     if (runY !== undefined && anchors !== undefined) {
-      const points = simplify([anchors.exit, { x: anchors.exit.x, y: runY }, { x: anchors.entry.x, y: runY }, anchors.entry])
-      if (clearOfBoxes(points, source, target)) {
-        paintRoute(edge, points, colour)
-        continue
-      }
+      paintRoute(edge, simplify([anchors.exit, { x: anchors.exit.x, y: runY }, { x: anchors.entry.x, y: runY }, anchors.entry]), colour)
+      continue
     }
 
     paintRoute(edge, routeEdge(source, target, boxList, anchors).points, colour)

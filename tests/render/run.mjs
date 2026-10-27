@@ -2171,6 +2171,164 @@ test('a stadium and a hexagon keep their ports on the flat run, not on a cap or 
   }
 })
 
+const diagramOf = (spec) => ({ kind: 'graph', title: 't', caption: 'graph', ...spec })
+
+test('a side anchor is the middle of that side, and a sideways edge leaves toward where it goes', () => {
+  const box = { x: 10, y: 20, width: 40, height: 20 }
+  const sides = [
+    ['top', { x: 30, y: 20 }],
+    ['bottom', { x: 30, y: 40 }],
+    ['left', { x: 10, y: 30 }],
+    ['right', { x: 50, y: 30 }],
+  ]
+  for (const [side, want] of sides) {
+    const got = anchor(box, side)
+    if (got.x !== want.x || got.y !== want.y) throw new Error(side + ': ' + JSON.stringify(got))
+  }
+  const right = { x: 100, y: 20, width: 40, height: 20 }
+  const forward = approachSides(box, right)
+  if (forward.exit !== 'right' || forward.entry !== 'left') throw new Error('forward: ' + JSON.stringify(forward))
+  const backward = approachSides(right, box)
+  if (backward.exit !== 'left' || backward.entry !== 'right') throw new Error('backward: ' + JSON.stringify(backward))
+})
+
+test('every symbol a node can state is written as the SVG shape that draws it', () => {
+  const source = [
+    'graph TD',
+    '  a[[Subroutine]] --> b([Stadium])',
+    '  b --> c<<Hexagon>>',
+    '  c --> d[(Store)]',
+    '  d --> e{Decision}',
+    '  e --> f[Rectangle]',
+  ].join(NL)
+  const { markup, dropped } = render({ source })
+  if (dropped !== 0) throw new Error('the writer dropped ' + String(dropped) + ' shapes')
+  for (const tag of ['<polygon', '<rect', '<path']) if (!markup.includes(tag)) throw new Error('the drawing has no ' + tag)
+})
+
+test('a use case states a circle, which is drawn as an ellipse', () => {
+  const { markup } = render({ source: '@startuml\nusecase "Do the thing" as uc\ncomponent Api\nApi --> uc\n@enduml' })
+  if (!markup.includes('<ellipse')) throw new Error('the use case is not an ellipse')
+})
+
+test('a self loop keeps the line and the head the source stated', () => {
+  const state = render({ source: ['stateDiagram-v2', '  [*] --> busy', '  busy --> [*]'].join(NL) })
+  const loop = state.canvas.shapes.find((shape) => shape.kind === 'path' && shape.dashed === true)
+  if (loop === undefined) throw new Error('the end transition is not a dashed self loop')
+  const plant = render({ source: '@startuml\nA --> A\n@enduml' })
+  const arrowed = plant.canvas.shapes.find((shape) => shape.kind === 'path' && shape.arrow === 'association')
+  if (arrowed === undefined) throw new Error('the self loop carries no arrow type')
+})
+
+test('an edge from a boundary attaches to its rectangle and earns the muted colour; an edge to a boundary with nothing drawn is dropped', () => {
+  const diagram = diagramOf({
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }, { id: 'c', role: 'normal' }],
+    edges: [
+      { from: 'b', to: 'a', label: '' },
+      { from: 'g', to: 'b', label: '' },
+      { from: 'b', to: 'empty', label: '' },
+      { from: 'b', to: 'hollow', label: '' },
+    ],
+    groups: [
+      { id: 'g', label: 'G', members: ['a'] },
+      { id: 'empty', label: 'Empty', members: [] },
+      { id: 'outer', label: 'Outer', members: ['c'] },
+      { id: 'hollow', label: 'Hollow', members: [], parent: 'outer' },
+    ],
+  })
+  const { canvas } = paintWith(diagram)
+  const edges = canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path')
+  // The empty boundary is not drawn, so an edge into it has nothing to land on - not even the boundary around it,
+  // which the source did not say the edge pointed at.
+  if (edges.length !== 2) throw new Error('edge shapes: ' + String(edges.length))
+  const fromBoundary = edges.find((shape) => shape.colour === 'muted')
+  if (fromBoundary === undefined) throw new Error('the boundary edge did not fall back to the muted colour')
+})
+
+test('a three-level nest is drawn inside out, and an edge naming a nested boundary attaches to the outermost one', () => {
+  const diagram = diagramOf({
+    nodes: [{ id: 'x', role: 'normal' }, { id: 'y', role: 'normal' }, { id: 'w', role: 'normal' }],
+    edges: [
+      { from: 'x', to: 'y', label: '' },
+      { from: 'w', to: 'inner', label: '' },
+    ],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['x'] },
+      { id: 'mid', label: 'Mid', members: [], parent: 'outer' },
+      { id: 'inner', label: 'Inner', members: ['y'], parent: 'mid' },
+      { id: 'other', label: 'Other', members: ['w'] },
+    ],
+  })
+  const { canvas } = paintWith(diagram)
+  const rects = new Map(canvas.shapes.filter((shape) => shape.kind === 'group').map((shape) => [shape.id, shape]))
+  for (const id of ['outer', 'mid', 'inner', 'other']) if (!rects.has(id)) throw new Error('the boundary ' + id + ' was not drawn')
+  const nested = rects.get('inner')
+  const middle = rects.get('mid')
+  if (!(nested.x >= middle.x && nested.y >= middle.y && nested.x + nested.width <= middle.x + middle.width)) {
+    throw new Error('the inner boundary is not inside the middle one')
+  }
+  if (canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path').length === 0) throw new Error('no edge was drawn')
+})
+
+test('the initial state pins its own level, and a sibling level is laid out without it', () => {
+  const diagram = diagramOf({
+    kind: 'machine',
+    init: 'i',
+    nodes: [{ id: 'i', role: 'normal' }, { id: 'a', role: 'normal' }],
+    edges: [{ from: 'i', to: 'a', label: '' }],
+    groups: [
+      { id: 'g1', label: 'One', members: ['i'] },
+      { id: 'g2', label: 'Two', members: ['a'] },
+    ],
+  })
+  const { canvas } = paintWith(diagram)
+  const rects = new Map(canvas.shapes.filter((shape) => shape.kind === 'group').map((shape) => [shape.id, shape]))
+  const first = rects.get('g1')
+  const second = rects.get('g2')
+  if (first === undefined || second === undefined) throw new Error('a boundary was not drawn')
+  if (!(first.y < second.y)) throw new Error('the initial state is not on the top level: ' + String(first.y) + ' vs ' + String(second.y))
+})
+
+test('a wrapped column reads its edges sideways, on whatever symbol the box is, and keeps the line style', () => {
+  for (const shape of ['cylinder', 'hexagon', 'stadium']) {
+    const nodes = []
+    const edges = []
+    for (let index = 0; index < 12; index += 1) nodes.push({ id: 'n' + String(index), role: 'normal', shape })
+    for (let index = 0; index + 1 < 12; index += 1) edges.push({ from: 'n' + String(index), to: 'n' + String(index + 1), label: '' })
+    edges.push({ from: 'n0', to: 'n11', label: 'skip', dashed: true, arrow: 'dependency' })
+    const { canvas } = paintWith(diagramOf({ nodes, edges }))
+    const columns = new Set(canvas.shapes.filter((entry) => entry.kind === 'box').map((entry) => Math.round(entry.x / 10)))
+    if (columns.size < 2) throw new Error(shape + ': the drawing did not wrap')
+    const skip = canvas.shapes.find((entry) => (entry.kind === 'path' || entry.kind === 'link') && entry.label === 'skip')
+    if (skip === undefined) throw new Error(shape + ': the long edge is not drawn')
+    if (skip.kind !== 'path') throw new Error(shape + ': the long edge did not take the router')
+    if (skip.dashed !== true) throw new Error(shape + ': the long edge lost its dash')
+    if (skip.arrow !== 'dependency') throw new Error(shape + ': the long edge lost its arrow type')
+    const boxes = new Map(canvas.shapes.filter((entry) => entry.kind === 'box').map((entry) => [entry.label, entry]))
+    const from = boxes.get('n0')
+    const to = boxes.get('n11')
+    if (skip.points[0].x !== from.x + from.width) throw new Error(shape + ': the edge does not leave the right side')
+    if (skip.points[skip.points.length - 1].x !== to.x) throw new Error(shape + ': the edge does not arrive at the left side')
+  }
+})
+
+test('a degenerate arrowhead is not written rather than written wrong', () => {
+  const canvas = {
+    width: 100,
+    height: 100,
+    shapes: [
+      { kind: 'link', x1: 20, y1: 20, x2: 20, y2: 20, label: '', labelX: 20, labelY: 20, colour: 'edge', arrow: 'association' },
+      { kind: 'link', x1: 30, y1: 30, x2: 30, y2: 30, label: '', labelX: 30, labelY: 30, colour: 'edge', arrow: 'generalization' },
+      { kind: 'link', x1: 40, y1: 40, x2: 40, y2: 40, label: '', labelX: 40, labelY: 40, colour: 'edge', arrow: 'composition' },
+      { kind: 'link', x1: 20, y1: 40, x2: 80, y2: 40, label: 'go', labelX: 50, labelY: 40, colour: 'edge', arrow: 'generalization' },
+    ],
+  }
+  const { markup, dropped } = toSvg(canvas, palette(), 'degenerate')
+  if (dropped !== 0) throw new Error('dropped: ' + String(dropped))
+  if (markup.split('<polygon').length - 1 !== 1) throw new Error('the zero-length head was drawn')
+  if (!markup.includes('go')) throw new Error('the labelled edge lost its label')
+})
+
 if (failures > 0) {
   console.log(NL + 'render tests failed: ' + String(failures))
   process.exit(1)

@@ -204,16 +204,16 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
-| `diagram` | 64 | a flowchart becomes boxes and labelled arrows |
+| `diagram` | 97 | a flowchart becomes boxes and labelled arrows |
 | `client` | 12 | the declared client export is the built bundle the loader can execute |
-| `render` | 138 | every verdict earns its own role |
+| `render` | 147 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
-| `layering` | 16 | a chain is one row per box |
-| `ordering` | 8 | two edges that end in opposite order cross, and two in the same order do not |
+| `layering` | 19 | a chain is one row per box |
+| `ordering` | 10 | two edges that end in opposite order cross, and two in the same order do not |
 | `coords` | 10 | a box with one parent sits under it, and two of them straddle it evenly |
-| `channels` | 8 | two long edges crossing one gap get one lane each, in the order of their dummies |
+| `channels` | 12 | two long edges crossing one gap get one lane each, in the order of their dummies |
 | `components` | 9 | a drawing splits into the pieces that share no edge |
-| `placement` | 9 | a boundary contains its own contents and only its own |
+| `placement` | 11 | a boundary contains its own contents and only its own |
 | `presentation` | 55 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

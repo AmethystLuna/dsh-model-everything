@@ -171,6 +171,37 @@ test('every node is placed exactly once, even when the model repeats an id', () 
   if (placement.boxes.size !== 2) throw new Error('boxes: ' + String(placement.boxes.size))
 })
 
+test('no layers is not a page, and a zero-width layer is still planned rather than rejected', () => {
+  const empty = planBands([], [], 40)
+  if (empty.bands.length !== 0 || empty.width !== 0 || empty.height !== 0) throw new Error('an empty plan: ' + JSON.stringify(empty))
+  const zero = planBands([0, 0, 0, 0], [20, 20, 20, 20], 40)
+  if (zero.bands.length === 0) throw new Error('a zero-width drawing got no bands')
+  if (!Number.isFinite(zero.width) || !Number.isFinite(zero.height)) throw new Error('a zero-width drawing has no size: ' + JSON.stringify(zero))
+})
+
+test('an edge naming a boundary the drawing does not show reserves no geometry', () => {
+  // The boundary around an empty nested block is not drawn, so an edge aimed at it has no rectangle to reach. It
+  // must not be laid out at all: a run reserved for it would be a corridor in a gap with no edge in it.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    nodes: [node('a'), node('b')],
+    edges: [
+      { from: 'b', to: 'a', label: '' },
+      { from: 'b', to: 'hollow', label: '' },
+    ],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['a'] },
+      { id: 'hollow', label: 'Hollow', members: [], parent: 'outer' },
+    ],
+    caption: 'graph',
+  }
+  const placement = place(diagram, 20)
+  if (!placement.runs.has(0)) throw new Error('the edge the drawing does show reserved no run')
+  if (placement.runs.has(1)) throw new Error('the edge into the empty boundary was laid out')
+  if (placement.lanes.has(1)) throw new Error('the edge into the empty boundary claimed a lane')
+})
+
 if (failures > 0) {
   console.log(String.fromCharCode(10) + 'placement tests failed: ' + String(failures))
   process.exit(1)

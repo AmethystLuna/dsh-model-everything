@@ -303,6 +303,95 @@ test('a lane that would have crossed a box is moved, and the box stays where the
   if (Math.abs(centre - expected) > 0.5) throw new Error('"d" was moved off its coordinate: ' + String(centre) + ' vs ' + String(expected))
 })
 
+test('a box narrower than two port margins still offers one port point', () => {
+  // A box 12 wide cannot hold a port 10 in from each corner: the two margins cross, so the only point on the side
+  // is its middle. A lane must take that point rather than a coordinate the box does not have.
+  const plan = assignChannels(
+    {
+      layers: [['a'], ['#d0_1'], ['b']],
+      chains: [{ index: 0, path: ['a', '#d0_1', 'b'] }],
+      chainOf: new Map([['#d0_1', '#e0']]),
+      boxes: new Map([
+        ['a', { x: 0, y: 0, width: 12, height: 20 }],
+        ['b', { x: 0, y: 80, width: 12, height: 20 }],
+      ]),
+      layerY: [0, 40, 80],
+      layerHeight: [20, 20, 20],
+      laneX: new Map([['#e0', 6]]),
+    },
+    { clearance: CLEARANCE, spacing: SPACING },
+  )
+  const lane = plan.lanes.get(0)
+  if (lane === undefined) throw new Error('the long edge reserved no lane')
+  if (lane.x !== 6) throw new Error('the lane is not on the box middle: ' + String(lane.x))
+})
+
+test('an edge the stage cannot reserve a lane for gets none, and is left to the router', () => {
+  const options = { clearance: CLEARANCE, spacing: SPACING }
+  const boxes = new Map([
+    ['a', { x: 0, y: 0, width: WIDTH, height: HEIGHT }],
+    ['b', { x: 0, y: 71, width: WIDTH, height: HEIGHT }],
+    ['c', { x: 0, y: 142, width: WIDTH, height: HEIGHT }],
+  ])
+  const base = {
+    layers: [['a'], ['b'], ['c']],
+    layerY: [0, 71, 142],
+    layerHeight: [HEIGHT, HEIGHT, HEIGHT],
+    laneX: new Map(),
+  }
+  // An edge written against the reading order has no lane to reserve: the layering is what orients it.
+  const upward = assignChannels({ ...base, boxes, chains: [{ index: 0, path: ['c', '#d0_1', 'a'] }], chainOf: new Map([['#d0_1', '#e0']]) }, options)
+  // An edge whose end is not a box in this level (a boundary, say) has no box to arrive at.
+  const dangling = assignChannels({ ...base, boxes: new Map([['a', boxes.get('a')]]), chains: [{ index: 0, path: ['a', '#d0_1', 'c'] }], chainOf: new Map([['#d0_1', '#e0']]) }, options)
+  // A lane id the coordinates never proposed is not a lane this stage can place.
+  const unproposed = assignChannels({ ...base, boxes, chains: [{ index: 0, path: ['a', '#d0_1', 'c'] }], chainOf: new Map() }, options)
+  for (const [name, plan] of [['upward', upward], ['dangling', dangling], ['unproposed', unproposed]]) {
+    if (plan.lanes.size !== 0) throw new Error(name + ': a lane was reserved: ' + String(plan.lanes.size))
+    if (plan.runs.size !== 0) throw new Error(name + ': a run was reserved')
+  }
+})
+
+test('a lane with no proposed x takes the middle between its two ends', () => {
+  const plan = assignChannels(
+    {
+      layers: [['a'], ['#d0_1'], ['b']],
+      chains: [{ index: 0, path: ['a', '#d0_1', 'b'] }],
+      chainOf: new Map([['#d0_1', '#e0']]),
+      boxes: new Map([
+        ['a', { x: 0, y: 0, width: 100, height: 20 }],
+        ['b', { x: 0, y: 80, width: 100, height: 20 }],
+      ]),
+      layerY: [0, 40, 80],
+      layerHeight: [20, 20, 20],
+      laneX: new Map(),
+    },
+    { clearance: CLEARANCE, spacing: SPACING },
+  )
+  const lane = plan.lanes.get(0)
+  if (lane === undefined) throw new Error('the long edge reserved no lane')
+  if (lane.x !== 50) throw new Error('the lane is not between its ends: ' + String(lane.x))
+})
+
+test('an edge the stage cannot run between two adjacent rows claims no run', () => {
+  const options = { clearance: CLEARANCE, spacing: SPACING }
+  const boxes = new Map([
+    ['a', { x: 0, y: 0, width: WIDTH, height: HEIGHT }],
+    ['b', { x: 0, y: 71, width: WIDTH, height: HEIGHT }],
+    ['c', { x: 0, y: 142, width: WIDTH, height: HEIGHT }],
+  ])
+  // Two rows apart is a lane's job, not a run's; a chain of length two with a missing box has no run either.
+  const apart = assignChannels(
+    { layers: [['a'], ['b'], ['c']], chains: [{ index: 0, path: ['a', 'c'] }], chainOf: new Map(), boxes, layerY: [0, 71, 142], layerHeight: [HEIGHT, HEIGHT, HEIGHT], laneX: new Map() },
+    options,
+  )
+  const missing = assignChannels(
+    { layers: [['a'], ['b']], chains: [{ index: 0, path: ['a', 'b'] }], chainOf: new Map(), boxes: new Map([['a', boxes.get('a')]]), layerY: [0, 71], layerHeight: [HEIGHT, HEIGHT], laneX: new Map() },
+    options,
+  )
+  if (apart.runs.size !== 0) throw new Error('an edge two rows apart claimed a run')
+  if (missing.runs.size !== 0) throw new Error('an edge with a missing box claimed a run')
+})
+
 if (failures > 0) {
   console.log(NL + 'channel tests failed: ' + String(failures))
   process.exit(1)

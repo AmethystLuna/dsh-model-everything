@@ -15,6 +15,7 @@
 import { breakCycles } from '../../lib/render/cycle-break.js'
 import { addDummies } from '../../lib/render/dummy.js'
 import { layer } from '../../lib/render/layer.js'
+import { minimumLength } from '../../lib/render/network-simplex.js'
 
 let failures = 0
 const test = (name, body) => {
@@ -264,6 +265,160 @@ test('an initial state the graph does not have pins nothing', () => {
   const parsed = graph(['a', 'b'], [['a', 'b']], 'ghost')
   const layering = layer(parsed, parsed.edges)
   if (layering.layerOf.get('a') !== 0 || layering.layerOf.get('b') !== 1) throw new Error('layers: ' + JSON.stringify(layering.layers))
+})
+
+test('a box the model writes twice is one box, on one layer', () => {
+  // A model is data: the same node may be listed twice. The layer must hold one box and the edge must not add a
+  // second row for the copy.
+  const parsed = graph(['a', 'a', 'b'], [['a', 'b']])
+  const layering = layer(parsed, parsed.edges)
+  if (JSON.stringify(layering.layers) !== JSON.stringify([['a'], ['b']])) throw new Error('layers: ' + JSON.stringify(layering.layers))
+  if (layering.layerOf.get('a') !== 0 || layering.layerOf.get('b') !== 1) throw new Error('ranks: ' + JSON.stringify([...layering.layerOf]))
+})
+
+test('an edge the layering did not rank downwards gets no placeholders', () => {
+  // A caller can hand the stage a graph that arrived cyclic: `layer` lays out what it can, and an edge that still
+  // runs upwards (or names a box this level does not have) has no row to cross, so it needs no dummy.
+  const layering = { layers: [['a'], ['b']], layerOf: new Map([['a', 1], ['b', 0]]) }
+  const augmented = addDummies(layering, [
+    { index: 0, from: 'a', to: 'b' },
+    { index: 1, from: 'b', to: 'ghost' },
+  ])
+  if (augmented.layers.flat().join(',') !== 'a,b') throw new Error('a dummy was inserted: ' + JSON.stringify(augmented.layers))
+  for (const chain of augmented.chains) if (chain.path.length !== 2) throw new Error('a chain got a placeholder: ' + JSON.stringify(chain))
+  if (augmented.laneOf.size !== 0) throw new Error('a lane was claimed')
+})
+
+/** The objective the solver minimises: the weight of every layer an edge spans beyond its minimum. */
+const totalLength = (rank, edges) => {
+  let total = 0
+  for (const edge of edges) {
+    const slack = rank[edge.to] - rank[edge.from] - edge.minLength
+    if (slack < 0) return Infinity
+    total += slack * edge.weight
+  }
+  return total
+}
+
+/** The smallest total any ranking of this program can have, by trying every ranking in the only layers it needs. */
+const shortestLength = (count, edges) => {
+  const rank = new Array(count).fill(0)
+  let best = Infinity
+  const walk = (at) => {
+    if (at === count) {
+      const total = totalLength(rank, edges)
+      if (total < best) best = total
+      return
+    }
+    for (let depth = 0; depth < count; depth += 1) {
+      rank[at] = depth
+      walk(at + 1)
+    }
+  }
+  walk(0)
+  return best
+}
+
+test('the ranking solver reaches the optimum on the programs that make it exchange, not only on chains', () => {
+  // One row per decision the exchange loop can take: a constraint edge pointing backwards (the tree has to slide
+  // its outside nodes the other way), a zero-weight edge (no leaving bound to stop the slide), two negative cut
+  // values (the worse one wins), an entering scan that has to skip an edge that is not a candidate, and a swap
+  // whose head side is the tree edge's tail. Each is asserted against the optimum found by search, so the row says
+  // the answer is the shortest one and not merely a feasible one.
+  const programs = [
+    {
+      name: 'a backwards constraint edge',
+      count: 3,
+      start: [0, 1, 0],
+      edges: [
+        { from: 0, to: 1, minLength: 0, weight: 1 },
+        { from: 2, to: 1, minLength: 1, weight: 1 },
+      ],
+    },
+    {
+      name: 'a zero-weight edge',
+      count: 3,
+      start: [0, 0, 1],
+      edges: [
+        { from: 0, to: 2, minLength: 1, weight: 0 },
+        { from: 1, to: 2, minLength: 0, weight: 1 },
+      ],
+    },
+    {
+      name: 'two negative cuts',
+      count: 4,
+      start: [0, 1, 0, 0],
+      edges: [
+        { from: 0, to: 1, minLength: 1, weight: 1 },
+        { from: 0, to: 2, minLength: 0, weight: 0 },
+        { from: 2, to: 1, minLength: 1, weight: 1 },
+        { from: 3, to: 1, minLength: 1, weight: 1 },
+      ],
+    },
+    {
+      name: 'an edge that is not a candidate',
+      count: 5,
+      start: [1, 0, 1, 1, 2],
+      edges: [
+        { from: 0, to: 4, minLength: 1, weight: 0 },
+        { from: 1, to: 0, minLength: 1, weight: 1 },
+        { from: 1, to: 2, minLength: 1, weight: 0 },
+        { from: 1, to: 3, minLength: 1, weight: 1 },
+        { from: 1, to: 4, minLength: 1, weight: 0 },
+        { from: 2, to: 4, minLength: 1, weight: 1 },
+      ],
+    },
+    {
+      name: 'a swap on the head side',
+      count: 4,
+      start: [0, 1, 1, 0],
+      edges: [
+        { from: 0, to: 1, minLength: 1, weight: 1 },
+        { from: 2, to: 1, minLength: 0, weight: 0 },
+        { from: 3, to: 1, minLength: 1, weight: 1 },
+        { from: 3, to: 2, minLength: 1, weight: 1 },
+      ],
+    },
+    {
+      name: 'a second negative cut value',
+      count: 6,
+      start: [0, 0, 1, 1, 0, 0],
+      edges: [
+        { from: 0, to: 1, minLength: 0, weight: 0 },
+        { from: 0, to: 3, minLength: 1, weight: 1 },
+        { from: 1, to: 2, minLength: 1, weight: 0 },
+        { from: 1, to: 3, minLength: 1, weight: 0 },
+        { from: 4, to: 2, minLength: 1, weight: 0 },
+        { from: 4, to: 3, minLength: 1, weight: 1 },
+        { from: 4, to: 5, minLength: 0, weight: 1 },
+        { from: 5, to: 2, minLength: 1, weight: 0 },
+      ],
+    },
+    {
+      // Without the exchange loop this one comes out one layer longer than the optimum: the start ranking is
+      // feasible but leaves the last edge stretched.
+      name: 'a ranking the exchange loop has to shorten',
+      count: 6,
+      start: [0, 0, 1, 1, 2, 3],
+      edges: [
+        { from: 0, to: 2, minLength: 1, weight: 1 },
+        { from: 0, to: 3, minLength: 1, weight: 1 },
+        { from: 0, to: 4, minLength: 1, weight: 1 },
+        { from: 1, to: 2, minLength: 1, weight: 1 },
+        { from: 1, to: 4, minLength: 1, weight: 1 },
+        { from: 2, to: 5, minLength: 1, weight: 1 },
+        { from: 3, to: 4, minLength: 1, weight: 1 },
+        { from: 4, to: 5, minLength: 1, weight: 1 },
+      ],
+    },
+  ]
+  for (const program of programs) {
+    const rank = minimumLength({ count: program.count, edges: program.edges, start: program.start })
+    const total = totalLength(rank, program.edges)
+    if (!Number.isFinite(total)) throw new Error(program.name + ': the answer is not a feasible ranking: ' + JSON.stringify(rank))
+    const possible = shortestLength(program.count, program.edges)
+    if (total !== possible) throw new Error(program.name + ': total ' + String(total) + ' where ' + String(possible) + ' is possible: ' + JSON.stringify(rank))
+  }
 })
 
 if (failures > 0) {

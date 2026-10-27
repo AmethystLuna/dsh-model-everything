@@ -25,7 +25,7 @@ import { seedOrder, type LayoutEdge, type LayoutGraph } from './layout.js'
 import { order } from './order.js'
 import { measure, MIN_NODE_WIDTH, type Measured as TextBox } from './text.js'
 import { planBands } from './wrap.js'
-import type { Diagram, DiagramGroup, DiagramNode } from './model.js'
+import type { Diagram, DiagramEdge, DiagramGroup, DiagramNode } from './model.js'
 
 /** Geometry of one placed box, before anything is drawn. */
 export type Box = { x: number; y: number; width: number; height: number }
@@ -203,11 +203,7 @@ export function place(diagram: Diagram, top: number): Placement {
   const isVisible = (id: string): boolean => {
     const known = asked.get(id)
     if (known !== undefined) return known
-    const group = groupById.get(id)
-    if (group === undefined) {
-      asked.set(id, false)
-      return false
-    }
+    const group = groupById.get(id) as DiagramGroup
     let found = false
     for (const member of group.members) {
       if (tree.owner.get(member) === id && nodeById.has(member)) {
@@ -243,7 +239,7 @@ export function place(diagram: Diagram, top: number): Placement {
       .map((member) => appearance.get(member) as number)
     const children = directGroups(id).map(firstIndexOf)
     const all = [...members, ...children]
-    const found = all.length === 0 ? (appearance.get(id) ?? Number.MAX_SAFE_INTEGER) : Math.min(...all)
+    const found = Math.min(...all)
     firstIndexCache.set(id, found)
     return found
   }
@@ -275,17 +271,13 @@ export function place(diagram: Diagram, top: number): Placement {
     return tree.parentOf.get(group) === scope && visible.has(group) ? group : undefined
   }
 
-  const groupSizes = new Map<string, { width: number; height: number }>()
   const groupLayouts = new Map<string, LevelLayout>()
   const measureGroup = (id: string): { width: number; height: number } => {
-    const cached = groupSizes.get(id)
-    if (cached !== undefined) return cached
     const inside = buildLevel(id)
     const size = {
       width: Math.max(MIN_NODE_WIDTH, inside.width) + GROUP_PADDING * 2,
       height: inside.height + GROUP_HEADER + GROUP_PADDING * 2,
     }
-    groupSizes.set(id, size)
     groupLayouts.set(id, inside)
     return size
   }
@@ -350,14 +342,14 @@ export function place(diagram: Diagram, top: number): Placement {
     const layered = layer(graph, broken.edges)
     const augmented = addDummies(layered, broken.edges)
     const ordered = order(augmented.layers, augmented.chains, seed)
-    const gap = edges.some((edge) => (diagram.edges[edge.index]?.label ?? '') !== '') ? LABELLED_LAYER_GAP : LAYER_GAP
+    const gap = edges.some((edge) => (diagram.edges[edge.index] as DiagramEdge).label !== '') ? LABELLED_LAYER_GAP : LAYER_GAP
     const coordinates = assignCoordinates(
       {
         layers: ordered.layers,
         chains: augmented.chains,
         sizeOf: (id) => {
-          const entity = byId.get(id)
-          return entity === undefined ? { width: 0, height: 0 } : { width: entity.width, height: entity.height }
+          const entity = byId.get(id) as Entity
+          return { width: entity.width, height: entity.height }
         },
         chainOf: augmented.chainOf,
       },
@@ -385,7 +377,7 @@ export function place(diagram: Diagram, top: number): Placement {
       for (const id of row) {
         const entity = byId.get(id)
         if (entity === undefined) continue
-        const centre = coordinates.x.get(id) ?? 0
+        const centre = coordinates.x.get(id) as number
         items.set(id, {
           box: {
             x: centre + shift - entity.width / 2,
@@ -402,9 +394,8 @@ export function place(diagram: Diagram, top: number): Placement {
     // out of the side of one box and into the side of the other, which is where a wrapped reading order turns.
     const across = new Set<number>()
     for (const edge of edges) {
-      const from = layered.layerOf.get(edge.from)
-      const to = layered.layerOf.get(edge.to)
-      if (from === undefined || to === undefined) continue
+      const from = layered.layerOf.get(edge.from) as number
+      const to = layered.layerOf.get(edge.to) as number
       if (bandOfLayer[from] !== bandOfLayer[to]) across.add(edge.index)
     }
 
@@ -414,11 +405,9 @@ export function place(diagram: Diagram, top: number): Placement {
     const laneProposal = new Map<string, number>()
     for (const chain of augmented.chains) {
       if (chain.path.length <= 2) continue
-      const lane = augmented.chainOf.get(chain.path[1])
-      const fromLayer = layered.layerOf.get(chain.path[0])
-      if (lane === undefined || fromLayer === undefined) continue
-      const proposed = coordinates.x.get(lane)
-      if (proposed === undefined) continue
+      const lane = augmented.chainOf.get(chain.path[1]) as string
+      const fromLayer = layered.layerOf.get(chain.path[0]) as number
+      const proposed = coordinates.x.get(lane) as number
       laneProposal.set(lane, proposed + bands.bands[bandOfLayer[fromLayer]].offsetX)
     }
     const itemBoxes = new Map<string, Box>()
@@ -438,15 +427,13 @@ export function place(diagram: Diagram, top: number): Placement {
     const lanes = new Map<number, Lane>()
     for (const chain of augmented.chains) {
       if (chain.path.length <= 2) continue
-      const start = byId.get(chain.path[0])
-      const end = byId.get(chain.path[chain.path.length - 1])
-      if (start === undefined || end === undefined || start.group || end.group) continue
-      const fromLayer = layered.layerOf.get(chain.path[0])
-      const toLayer = layered.layerOf.get(chain.path[chain.path.length - 1])
-      if (fromLayer === undefined || toLayer === undefined) continue
+      const start = byId.get(chain.path[0]) as Entity
+      const end = byId.get(chain.path[chain.path.length - 1]) as Entity
+      if (start.group || end.group) continue
+      const fromLayer = layered.layerOf.get(chain.path[0]) as number
+      const toLayer = layered.layerOf.get(chain.path[chain.path.length - 1]) as number
       if (bandOfLayer[fromLayer] !== bandOfLayer[toLayer]) continue
-      const channel = channels.lanes.get(chain.index)
-      if (channel === undefined) continue
+      const channel = channels.lanes.get(chain.index) as { x: number; y: number[] }
       lanes.set(chain.index, {
         points: channel.y.map((y) => ({ x: channel.x, y })),
         reversed: broken.reversed.has(chain.index),
@@ -464,16 +451,10 @@ export function place(diagram: Diagram, top: number): Placement {
     return { width: right, height: bottom, items, lanes, runs, across }
   }
 
-  const cache = new Map<string, LevelLayout>()
   function buildLevel(scope: string | undefined): LevelLayout {
-    const key = scope ?? ''
-    const cached = cache.get(key)
-    if (cached !== undefined) return cached
     const entities = entitiesIn(scope)
     if (entities.length === 0) {
-      const empty: LevelLayout = { width: 0, height: 0, items: new Map(), lanes: new Map(), runs: new Map(), across: new Set() }
-      cache.set(key, empty)
-      return empty
+      return { width: 0, height: 0, items: new Map(), lanes: new Map(), runs: new Map(), across: new Set() }
     }
     const edges = edgesIn(scope)
     const pinned = pinnedAt(scope)
@@ -500,7 +481,6 @@ export function place(diagram: Diagram, top: number): Placement {
       }
       for (const [edgeIndex, y] of piece.runs) layout.runs.set(edgeIndex, y + at.y)
     })
-    cache.set(key, layout)
     return layout
   }
 

@@ -12,19 +12,17 @@
 import type { Diagram, DiagramEdge, DiagramGroup, DiagramNode } from './model.js'
 
 /** How many nodes a group holds, counting the whole subtree - what the folded box offers to unfold. */
-function subtreeSize(diagram: Diagram, groupId: string, seen: Set<string>): number {
+function subtreeSize(groups: DiagramGroup[], groupId: string, seen: Set<string>): number {
   if (seen.has(groupId)) return 0
   seen.add(groupId)
-  const groups = diagram.groups ?? []
-  const group = groups.find((entry) => entry.id === groupId)
-  if (group === undefined) return 0
+  const group = groups.find((entry) => entry.id === groupId) as DiagramGroup
   const children = groups.filter((entry) => entry.parent === groupId)
-  return group.members.length + children.reduce((total, child) => total + subtreeSize(diagram, child.id, seen), 0)
+  return group.members.length + children.reduce((total, child) => total + subtreeSize(groups, child.id, seen), 0)
 }
 
 /** The group that directly holds a node, when one does. */
-function ownerOf(diagram: Diagram, nodeId: string): string | undefined {
-  return (diagram.groups ?? []).find((group) => group.members.includes(nodeId))?.id
+function ownerOf(groups: DiagramGroup[], nodeId: string): string | undefined {
+  return groups.find((group) => group.members.includes(nodeId))?.id
 }
 
 /**
@@ -48,7 +46,7 @@ export function collapse(diagram: Diagram, folded: Iterable<string>): Diagram {
   const targets = new Set<string>()
   for (const id of asked) {
     const group = byId.get(id)
-    if (group !== undefined && subtreeSize(diagram, id, new Set()) > 0) targets.add(id)
+    if (group !== undefined && subtreeSize(groups, id, new Set()) > 0) targets.add(id)
   }
   if (targets.size === 0) return diagram
 
@@ -68,16 +66,13 @@ export function collapse(diagram: Diagram, folded: Iterable<string>): Diagram {
 
   const removedNodes = new Set<string>()
   const removedGroups = new Set<string>()
-  const descend = (groupId: string, seen: Set<string>): void => {
-    if (seen.has(groupId)) return
-    seen.add(groupId)
+  const descend = (groupId: string): void => {
     removedGroups.add(groupId)
-    const group = byId.get(groupId)
-    if (group === undefined) return
+    const group = byId.get(groupId) as DiagramGroup
     for (const member of group.members) removedNodes.add(member)
-    for (const child of groups.filter((entry) => entry.parent === groupId)) descend(child.id, seen)
+    for (const child of groups.filter((entry) => entry.parent === groupId)) descend(child.id)
   }
-  for (const id of targets) descend(id, new Set())
+  for (const id of targets) descend(id)
 
   /** The innermost fold that swallowed this id, if any. */
   const foldOf = (id: string): string | undefined => {
@@ -89,7 +84,7 @@ export function collapse(diagram: Diagram, folded: Iterable<string>): Diagram {
         return groups.filter((entry) => entry.parent === groupId).some((child) => inSubtree(child.id, seen))
       }
       const group = byId.get(target) as DiagramGroup
-      if (group.members.includes(id) || inSubtree(ownerOf(diagram, id) ?? '', new Set())) return target
+      if (group.members.includes(id) || inSubtree(ownerOf(groups, id) as string, new Set())) return target
     }
     return undefined
   }
@@ -107,13 +102,13 @@ export function collapse(diagram: Diagram, folded: Iterable<string>): Diagram {
     if (fold === undefined || emitted.has(fold)) continue
     emitted.add(fold)
     const group = byId.get(fold) as DiagramGroup
-    nodes.push({ id: fold, label: group.label + ' (' + String(subtreeSize(diagram, fold, new Set())) + ')', role: 'normal' })
+    nodes.push({ id: fold, label: group.label + ' (' + String(subtreeSize(groups, fold, new Set())) + ')', role: 'normal' })
   }
   // A fold whose members are not in `nodes` at all still deserves a box rather than vanishing.
   for (const id of targets) {
     if (emitted.has(id)) continue
     const group = byId.get(id) as DiagramGroup
-    nodes.push({ id, label: group.label + ' (' + String(subtreeSize(diagram, id, new Set())) + ')', role: 'normal' })
+    nodes.push({ id, label: group.label + ' (' + String(subtreeSize(groups, id, new Set())) + ')', role: 'normal' })
   }
 
   const edges: DiagramEdge[] = []
@@ -134,7 +129,7 @@ export function collapse(diagram: Diagram, folded: Iterable<string>): Diagram {
   const adopted = new Map<string, string[]>()
   for (const id of targets) {
     const parent = byId.get(id)?.parent
-    if (parent === undefined || targets.has(parent) || removedGroups.has(parent)) continue
+    if (parent === undefined) continue
     adopted.set(parent, [...(adopted.get(parent) ?? []), id])
   }
   const remaining = groups

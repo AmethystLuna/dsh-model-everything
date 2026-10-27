@@ -143,7 +143,7 @@ function reference(token: string): Reference {
 }
 
 function keywordOf(line: string): string {
-  return (line.split(/[\s{]/)[0] ?? '').toLowerCase()
+  return line.split(/[\s{]/)[0].toLowerCase()
 }
 
 /** The id and label an opening boundary line states. An alias is the id, because edges will name it. */
@@ -343,7 +343,6 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const disputedNames = new Set<string>()
   for (const group of builder.groups) {
     for (const name of [group.id, group.label]) {
-      if (name === '') continue
       const existing = boundaryNames.get(name)
       if (existing !== undefined && existing !== group.id) disputedNames.add(name)
       else boundaryNames.set(name, group.id)
@@ -380,47 +379,41 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   // An empty boundary is not drawn, so an edge cannot attach to it. Look through nested boundaries, which
   // are drawn only when something inside them is.
   const drawable = new Map<string, boolean>()
-  const hasContents = (id: string, seen: Set<string> = new Set()): boolean => {
+  const hasContents = (id: string): boolean => {
     const known = drawable.get(id)
     if (known !== undefined) return known
-    if (seen.has(id)) return false
-    seen.add(id)
-    const group = groupById.get(id)
+    const group = groupById.get(id) as DiagramGroup
     let found = false
-    if (group !== undefined) {
-      for (const member of group.members) {
-        if (builder.nodes.has(member)) {
+    for (const member of group.members) {
+      if (builder.nodes.has(member)) {
+        found = true
+        break
+      }
+    }
+    if (!found) {
+      for (const child of childrenOf.get(id) ?? []) {
+        if (hasContents(child)) {
           found = true
           break
-        }
-      }
-      if (!found) {
-        for (const child of childrenOf.get(id) ?? []) {
-          if (hasContents(child, seen)) {
-            found = true
-            break
-          }
         }
       }
     }
     drawable.set(id, found)
     return found
   }
-  const boundaryLabel = (id: string): string => groupById.get(id)?.label ?? id
+  const boundaryLabel = (id: string): string => (groupById.get(id) as DiagramGroup).label
   const within = (scope: string | undefined, boundary: string): boolean => {
     let cursor = scope
-    const seen = new Set<string>()
-    while (cursor !== undefined && !seen.has(cursor)) {
+    while (cursor !== undefined) {
       if (cursor === boundary) return true
-      seen.add(cursor)
-      cursor = groupById.get(cursor)?.parent
+      cursor = (groupById.get(cursor) as DiagramGroup).parent
     }
     return false
   }
 
   const keptEdges: DiagramEdge[] = []
   builder.edges.forEach((edge, index) => {
-    const where = 'line ' + String(builder.edgeLines[index] ?? 0) + ': '
+    const where = 'line ' + String(builder.edgeLines[index]) + ': '
     const fromBoundary = boundaryAt.get(edge.from)
     const toBoundary = boundaryAt.get(edge.to)
     if (ambiguousAt.has(edge.from) || ambiguousAt.has(edge.to)) {
@@ -434,8 +427,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     }
     const boundary = fromBoundary ?? toBoundary
     if (boundary !== undefined) {
-      const group = groupById.get(boundary)
-      if (group === undefined) return
+      const group = groupById.get(boundary) as DiagramGroup
       if (group.parent !== undefined) {
         refused.push(where + '`' + group.label + '` is a block inside `' + boundaryLabel(group.parent) + '`, not an element; an edge to a nested boundary would have to enter another boundary')
         return

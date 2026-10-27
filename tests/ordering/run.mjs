@@ -92,6 +92,32 @@ test('the crossing count falls or stays the same, never rises, over the ordering
   if (after !== 0) throw new Error('the three crossings were not removed: ' + String(after))
 })
 
+test('a chain step that skips a row is not a crossing between adjacent rows', () => {
+  // The crossing count is per pair of adjacent rows. A segment that jumps a row is not one a reader sees between
+  // those two rows, so it is not counted - while the two real crossings next to it still are.
+  const rows = [['a', 'b'], ['m', 'n'], ['x', 'y']]
+  const crossings = countCrossings(rows, [
+    chain(0, ['a', 'x']),
+    chain(1, ['b', 'y']),
+    chain(2, ['a', 'n']),
+    chain(3, ['b', 'm']),
+  ])
+  if (crossings !== 1) throw new Error('crossings: ' + String(crossings))
+})
+
+test('greedy switch removes a crossing the median cannot see', () => {
+  // The median of every box is its own position here, so the sweeps leave both rows untouched and the crossing
+  // stays: a meets d and b meets c. One transposition of the top row removes it, and only the greedy pass looks
+  // for one.
+  const rows = [['a', 'b'], ['c', 'd', 'e']]
+  const chains = [chain(0, ['a', 'd']), chain(1, ['b', 'c']), chain(2, ['a', 'c']), chain(3, ['a', 'c'])]
+  if (countCrossings(rows, chains) !== 1) throw new Error('the fixture has no crossing')
+  const ordered = order(rows, chains)
+  if (ordered.crossings !== 0) throw new Error('greedy switch left ' + String(ordered.crossings) + ' crossing(s)')
+  if (JSON.stringify(ordered.layers[0]) !== JSON.stringify(['b', 'a'])) throw new Error('top row: ' + JSON.stringify(ordered.layers[0]))
+  if (countCrossings(ordered.layers, chains) !== 0) throw new Error('the reported count is not the drawing count')
+})
+
 if (failures > 0) {
   console.log(String.fromCharCode(10) + 'ordering tests failed: ' + String(failures))
   process.exit(1)

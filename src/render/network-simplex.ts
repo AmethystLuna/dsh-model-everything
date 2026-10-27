@@ -126,9 +126,8 @@ function buildTightTree(members: number[], edges: RankEdge[], rank: number[], tr
       if (from) lowest = Math.max(lowest, -slack)
       else highest = Math.min(highest, slack)
     }
-    if (lowest === -Infinity && highest === Infinity) return
+    // A connected component has at least one edge across the tree's cut, so one of the two bounds is finite.
     const step = lowest > -Infinity ? lowest : highest
-    if (step === 0) return
     for (const node of members) if (!inside.has(node)) rank[node] += step
   }
 }
@@ -166,7 +165,7 @@ function walkTree(members: number[], edges: RankEdge[], tree: Set<number>): Tree
     const node = stack.pop() as number
     first.set(node, order.length)
     order.push(node)
-    for (const step of adjacency.get(node) ?? []) {
+    for (const step of adjacency.get(node) as Array<{ node: number }>) {
       if (seen.has(step.node)) continue
       seen.add(step.node)
       parent.set(step.node, node)

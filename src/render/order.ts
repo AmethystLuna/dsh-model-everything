@@ -43,7 +43,7 @@ function medianOf(
     .filter((other) => positions.get(other)?.layer === reference)
     .map((other) => (positions.get(other) as { index: number }).index)
     .sort((left, right) => left - right)
-  if (found.length === 0) return (positions.get(id) ?? { index: 0 }).index
+  if (found.length === 0) return (positions.get(id) as { index: number }).index
   const middle = Math.floor(found.length / 2)
   return found.length % 2 === 1 ? found[middle] : (found[middle - 1] + found[middle]) / 2
 }

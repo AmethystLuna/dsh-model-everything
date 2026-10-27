@@ -103,8 +103,6 @@ function alignBlocks(frame: Frame, at: Map<string, number>): Map<string, string>
   for (let depth = 1; depth < frame.rows.length; depth += 1) {
     let previous = -1
     for (const id of frame.rows[depth]) {
-      // An id that already belongs to a block was joined to one from below or above: it cannot start another.
-      if (joined.get(id) !== id) continue
       const close = frame.near.get(id) ?? []
       if (close.length === 0) continue
       const sorted = [...close].sort((left, right) => (at.get(left) as number) - (at.get(right) as number))
@@ -140,21 +138,16 @@ function compactBlocks(rows: string[][], root: Map<string, string>, widthOf: (id
       const right = row[index]
       const leftBlock = root.get(left) as string
       const rightBlock = root.get(right) as string
-      if (leftBlock === rightBlock) continue
       const space = (widthOf(left) + widthOf(right)) / 2 + gap
       clears.set(rightBlock, [...(clears.get(rightBlock) ?? []), { block: leftBlock, space }])
     }
   }
   const placed = new Map<string, number>()
-  const open = new Set<string>()
   const place = (block: string): number => {
     const known = placed.get(block)
     if (known !== undefined) return known
-    if (open.has(block)) return 0
-    open.add(block)
     let value = 0
     for (const step of clears.get(block) ?? []) value = Math.max(value, place(step.block) + step.space)
-    open.delete(block)
     placed.set(block, value)
     return value
   }
@@ -217,7 +210,7 @@ export function assignCoordinates(input: CoordInput, options: CoordOptions): Coo
   const heightOf = (id: string): number => (isPoint(id) ? 0 : sizeOf(id).height)
   const laneOf = (id: string): string => chainOf.get(id) ?? id
   const x = new Map<string, number>()
-  const read = (id: string): number => x.get(laneOf(id)) ?? 0
+  const read = (id: string): number => x.get(laneOf(id)) as number
 
   const above = new Map<string, string[]>()
   const below = new Map<string, string[]>()
@@ -258,7 +251,7 @@ export function assignCoordinates(input: CoordInput, options: CoordOptions): Coo
   for (const row of layers) {
     for (const id of row) {
       let total = 0
-      for (const candidate of candidates) total += candidate.get(id) ?? 0
+      for (const candidate of candidates) total += candidate.get(id) as number
       x.set(id, total / candidates.length)
     }
   }
@@ -314,7 +307,7 @@ export function assignCoordinates(input: CoordInput, options: CoordOptions): Coo
       lowest = Math.min(lowest, value - widthOf(id) / 2)
       highest = Math.max(highest, value + widthOf(id) / 2)
     }
-    return highest > lowest ? highest - lowest : 0
+    return highest - lowest
   })
   const layerY: number[] = []
   let top = 0

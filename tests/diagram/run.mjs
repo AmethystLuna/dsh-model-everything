@@ -743,8 +743,440 @@ test('the render entry takes an explicit notation as readily as auto', () => {
   if (auto.notation !== 'plantuml') throw new Error('auto did not detect plantuml: ' + auto.notation)
 })
 
+const NL = String.fromCharCode(10)
+
+test('every mermaid node shape is carried into the drawing, and a bare node has none', () => {
+  const source = [
+    'graph TD',
+    '  a[[Subroutine]]',
+    '  b([Stadium])',
+    '  c<<Hexagon>>',
+    '  d[(Store)]',
+    '  f{Decision}',
+    '  g[Rectangle]',
+    '  h',
+  ].join(NL)
+  const { diagram, refused } = fromMermaid(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const shape = (id) => diagram.nodes.find((node) => node.id === id)?.shape
+  const expected = { a: 'subroutine', b: 'stadium', c: 'hexagon', d: 'cylinder', f: 'diamond', g: 'rect', h: undefined }
+  for (const [id, want] of Object.entries(expected)) {
+    if (shape(id) !== want) throw new Error(id + ' shape: ' + String(shape(id)))
+  }
+})
+
+test('a node written bare first takes the label of its later declaration', () => {
+  const { diagram } = fromMermaid(['graph TD', '  a', '  a[Readable]'].join(NL))
+  const a = diagram.nodes.find((node) => node.id === 'a')
+  if (a?.label !== 'Readable') throw new Error('label: ' + String(a?.label))
+  if (diagram.nodes.length !== 1) throw new Error('the label declaration made a second box: ' + String(diagram.nodes.length))
+})
+
+test('an unnamed subgraph is named by its position', () => {
+  const { diagram } = fromMermaid(['graph TD', '  subgraph', '    a', '  end'].join(NL))
+  const group = (diagram.groups ?? [])[0]
+  if (group === undefined) throw new Error('no group was made')
+  if (group.id !== 'subgraph-1' || group.label !== 'subgraph-1') throw new Error('id/label: ' + group.id + '/' + group.label)
+})
+
+test('a state named on its own line is a declaration, not a refusal', () => {
+  const { diagram, refused } = fromMermaid(['stateDiagram', '  Idle', '  Idle --> Busy'].join(NL))
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  if (JSON.stringify(ids(diagram)) !== JSON.stringify(['Busy', 'Idle'])) throw new Error('nodes: ' + ids(diagram).join(','))
+})
+
+test('a transition to the end marker is drawn back to its state, labelled end unless the source named it', () => {
+  const { diagram } = fromMermaid(['stateDiagram-v2', '  A --> [*]', '  B --> [*]: finished'].join(NL))
+  const unlabelled = diagram.edges.find((edge) => edge.from === 'A')
+  const labelled = diagram.edges.find((edge) => edge.from === 'B')
+  if (unlabelled?.label !== 'end' || unlabelled?.dashed !== true) throw new Error('unlabelled end: ' + JSON.stringify(unlabelled))
+  if (labelled?.label !== 'finished') throw new Error('labelled end: ' + JSON.stringify(labelled))
+  if (unlabelled?.to !== 'A') throw new Error('the end edge does not return to its state')
+})
+
+test('an arrow whose end is not a node token is refused rather than half-read', () => {
+  const labelled = fromMermaid(['graph TD', '  a[One] -- go --> not a node'].join(NL))
+  const curved = fromMermaid(['graph TD', '  a[One] --> not a node'].join(NL))
+  for (const [kind, parsed] of [['labelled', labelled], ['curved', curved]]) {
+    if (parsed.refused.length === 0) throw new Error('the ' + kind + ' arrow was not refused')
+    if (!parsed.refused[0].startsWith('line 2:')) throw new Error('the ' + kind + ' refusal has no line: ' + parsed.refused[0])
+    if (parsed.diagram.edges.length !== 0) throw new Error('the ' + kind + ' refusal still drew an edge')
+  }
+})
+
+// ------------------------------------------------------------------------------------------------- plantuml
+
+test('an element declaration can name its label with a quoted, bracketed or plain alias', () => {
+  const source = [
+    '@startuml',
+    'component "Readable" as a',
+    'component [Bracketed] as b',
+    'component Plain as c',
+    '@enduml',
+  ].join(NL)
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const byId = new Map(diagram.nodes.map((node) => [node.id, node]))
+  if (byId.get('a')?.label !== 'Readable') throw new Error('quoted: ' + String(byId.get('a')?.label))
+  if (byId.get('b')?.label !== 'Bracketed') throw new Error('bracketed: ' + String(byId.get('b')?.label))
+  if (byId.get('c')?.label !== 'Plain') throw new Error('plain: ' + String(byId.get('c')?.label))
+})
+
+test('a boundary can be named by an alias or left unnamed, which names it by its keyword', () => {
+  const source = [
+    '@startuml',
+    'package [Core] as core {',
+    '  [a]',
+    '}',
+    'folder Plain as folder1 {',
+    '  [b]',
+    '}',
+    'package {',
+    '  [c]',
+    '}',
+    '@enduml',
+  ].join(NL)
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const byId = new Map((diagram.groups ?? []).map((group) => [group.id, group]))
+  if (byId.get('core')?.label !== 'Core') throw new Error('bracketed boundary: ' + JSON.stringify(byId.get('core')))
+  if (byId.get('folder1')?.label !== 'Plain') throw new Error('plain boundary: ' + JSON.stringify(byId.get('folder1')))
+  if (byId.get('group-3')?.label !== 'package') throw new Error('unnamed boundary: ' + JSON.stringify(byId.get('group-3')))
+})
+
+test('a declaration after the arrow settles the label and symbol the arrow wrote first', () => {
+  const source = ['@startuml', 'X --> Y', 'component "Readable X" as X', 'database Y', '@enduml'].join(NL)
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const byId = new Map(diagram.nodes.map((node) => [node.id, node]))
+  if (byId.get('X')?.label !== 'Readable X') throw new Error('label: ' + JSON.stringify(byId.get('X')))
+  if (byId.get('X')?.shape !== 'rect') throw new Error('shape X: ' + String(byId.get('X')?.shape))
+  if (byId.get('Y')?.shape !== 'cylinder') throw new Error('shape Y: ' + String(byId.get('Y')?.shape))
+  if (diagram.edges.length !== 1) throw new Error('edges: ' + String(diagram.edges.length))
+})
+
+test('a quoted component reference is the element it names', () => {
+  const { diagram } = fromPlantUml(['@startuml', 'A --> "Quoted thing"', '@enduml'].join(NL))
+  const target = diagram.nodes.find((node) => node.id === 'Quoted thing')
+  if (target === undefined) throw new Error('nodes: ' + ids(diagram).join(','))
+  if (target.label !== 'Quoted thing') throw new Error('label: ' + String(target.label))
+})
+
+test('a sequence fragment line is refused by its keyword', () => {
+  const { refused } = fromPlantUml(['@startuml', 'A --> B', 'alt when it fails', '@enduml'].join(NL))
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('alt')) throw new Error('the refusal does not name the keyword: ' + refused[0])
+})
+
+test('a block whose keyword is not a boundary is refused with the reason for its kind', () => {
+  const known = fromPlantUml(['@startuml', 'database {', '  a', '}', '@enduml'].join(NL))
+  const unknown = fromPlantUml(['@startuml', 'gadget {', '  a', '}', '@enduml'].join(NL))
+  if (!known.refused[0]?.includes('`database`')) throw new Error('known keyword: ' + String(known.refused[0]))
+  if (!known.refused[0]?.includes('not a boundary')) throw new Error('known keyword reason: ' + String(known.refused[0]))
+  if (!unknown.refused[0]?.includes('gadget')) throw new Error('unknown keyword: ' + String(unknown.refused[0]))
+  for (const parsed of [known, unknown]) if ((parsed.diagram.groups ?? []).length !== 0) throw new Error('a refused block became a group')
+})
+
+test('a state line that is neither a transition nor a state name is refused with its line', () => {
+  const { refused } = fromMermaid(['stateDiagram-v2', '  A -> B'].join(NL))
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].startsWith('line 2:')) throw new Error('line: ' + refused[0])
+  if (!refused[0].includes('not a state transition')) throw new Error('reason: ' + refused[0])
+})
+
+test('a second label on an already-labelled node does not overwrite the first', () => {
+  const { diagram } = fromMermaid(['graph TD', '  a[First]', '  a[Second]'].join(NL))
+  const a = diagram.nodes.find((node) => node.id === 'a')
+  if (a?.label !== 'First') throw new Error('label: ' + String(a?.label))
+  if (diagram.nodes.length !== 1) throw new Error('the second declaration made a box')
+})
+
+test('two boundaries with one name make an edge that uses the name ambiguous, and it is refused', () => {
+  const source = [
+    '@startuml',
+    'package A {',
+    '  [x]',
+    '}',
+    'package A {',
+    '  [y]',
+    '  z --> A',
+    '}',
+    '@enduml',
+  ].join(NL)
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('more than one block')) throw new Error('reason: ' + refused[0])
+  if (ids(diagram).includes('A')) throw new Error('the ambiguous name is still drawn as a box')
+  if (diagram.edges.length !== 0) throw new Error('the ambiguous edge was kept')
+})
+
+test('an ambiguous name is refused whichever end of the edge it is on', () => {
+  const source = [
+    '@startuml',
+    'package A {',
+    '  [x]',
+    '}',
+    'package A {',
+    '  [y]',
+    '  A --> z',
+    '}',
+    '@enduml',
+  ].join(NL)
+  const { refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('`A` is the name of more than one block')) throw new Error('reason: ' + refused[0])
+})
+
+test('an edge to a nested boundary is refused, because it would have to enter another boundary', () => {
+  const source = [
+    '@startuml',
+    'package Outer {',
+    '  package Inner {',
+    '    [a]',
+    '  }',
+    '  b --> Inner',
+    '}',
+    '@enduml',
+  ].join(NL)
+  const { refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('nested boundary') && !refused[0].includes('inside')) throw new Error('reason: ' + refused[0])
+})
+
+test('an edge written inside a nested block and aimed at the outer block is refused as staying inside it', () => {
+  const source = [
+    '@startuml',
+    'package Outer {',
+    '  package Inner {',
+    '    [a]',
+    '    a --> Outer',
+    '  }',
+    '}',
+    '@enduml',
+  ].join(NL)
+  const { refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('written inside')) throw new Error('reason: ' + refused[0])
+})
+
+test('an edge that leaves a boundary and arrives at the same boundary is refused', () => {
+  const source = ['@startuml', 'package P {', '  [a]', '  b --> P', '}', '@enduml'].join(NL)
+  const { refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('written inside')) throw new Error('reason: ' + refused[0])
+})
+
+test('an edge into a boundary with nothing drawn inside is refused', () => {
+  const source = ['@startuml', 'package Empty {', '}', 'a --> Empty', '@enduml'].join(NL)
+  const { refused } = fromPlantUml(source)
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('nothing drawn inside')) throw new Error('reason: ' + refused[0])
+})
+
+test('an edge from a declared boundary attaches to its rectangle, and a second edge finds it already measured', () => {
+  const source = ['@startuml', 'package Web {', '  [a]', '}', 'Web --> Mobile', 'Tablet --> Web', '@enduml'].join(NL)
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const web = (diagram.groups ?? [])[0]
+  if (web === undefined) throw new Error('the package was not made a boundary')
+  const from = diagram.edges.find((edge) => edge.from === web.id)
+  const to = diagram.edges.find((edge) => edge.to === web.id)
+  if (from === undefined) throw new Error('an edge from the boundary was not attached to it: ' + JSON.stringify(diagram.edges))
+  if (to === undefined) throw new Error('an edge into the boundary was not attached to it')
+  if (to.from !== 'Tablet') throw new Error('the other edge changed: ' + JSON.stringify(to))
+})
+
+test('a boundary whose only contents are in a nested boundary is still drawable', () => {
+  const source = [
+    '@startuml',
+    'package Outer {',
+    '  package Inner {',
+    '    [a]',
+    '  }',
+    '}',
+    'b --> Outer',
+    '@enduml',
+  ].join(NL)
+  const { diagram, refused } = fromPlantUml(source)
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  const outer = (diagram.groups ?? []).find((group) => group.label === 'Outer')
+  if (outer === undefined) throw new Error('no Outer group')
+  if (!diagram.edges.some((edge) => edge.to === outer.id)) throw new Error('the edge did not reach the outer boundary: ' + JSON.stringify(diagram.edges))
+})
+
+test('a title line and a blank line are ignored, and a single box pluralises its caption', () => {
+  const { diagram, refused } = fromPlantUml(['@startuml', '', 'title Architecture', 'component Only', '@enduml'].join(NL))
+  if (refused.length !== 0) throw new Error('refused: ' + refused.join('; '))
+  if (!diagram.caption.includes('1 box,')) throw new Error('caption: ' + diagram.caption)
+})
+
+// ------------------------------------------------------------------------------------------------- collapse
+
+test('folding on a drawing with no boundaries, or an empty group, changes nothing', () => {
+  const flat = { kind: 'graph', title: 't', caption: 'graph', nodes: [{ id: 'a', role: 'normal' }], edges: [] }
+  if (collapse(flat, ['nope']) !== flat) throw new Error('a fold on a drawing with no groups copied it')
+  const hollow = { ...flat, groups: [{ id: 'g', label: 'G', members: [] }] }
+  if (collapse(hollow, ['g']) !== hollow) throw new Error('an empty group was folded')
+})
+
+test('folding both members of a parent cycle is a no-op, not a hang', () => {
+  // A group whose parent chain loops back to itself cannot be placed in the tree, so there is nothing to fold and
+  // the drawing comes back untouched. The walk that looks for the outermost fold is what has to survive the loop.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'g1', label: 'One', members: [], parent: 'g2' },
+      { id: 'g2', label: 'Two', members: ['a'], parent: 'g1' },
+    ],
+  }
+  if (collapse(diagram, ['g1', 'g2']).nodes.length !== diagram.nodes.length) throw new Error('a fold on a parent cycle emitted a box')
+})
+
+test('a node claimed by an outer group is still found when its own group is nested inside the fold', () => {
+  // Membership is read from the first group that claims the node, and that group can be the fold's parent. The
+  // search for the fold has to look down from there, or a node written in two groups loses its fold box.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['a'] },
+      { id: 'target', label: 'Target', members: [], parent: 'outer' },
+      { id: 'child', label: 'Child', members: ['a'], parent: 'target' },
+    ],
+  }
+  const folded = collapse(diagram, ['target'])
+  if (!folded.nodes.some((node) => node.id === 'target')) throw new Error('the fold box was lost: ' + JSON.stringify(folded.nodes.map((node) => node.id)))
+})
+
+test('a node claimed by two groups is found through the group that owns it, without looping', () => {
+  // A node written in two groups is data the parser cannot produce but a hand-written model can. It belongs to the
+  // first group that claims it, and that group is outside the fold: the walk over its parent cycle must stop.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'gA', label: 'A', members: ['a'], parent: 'gB' },
+      { id: 'gB', label: 'B', members: [], parent: 'gA' },
+      { id: 'gT', label: 'Target', members: [] },
+      { id: 'gC', label: 'C', members: ['a'], parent: 'gT' },
+    ],
+  }
+  const folded = collapse(diagram, ['gT'])
+  if (folded.nodes.length !== 2) throw new Error('nodes: ' + JSON.stringify(folded.nodes.map((node) => node.id)))
+  if (!folded.nodes.some((node) => node.id === 'gT')) throw new Error('the fold box is missing')
+})
+
+test('a node the fold lists directly is folded even when an earlier group also claims it', () => {
+  // Membership is read from the first group that claims a node, and that group can be unrelated to the fold. The
+  // node is still the fold's own member, so its edge has to be re-aimed at the fold's box rather than dropped.
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [{ from: 'a', to: 'b', label: '' }],
+    groups: [
+      { id: 'other', label: 'Other', members: ['a'] },
+      { id: 'target', label: 'Target', members: ['a'] },
+    ],
+  }
+  const folded = collapse(diagram, ['target'])
+  const edge = folded.edges.find((entry) => entry.from === 'target' && entry.to === 'b')
+  if (edge === undefined) throw new Error('the edge did not follow the fold: ' + JSON.stringify(folded.edges))
+})
+
+test('two folded groups keep their place inside the parent that held them', () => {
+  const diagram = {
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'keep', role: 'normal' }, { id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'outer', label: 'Outer', members: ['keep'] },
+      { id: 'one', label: 'One', members: ['a'], parent: 'outer' },
+      { id: 'two', label: 'Two', members: ['b'], parent: 'outer' },
+    ],
+  }
+  const folded = collapse(diagram, ['one', 'two'])
+  const outer = (folded.groups ?? []).find((group) => group.id === 'outer')
+  if (outer === undefined) throw new Error('the parent boundary was dropped')
+  for (const id of ['one', 'two']) if (!outer.members.includes(id)) throw new Error('the fold box ' + id + ' did not stay in its parent: ' + JSON.stringify(outer.members))
+})
+
+// ----------------------------------------------------------------------------------------------------- diff
+
+test('a node that disappeared is reported as removed', () => {
+  const side = (nodeIds) => ({ kind: 'graph', title: 't', caption: 'graph', nodes: nodeIds.map((id) => ({ id, role: 'normal' })), edges: [] })
+  const report = diffStructure(side(['a', 'b']), side(['a']))
+  const removed = report.changes.find((change) => change.code === 'H6_NODE_REMOVED')
+  if (removed === undefined) throw new Error('no removal: ' + report.changes.map((change) => change.code).join(','))
+  if (removed.subject !== 'b') throw new Error('the wrong node was reported removed: ' + removed.subject)
+})
+
+test('an added boundary names the parent it was written inside', () => {
+  const base = {
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'outer', label: 'Outer', members: [] }],
+  }
+  const after = { ...base, groups: [{ id: 'outer', label: 'Outer', members: [] }, { id: 'inner', label: 'Inner', members: ['a'], parent: 'outer' }] }
+  const added = diffStructure(base, after).changes.find((change) => change.code === 'H1_GROUP_ADDED')
+  if (added === undefined) throw new Error('no addition')
+  if (!added.message.includes('inside "Outer"')) throw new Error('the parent is not named: ' + added.message)
+  const ghost = diffStructure(base, { ...base, groups: [{ id: 'outer', label: 'Outer', members: [] }, { id: 'g', label: 'G', members: ['a'], parent: 'ghost' }] })
+  const ghostAdded = ghost.changes.find((change) => change.code === 'H1_GROUP_ADDED')
+  if (ghostAdded === undefined || !ghostAdded.message.includes('ghost')) throw new Error('an undeclared parent does not fall back to its id: ' + String(ghostAdded?.message))
+})
+
+test('a boundary that moved to the top level says so on the destination side', () => {
+  const side = (parent) => ({
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [
+      { id: 'outer', label: 'Outer', members: [] },
+      { id: 'inner', label: 'Inner', members: ['a'], ...(parent === undefined ? {} : { parent }) },
+    ],
+  })
+  const moved = diffStructure(side('outer'), side(undefined)).changes.find((change) => change.code === 'H4_GROUP_MOVED')
+  if (moved === undefined) throw new Error('no move finding')
+  if (!moved.message.includes('to the top level')) throw new Error('destination: ' + moved.message)
+})
+
+test('a node that joined a group is reported as coming from no group', () => {
+  const side = (members) => ({
+    kind: 'graph',
+    title: 't',
+    caption: 'graph',
+    nodes: [{ id: 'a', role: 'normal' }],
+    edges: [],
+    groups: [{ id: 'g', label: 'G', members }],
+  })
+  const moved = diffStructure(side([]), side(['a'])).changes.find((change) => change.code === 'H7_NODE_REGROUPED')
+  if (moved === undefined) throw new Error('no regroup finding')
+  if (!moved.message.includes('from no group')) throw new Error('source: ' + moved.message)
+  if (!moved.message.includes('"G"')) throw new Error('destination: ' + moved.message)
+})
+
 if (failures > 0) {
   console.log('diagram tests failed: ' + String(failures))
   process.exit(1)
 }
 console.log('all diagram tests passed')
+

@@ -225,13 +225,10 @@ export function routeEdge(
       queue.push({ point: next, axis, cost, bends: current.bends + bend, path: [...current.path, next] })
     }
   }
-  // Nothing found: a two-bend orthogonal fallback still beats a diagonal, and it is what a reader expects.
-  const elbow = { x: entryStub.x, y: exitStub.y }
-  const mid = { x: exitStub.x, y: (exitStub.y + entryStub.y) / 2 }
-  const detour = { x: entryStub.x, y: entryStub.y }
-  void elbow
-  const fallback = axisAligned ? straight : [exit, exitStub, mid, { x: detour.x, y: mid.y }, entryStub, entry]
-  return { points: simplify(fallback), routed: !axisAligned }
+  // Nothing found: the sparse grid connects every box to the lane outside the obstacles, so a search that finds
+  // nothing is a graph this router cannot help. The straight line is still an edge, and drawing it straight is
+  // more honest than dropping it.
+  return { points: simplify(straight), routed: false }
 }
 
 /** Drop the points in the middle of a straight run: three collinear points are one segment. */
