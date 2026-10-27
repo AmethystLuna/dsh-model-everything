@@ -9,11 +9,15 @@
  */
 /** What a node is, as far as colour is concerned. */
 export type NodeRole = 'normal' | 'error' | 'warning' | 'muted';
+/** The symbol a node is drawn as. UML and Mermaid both distinguish these; the notation decides which one applies. */
+export type NodeShape = 'rect' | 'diamond' | 'cylinder' | 'stadium' | 'circle' | 'subroutine' | 'hexagon';
 export interface DiagramNode {
     id: string;
     /** The text drawn inside the box. Defaults to the id when a notation labelled it. */
     label?: string;
     role: NodeRole;
+    /** Defaults to a rectangle: a node the source gave no shape has no shape to draw. */
+    shape?: NodeShape;
 }
 export interface DiagramEdge {
     from: string;

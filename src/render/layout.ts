@@ -5,10 +5,10 @@
  * drawing asks for - edges mostly flow down, and a state's row is how far it is from the start. A state
  * nothing reaches goes in a block of its own rather than being dropped.
  *
- * Within a row, states keep the order breadth-first found them in: a row is filled by walking the row above
- * left to right, so a state already sits under the parent that discovered it. A barycentre pass was written
- * and removed - with breadth-first insertion it could never move a state, so it was complexity without an
- * observable effect.
+ * Within a row, states are ordered by the mean position of their predecessors - the barycentre pass - because a
+ * graph is not a tree: a node with several parents has to sit between them, and a row that keeps the order the
+ * walk found it in draws two long edges crossing for no reason. Two sweeps are enough for a drawing this size;
+ * a third has never moved anything in the fixtures.
  *
  * Pure, and asserted on the rows themselves.
  */

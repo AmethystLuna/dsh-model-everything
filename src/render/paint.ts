@@ -20,10 +20,10 @@
  */
 
 import { MARGIN, place, textOf, type Box } from './place.js'
-import { anchor, facingSides, routeEdge } from './route.js'
+import { anchor, facingSides, routeEdge, type Side } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
-import { labelOf, type Diagram, type DiagramGroup, type DiagramNode } from './model.js'
+import { labelOf, type Diagram, type DiagramGroup, type DiagramNode, type NodeShape } from './model.js'
 
 export interface Point {
   x: number
@@ -39,6 +39,8 @@ export interface BoxShape {
   /** The lines to draw, already wrapped; `label` keeps the whole text for anything that reads the shape. */
   label: string
   lines: string[]
+  /** The symbol to draw. Undefined means a rectangle. */
+  shape?: NodeShape
   colour: ColourRole
   initial: boolean
 }
@@ -271,6 +273,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       height: box.height,
       label: labelOf(node),
       lines: text.lines,
+      ...(node.shape === undefined ? {} : { shape: node.shape }),
       colour: roleOfNode(node),
       initial: diagram.init === node.id,
     })
@@ -278,7 +281,41 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
   const roleById = new Map(diagram.nodes.map((node) => [node.id, roleOfNode(node)] as const))
 
-  for (const edge of diagram.edges) {
+  // Ports: every edge on the same side of the same box takes its own point along that side, spaced evenly and
+  // centred on the side. One anchor per side is what made an in-edge and an out-edge meet in a single pixel.
+  const facing = diagram.edges.map((edge) => {
+    const source = boxes.get(edge.from)
+    const target = boxes.get(edge.to)
+    return source === undefined || target === undefined || edge.from === edge.to ? undefined : facingSides(source, target)
+  })
+  const slots = new Map<string, number>()
+  const counts = new Map<string, number>()
+  for (const [index, entry] of facing.entries()) {
+    if (entry === undefined) continue
+    for (const key of [diagram.edges[index].from + ':' + entry.exit, diagram.edges[index].to + ':' + entry.entry]) {
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+  }
+  const portOf = (boxId: string, side: Side): Point => {
+    const box = boxes.get(boxId) as Box
+    const key = boxId + ':' + side
+    const index = slots.get(key) ?? 0
+    slots.set(key, index + 1)
+    const spread = (index - ((counts.get(key) ?? 1) - 1) / 2) * 20
+    const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value))
+    if (side === 'top') return { x: box.x + clamp(box.width / 2 + spread, 10, box.width - 10), y: box.y }
+    if (side === 'bottom') return { x: box.x + clamp(box.width / 2 + spread, 10, box.width - 10), y: box.y + box.height }
+    if (side === 'left') return { x: box.x, y: box.y + clamp(box.height / 2 + spread, 8, box.height - 8) }
+    return { x: box.x + box.width, y: box.y + clamp(box.height / 2 + spread, 8, box.height - 8) }
+  }
+  const anchorsFor = new Map<number, { exit: Point; entry: Point }>()
+  for (const [index, entry] of facing.entries()) {
+    if (entry === undefined) continue
+    const edge = diagram.edges[index]
+    anchorsFor.set(index, { exit: portOf(edge.from, entry.exit), entry: portOf(edge.to, entry.entry) })
+  }
+
+  for (const [edgeIndex, edge] of diagram.edges.entries()) {
     const source = boxes.get(edge.from)
     const target = boxes.get(edge.to)
     if (source === undefined || target === undefined) continue
@@ -308,7 +345,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // One router decides every edge: the sparse grid when a box is in the way, and a straight line when none is.
     // Three hand-written cases used to decide this by comparing coordinates, and each of them could draw through a
     // box the comparison had not considered - a horizontal edge with a box between its ends was the common one.
-    const route = routeEdge(source, target, boxList)
+    const anchors = anchorsFor.get(edgeIndex)
+    const route = routeEdge(source, target, boxList, anchors)
     const ordinal = labelsFrom.get(edge.from) ?? 0
     labelsFrom.set(edge.from, ordinal + 1)
 
@@ -335,8 +373,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     }
 
     const sides = facingSides(source, target)
-    const exit = anchor(source, sides.exit)
-    const entry = anchor(target, sides.entry)
+    const exit = anchors?.exit ?? anchor(source, sides.exit)
+    const entry = anchors?.entry ?? anchor(target, sides.entry)
     const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal)
     labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
     shapes.push({

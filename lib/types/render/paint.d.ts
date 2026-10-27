@@ -19,7 +19,7 @@
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 import { type ColourRole, type Palette, type PaletteOptions } from './palette.js';
-import { type Diagram, type DiagramNode } from './model.js';
+import { type Diagram, type DiagramNode, type NodeShape } from './model.js';
 export interface Point {
     x: number;
     y: number;
@@ -33,6 +33,8 @@ export interface BoxShape {
     /** The lines to draw, already wrapped; `label` keeps the whole text for anything that reads the shape. */
     label: string;
     lines: string[];
+    /** The symbol to draw. Undefined means a rectangle. */
+    shape?: NodeShape;
     colour: ColourRole;
     initial: boolean;
 }

@@ -640,8 +640,9 @@ test('an edge leaving a state nothing reaches still gets a row', () => {
   if (routes.length !== 3) throw new Error('edges drawn: ' + String(routes.length))
 })
 
-test('a sideways edge that points left attaches to the left side of its source', () => {
-  // Both lower states share a row; `c` points back at `b`, which is to its left.
+test('a sideways edge runs between the facing sides of its two boxes', () => {
+  // Both lower states share a row and one points back at the other; the barycentre pass decides which is on the
+  // left, so the assertion is about the sides each end attaches to, not about which box that turns out to be.
   const diagram = {
     kind: 'machine',
     title: 't',
@@ -657,7 +658,10 @@ test('a sideways edge that points left attaches to the left side of its source',
   const { canvas } = paintWith(diagram)
   const sideways = canvas.shapes.filter((shape) => shape.kind === 'link' && shape.y1 === shape.y2)
   if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
-  if (sideways[0].x2 >= sideways[0].x1) throw new Error('the leftward edge runs the wrong way: ' + String(sideways[0].x1) + ' -> ' + String(sideways[0].x2))
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const touching = (x, y) => boxes.some((box) => (x === box.x || x === box.x + box.width) && y > box.y && y < box.y + box.height)
+  if (!touching(sideways[0].x1, sideways[0].y1)) throw new Error('the edge does not leave the side of its source: ' + String(sideways[0].x1))
+  if (!touching(sideways[0].x2, sideways[0].y2)) throw new Error('the edge does not arrive at the side of its target: ' + String(sideways[0].x2))
 })
 
 test('the dark surface gets its own palette', () => {

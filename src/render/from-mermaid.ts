@@ -57,10 +57,15 @@ interface Builder {
   open: DiagramGroup[]
 }
 
-function ensure(builder: Builder, id: string, label?: string): void {
+function ensure(builder: Builder, id: string, label?: string, shape?: DiagramNode['shape']): void {
   const existing = builder.nodes.get(id)
   if (existing === undefined) {
-    builder.nodes.set(id, { id, role: 'normal', ...(label === undefined ? {} : { label }) })
+    builder.nodes.set(id, {
+      id,
+      role: 'normal',
+      ...(label === undefined ? {} : { label }),
+      ...(shape === undefined ? {} : { shape }),
+    })
     // Membership is decided where the node is first written: the innermost open boundary. Naming it again
     // later from an outer boundary does not move it - the outer boundary holds it through `parent`.
     const innermost = builder.open[builder.open.length - 1]
@@ -70,12 +75,32 @@ function ensure(builder: Builder, id: string, label?: string): void {
   if (label !== undefined && (existing.label === undefined || existing.label === '')) existing.label = label
 }
 
-function nodeFrom(token: string): { id: string; label?: string } | undefined {
+function nodeFrom(token: string): { id: string; label?: string; shape?: DiagramNode['shape'] } | undefined {
   const match = NODE.exec(token.trim())
   if (match === null) return undefined
   const id = match[1]
   const label = [match[2], match[3], match[4], match[5], match[6], match[7]].find((value) => value !== undefined && value.trim() !== '')
-  return { id, ...(label === undefined ? {} : { label: label.trim().replace(/^["']|["']$/g, '') }) }
+  // Group 2 `[(x)]` is a datastore, 3 `[[x]]` a subroutine, 4 `[x]` a rectangle, 5 `(x)` a rounded box, 6 `{x}` a
+  // decision, 7 `<<x>>` a hexagon. Mermaid's own mapping; a shape the notation did not state stays undefined.
+  const shape: DiagramNode['shape'] | undefined =
+    match[2] !== undefined
+      ? 'cylinder'
+      : match[3] !== undefined
+        ? 'subroutine'
+        : match[4] !== undefined
+          ? 'rect'
+          : match[5] !== undefined
+            ? 'stadium'
+            : match[6] !== undefined
+              ? 'diamond'
+              : match[7] !== undefined
+                ? 'hexagon'
+                : undefined
+  return {
+    id,
+    ...(label === undefined ? {} : { label: label.trim().replace(/^["']|["']$/g, '') }),
+    ...(shape === undefined ? {} : { shape }),
+  }
 }
 
 export function fromMermaid(source: string, title = 'mermaid'): Parsed {
@@ -178,8 +203,8 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
         refused.push(where + '`' + line + '` does not name two nodes')
         return
       }
-      ensure(builder, left.id, left.label)
-      ensure(builder, right.id, right.label)
+      ensure(builder, left.id, left.label, left.shape)
+      ensure(builder, right.id, right.label, right.shape)
       push({ from: left.id, to: right.id, label: labelled[2].trim() })
       return
     }
@@ -192,8 +217,8 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
         refused.push(where + '`' + line + '` does not name two nodes')
         return
       }
-      ensure(builder, left.id, left.label)
-      ensure(builder, right.id, right.label)
+      ensure(builder, left.id, left.label, left.shape)
+      ensure(builder, right.id, right.label, right.shape)
       push({
         from: left.id,
         to: right.id,
@@ -205,7 +230,7 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
 
     const single = nodeFrom(line)
     if (single !== undefined) {
-      ensure(builder, single.id, single.label)
+      ensure(builder, single.id, single.label, single.shape)
       return
     }
 
