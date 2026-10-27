@@ -5,9 +5,9 @@
 //   (c) two boxes in a layer never overlap,
 //   (d) two layers are separated by the same gap.
 //
-// There is a fifth that the drawing depends on and that is easy to lose: a lane must not run through a box in a
-// layer it crosses, because the edge is drawn straight down that lane. The last case is the graph that found this
-// defect while the module was being written.
+// A fifth property used to live here: a lane must not run through a box in a layer it crosses. A lane is a routing
+// artifact, and this module no longer places one - it proposes an x, and `channels.ts` moves the lane into a corridor
+// that is free. The case moved with the property, to `tests/channels`.
 import { assignCoordinates } from '../../lib/render/coords.js'
 import { breakCycles } from '../../lib/render/cycle-break.js'
 import { addDummies } from '../../lib/render/dummy.js'
@@ -103,32 +103,6 @@ test('two layers are separated by the same gap', () => {
     const gap = coordinates.layerY[index] - coordinates.layerY[index - 1] - coordinates.layerHeight[index - 1]
     if (Math.abs(gap - LAYER_GAP) > 0.5) throw new Error('layer gap ' + String(index) + ' is ' + String(gap))
   }
-})
-
-test('a lane never runs through a box in a layer it crosses', () => {
-  // a fans out to b, c and e; b and c meet at d; e points back at b. The long edges reserve lanes through the
-  // middle row, and the row must keep its boxes clear of them.
-  const { coordinates, augmented } = coordinatesFor(
-    ['a', 'b', 'c', 'd', 'e'],
-    [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e'], ['e', 'b'], ['a', 'e']],
-  )
-  augmented.layers.forEach((row, depth) => {
-    const lanes = row
-      .filter((id) => augmented.chainOf.has(id))
-      .map((id) => coordinates.x.get(augmented.chainOf.get(id)))
-    if (lanes.length === 0) return
-    for (const id of row) {
-      if (augmented.chainOf.has(id)) continue
-      const centre = coordinates.x.get(id)
-      if (centre === undefined) continue
-      for (const lane of lanes) {
-        if (lane === undefined) throw new Error('a lane has no x')
-        if (lane > centre - WIDTH / 2 && lane < centre + WIDTH / 2) {
-          throw new Error('the lane at ' + String(lane) + ' runs through "' + id + '" in layer ' + String(depth))
-        }
-      }
-    }
-  })
 })
 
 test('the reported width and height cover every box', () => {

@@ -154,6 +154,7 @@ node tests/cycle-break/run.mjs
 node tests/layering/run.mjs
 node tests/ordering/run.mjs
 node tests/coords/run.mjs
+node tests/channels/run.mjs
 node tests/components/run.mjs
 node tests/placement/run.mjs
 node tests/presentation/run.mjs
@@ -209,7 +210,8 @@ And the gates around it:
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
 | `layering` | 10 | a chain is one row per box |
 | `ordering` | 8 | two edges that end in opposite order cross, and two in the same order do not |
-| `coords` | 6 | a box with one parent sits under it, and two of them straddle it evenly |
+| `coords` | 5 | a box with one parent sits under it, and two of them straddle it evenly |
+| `channels` | 8 | two long edges crossing one gap get one lane each, in the order of their dummies |
 | `components` | 9 | a drawing splits into the pieces that share no edge |
 | `placement` | 9 | a boundary contains its own contents and only its own |
 | `presentation` | 55 | the card keeps the verdict, the counts and the first error |

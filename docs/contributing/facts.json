@@ -151,6 +151,7 @@
     "automaton",
     "baseline",
     "catalog",
+    "channels",
     "client",
     "components",
     "concurrency",
