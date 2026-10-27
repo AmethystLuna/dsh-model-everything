@@ -124,6 +124,14 @@ const CAPTION_CHAR_WIDTH = 6.2
 const PORT_SEPARATION = 14
 
 /**
+ * How far apart two edges that join the same pair are drawn.
+ *
+ * Wider than the least two ports may sit: two statements about one pair have to read as two lines, and a gap the
+ * port packer would allow is a gap a reader sees as one thick line. Exported so a test can name the pattern.
+ */
+export const MULTI_EDGE_SPACING = 20
+
+/**
  * Spread the ports of one side along it: each stays as close to the point it asked for as the gap to its neighbours
  * allows, and the whole row is kept on the box.
  *
@@ -329,6 +337,30 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
   const roleById = new Map(diagram.nodes.map((node) => [node.id, roleOfNode(node)] as const))
 
+  // One pair may carry two statements - an association and a composition, or the same arrow written twice. They are
+  // two relations, not one, and one bend path between them reads as a thick line or as a mistake. So every edge of
+  // such a set is a line of its own: the first keeps the place the drawing gave it, and the rest take an offset
+  // perpendicular to the direction they run, alternating sign and growing - 0, +1, -1, +2, -2 spacings - so the set
+  // fans out from the pair instead of doubling it. A self loop is left out: it has no main direction to be
+  // perpendicular to, and its own shape is already not a line between two sides.
+  const multiEdgeSets = new Map<string, number[]>()
+  diagram.edges.forEach((edge, index) => {
+    if (edge.from === edge.to) return
+    if (endBox(edge.from) === undefined || endBox(edge.to) === undefined) return
+    const key = edge.from < edge.to ? edge.from + '\u0000' + edge.to : edge.to + '\u0000' + edge.from
+    const list = multiEdgeSets.get(key)
+    if (list === undefined) multiEdgeSets.set(key, [index])
+    else list.push(index)
+  })
+  const fanOf = new Map<number, number>()
+  for (const list of multiEdgeSets.values()) {
+    if (list.length < 2) continue
+    list.forEach((index, position) => {
+      if (position === 0) return
+      fanOf.set(index, (position % 2 === 1 ? 1 : -1) * Math.ceil(position / 2) * MULTI_EDGE_SPACING)
+    })
+  }
+
   // Ports. The side comes from the route, not from comparing the two boxes' centres: a layered drawing runs
   // downwards, so an edge between two rows leaves the bottom and arrives at the top, and a back edge does the
   // opposite. Where along the side the port sits follows the drawing: a long edge takes the point its lane meets, so
@@ -351,6 +383,47 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const down = target.y > source.y
     return { exit: down ? 'bottom' : 'top', entry: down ? 'top' : 'bottom', at: lane.points[0].x }
   })
+  // A long edge's lane is where the whole edge runs, so a fan moves the lane instead of bending the edge twice at its
+  // ends. It tries the place that keeps the set evenly spaced first, then its own place moved by the same offset; a
+  // move that would cross a box is refused, because an edge through a box is the worse defect. Refused, the edge keeps
+  // its lane - the two ports still differ, because every long edge already has a lane of its own.
+  const laneClear = (points: Point[], x: number, from: Box, to: Box): boolean => {
+    for (let at = 0; at + 1 < points.length; at += 1) {
+      for (const box of boxList) {
+        if (box === from || box === to) continue
+        if (crossesBox(x, points[at].y, x, points[at + 1].y, box)) return false
+      }
+    }
+    return true
+  }
+  const laneShift = new Map<number, number>()
+  for (const list of multiEdgeSets.values()) {
+    if (list.length < 2) continue
+    const lead = placement.lanes.get(list[0] as number)
+    if (lead === undefined || lead.points.length === 0) continue
+    const base = (lead.points[0] as Point).x
+    const taken = new Set<number>()
+    for (const index of list) {
+      const lane = placement.lanes.get(index)
+      if (lane === undefined || lane.points.length === 0) continue
+      const own = (lane.points[0] as Point).x
+      const offset = fanOf.get(index) ?? 0
+      const edge = diagram.edges[index] as DiagramEdge
+      const from = endBox(edge.from) as Box
+      const to = endBox(edge.to) as Box
+      let target = own
+      if (offset !== 0) {
+        for (const candidate of [base + offset, own + offset]) {
+          if (taken.has(candidate) || !laneClear(lane.points, candidate, from, to)) continue
+          target = candidate
+          break
+        }
+      }
+      taken.add(target)
+      if (target !== own) laneShift.set(index, target - own)
+    }
+  }
+
   const wanted = new Map<string, number>()
   const slotKey = (boxId: string, side: Side, index: number): string => boxId + ':' + side + ':' + String(index)
   /** Where a port may sit on one side: `corner` relaxes the margin, because a side that is crowded uses its corners. */
@@ -380,8 +453,14 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // made to give up its port would gain two bends for nothing.
     const corner = entry.at !== undefined
     const target = bounds(to, vertical, false)
+    // The k-th edge of a multi-edge set runs on a line of its own, perpendicular to the direction it runs: the fan's
+    // offset is added to the side's own coordinate, which is x for a vertical run and y for a horizontal one. A long
+    // edge carries the offset in its lane instead, so the whole edge moves rather than gaining two bends.
+    const offset = fanOf.get(index) ?? 0
     const chosen =
-      entry.at ?? (fromMiddle >= target.low && fromMiddle <= target.high ? fromMiddle : clampTo(from, vertical, toMiddle, false))
+      entry.at === undefined
+        ? (fromMiddle >= target.low && fromMiddle <= target.high ? fromMiddle : clampTo(from, vertical, toMiddle, false)) + offset
+        : entry.at + (laneShift.get(index) ?? 0)
     wanted.set(slotKey(edge.from, entry.exit, index), clampTo(from, vertical, chosen, corner))
     wanted.set(slotKey(edge.to, entry.entry, index), clampTo(to, vertical, chosen, corner))
   }
@@ -567,7 +646,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // two runs are the places where a port and the lane disagree, and everything between them is one straight drop.
     const lane = placement.lanes.get(edgeIndex)
     if (lane !== undefined && lane.points.length > 0 && anchors !== undefined) {
-      const waypoints = lane.reversed ? [...lane.points].reverse() : lane.points
+      const shift = laneShift.get(edgeIndex) ?? 0
+      const ordered = lane.reversed ? [...lane.points].reverse() : lane.points
+      const waypoints = shift === 0 ? ordered : ordered.map((point) => ({ x: point.x + shift, y: point.y }))
       const points: Point[] = [anchors.exit]
       let previous = anchors.exit
       for (const waypoint of waypoints) {
