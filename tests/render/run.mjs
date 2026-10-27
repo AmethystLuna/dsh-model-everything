@@ -6,7 +6,7 @@
 // version of this code guessed wrong: the card said "no report yet" for a report that was right there.
 import { palette, roleForVerdict, schemeNames } from '../../lib/render/palette.js'
 import { rankStates } from '../../lib/render/layout.js'
-import { MULTI_EDGE_SPACING, paint, paintWith } from '../../lib/render/paint.js'
+import { LABEL_HEIGHT, MULTI_EDGE_SPACING, paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
@@ -380,6 +380,27 @@ test('the initial box is written with a heavier border', () => {
   if (!markup.includes('stroke-width="2.5"')) throw new Error('the initial state has no heavier border')
 })
 
+/**
+ * Every edge label the writer emitted, as the mask rectangle it was drawn over and the text inside it.
+ *
+ * A label is a rectangle in the page colour followed by centred text; reading both together is what makes the
+ * markup say "this word sits on that line" rather than "this word is somewhere near it".
+ */
+const labelBlocks = (markup) =>
+  [...markup.matchAll(/<rect x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="([^"]+)" \/><text x="(-?[\d.]+)" y="(-?[\d.]+)" font-size="10" text-anchor="middle" fill="([^"]+)">([^<]*)<\/text>/g)].map(
+    (match) => ({
+      x: Number(match[1]),
+      y: Number(match[2]),
+      width: Number(match[3]),
+      height: Number(match[4]),
+      fill: match[5],
+      textX: Number(match[6]),
+      textY: Number(match[7]),
+      textFill: match[8],
+      text: match[9],
+    }),
+  )
+
 test('an edge with no event writes no label element', () => {
   const { canvas, colours } = paintWith({
     kind: 'machine',
@@ -389,8 +410,40 @@ test('an edge with no event writes no label element', () => {
     caption: 'pass',
   })
   const { markup } = toSvg(canvas, colours)
-  const labels = [...markup.matchAll(/<text x="[\d.]+" y="[\d.]+" font-size="10" fill="([^"]+)">([^<]*)<\/text>/g)].map((match) => match[2])
-  if (labels.includes('')) throw new Error('an empty label was written')
+  if (labelBlocks(markup).length !== 0) throw new Error('an empty label was written')
+  // The near miss: the same drawing with an event does emit one, so the assertion above is about the label and
+  // not about a markup shape the writer never produces.
+  const labelled = paintWith({
+    kind: 'machine',
+    title: 't',
+    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+    edges: [{ from: 'a', to: 'b', label: 'go' }],
+    caption: 'pass',
+  })
+  const blocks = labelBlocks(toSvg(labelled.canvas, labelled.colours).markup)
+  if (blocks.length !== 1 || blocks[0].text !== 'go') throw new Error('a labelled edge wrote ' + JSON.stringify(blocks))
+})
+
+test('a label is written over a mask in the page colour, centred on the point the painter chose', () => {
+  const { canvas, colours } = paintWith(view())
+  const { markup } = toSvg(canvas, colours)
+  const labelled = canvas.shapes.filter((shape) => (shape.kind === 'link' || shape.kind === 'path') && shape.label !== '')
+  const blocks = labelBlocks(markup)
+  if (labelled.length === 0) throw new Error('the fixture carries no label to write')
+  if (blocks.length !== labelled.length) throw new Error(String(blocks.length) + ' labels written for ' + String(labelled.length) + ' edges')
+  for (const [index, block] of blocks.entries()) {
+    const shape = labelled[index]
+    if (block.text !== shape.label) throw new Error('label text: ' + block.text)
+    // A mask of no width masks nothing, and the line shows through the word.
+    if (!(block.width > 0) || !(block.height > 0)) throw new Error('label "' + block.text + '" has an empty mask')
+    if (block.fill !== colours.background) throw new Error('label "' + block.text + '" is masked in ' + block.fill + ', not the page colour')
+    // The label keeps the colour it has always had: the mask is geometry, not emphasis.
+    if (block.textFill !== colours.muted) throw new Error('label "' + block.text + '" changed colour to ' + block.textFill)
+    if (Math.abs(block.textX - (block.x + block.width / 2)) > 0.2) throw new Error('label "' + block.text + '" is not centred in its mask')
+    if (Math.abs(block.textX - shape.labelX) > 0.2 || Math.abs(block.textY - 3.5 - shape.labelY) > 0.2) {
+      throw new Error('the mask of "' + block.text + '" is not where the painter put the label')
+    }
+  }
 })
 
 test('the geometry is written with at most two decimals', () => {
@@ -559,8 +612,10 @@ test('a mermaid edge states no arrow, and a mermaid drawing is unchanged', () =>
   const source = ['graph TD', '  a[Start] --> b{Check}', '  b -->|yes| c[Done]'].join(String.fromCharCode(10))
   const rendered = render({ source })
   if (rendered.diagram.edges.some((edge) => edge.arrow !== undefined)) throw new Error('a Mermaid edge gained an arrow type')
+  // The golden holds the label on its line as well as the shapes: `yes` is centred on x=64, the line's own x, over
+  // a mask from 54.1 to 73.9, so the line it names is interrupted by the word and nothing else is.
   const golden =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 283" width="240" height="283" role="img" aria-label="mermaid: graph, 3 boxes, 2 arrows" font-family="system-ui, -apple-system, Segoe UI, sans-serif"><rect x="0" y="0" width="240" height="283" fill="#ffffff" /><rect x="20" y="46" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="63.5">Start</tspan></text><polygon points="64,127,108,140.5,64,154,20,140.5" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="144.5">Check</tspan></text><rect x="20" y="208" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="225.5">Done</tspan></text><line x1="64" y1="73" x2="64" y2="127" stroke="#6b7280" stroke-width="1" /><polygon points="64,127 60.8,120 67.2,120" fill="#6b7280" /><line x1="64" y1="154" x2="64" y2="208" stroke="#6b7280" stroke-width="1" /><polygon points="64,208 60.8,201 67.2,201" fill="#6b7280" /><text x="64" y="181" font-size="10" fill="#9aa3ad">yes</text><text x="20" y="32" font-size="12" fill="#1f2933">mermaid</text><text x="20" y="262" font-size="10" text-anchor="middle" fill="#6b7280"><tspan x="20" dy="0">graph, 3 boxes, 2 arrows</tspan></text></svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 283" width="240" height="283" role="img" aria-label="mermaid: graph, 3 boxes, 2 arrows" font-family="system-ui, -apple-system, Segoe UI, sans-serif"><rect x="0" y="0" width="240" height="283" fill="#ffffff" /><rect x="20" y="46" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="63.5">Start</tspan></text><polygon points="64,127,108,140.5,64,154,20,140.5" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="144.5">Check</tspan></text><rect x="20" y="208" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="225.5">Done</tspan></text><line x1="64" y1="73" x2="64" y2="127" stroke="#6b7280" stroke-width="1" /><polygon points="64,127 60.8,120 67.2,120" fill="#6b7280" /><line x1="64" y1="154" x2="64" y2="208" stroke="#6b7280" stroke-width="1" /><polygon points="64,208 60.8,201 67.2,201" fill="#6b7280" /><rect x="54.1" y="175" width="19.8" height="12" fill="#ffffff" /><text x="64" y="184.5" font-size="10" text-anchor="middle" fill="#9aa3ad">yes</text><text x="20" y="32" font-size="12" fill="#1f2933">mermaid</text><text x="20" y="262" font-size="10" text-anchor="middle" fill="#6b7280"><tspan x="20" dy="0">graph, 3 boxes, 2 arrows</tspan></text></svg>'
   if (rendered.markup !== golden) throw new Error('the Mermaid drawing changed: ' + rendered.markup)
 })
 
@@ -1428,6 +1483,32 @@ test('a rendered drawing keeps its text inside its boxes', () => {
   }
 })
 
+// ------------------------------------------------------------------------------------------------ edge labels
+
+/** The labels a canvas carries: the point each is centred on, and the rectangle its mask covers. */
+const labelRectsOf = (canvas) =>
+  canvas.shapes
+    .filter((shape) => (shape.kind === 'link' || shape.kind === 'path') && shape.label !== '')
+    .map((shape) => ({ label: shape.label, x: shape.labelX, y: shape.labelY, width: textWidth(shape.label), height: LABEL_HEIGHT }))
+
+/** How far a point is from a drawn edge: zero means it lies on the line. */
+const distanceToRoute = (shape, point) => {
+  let best = Infinity
+  for (const segment of segmentsOfShape(shape)) {
+    const dx = Math.max(Math.min(segment.x1, segment.x2) - point.x, 0, point.x - Math.max(segment.x1, segment.x2))
+    const dy = Math.max(Math.min(segment.y1, segment.y2) - point.y, 0, point.y - Math.max(segment.y1, segment.y2))
+    best = Math.min(best, Math.hypot(dx, dy))
+  }
+  return best
+}
+
+/** Do two label rectangles overlap? The defect this whole change exists to prevent. */
+const labelsOverlap = (left, right) =>
+  left.x - left.width / 2 < right.x + right.width / 2 &&
+  left.x + left.width / 2 > right.x - right.width / 2 &&
+  left.y - left.height / 2 < right.y + right.height / 2 &&
+  left.y + left.height / 2 > right.y - right.height / 2
+
 test('an edge label is not drawn on top of a box', () => {
   const source = [
     'graph TD',
@@ -1439,17 +1520,146 @@ test('an edge label is not drawn on top of a box', () => {
   ].join(String.fromCharCode(10))
   const { canvas } = paintWith(render({ source }).diagram)
   const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
-  const labels = canvas.shapes.filter((shape) => (shape.kind === 'link' || shape.kind === 'path') && shape.label !== '')
-  for (const label of labels) {
-    const width = textWidth(label.label)
-    const left = label.labelX - width / 2
+  for (const label of labelRectsOf(canvas)) {
     for (const box of boxes) {
-      const overlaps = left < box.x + box.width && left + width > box.x && label.labelY < box.y + box.height && label.labelY + 12 > box.y
+      const overlaps =
+        label.x - label.width / 2 < box.x + box.width && label.x + label.width / 2 > box.x &&
+        label.y - label.height / 2 < box.y + box.height && label.y + label.height / 2 > box.y
       if (overlaps) {
         throw new Error('label "' + label.label + '" lands on box "' + String(box.label) + '"')
       }
     }
   }
+})
+
+/** Does a label rectangle lie across a piece of line? Two points of padding, the margin the painter reserves. */
+const labelHitsSegment = (spot, segment) =>
+  spot.x + spot.width / 2 > Math.min(segment.x1, segment.x2) - 2 &&
+  spot.x - spot.width / 2 < Math.max(segment.x1, segment.x2) + 2 &&
+  spot.y + spot.height / 2 > Math.min(segment.y1, segment.y2) - 2 &&
+  spot.y - spot.height / 2 < Math.max(segment.y1, segment.y2) + 2
+
+test('a label is centred on its own line', () => {
+  // Labels a reader actually meets: a decision's two branches, a long back edge, and a PlantUML pair whose edges
+  // run side by side. Five points at two notches is the tolerance stated: rounding to a tenth, never a whole gap.
+  const sources = [
+    ['graph TD', '  a[Idea] --> b{Feasible?}', '  b -->|yes| c[Build]', '  b -->|no| d[Revise]', '  d -->|retry| a'].join(NL),
+    ['graph TD', '  subgraph Ingest', '    a[Gateway] --> b[Auth]', '    b --> c[Order service]', '  end', '  c -->|handover| d[(Orders)]', '  d --> e[Warehouse]'].join(NL),
+    ['@startuml', 'API --> DB : read', 'API *-- DB : owns', 'Cache --> API : miss', '@enduml'].join(NL),
+  ]
+  let seen = 0
+  for (const source of sources) {
+    const { canvas } = paintWith(render({ source }).diagram)
+    for (const shape of routesOf(canvas)) {
+      if (shape.label === '') continue
+      seen += 1
+      const distance = distanceToRoute(shape, { x: shape.labelX, y: shape.labelY })
+      if (distance > 2) throw new Error('label "' + shape.label + '" is ' + distance.toFixed(1) + ' points off its own edge')
+    }
+  }
+  if (seen < 5) throw new Error('only ' + String(seen) + ' labels were measured')
+})
+
+test('a label whose midpoint sits across another line moves off the crossing', () => {
+  // Clearing a box and clearing another label are two of the three collisions. The third is another edge's line:
+  // a label lying across one hides it, and the mask makes that worse than text next to it. In this drawing the
+  // left branch's midpoint lies across the right branch's drop, and there is room above it on the same run.
+  const source = [
+    'graph TD',
+    '  a[Start here] --> b{Choice?}',
+    '  b -->|left, with a longer name| c[Left]',
+    '  b -->|right, also long| d[Right]',
+    '  c --> e[Merge]',
+    '  d --> e',
+    '  e -->|return| a',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const routes = routesOf(canvas)
+  const shape = routes.find((route) => route.label === 'left, with a longer name')
+  if (shape === undefined) throw new Error('the labelled branch was lost')
+  const label = labelRectsOf(canvas).find((entry) => entry.label === 'left, with a longer name')
+  const points = routePointsOf(shape)
+  let longest = { from: points[0], to: points[1], length: -1 }
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    const length = Math.abs(points[index].x - points[index + 1].x) + Math.abs(points[index].y - points[index + 1].y)
+    if (length > longest.length) longest = { from: points[index], to: points[index + 1], length }
+  }
+  const middle = { x: (longest.from.x + longest.to.x) / 2, y: (longest.from.y + longest.to.y) / 2, width: label.width, height: label.height }
+  const others = routes.filter((route) => route !== shape).flatMap((route) => segmentsOfShape(route))
+  if (!others.some((segment) => labelHitsSegment(middle, segment))) {
+    throw new Error('the fixture does not put the midpoint across another line, so nothing had to move')
+  }
+  const crossed = others.filter((segment) => labelHitsSegment(label, segment))
+  if (crossed.length > 0) throw new Error('the label still lies across ' + String(crossed.length) + ' line(s) of other edges')
+  if (distanceToRoute(shape, label) > 2) throw new Error('the label left its own edge')
+})
+
+test('two labels of a multi-edge do not overlap', () => {
+  // Each statement gets its own line, one fan spacing apart, and each label is wider than that spacing: left at
+  // their midpoints, the two words would sit on top of each other.
+  const { canvas } = paintWith(pairDiagram([{ label: 'read' }, { label: 'owns', arrow: 'composition' }]))
+  const labels = labelRectsOf(canvas)
+  if (labels.length !== 2) throw new Error('labels: ' + String(labels.length))
+  if (textWidth('read') <= MULTI_EDGE_SPACING) throw new Error('the fixture labels are too narrow to collide')
+  const routes = routesOf(canvas)
+  const midpoints = routes.map((shape) => {
+    const points = routePointsOf(shape)
+    return { label: 'midpoint', x: (points[0].x + points[points.length - 1].x) / 2, y: (points[0].y + points[points.length - 1].y) / 2, width: textWidth('read'), height: LABEL_HEIGHT }
+  })
+  if (!labelsOverlap(midpoints[0], midpoints[1])) throw new Error('the fixture does not put the two midpoints on top of each other')
+  if (labelsOverlap(labels[0], labels[1])) throw new Error('the two labels of one pair are drawn on top of each other')
+  const moved = labels.filter((label) => midpoints.some((middle) => Math.abs(label.y - middle.y) > 1))
+  if (moved.length === 0) throw new Error('neither label moved, so the clearance was luck rather than a decision')
+  for (const [index, label] of labels.entries()) {
+    if (distanceToRoute(routes[index], label) > 2) throw new Error('label "' + label.label + '" left its own edge to avoid the other')
+  }
+})
+
+test('a label whose midpoint lands on a box moves along its own segment, and stays on it', () => {
+  // The `loop` edge runs up the left of the drawing, straight past a box that starts one point into the label's
+  // width. So the midpoint is occupied and the label has to walk.
+  const source = [
+    'graph TD',
+    '  a[A] --> b[B]',
+    '  a --> c[C]',
+    '  b --> d[D]',
+    '  c --> d',
+    '  d --> e[E]',
+    '  e -->|loop| b',
+    '  a --> e',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const shape = routesOf(canvas).find((route) => route.label === 'loop')
+  if (shape === undefined) throw new Error('the labelled back edge was lost')
+  const points = routePointsOf(shape)
+  // The longest run is the whole edge here, so its midpoint is the place the label would take if it never moved.
+  let longest = { from: points[0], to: points[1], length: -1 }
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    const length = Math.abs(points[index].x - points[index + 1].x) + Math.abs(points[index].y - points[index + 1].y)
+    if (length > longest.length) longest = { from: points[index], to: points[index + 1], length }
+  }
+  const middle = { x: (longest.from.x + longest.to.x) / 2, y: (longest.from.y + longest.to.y) / 2 }
+  const onBox = (spot) =>
+    boxes.some((box) => spot.x - spot.width / 2 < box.x + box.width && spot.x + spot.width / 2 > box.x && spot.y - LABEL_HEIGHT / 2 < box.y + box.height && spot.y + LABEL_HEIGHT / 2 > box.y)
+  const label = labelRectsOf(canvas).find((entry) => entry.label === 'loop')
+  if (!onBox({ ...label, x: middle.x, y: middle.y })) throw new Error('the fixture does not put the midpoint on a box, so nothing had to move')
+  if (Math.abs(label.y - middle.y) < 1) throw new Error('the label stayed on the box it had to clear')
+  if (distanceToRoute(shape, label) > 2) throw new Error('the label left its segment while moving')
+  if (onBox(label)) throw new Error('the label moved and is still on a box')
+})
+
+test('a self loop keeps its label beside the loop, the one label that cannot fit on its line', () => {
+  // A self loop's longest run is eighteen points long. Its name does not fit in that, and masking the run would
+  // put the word over the box it belongs to, so the label sits outside the loop by design.
+  const source = ['graph TD', '  a[Only] -->|again| a'].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const shape = routesOf(canvas).find((route) => route.kind === 'path')
+  if (shape === undefined) throw new Error('the self loop was not drawn as a loop')
+  const label = labelRectsOf(canvas).find((entry) => entry.label === 'again')
+  if (label === undefined) throw new Error('the loop label was dropped')
+  const loopRight = Math.max(...shape.points.map((point) => point.x))
+  if (label.x - label.width / 2 < loopRight) throw new Error('the loop label is on top of the loop')
 })
 
 test('the canvas covers what was drawn, including an edge that runs beside the boxes', () => {

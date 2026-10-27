@@ -29,7 +29,8 @@ function boxText(shape: { x: number; y: number; width: number; height: number; l
 }
 
 
-import type { Canvas, Shape } from './paint.js'
+import { LABEL_HEIGHT, type Canvas, type Shape } from './paint.js'
+import { textWidth } from './text.js'
 import type { EdgeArrow } from './model.js'
 import type { Palette } from './palette.js'
 
@@ -221,11 +222,28 @@ function diamond(at: At, next: At, stroke: string, fill: string): string {
   return '<polygon points="' + points + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1" />'
 }
 
-/** An edge label, or nothing when the edge carries no event. */
+/**
+ * An edge label, or nothing when the edge carries no event.
+ *
+ * The text is centred on the point the painter chose - a point on the edge itself - and drawn over a rectangle in
+ * the page colour. The mask is the whole point of drawing it here: it hides the stretch of line behind the text,
+ * so the label interrupts its edge instead of floating beside it, which is the only way a reader can tell that
+ * the word names that line and not something it happens to sit next to. The label keeps its own colour: the mask
+ * is geometry, not emphasis.
+ */
 function edgeLabel(label: string, x: number, y: number, colours: Palette): string {
   // Total on purpose: a malformed edge must lose its label, not the whole drawing.
   if (typeof label !== 'string' || label === '') return ''
-  return '<text x="' + n(x) + '" y="' + n(y) + '" font-size="10" fill="' + colours.muted + '">' + escape(label) + '</text>'
+  const width = textWidth(label)
+  const left = x - width / 2
+  const top = y - LABEL_HEIGHT / 2
+  // Ten point text sits on a baseline about a third of the mask above its centre, which centres the cap height.
+  const baseline = y + 3.5
+  return (
+    '<rect x="' + n(left) + '" y="' + n(top) + '" width="' + n(width) + '" height="' + n(LABEL_HEIGHT) +
+    '" fill="' + colours.background + '" />' +
+    '<text x="' + n(x) + '" y="' + n(baseline) + '" font-size="10" text-anchor="middle" fill="' + colours.muted + '">' + escape(label) + '</text>'
+  )
 }
 
 export function toSvg(canvas: Canvas, colours: Palette, label?: string): { markup: string; dropped: number } {

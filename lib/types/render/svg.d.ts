@@ -11,7 +11,7 @@
  *
  * Pure, and the output is asserted as text: escaping, geometry, arrowheads, wrapped captions.
  */
-import type { Canvas } from './paint.js';
+import { type Canvas } from './paint.js';
 import type { Palette } from './palette.js';
 export declare function toSvg(canvas: Canvas, colours: Palette, label?: string): {
     markup: string;

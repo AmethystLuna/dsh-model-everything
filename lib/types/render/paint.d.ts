@@ -12,6 +12,11 @@
  * is snapped onto the top or bottom perimeter in the direction the route approaches, and two edges on the same
  * side take separate points along it.
  *
+ * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of the edge's longest straight
+ * run, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
+ * something is in the way. Labels are placed after every edge is drawn, because what a label has to avoid is the
+ * whole picture.
+ *
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 import { type ColourRole, type Palette, type PaletteOptions } from './palette.js';
@@ -41,6 +46,7 @@ export interface LinkShape {
     x2: number;
     y2: number;
     label: string;
+    /** The centre the label is drawn on, and therefore a point on the edge itself. */
     labelX: number;
     labelY: number;
     colour: ColourRole;
@@ -53,6 +59,7 @@ export interface PathShape {
     kind: 'path';
     points: Point[];
     label: string;
+    /** The centre the label is drawn on, and therefore a point on the edge itself. */
     labelX: number;
     labelY: number;
     colour: ColourRole;
@@ -100,6 +107,13 @@ export interface Canvas {
 export declare const MULTI_EDGE_SPACING = 20;
 /** Which colour a box earns from its role. One mapping, used by every container. */
 export declare function roleOfNode(node: DiagramNode): ColourRole;
+/**
+ * How tall the mask an edge label is drawn over is.
+ *
+ * Exported because two modules must agree on it: the painter reserves the rectangle when it looks for a clear
+ * place, and the writer draws the rectangle that was reserved. A label with two sizes is a label half masked.
+ */
+export declare const LABEL_HEIGHT = 12;
 export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>, options?: PaletteOptions): {
     canvas: Canvas;
     colours: Palette;

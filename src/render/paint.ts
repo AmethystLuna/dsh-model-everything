@@ -12,6 +12,11 @@
  * is snapped onto the top or bottom perimeter in the direction the route approaches, and two edges on the same
  * side take separate points along it.
  *
+ * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of the edge's longest straight
+ * run, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
+ * something is in the way. Labels are placed after every edge is drawn, because what a label has to avoid is the
+ * whole picture.
+ *
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 
@@ -49,6 +54,7 @@ export interface LinkShape {
   x2: number
   y2: number
   label: string
+  /** The centre the label is drawn on, and therefore a point on the edge itself. */
   labelX: number
   labelY: number
   colour: ColourRole
@@ -62,6 +68,7 @@ export interface PathShape {
   kind: 'path'
   points: Point[]
   label: string
+  /** The centre the label is drawn on, and therefore a point on the edge itself. */
   labelX: number
   labelY: number
   colour: ColourRole
@@ -192,67 +199,112 @@ function captionRole(caption: string): ColourRole {
 
 
 /**
- * Where an edge's label goes.
+ * How tall the mask an edge label is drawn over is.
  *
- * A label dropped at the midpoint lands on a box as soon as the two ends are not vertically aligned - the defect a
- * reader sees as "text on top of a box". Graphviz solves it by making the label a node the layout must make room
- * for; without a layout that can do that, the label walks along its own edge and takes the first position that is
- * clear of every box, falling back to the midpoint when the whole edge is crowded.
+ * Exported because two modules must agree on it: the painter reserves the rectangle when it looks for a clear
+ * place, and the writer draws the rectangle that was reserved. A label with two sizes is a label half masked.
+ */
+export const LABEL_HEIGHT = 12
+
+/** The room a label's mask keeps from anything it may not cover, so two rectangles never read as one. */
+const LABEL_PAD = 2
+
+/** How far a label steps along its own run while it looks for a clear place to sit. */
+const LABEL_STEP = 3
+
+/** A straight piece of an edge, as the collision test needs it. */
+interface Segment {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
+/** Where a label sits: the point it is centred on, and the rectangle its mask covers. */
+interface LabelSpot {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** The point an edge's label is drawn at.
+ *
+ * A label is not furniture parked beside the line: it names the transition, so it sits on the line - anchored at
+ * the middle of the longest straight run of its own edge - and the writer masks the stretch of line it covers.
+ * Text beside a line can be read as belonging to whatever it happens to sit next to; text that interrupts its own
+ * line reads as part of it.
+ *
+ * The anchor then has to be earned. A mask over a box hides a border, over another label it makes both
+ * unreadable, and over a third edge's line it hides that line. So the label walks along its own run in small
+ * steps, in both directions and bounded so its rectangle stays on that run, and takes the first place that is
+ * clear. It never leaves the run: a label moved onto a neighbouring edge is a label that names the wrong thing.
  */
 function placeLabel(
   label: string,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
+  from: Point,
+  to: Point,
   boxes: Iterable<Box>,
-  placed: Array<{ x: number; y: number; width: number; height: number }> = [],
-  ordinal = 0,
-  segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [],
-  offsets: Array<{ t: number; dx: number }> = [
-    { t: 0.5, dx: 0 },
-    { t: 0.5, dx: 26 },
-    { t: 0.5, dx: -26 },
-    { t: 0.42, dx: 26 },
-    { t: 0.58, dx: -26 },
-    { t: 0.5, dx: 52 },
-    { t: 0.5, dx: -52 },
-    { t: 0.5, dx: 100 },
-    { t: 0.5, dx: -100 },
-    { t: 0.82, dx: 0 },
-    { t: 0.18, dx: 0 },
-    { t: 0.3, dx: 0 },
-    { t: 0.7, dx: 0 },
-  ],
-): { x: number; y: number } {
+  placed: LabelSpot[],
+  segments: Segment[],
+): LabelSpot {
   const width = textWidth(label)
-  const height = 12
-  const hits = (x: number, y: number, w: number, other: { x: number; y: number; width: number; height: number }): boolean =>
-    x - w / 2 < other.x + other.width + 3 && x + w / 2 > other.x - 3 && y < other.y + other.height + 3 && y + height > other.y - 3
-  const clear = (x: number, y: number, w: number): boolean => {
-    for (const box of boxes) if (hits(x, y, w, box)) return false
-    for (const earlier of placed) if (hits(x, y, w, earlier)) return false
-    // A label on top of a line is as unreadable as one on top of a box.
-    const left = x - w / 2 - 2
-    const right = x + w / 2 + 2
-    const top2 = y - 2
-    const bottom2 = y + 14
-    for (const segment of segments) {
-      const minX = Math.min(segment.x1, segment.x2)
-      const maxX = Math.max(segment.x1, segment.x2)
-      const minY = Math.min(segment.y1, segment.y2)
-      const maxY = Math.max(segment.y1, segment.y2)
-      if (right > minX && left < maxX && bottom2 > minY && top2 < maxY) return false
-    }
+  const height = LABEL_HEIGHT
+  const spotAt = (x: number, y: number): LabelSpot => ({ x, y, width, height })
+  const hitsBox = (spot: LabelSpot, box: Box): boolean =>
+    spot.x - spot.width / 2 < box.x + box.width + LABEL_PAD &&
+    spot.x + spot.width / 2 > box.x - LABEL_PAD &&
+    spot.y - spot.height / 2 < box.y + box.height + LABEL_PAD &&
+    spot.y + spot.height / 2 > box.y - LABEL_PAD
+  const hitsSpot = (spot: LabelSpot, other: LabelSpot): boolean =>
+    spot.x - spot.width / 2 < other.x + other.width / 2 + LABEL_PAD &&
+    spot.x + spot.width / 2 > other.x - other.width / 2 - LABEL_PAD &&
+    spot.y - spot.height / 2 < other.y + other.height / 2 + LABEL_PAD &&
+    spot.y + spot.height / 2 > other.y - other.height / 2 - LABEL_PAD
+  // A label on top of a line is as unreadable as one on top of a box: the mask hides the stretch of line it
+  // covers, which on its own edge is the point of the mask and on any other edge is a line that goes missing.
+  const hitsSegment = (spot: LabelSpot, segment: Segment): boolean =>
+    spot.x + spot.width / 2 > Math.min(segment.x1, segment.x2) - LABEL_PAD &&
+    spot.x - spot.width / 2 < Math.max(segment.x1, segment.x2) + LABEL_PAD &&
+    spot.y + spot.height / 2 > Math.min(segment.y1, segment.y2) - LABEL_PAD &&
+    spot.y - spot.height / 2 < Math.max(segment.y1, segment.y2) + LABEL_PAD
+  const clearOfBoxes = (spot: LabelSpot): boolean => {
+    for (const box of boxes) if (hitsBox(spot, box)) return false
+    for (const earlier of placed) if (hitsSpot(spot, earlier)) return false
     return true
   }
-  // A second label on the same source moves along and down: the two describe different branches of one decision,
-  // and stacking them is what made them unreadable.
-  const centre = (x: number, y: number): { x: number; y: number } => ({ x: x - width / 2, y })
-  for (const candidate of offsets) {
-    const x = from.x + (to.x - from.x) * candidate.t + candidate.dx
-    const y = from.y + (to.y - from.y) * candidate.t + ordinal * 14
-    if (clear(x, y, width)) return centre(x, y)
+  const clearOfEdges = (spot: LabelSpot): boolean => {
+    for (const segment of segments) if (hitsSegment(spot, segment)) return false
+    return true
   }
-  return centre(from.x + (to.x - from.x) * 0.5, from.y + (to.y - from.y) * 0.5)
+  const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
+  // The run is axis-aligned, so its Manhattan length is its length.
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length = Math.abs(dx) + Math.abs(dy)
+  if (length < 1) return spotAt(middle.x, middle.y)
+  const ux = dx / length
+  const uy = dy / length
+  // The walk is bounded so the label's own rectangle stays on the run that names it: a mask that hangs off the
+  // end of its segment would be half over the next thing and would not read as sitting on this edge.
+  const along = (Math.abs(ux) * width) / 2 + (Math.abs(uy) * height) / 2
+  const bound = Math.max(0, length / 2 - along)
+  const walk: number[] = [0]
+  for (let step = LABEL_STEP; step <= bound + 0.001; step += LABEL_STEP) walk.push(step, -step)
+  const at = (offset: number): LabelSpot => spotAt(middle.x + ux * offset, middle.y + uy * offset)
+  for (const offset of walk) {
+    const spot = at(offset)
+    if (clearOfBoxes(spot) && clearOfEdges(spot)) return spot
+  }
+  // Nothing on the run is clear of every other edge - two runs may lie side by side for their whole length, and
+  // then no place on one is clear of the other. Covering a neighbour's line is the least of the three: text over
+  // a line still reads, while text over a box hides the box and text over text is unreadable. The label stays
+  // on its own edge, which is the one thing it may not give up.
+  for (const offset of walk) {
+    const spot = at(offset)
+    if (clearOfBoxes(spot)) return spot
+  }
+  return at(0)
 }
 
 
@@ -272,11 +324,11 @@ function drawnExtent(shapes: Shape[]): { width: number; height: number } {
         break
       case 'link':
         consider(Math.max(shape.x1, shape.x2), Math.max(shape.y1, shape.y2))
-        if (shape.label !== '') consider(shape.labelX + textWidth(shape.label), shape.labelY + 12)
+        if (shape.label !== '') consider(shape.labelX + textWidth(shape.label) / 2, shape.labelY + LABEL_HEIGHT / 2)
         break
       case 'path': {
         for (const point of shape.points) consider(point.x, point.y)
-        if (shape.label !== '') consider(shape.labelX + textWidth(shape.label), shape.labelY + 12)
+        if (shape.label !== '') consider(shape.labelX + textWidth(shape.label) / 2, shape.labelY + LABEL_HEIGHT / 2)
         break
       }
       case 'caption':
@@ -312,9 +364,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const drawn = new Set<string>()
   // A Map iterator is consumed by the first pass: collision checks need a list.
   const boxList = Array.from(boxes.values())
-  const labelRects: Array<{ x: number; y: number; width: number; height: number }> = []
-  const segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = []
-  const labelsFrom = new Map<string, number>()
+  /** The edges drawn as lines, in paint order: their labels are placed once every one of them is known. */
+  const routes: Array<LinkShape | PathShape> = []
   for (const node of diagram.nodes) {
     // A state id may repeat in a malformed model: the first placement wins and the repeat is skipped.
     if (drawn.has(node.id)) continue
@@ -547,31 +598,39 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     return best
   }
 
-  /** Paint one edge as a polyline: its label walks along the longest run, and its segments join the collision set. */
-  const paintPath = (edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
-    const ordinal = labelsFrom.get(edge.from) ?? 0
-    labelsFrom.set(edge.from, ordinal + 1)
-    const run = longestRun(points)
-    const spot = placeLabel(edge.label, run.from, run.to, boxList, labelRects, ordinal, segments)
-    labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+  /** The points a drawn edge passes through, whichever of the two shapes carries it. */
+  const pointsOfRoute = (shape: LinkShape | PathShape): Point[] =>
+    shape.kind === 'path' ? shape.points : [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }]
+
+  /** The straight pieces an edge draws, so a label can tell its own line from every other one. */
+  const segmentsOfRoute = (shape: LinkShape | PathShape): Segment[] => {
+    const points = pointsOfRoute(shape)
+    const out: Segment[] = []
     for (let index = 0; index + 1 < points.length; index += 1) {
       const from = points[index]
       const to = points[index + 1]
-      segments.push({ x1: from.x, y1: from.y, x2: to.x, y2: to.y })
+      out.push({ x1: from.x, y1: from.y, x2: to.x, y2: to.y })
     }
-    shapes.push({
+    return out
+  }
+
+  /** Paint one edge as a polyline. Its label is placed once every edge is drawn; see the pass after the loop. */
+  const paintPath = (edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
+    const shape: PathShape = {
       kind: 'path',
       points,
       label: edge.label,
-      labelX: spot.x + textWidth(edge.label) / 2,
-      labelY: spot.y,
+      labelX: 0,
+      labelY: 0,
       colour,
       ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
       ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
-    })
+    }
+    shapes.push(shape)
+    routes.push(shape)
   }
 
-  /** Two points are a line and more of them are a polyline; both carry the label and join the collision set. */
+  /** Two points are a line and more of them are a polyline; both are an edge carrying a label. */
   const paintRoute = (edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     if (points.length > 2) {
       paintPath(edge, points, colour)
@@ -579,24 +638,21 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     }
     const exit = points[0]
     const entry = points[points.length - 1]
-    const ordinal = labelsFrom.get(edge.from) ?? 0
-    labelsFrom.set(edge.from, ordinal + 1)
-    const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal, segments)
-    labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
-    segments.push({ x1: exit.x, y1: exit.y, x2: entry.x, y2: entry.y })
-    shapes.push({
+    const shape: LinkShape = {
       kind: 'link',
       x1: exit.x,
       y1: exit.y,
       x2: entry.x,
       y2: entry.y,
       label: edge.label,
-      labelX: spot.x + textWidth(edge.label) / 2,
-      labelY: spot.y,
+      labelX: 0,
+      labelY: 0,
       colour,
       ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
       ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
-    })
+    }
+    shapes.push(shape)
+    routes.push(shape)
   }
 
   /** Does any segment of this route pass through a box other than its own two ends? */
@@ -630,7 +686,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
           { x, y: y + 9 },
         ],
         label: edge.label,
-        labelX: x + 20,
+        // The one label that is not on its own edge: a self loop's longest run is eighteen points, and its name
+        // does not fit on that. It sits beside the loop, where it belongs to the edge and touches nothing.
+        labelX: x + 20 + textWidth(edge.label) / 2,
         labelY: y,
         colour,
         ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
@@ -676,6 +734,22 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
     paintRoute(edge, routeEdge(source, target, boxList, anchors).points, colour)
   }
+
+  // Labels last. A label has to clear every other edge, and until the last edge is drawn the painter does not know
+  // where those are: this is why the whole pass exists rather than a decision made edge by edge.
+  const routeSegments = routes.map((shape) => segmentsOfRoute(shape))
+  const placedLabels: LabelSpot[] = []
+  routes.forEach((shape, index) => {
+    const run = longestRun(pointsOfRoute(shape))
+    // The middle of the longest run is where the label belongs; a label with nothing to avoid stays exactly there.
+    let spot: LabelSpot = { x: (run.from.x + run.to.x) / 2, y: (run.from.y + run.to.y) / 2, width: textWidth(shape.label), height: LABEL_HEIGHT }
+    if (shape.label !== '') {
+      spot = placeLabel(shape.label, run.from, run.to, boxList, placedLabels, routeSegments.flatMap((list, at) => (at === index ? [] : list)))
+      placedLabels.push(spot)
+    }
+    shape.labelX = spot.x
+    shape.labelY = spot.y
+  })
 
   shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12, text: diagram.title, colour: 'text' })
 
