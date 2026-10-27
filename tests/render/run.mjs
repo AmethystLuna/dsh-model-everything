@@ -6,7 +6,7 @@
 // version of this code guessed wrong: the card said "no report yet" for a report that was right there.
 import { palette, roleForVerdict, schemeNames } from '../../lib/render/palette.js'
 import { rankStates } from '../../lib/render/layout.js'
-import { paint, paintWith } from '../../lib/render/paint.js'
+import { MULTI_EDGE_SPACING, paint, paintWith } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
@@ -583,6 +583,150 @@ test('a plantuml source reaches the svg with the head its arrow stated', () => {
   }
 })
 
+// ---------------------------------------------------------------------------------------- multi-edges between one pair
+
+/** The points a link or a path draws, in drawing order. */
+const routePointsOf = (shape) =>
+  shape.kind === 'link' ? [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }] : shape.points
+
+/** The segments a link or a path draws, so two edges can be compared for a shared run. */
+const segmentsOfShape = (shape) => {
+  const points = routePointsOf(shape)
+  const out = []
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    out.push({ x1: points[index].x, y1: points[index].y, x2: points[index + 1].x, y2: points[index + 1].y })
+  }
+  return out
+}
+
+/** Do two edges run along one line with an overlap? Two relations may cross; they may not be drawn as one line. */
+const sharesSegment = (left, right) =>
+  left.some((p) =>
+    right.some((q) => {
+      const horizontal = Math.abs(p.y1 - p.y2) < 0.5 && Math.abs(q.y1 - q.y2) < 0.5 && Math.abs(p.y1 - q.y1) < 0.5
+      const vertical = Math.abs(p.x1 - p.x2) < 0.5 && Math.abs(q.x1 - q.x2) < 0.5 && Math.abs(p.x1 - q.x1) < 0.5
+      if (!horizontal && !vertical) return false
+      return horizontal
+        ? Math.max(Math.min(p.x1, p.x2), Math.min(q.x1, q.x2)) < Math.min(Math.max(p.x1, p.x2), Math.max(q.x1, q.x2)) - 0.5
+        : Math.max(Math.min(p.y1, p.y2), Math.min(q.y1, q.y2)) < Math.min(Math.max(p.y1, p.y2), Math.max(q.y1, q.y2)) - 0.5
+    }),
+  )
+
+/** A drawing whose only edges are the ones given, between two boxes in two rows. */
+const pairDiagram = (edges) => ({
+  kind: 'machine',
+  title: 't',
+  init: 'a',
+  nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
+  edges: edges.map((edge) => ({ from: 'a', label: '', to: 'b', ...edge })),
+  caption: 'pass',
+})
+
+/** The link-or-path shapes of a canvas, in edge order. */
+const routesOf = (canvas) => canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path')
+
+test('two edges between one pair take a port each and share no segment', () => {
+  const { canvas } = paintWith(pairDiagram([{ arrow: 'association' }, { arrow: 'composition' }]))
+  const routes = routesOf(canvas)
+  if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
+  const target = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'b')
+  const ends = routes.map((shape) => routePointsOf(shape)[routePointsOf(shape).length - 1])
+  for (const end of ends) if (end.y !== target.y) throw new Error('a port is not on the target top side: ' + JSON.stringify(end))
+  if (ends[0].x === ends[1].x) throw new Error('the two edges share a target port: ' + String(ends[0].x))
+  const middle = target.x + target.width / 2
+  if (ends[0].x !== middle) throw new Error('the first edge did not keep the middle: ' + String(ends[0].x) + ' vs ' + String(middle))
+  if (ends[1].x !== middle + MULTI_EDGE_SPACING) throw new Error('the second edge is not one spacing over: ' + String(ends[1].x))
+  // Both ends differ, not only the target: two edges that met at one box would still read as one edge there.
+  const starts = routes.map((shape) => routePointsOf(shape)[0])
+  if (starts[0].x === starts[1].x) throw new Error('the two edges share a source port')
+  if (sharesSegment(segmentsOfShape(routes[0]), segmentsOfShape(routes[1]))) throw new Error('the two edges share a segment')
+})
+
+test('three edges between one pair stay distinct and take the fan in order', () => {
+  const { canvas } = paintWith(pairDiagram([{}, { arrow: 'composition' }, { arrow: 'aggregation' }]))
+  const routes = routesOf(canvas)
+  if (routes.length !== 3) throw new Error('edges drawn: ' + String(routes.length))
+  const target = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'b')
+  const middle = target.x + target.width / 2
+  const ends = routes.map((shape) => routePointsOf(shape)[routePointsOf(shape).length - 1])
+  const offsets = ends.map((end) => end.x - middle)
+  if (JSON.stringify(offsets) !== JSON.stringify([0, MULTI_EDGE_SPACING, -MULTI_EDGE_SPACING])) {
+    throw new Error('the fan is not 0, +1, -1: ' + JSON.stringify(offsets))
+  }
+  if (new Set(ends.map((end) => end.x)).size !== 3) throw new Error('two of the three share a port')
+  for (let left = 0; left < routes.length; left += 1) {
+    for (let right = left + 1; right < routes.length; right += 1) {
+      if (sharesSegment(segmentsOfShape(routes[left]), segmentsOfShape(routes[right]))) {
+        throw new Error('edges ' + String(left) + ' and ' + String(right) + ' share a segment')
+      }
+    }
+  }
+  // The fan is ordered, not just distinct: the third edge is left of the first, which is left of the second.
+  if (!(ends[2].x < ends[0].x && ends[0].x < ends[1].x)) throw new Error('the fan is not ordered: ' + JSON.stringify(ends.map((end) => end.x)))
+})
+
+test('two long edges between one pair run on two lanes', () => {
+  const source = ['graph TD', '  a[A] --> b[B]', '  b --> c[C]', '  a --> c', '  a --> c'].join(String.fromCharCode(10))
+  const routes = routesOf(paintWith(render({ source }).diagram).canvas)
+  if (routes.length !== 4) throw new Error('edges drawn: ' + String(routes.length))
+  const laneOf = (shape) => {
+    let best
+    for (const segment of segmentsOfShape(shape)) {
+      if (Math.abs(segment.x1 - segment.x2) > 0.5) continue
+      const length = Math.abs(segment.y2 - segment.y1)
+      if (best === undefined || length > best.length) best = { x: segment.x1, length }
+    }
+    return best === undefined ? undefined : best.x
+  }
+  const left = laneOf(routes[2])
+  const right = laneOf(routes[3])
+  if (left === undefined || right === undefined) throw new Error('a long edge lost its lane')
+  if (Math.abs(Math.abs(left - right) - MULTI_EDGE_SPACING) > 0.01) {
+    throw new Error('the two lanes are ' + String(Math.abs(left - right)) + ' apart, not one fan spacing')
+  }
+  if (sharesSegment(segmentsOfShape(routes[2]), segmentsOfShape(routes[3]))) throw new Error('the two long edges share a segment')
+})
+
+test('a single edge is drawn exactly as before the fan', () => {
+  // The guard against over-correction: a pair is a fan, one edge is the line it always was, byte for byte.
+  const golden =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 192" width="240" height="192" role="img" aria-label="plantuml: plantuml, 2 boxes, 1 arrow" font-family="system-ui, -apple-system, Segoe UI, sans-serif"><rect x="0" y="0" width="240" height="192" fill="#ffffff" /><rect x="20" y="46" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="63.5">API</tspan></text><rect x="20" y="117" width="88" height="27" rx="6" fill="transparent" stroke="#6b7280" stroke-width="1" /><text font-size="11" text-anchor="middle" fill="#6b7280"><tspan x="64" y="134.5">DB</tspan></text><line x1="64" y1="73" x2="64" y2="117" stroke="#6b7280" stroke-width="1" /><polygon points="64,117 60.8,110 67.2,110" fill="#6b7280" /><text x="20" y="32" font-size="12" fill="#1f2933">plantuml</text><text x="20" y="171" font-size="10" text-anchor="middle" fill="#6b7280"><tspan x="20" dy="0">plantuml, 2 boxes, 1 arrow</tspan></text></svg>'
+  const markup = render({ source: '@startuml\nAPI --> DB\n@enduml' }).markup
+  if (markup !== golden) throw new Error('a drawing with one edge changed: ' + markup)
+})
+
+test('a composition in a multi-edge keeps its diamond and the association keeps its head', () => {
+  const rendered = render({ source: '@startuml\nAPI --> DB\nAPI *-- DB\n@enduml' })
+  const heads = headsOf(rendered.markup)
+  if (heads.length !== 2) throw new Error('heads drawn: ' + String(heads.length) + ' for two edges')
+  const diamond = heads.find((head) => head.corners.length === 4)
+  const arrow = heads.find((head) => head.corners.length === 3)
+  if (diamond === undefined) throw new Error('the composition lost its diamond')
+  if (arrow === undefined) throw new Error('the association lost its head')
+  const boxes = rendered.canvas.shapes.filter((shape) => shape.kind === 'box')
+  const api = boxes.find((box) => box.label === 'API')
+  const db = boxes.find((box) => box.label === 'DB')
+  // The diamond sits at the source end, on the box the edge leaves; the association's head on the target's edge.
+  const diamondAt = diamond.corners[0].split(',')
+  if (Number(diamondAt[1]) !== api.y + api.height) throw new Error('the diamond is not at the source: ' + diamond.corners[0])
+  const arrowAt = arrow.corners[0].split(',')
+  if (Number(arrowAt[1]) !== db.y) throw new Error('the association head is not at the target: ' + arrow.corners[0])
+  if (diamondAt[0] === arrowAt[0]) throw new Error('the two edges are drawn on one line')
+})
+
+test('two identical mermaid edges are two edges, drawn apart', () => {
+  // The property is a model-level one: Mermaid states no arrow, and its two `-->` lines are still two statements.
+  const { diagram } = render({ source: ['graph TD', '  a[A] --> b[B]', '  a --> b'].join(String.fromCharCode(10)) })
+  if (diagram.edges.length !== 2) throw new Error('edges in the model: ' + String(diagram.edges.length))
+  if (diagram.edges.some((edge) => edge.arrow !== undefined)) throw new Error('a Mermaid edge gained an arrow type')
+  const { canvas } = paintWith(diagram)
+  const routes = routesOf(canvas)
+  if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
+  const ends = routes.map((shape) => routePointsOf(shape)[routePointsOf(shape).length - 1])
+  if (ends[0].x === ends[1].x) throw new Error('the two Mermaid edges share a port')
+  if (sharesSegment(segmentsOfShape(routes[0]), segmentsOfShape(routes[1]))) throw new Error('the two Mermaid edges share a segment')
+})
+
 
 test('an edge between two rows leaves a horizontal side, whichever side of the page the target is on', () => {
   // The side is the route's approach direction, not the distance between the two centres: the drawing is layered
@@ -783,6 +927,8 @@ test('every drawn segment is axis-aligned, on every kind of drawing', () => {
   const sources = [
     ['graph TD', '  a[Gateway] --> b[Auth]', '  a --> c[Order service]', '  a --> d[Stock]', '  c --> e[(Orders)]', '  d --> e', '  a -->|probe| e'].join(String.fromCharCode(10)),
     ['graph TD', '  subgraph Ingest', '    a[Gateway] --> b[Auth]', '    b --> c[Order service]', '  end', '  subgraph Fulfil', '    c --> d[(Orders)]', '    d --> e[Warehouse]', '  end', '  e --> f[Reconcile]', '  f -->|drift| a'].join(String.fromCharCode(10)),
+    // A pair carrying three relations: the fan moves each edge, and a fan is still a run of axis-aligned segments.
+    '@startuml\nAPI --> DB\nAPI *-- DB\nAPI o-- DB\n@enduml',
   ]
   for (const source of sources) {
     const { canvas } = paintWith(render({ source }).diagram)

@@ -91,6 +91,13 @@ export interface Canvas {
     height: number;
     shapes: Shape[];
 }
+/**
+ * How far apart two edges that join the same pair are drawn.
+ *
+ * Wider than the least two ports may sit: two statements about one pair have to read as two lines, and a gap the
+ * port packer would allow is a gap a reader sees as one thick line. Exported so a test can name the pattern.
+ */
+export declare const MULTI_EDGE_SPACING = 20;
 /** Which colour a box earns from its role. One mapping, used by every container. */
 export declare function roleOfNode(node: DiagramNode): ColourRole;
 export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>, options?: PaletteOptions): {
