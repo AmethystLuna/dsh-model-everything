@@ -91,6 +91,13 @@ because a layered diagram whose members float outside their package is not showi
 boundary folds it into one box and clicking again unfolds it; folding is a transform on the model, not a mode of
 the painter, so the edges re-aim at the box.
 
+**An edge goes around a component, never through one.** A clear edge is a straight line; as soon as a box sits
+between the two ends, the edge is routed on a **sparse grid** - one candidate line just outside each side of every
+box, then A* over that small graph with a bend penalty. It is the same construction Graphviz (a visibility graph),
+ELK and yFiles (an orthogonal router) and mxGraph use: no pixel grid, O(boxes) candidate lines, and the cost of a
+bend counted so a route does not zig-zag to save a few points. When the search cannot finish, the straight line
+stays: losing an edge is worse than a detour.
+
 **Text is measured before a box is placed.** A `<br>` or `<br/>` in a label is a hard break and a long label wraps;
 a box is sized from the lines it actually draws, and a row is as tall as its tallest box. An edge label walks along
 its own edge and steps aside when the line is occupied - the same idea as Graphviz making a label a dummy node the

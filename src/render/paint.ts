@@ -20,6 +20,7 @@
  */
 
 import { MARGIN, place, textOf, type Box } from './place.js'
+import { anchor, facingSides, routeEdge } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramGroup, type DiagramNode } from './model.js'
@@ -109,7 +110,6 @@ const nodeWidth = (label: string): number => Math.min(MAX_NODE_WIDTH, Math.max(M
 
 const TITLE_HEIGHT = 26
 const NODE_HEIGHT = 34
-const CHANNEL_GAP = 16
 const CAPTION_CHARS = 78
 const CAPTION_LINE = 15
 const CAPTION_GAP = 16
@@ -277,8 +277,6 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   const roleById = new Map(diagram.nodes.map((node) => [node.id, roleOfNode(node)] as const))
-  let channel = Math.max(placement.width, ...Array.from(boxes.values(), (box) => box.x + box.width)) + CHANNEL_GAP
-  let channelUses = 0
 
   for (const edge of diagram.edges) {
     const source = boxes.get(edge.from)
@@ -307,57 +305,49 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       continue
     }
 
-    if (target.y > source.y && !sameRow) {
-      const x1 = source.x + source.width / 2
-      const y1 = source.y + source.height
-      const x2 = target.x + target.width / 2
-      const y2 = target.y
-      const ordinal = labelsFrom.get(edge.from) ?? 0
-      labelsFrom.set(edge.from, ordinal + 1)
-      const spot = placeLabel(edge.label, { x: x1, y: y1 }, { x: x2, y: y2 }, boxList, labelRects, ordinal)
-      labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
-      shapes.push({ kind: 'link', x1, y1, x2, y2, label: edge.label, labelX: spot.x + textWidth(edge.label) / 2, labelY: spot.y, colour })
-      continue
-    }
+    // One router decides every edge: the sparse grid when a box is in the way, and a straight line when none is.
+    // Three hand-written cases used to decide this by comparing coordinates, and each of them could draw through a
+    // box the comparison had not considered - a horizontal edge with a box between its ends was the common one.
+    const route = routeEdge(source, target, boxList)
+    const ordinal = labelsFrom.get(edge.from) ?? 0
+    labelsFrom.set(edge.from, ordinal + 1)
 
-    if (sameRow) {
-      const right = source.x + source.width
-      const left = target.x
-      const y = source.y + source.height / 2
-      const forward = right <= left
-      const spot = placeLabel(edge.label, { x: right, y }, { x: left, y }, boxList, labelRects)
+    if (route.routed) {
+      // The label walks along the longest straight run of the route, which is where there is room for it.
+      let longest = { from: route.points[0], to: route.points[1], length: 0 }
+      for (let index = 0; index + 1 < route.points.length; index += 1) {
+        const a = route.points[index]
+        const b = route.points[index + 1]
+        const length = Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
+        if (length > longest.length) longest = { from: a, to: b, length }
+      }
+      const spot = placeLabel(edge.label, longest.from, longest.to, boxList, labelRects, ordinal)
       labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
       shapes.push({
-        kind: 'link',
-        x1: forward ? right : source.x,
-        y1: y,
-        x2: forward ? left : target.x + target.width,
-        y2: y,
+        kind: 'path',
+        points: route.points,
         label: edge.label,
-        labelX: spot.x,
-        labelY: spot.y - 7,
+        labelX: spot.x + textWidth(edge.label) / 2,
+        labelY: spot.y,
         colour,
       })
       continue
     }
 
-    // Backward: leave right, run down a lane clear of every box, come back in from the right.
-    const lane = channel + (channelUses % 3) * 8
-    channelUses += 1
-    channel = Math.max(channel, lane)
-    const startY = source.y + source.height / 2
-    const endY = target.y + target.height / 2
+    const sides = facingSides(source, target)
+    const exit = anchor(source, sides.exit)
+    const entry = anchor(target, sides.entry)
+    const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal)
+    labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
     shapes.push({
-      kind: 'path',
-      points: [
-        { x: source.x + source.width, y: startY },
-        { x: lane, y: startY },
-        { x: lane, y: endY },
-        { x: target.x + target.width, y: endY },
-      ],
+      kind: 'link',
+      x1: exit.x,
+      y1: exit.y,
+      x2: entry.x,
+      y2: entry.y,
       label: edge.label,
-      labelX: lane + 6,
-      labelY: (startY + endY) / 2,
+      labelX: spot.x + textWidth(edge.label) / 2,
+      labelY: spot.y,
       colour,
     })
   }
@@ -371,7 +361,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   )
   const captionLines = wrap(diagram.caption, CAPTION_CHARS)
   const captionWidth = Math.max(...captionLines.map((line) => line.length * CAPTION_CHAR_WIDTH)) + MARGIN * 2
-  const width = Math.max(contentRight + MARGIN + (channelUses > 0 ? CHANNEL_GAP * 3 : 0), captionWidth, 240)
+  const width = Math.max(contentRight + MARGIN, captionWidth, 240)
 
   const contentBottom = Math.max(
     topOffset,

@@ -11,6 +11,7 @@ import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
 import { LINE_HEIGHT, MAX_LINE_CHARS, TEXT_PADDING, MAX_NODE_WIDTH, explicitLines, measure, textWidth, wrapLine } from '../../lib/render/text.js'
+import { anchor, crossesBox, facingSides, routeEdge, simplify } from '../../lib/render/route.js'
 import { render } from '../../lib/render/index.js'
 
 let failures = 0
@@ -420,7 +421,7 @@ test('a row keeps the order breadth-first found it in, under the parent that dis
   if (JSON.stringify(ranked.rows) !== JSON.stringify([['s'], ['a', 'b']])) throw new Error('rows: ' + JSON.stringify(ranked.rows))
 })
 
-test('a back edge is routed on a channel clear of every box', () => {
+test('a back edge with nothing in its way is a straight line between the two boxes', () => {
   const diagram = {
     kind: 'machine',
     title: 't',
@@ -433,14 +434,12 @@ test('a back edge is routed on a channel clear of every box', () => {
     caption: 'pass',
   }
   const { canvas } = paintWith(diagram)
-  const routes = canvas.shapes.filter((shape) => shape.kind === 'path')
-  if (routes.length !== 1) throw new Error('routes: ' + String(routes.length))
-  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
-  const right = Math.max(...boxes.map((box) => box.x + box.width))
-  for (const point of routes[0].points) {
-    if (point.x < right) throw new Error('the route crosses the boxes at x=' + String(point.x) + ' (right edge ' + String(right) + ')')
-  }
-  if (routes[0].points.length !== 4) throw new Error('points: ' + String(routes[0].points.length))
+  const links = canvas.shapes.filter((shape) => shape.kind === 'link')
+  if (links.length !== 2) throw new Error('links: ' + String(links.length))
+  const back = links.find((shape) => shape.label === 'back')
+  if (back === undefined) throw new Error('the back edge was lost')
+  // Upward: the arrow leaves the top of the lower box and arrives at the bottom of the upper one.
+  if (!(back.y2 < back.y1)) throw new Error('the back edge points the wrong way: ' + String(back.y1) + ' -> ' + String(back.y2))
 })
 
 test('a self loop is a small loop, not a line to itself', () => {
@@ -508,23 +507,26 @@ test('an edge inside one row runs sideways, not diagonally', () => {
   if (sideways.length !== 1) throw new Error('sideways edges: ' + String(sideways.length))
 })
 
-test('a back edge is written as a polyline with an arrow, not as a line', () => {
-  const diagram = {
-    kind: 'machine',
-    title: 't',
-    init: 'a',
-    nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal' }],
-    edges: [
-      { from: 'a', label: 'go', to: 'b' },
-      { from: 'b', label: 'back', to: 'a' },
-    ],
-    caption: 'pass',
-  }
-  const { canvas, colours } = paintWith(diagram)
+test('an edge that has to go around a box is written as a polyline, not a line', () => {
+  // The fan-out below puts a box under the direct edge: `a` reaches `e` past the row of services.
+  const source = [
+    'graph TD',
+    '  a[Gateway] --> b[Auth service]',
+    '  a --> c[Order service]',
+    '  a --> d[Stock service]',
+    '  c --> e[(Orders)]',
+    '  d --> e',
+    '  a -->|health probe| e',
+  ].join(String.fromCharCode(10))
+  const { canvas, colours } = paintWith(render({ source }).diagram)
+  const routes = canvas.shapes.filter((shape) => shape.kind === 'path')
+  if (routes.length === 0) throw new Error('no edge was routed')
   const { markup, dropped } = toSvg(canvas, colours)
   if (dropped !== 0) throw new Error('dropped: ' + String(dropped))
   if (!markup.includes('<polyline points="')) throw new Error('the routed edge wrote no polyline')
-  if (!markup.includes('back')) throw new Error('the routed edge lost its label')
+  // Every edge of the source is drawn exactly once, routed or not.
+  const drawnEdges = canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path').length
+  if (drawnEdges !== 6) throw new Error('edges drawn: ' + String(drawnEdges))
 })
 
 test('a diagram with no states is a title and a caption, nothing else', () => {
@@ -547,20 +549,6 @@ test('a caption holding one very long token is broken instead of overflowing', (
   for (const line of caption.lines) if (line.length > 78) throw new Error('a line still overflows: ' + String(line.length))
 })
 
-test('several back edges take separate lanes instead of stacking on one', () => {
-  const nodes = ['a', 'b', 'c', 'd'].map((id) => ({ id, role: 'normal' }))
-  const edges = [
-    { from: 'a', label: 'toB', to: 'b' },
-    { from: 'a', label: 'toC', to: 'c' },
-    { from: 'a', label: 'toD', to: 'd' },
-    { from: 'b', label: 'b1', to: 'a' },
-    { from: 'c', label: 'c1', to: 'a' },
-    { from: 'd', label: 'd1', to: 'a' },
-  ]
-  const { canvas } = paintWith({ kind: 'machine', title: 't', init: 'a', nodes, edges, caption: 'pass' })
-  const lanes = canvas.shapes.filter((shape) => shape.kind === 'path').map((shape) => shape.points[1].x)
-  if (new Set(lanes).size < 2) throw new Error('every back edge shares one lane: ' + JSON.stringify(lanes))
-})
 
 test('an edge naming a state the model does not have is dropped by the painter, not drawn', () => {
   const diagram = {
@@ -1210,6 +1198,116 @@ test('a box written without pre-wrapped lines still draws its label', () => {
     shapes: [{ kind: 'box', x: 10, y: 10, width: 120, height: 34, label: 'Single line', colour: 'normal', initial: false }],
   }, palette())
   if (!markup.includes('<tspan') || !markup.includes('Single line')) throw new Error('the label was not drawn')
+})
+
+test('a box in the way of an edge is routed around, not through', () => {
+  const from = { x: 0, y: 0, width: 100, height: 40 }
+  const to = { x: 0, y: 200, width: 100, height: 40 }
+  const between = { x: 0, y: 100, width: 100, height: 40 }
+  const route = routeEdge(from, to, [from, to, between])
+  if (!route.routed) throw new Error('the edge was not routed')
+  if (route.points.length < 3) throw new Error('a detour needs at least three points: ' + JSON.stringify(route.points))
+  for (let index = 0; index + 1 < route.points.length; index += 1) {
+    const a = route.points[index]
+    const b = route.points[index + 1]
+    if (crossesBox(a.x, a.y, b.x, b.y, between)) throw new Error('the route still crosses the box: ' + JSON.stringify(a) + ' -> ' + JSON.stringify(b))
+  }
+})
+
+test('an edge with nothing in its way stays a straight segment', () => {
+  const from = { x: 0, y: 0, width: 100, height: 40 }
+  const to = { x: 0, y: 200, width: 100, height: 40 }
+  const route = routeEdge(from, to, [from, to])
+  if (route.routed) throw new Error('a clear edge was routed as a detour')
+  if (route.points.length !== 2) throw new Error('points: ' + JSON.stringify(route.points))
+})
+
+test('the route leaves the side that faces the target and arrives at the side that faces back', () => {
+  const from = { x: 0, y: 0, width: 100, height: 40 }
+  const right = { x: 300, y: 0, width: 100, height: 40 }
+  const below = { x: 0, y: 300, width: 100, height: 40 }
+  if (facingSides(from, right).exit !== 'right' || facingSides(from, right).entry !== 'left') throw new Error('horizontal sides')
+  if (facingSides(from, below).exit !== 'bottom' || facingSides(from, below).entry !== 'top') throw new Error('vertical sides')
+  const exit = anchor(from, 'bottom')
+  if (exit.x !== 50 || exit.y !== 40) throw new Error('bottom anchor: ' + JSON.stringify(exit))
+})
+
+test('collinear points are dropped, so a route carries only its corners', () => {
+  const points = simplify([{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 60 }])
+  if (points.length !== 3) throw new Error('points: ' + JSON.stringify(points))
+  if (points[1].x !== 100 || points[1].y !== 0) throw new Error('the corner moved: ' + JSON.stringify(points[1]))
+})
+
+test('a route never crosses the box it was routed around, however it got there', () => {
+  const from = { x: 0, y: 0, width: 100, height: 40 }
+  const to = { x: 0, y: 300, width: 100, height: 40 }
+  const wall = { x: -1000, y: 50, width: 3000, height: 200 }
+  const route = routeEdge(from, to, [from, to, wall])
+  // Going around the end of the wall is a legitimate route; crossing it is not, whether or not a search ran.
+  for (let index = 0; index + 1 < route.points.length; index += 1) {
+    const a = route.points[index]
+    const b = route.points[index + 1]
+    if (crossesBox(a.x, a.y, b.x, b.y, wall)) throw new Error('the route crosses the wall: ' + JSON.stringify(route.points))
+  }
+})
+
+test('a rendered drawing carries no edge through a box', () => {
+  const source = [
+    'graph TD',
+    '  a[Gateway] --> b[Auth service]',
+    '  a --> c[Order service]',
+    '  a --> d[Stock service]',
+    '  c --> e[(Orders)]',
+    '  d --> e',
+    '  a -->|health probe, every 30s| e',
+  ].join(String.fromCharCode(10))
+  const { canvas } = paintWith(render({ source }).diagram)
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const crossings = []
+  for (const shape of canvas.shapes) {
+    if (shape.kind === 'link') {
+      for (const box of boxes) if (crossesBox(shape.x1, shape.y1, shape.x2, shape.y2, box)) crossings.push('a link crosses "' + box.label + '"')
+      continue
+    }
+    if (shape.kind !== 'path') continue
+    for (let index = 0; index + 1 < shape.points.length; index += 1) {
+      const a = shape.points[index]
+      const b = shape.points[index + 1]
+      for (const box of boxes) if (crossesBox(a.x, a.y, b.x, b.y, box)) crossings.push('a path crosses "' + box.label + '"')
+    }
+  }
+  if (crossings.length > 0) throw new Error(crossings.join('; '))
+})
+
+test('a diagonal that misses every box is not a crossing, and a short route needs no simplification', () => {
+  const box = { x: 100, y: 100, width: 50, height: 50 }
+  if (crossesBox(0, 0, 60, 60, box)) throw new Error('a clear diagonal was reported as a crossing')
+  if (!crossesBox(0, 0, 200, 200, box)) throw new Error('a diagonal through the box was missed')
+  const two = simplify([{ x: 0, y: 0 }, { x: 10, y: 10 }])
+  if (two.length !== 2) throw new Error('a two-point route was changed')
+})
+
+test('a caller can pin the anchors an edge leaves and enters by', () => {
+  const from = { x: 0, y: 0, width: 100, height: 40 }
+  const to = { x: 400, y: 0, width: 100, height: 40 }
+  const route = routeEdge(from, to, [from, to], { exit: { x: 100, y: 20 }, entry: { x: 400, y: 20 } })
+  if (route.routed) throw new Error('a clear route was sent on a detour')
+  if (route.points[0].x !== 100 || route.points[1].x !== 400) throw new Error('the anchors were ignored: ' + JSON.stringify(route.points))
+})
+
+test('a target walled in on every side keeps its edge rather than losing it', () => {
+  // Four boxes drawn as a closed ring around the target: no lane reaches its top edge, so the search cannot finish.
+  const from = { x: 0, y: 0, width: 100, height: 40 }
+  const to = { x: 0, y: 400, width: 100, height: 40 }
+  const ring = [
+    { x: -30, y: 340, width: 160, height: 12 },
+    { x: -30, y: 488, width: 160, height: 12 },
+    { x: -42, y: 340, width: 12, height: 160 },
+    { x: 130, y: 340, width: 12, height: 160 },
+  ]
+  const route = routeEdge(from, to, [from, to, ...ring])
+  if (route.routed) throw new Error('a closed ring reported a route')
+  if (route.points.length !== 2) throw new Error('the edge was not kept: ' + JSON.stringify(route.points))
 })
 
 if (failures > 0) {
