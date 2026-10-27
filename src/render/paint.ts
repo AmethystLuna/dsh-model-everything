@@ -169,6 +169,7 @@ function placeLabel(
   boxes: Iterable<Box>,
   placed: Array<{ x: number; y: number; width: number; height: number }> = [],
   ordinal = 0,
+  segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [],
   offsets: Array<{ t: number; dx: number }> = [
     { t: 0.5, dx: 0 },
     { t: 0.5, dx: 26 },
@@ -192,6 +193,18 @@ function placeLabel(
   const clear = (x: number, y: number, w: number): boolean => {
     for (const box of boxes) if (hits(x, y, w, box)) return false
     for (const earlier of placed) if (hits(x, y, w, earlier)) return false
+    // A label on top of a line is as unreadable as one on top of a box.
+    const left = x - w / 2 - 2
+    const right = x + w / 2 + 2
+    const top2 = y - 2
+    const bottom2 = y + 14
+    for (const segment of segments) {
+      const minX = Math.min(segment.x1, segment.x2)
+      const maxX = Math.max(segment.x1, segment.x2)
+      const minY = Math.min(segment.y1, segment.y2)
+      const maxY = Math.max(segment.y1, segment.y2)
+      if (right > minX && left < maxX && bottom2 > minY && top2 < maxY) return false
+    }
     return true
   }
   // A second label on the same source moves along and down: the two describe different branches of one decision,
@@ -258,6 +271,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   // A Map iterator is consumed by the first pass: collision checks need a list.
   const boxList = Array.from(boxes.values())
   const labelRects: Array<{ x: number; y: number; width: number; height: number }> = []
+  const segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = []
   const labelsFrom = new Map<string, number>()
   for (const node of diagram.nodes) {
     // A state id may repeat in a malformed model: the first placement wins and the repeat is skipped.
@@ -286,7 +300,11 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const facing = diagram.edges.map((edge) => {
     const source = boxes.get(edge.from)
     const target = boxes.get(edge.to)
-    return source === undefined || target === undefined || edge.from === edge.to ? undefined : facingSides(source, target)
+    if (source === undefined || target === undefined || edge.from === edge.to) return undefined
+    if (Math.abs(target.y - source.y) < NODE_HEIGHT / 2) return facingSides(source, target)
+    return target.y > source.y
+      ? { exit: 'bottom' as const, entry: 'top' as const }
+      : { exit: 'top' as const, entry: 'bottom' as const }
   })
   const slots = new Map<string, number>()
   const counts = new Map<string, number>()
@@ -365,8 +383,13 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         to: route.points[Math.min(route.points.length - 1, middle)],
         length: 0,
       }
-      const spot = placeLabel(edge.label, longest.from, longest.to, boxList, labelRects, ordinal)
+      const spot = placeLabel(edge.label, longest.from, longest.to, boxList, labelRects, ordinal, segments)
       labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+      for (let index = 0; index + 1 < route.points.length; index += 1) {
+        const a = route.points[index]
+        const b = route.points[index + 1]
+        segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y })
+      }
       shapes.push({
         kind: 'path',
         points: route.points,
@@ -381,8 +404,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const sides = facingSides(source, target)
     const exit = anchors?.exit ?? anchor(source, sides.exit)
     const entry = anchors?.entry ?? anchor(target, sides.entry)
-    const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal)
+    const spot = placeLabel(edge.label, exit, entry, boxList, labelRects, ordinal, segments)
     labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })
+    segments.push({ x1: exit.x, y1: exit.y, x2: entry.x, y2: entry.y })
     shapes.push({
       kind: 'link',
       x1: exit.x,

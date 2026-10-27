@@ -169,7 +169,10 @@ export function routeEdge(
   }
   const straight = [exit, exitStub, entryStub, entry]
 
-  if (!others.some((box) => crossesBox(exitStub.x, exitStub.y, entryStub.x, entryStub.y, box))) {
+  // A straight line is only offered when it is axis-aligned and clear. A diagonal is clear often enough and still
+  // wrong: in a layered drawing it reads as a connection that skips the layers it crosses.
+  const axisAligned = Math.abs(exitStub.x - entryStub.x) < 0.5 || Math.abs(exitStub.y - entryStub.y) < 0.5
+  if (axisAligned && !others.some((box) => crossesBox(exitStub.x, exitStub.y, entryStub.x, entryStub.y, box))) {
     return { points: simplify(straight), routed: false }
   }
 
@@ -208,7 +211,13 @@ export function routeEdge(
       queue.push({ point: next, axis, cost, bends: current.bends + bend, path: [...current.path, next] })
     }
   }
-  return { points: simplify(straight), routed: false }
+  // Nothing found: a two-bend orthogonal fallback still beats a diagonal, and it is what a reader expects.
+  const elbow = { x: entryStub.x, y: exitStub.y }
+  const mid = { x: exitStub.x, y: (exitStub.y + entryStub.y) / 2 }
+  const detour = { x: entryStub.x, y: entryStub.y }
+  void elbow
+  const fallback = axisAligned ? straight : [exit, exitStub, mid, { x: detour.x, y: mid.y }, entryStub, entry]
+  return { points: simplify(fallback), routed: !axisAligned }
 }
 
 /** Drop the points in the middle of a straight run: three collinear points are one segment. */
