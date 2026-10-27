@@ -34,6 +34,23 @@ export type Side = 'top' | 'bottom' | 'left' | 'right'
 /** How far outside a box a lane runs, so a route does not graze the border. */
 const LANE_GAP = 10
 
+/** The length of the straight run an edge takes before it is allowed to turn. */
+const STUB = 16
+
+/** The outward normal of a side: the direction an edge leaves along. */
+export function normalOf(side: Side): Point {
+  switch (side) {
+    case 'top':
+      return { x: 0, y: -1 }
+    case 'bottom':
+      return { x: 0, y: 1 }
+    case 'left':
+      return { x: -1, y: 0 }
+    case 'right':
+      return { x: 1, y: 0 }
+  }
+}
+
 /** What a bend costs, in points of length: a route prefers one long detour to three small ones. */
 const BEND_COST = 24
 
@@ -118,28 +135,52 @@ function lanes(obstacles: Obstacle[], extra: number[]): number[] {
  * single box that fills the drawing), the straight line is returned and the caller keeps a two-point shape - an
  * unroutable edge is still an edge, and drawing it straight is more honest than dropping it.
  */
+export interface Ports {
+  exit: Point
+  entry: Point
+  exitSide: Side
+  entrySide: Side
+}
+
 export function routeEdge(
   from: Obstacle,
   to: Obstacle,
   obstacles: Obstacle[],
-  anchors?: { exit: Point; entry: Point },
+  anchors?: Ports,
 ): { points: Point[]; routed: boolean } {
   const sides = facingSides(from, to)
-  const exit = anchors?.exit ?? anchor(from, sides.exit)
-  const entry = anchors?.entry ?? anchor(to, sides.entry)
+  const exitSide = anchors?.exitSide ?? sides.exit
+  const entrySide = anchors?.entrySide ?? sides.entry
+  const exit = anchors?.exit ?? anchor(from, exitSide)
+  const entry = anchors?.entry ?? anchor(to, entrySide)
 
+  // The stub: an edge leaves square to its side and arrives square to the target's side. Without it a route may
+  // slide sideways out of a box, which is what made the line look like it was glued to whatever box was nearest.
   const others = obstacles.filter((box) => box !== from && box !== to)
-  const straight = [exit, entry]
-  if (!others.some((box) => crossesBox(exit.x, exit.y, entry.x, entry.y, box))) return { points: straight, routed: false }
+  // A stub that lands inside another box is no stub: keep the plain anchors and let the search decide.
+  const blockedStub = (point: Point): boolean => others.some((box) => point.x > box.x && point.x < box.x + box.width && point.y > box.y && point.y < box.y + box.height)
+  const outNormal = normalOf(exitSide)
+  const inNormal = normalOf(entrySide)
+  let exitStub = { x: exit.x + outNormal.x * STUB, y: exit.y + outNormal.y * STUB }
+  let entryStub = { x: entry.x + inNormal.x * STUB, y: entry.y + inNormal.y * STUB }
+  if (blockedStub(exitStub) || blockedStub(entryStub)) {
+    exitStub = exit
+    entryStub = entry
+  }
+  const straight = [exit, exitStub, entryStub, entry]
+
+  if (!others.some((box) => crossesBox(exitStub.x, exitStub.y, entryStub.x, entryStub.y, box))) {
+    return { points: simplify(straight), routed: false }
+  }
 
   // The grid: one axis is x-lane values, the other y-lane values, and the routes are their intersections.
-  const xs = lanes(others, [exit.x, entry.x])
-  const ys = lanes(others, [exit.y, entry.y])
+  const xs = lanes(others, [exitStub.x, entryStub.x])
+  const ys = lanes(others, [exitStub.y, entryStub.y])
 
   const blocked = (x1: number, y1: number, x2: number, y2: number): boolean =>
     others.some((box) => crossesBox(x1, y1, x2, y2, box))
 
-  const start: Candidate = { point: exit, axis: -1, cost: 0, bends: 0, path: [exit] }
+  const start: Candidate = { point: exitStub, axis: -1, cost: 0, bends: 0, path: [exit] }
   const queue: Candidate[] = [start]
   const best = new Map<string, number>()
   const key = (point: Point): string => String(Math.round(point.x)) + ',' + String(Math.round(point.y))
@@ -150,8 +191,8 @@ export function routeEdge(
     for (let cursor = 1; cursor < queue.length; cursor += 1) if (queue[cursor].cost < queue[index].cost) index = cursor
     const current = queue.splice(index, 1)[0]
     if (current.cost > (best.get(key(current.point)) ?? Infinity)) continue
-    if (Math.abs(current.point.x - entry.x) < 0.5 && Math.abs(current.point.y - entry.y) < 0.5) {
-      return { points: simplify([...current.path]), routed: true }
+    if (Math.abs(current.point.x - entryStub.x) < 0.5 && Math.abs(current.point.y - entryStub.y) < 0.5) {
+      return { points: simplify([...current.path, entryStub, entry]), routed: true }
     }
     const options: Point[] = []
     for (const x of xs) if (Math.abs(x - current.point.x) > 0.5) options.push({ x, y: current.point.y })
@@ -167,7 +208,7 @@ export function routeEdge(
       queue.push({ point: next, axis, cost, bends: current.bends + bend, path: [...current.path, next] })
     }
   }
-  return { points: straight, routed: false }
+  return { points: simplify(straight), routed: false }
 }
 
 /** Drop the points in the middle of a straight run: three collinear points are one segment. */

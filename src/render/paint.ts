@@ -20,7 +20,7 @@
  */
 
 import { MARGIN, place, textOf, type Box } from './place.js'
-import { anchor, facingSides, routeEdge, type Side } from './route.js'
+import { anchor, facingSides, routeEdge, type Ports, type Side } from './route.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramGroup, type DiagramNode, type NodeShape } from './model.js'
@@ -308,11 +308,16 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (side === 'left') return { x: box.x, y: box.y + clamp(box.height / 2 + spread, 8, box.height - 8) }
     return { x: box.x + box.width, y: box.y + clamp(box.height / 2 + spread, 8, box.height - 8) }
   }
-  const anchorsFor = new Map<number, { exit: Point; entry: Point }>()
+  const anchorsFor = new Map<number, Ports>()
   for (const [index, entry] of facing.entries()) {
     if (entry === undefined) continue
     const edge = diagram.edges[index]
-    anchorsFor.set(index, { exit: portOf(edge.from, entry.exit), entry: portOf(edge.to, entry.entry) })
+    anchorsFor.set(index, {
+      exit: portOf(edge.from, entry.exit),
+      entry: portOf(edge.to, entry.entry),
+      exitSide: entry.exit,
+      entrySide: entry.entry,
+    })
   }
 
   for (const [edgeIndex, edge] of diagram.edges.entries()) {
@@ -352,12 +357,13 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
     if (route.routed) {
       // The label walks along the longest straight run of the route, which is where there is room for it.
-      let longest = { from: route.points[0], to: route.points[1], length: 0 }
-      for (let index = 0; index + 1 < route.points.length; index += 1) {
-        const a = route.points[index]
-        const b = route.points[index + 1]
-        const length = Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
-        if (length > longest.length) longest = { from: a, to: b, length }
+      // The chord across the middle of the route: it runs through open space by construction, unlike a stub that
+      // hugs the box it just left.
+      const middle = Math.max(1, Math.floor(route.points.length / 2))
+      const longest = {
+        from: route.points[Math.max(0, middle - 1)],
+        to: route.points[Math.min(route.points.length - 1, middle)],
+        length: 0,
       }
       const spot = placeLabel(edge.label, longest.from, longest.to, boxList, labelRects, ordinal)
       labelRects.push({ x: spot.x, y: spot.y, width: textWidth(edge.label), height: 12 })

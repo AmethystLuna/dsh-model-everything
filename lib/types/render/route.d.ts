@@ -27,6 +27,8 @@ export interface Obstacle {
 }
 /** The four sides a route may leave a box from. */
 export type Side = 'top' | 'bottom' | 'left' | 'right';
+/** The outward normal of a side: the direction an edge leaves along. */
+export declare function normalOf(side: Side): Point;
 /** A segment crossing a box at all, with a little slack so a route does not shave a corner. */
 export declare function crossesBox(x1: number, y1: number, x2: number, y2: number, box: Obstacle): boolean;
 /** The point on a side of a box, in the middle of that side. */
@@ -43,10 +45,13 @@ export declare function facingSides(from: Obstacle, to: Obstacle): {
  * single box that fills the drawing), the straight line is returned and the caller keeps a two-point shape - an
  * unroutable edge is still an edge, and drawing it straight is more honest than dropping it.
  */
-export declare function routeEdge(from: Obstacle, to: Obstacle, obstacles: Obstacle[], anchors?: {
+export interface Ports {
     exit: Point;
     entry: Point;
-}): {
+    exitSide: Side;
+    entrySide: Side;
+}
+export declare function routeEdge(from: Obstacle, to: Obstacle, obstacles: Obstacle[], anchors?: Ports): {
     points: Point[];
     routed: boolean;
 };
