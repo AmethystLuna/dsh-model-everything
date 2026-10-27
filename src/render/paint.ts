@@ -9,8 +9,10 @@
  * Edges are drawn from where the boxes ended up, in two ways only: a long edge follows its lane as one polyline,
  * and everything else goes through the orthogonal router. Which side of a box an edge leaves by is read off the
  * route, not picked by comparing the boxes' centres: a route between two rows arrives vertically, so the endpoint
- * is snapped onto the top or bottom perimeter in the direction the route approaches, and two edges on the same
- * side take separate points along it.
+ * is snapped onto the top or bottom perimeter in the direction the route approaches. Where along that side it sits
+ * follows the symbol: a rectangle spreads its ports along the side, a diamond has four legal points and no side at
+ * all, and a cylinder's top port sits on its cap curve. Two edges that want the same point share it, and their
+ * routes fan apart from there.
  *
  * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of the edge's longest straight
  * run, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
@@ -23,6 +25,7 @@
 import { MARGIN, place, textOf, type Box } from './place.js'
 import { PORT_INSET } from './channels.js'
 import { approachSides, crossesBox, routeEdge, simplify, type Ports, type Side } from './route.js'
+import { cylinderApex, cylinderCaps, hexagonCut, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
@@ -354,6 +357,12 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   // `boxes` asks this instead.
   const endBox = (id: string): Box | undefined => boxes.get(id) ?? groupRects.get(id)
 
+  // The symbol a box is drawn as, which decides which points on its sides an edge may meet. A boundary, and a node
+  // the source gave no shape, is a rectangle.
+  const shapeById = new Map<string, NodeShape>()
+  for (const node of diagram.nodes) if (node.shape !== undefined && !shapeById.has(node.id)) shapeById.set(node.id, node.shape)
+  const shapeOf = (id: string): NodeShape => shapeById.get(id) ?? 'rect'
+
   // Boundaries first, so everything else is painted on top of them.
   for (const group of groups) {
     const rect = groupRects.get(group.id)
@@ -477,16 +486,64 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
   const wanted = new Map<string, number>()
   const slotKey = (boxId: string, side: Side, index: number): string => boxId + ':' + side + ':' + String(index)
-  /** Where a port may sit on one side: `corner` relaxes the margin, because a side that is crowded uses its corners. */
-  const bounds = (box: Box, vertical: boolean, corner: boolean): { low: number; high: number } => {
-    const inset = corner ? 2 : vertical ? PORT_INSET : 8
-    return vertical
-      ? { low: box.x + inset, high: box.x + box.width - inset }
-      : { low: box.y + inset, high: box.y + box.height - inset }
+  /**
+   * Where a port may sit on one side of one node, as the interval its coordinate may take.
+   *
+   * This is the per-symbol rule, and it is why the rule lives here: a port slot is chosen in this module, so this is
+   * where the symbol has to be known. A rectangle spreads a port along the side, and a subroutine does the same. A
+   * diamond's side meets its outline at exactly one point - the vertex - so its interval is that point, and a circle's
+   * is its cardinal point; two edges that want one side share the point instead of taking two points in the air. A
+   * hexagon's top and bottom are the flat run between the cut corners, and its left and right are the vertices. A
+   * stadium's flat run stops at the end caps, and a cylinder's flat sides are the two vertical runs, never the caps.
+   *
+   * A zero-width interval is not a failure: the packer keeps every port on it, so a symbol that offers one point on a
+   * side hands that point to every edge that wants it.
+   */
+  const spanOf = (boxId: string, side: Side, corner: boolean): { low: number; high: number } => {
+    const box = endBox(boxId) as Box
+    const vertical = side === 'top' || side === 'bottom'
+    const middle = vertical ? box.x + box.width / 2 : box.y + box.height / 2
+    const within = (low: number, high: number): { low: number; high: number } => ({ low, high: Math.max(low, high) })
+    switch (shapeOf(boxId)) {
+      // The four vertices of a diamond, and the four cardinal points of an ellipse, are the middles of its sides.
+      case 'diamond':
+      case 'circle':
+        return within(middle, middle)
+      case 'hexagon':
+        return vertical ? within(box.x + hexagonCut(box.width), box.x + box.width - hexagonCut(box.width)) : within(middle, middle)
+      case 'stadium': {
+        const radius = stadiumRadius(box)
+        return vertical ? within(box.x + radius, box.x + box.width - radius) : within(middle, middle)
+      }
+      case 'cylinder': {
+        if (vertical) return within(middle, middle)
+        const cap = cylinderCaps(box).cap
+        return within(box.y + cap, box.y + box.height - cap)
+      }
+      default: {
+        // A rectangle, and a subroutine's doubled side, keep the margins they have always had; `corner` relaxes them
+        // because a side that is crowded uses its corners.
+        const inset = corner ? 2 : vertical ? PORT_INSET : 8
+        return vertical ? within(box.x + inset, box.x + box.width - inset) : within(box.y + inset, box.y + box.height - inset)
+      }
+    }
   }
-  const clampTo = (box: Box, vertical: boolean, value: number, corner: boolean): number => {
-    const span = bounds(box, vertical, corner)
+  const clampTo = (boxId: string, side: Side, value: number, corner: boolean): number => {
+    const span = spanOf(boxId, side, corner)
     return Math.min(span.high, Math.max(span.low, value))
+  }
+  /**
+   * The boundary point a coordinate along one side takes.
+   *
+   * The box's rectangle is the point for every symbol whose side is the box's side. A cylinder's top and bottom are
+   * arcs, so a port there sits on the cap curve's apex - `cap / 4` inside the box, not on the box's own edge.
+   */
+  const pointOn = (boxId: string, side: Side, along: number): Point => {
+    const box = endBox(boxId) as Box
+    if (side === 'left') return { x: box.x, y: along }
+    if (side === 'right') return { x: box.x + box.width, y: along }
+    if (side === 'top') return { x: along, y: shapeOf(boxId) === 'cylinder' ? cylinderApex(box, 'top').y : box.y }
+    return { x: along, y: shapeOf(boxId) === 'cylinder' ? cylinderApex(box, 'bottom').y : box.y + box.height }
   }
   for (const [index, entry] of facing.entries()) {
     if (entry === undefined) continue
@@ -503,17 +560,17 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // and takes the corner nearest it when the lane runs outside the box: that edge turns anyway, and a straight edge
     // made to give up its port would gain two bends for nothing.
     const corner = entry.at !== undefined
-    const target = bounds(to, vertical, false)
+    const target = spanOf(edge.to, entry.entry, false)
     // The k-th edge of a multi-edge set runs on a line of its own, perpendicular to the direction it runs: the fan's
     // offset is added to the side's own coordinate, which is x for a vertical run and y for a horizontal one. A long
     // edge carries the offset in its lane instead, so the whole edge moves rather than gaining two bends.
     const offset = fanOf.get(index) ?? 0
     const chosen =
       entry.at === undefined
-        ? (fromMiddle >= target.low && fromMiddle <= target.high ? fromMiddle : clampTo(from, vertical, toMiddle, false)) + offset
+        ? (fromMiddle >= target.low && fromMiddle <= target.high ? fromMiddle : clampTo(edge.from, entry.exit, toMiddle, false)) + offset
         : entry.at + (laneShift.get(index) ?? 0)
-    wanted.set(slotKey(edge.from, entry.exit, index), clampTo(from, vertical, chosen, corner))
-    wanted.set(slotKey(edge.to, entry.entry, index), clampTo(to, vertical, chosen, corner))
+    wanted.set(slotKey(edge.from, entry.exit, index), clampTo(edge.from, entry.exit, chosen, corner))
+    wanted.set(slotKey(edge.to, entry.entry, index), clampTo(edge.to, entry.entry, chosen, corner))
   }
   const sides = new Map<string, Array<{ index: number; wanted: number }>>()
   for (const [index, entry] of facing.entries()) {
@@ -535,12 +592,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     placedPort = new Map<string, number>()
     for (const [key, list] of sides) {
       const [boxId, side] = key.split(':') as [string, Side]
-      const box = endBox(boxId) as Box
-      const vertical = side === 'bottom' || side === 'top'
-      const span = bounds(box, vertical, true)
+      const span = spanOf(boxId, side, true)
       const order = [...list].sort((left, right) => left.wanted - right.wanted || left.index - right.index)
       const packed = packPorts(
-        order.map((entry) => clampTo(box, vertical, entry.wanted, true)),
+        order.map((entry) => clampTo(boxId, side, entry.wanted, true)),
         span.low,
         span.high,
       )
@@ -555,8 +610,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       const exit = placedPort.get(slotKey(edge.from, entry.exit, index)) as number
       if (Math.abs(exit - (placedPort.get(slotKey(edge.to, entry.entry, index)) as number)) < 0.01) continue
       // Only an entry that can reach the exit's x asks for it: a box that does not span it keeps its own point.
-      const target = endBox(edge.to) as Box
-      if (Math.abs(clampTo(target, true, exit, true) - exit) > 0.01) continue
+      if (Math.abs(clampTo(edge.to, entry.entry, exit, true) - exit) > 0.01) continue
       for (const slot of sides.get(edge.to + ':' + entry.entry) as Array<{ index: number; wanted: number }>) {
         if (slot.index !== index) continue
         slot.wanted = exit
@@ -566,13 +620,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (!moved) break
   }
   const portOf = (boxId: string, side: Side, edgeIndex: number): Point => {
-    const box = endBox(boxId) as Box
-    const vertical = side === 'bottom' || side === 'top'
-    const coordinate = placedPort.get(slotKey(boxId, side, edgeIndex)) ?? (vertical ? box.x + box.width / 2 : box.y + box.height / 2)
-    if (side === 'top') return { x: coordinate, y: box.y }
-    if (side === 'bottom') return { x: coordinate, y: box.y + box.height }
-    if (side === 'left') return { x: box.x, y: coordinate }
-    return { x: box.x + box.width, y: coordinate }
+    const span = spanOf(boxId, side, false)
+    const coordinate = placedPort.get(slotKey(boxId, side, edgeIndex)) ?? (span.low + span.high) / 2
+    return pointOn(boxId, side, coordinate)
   }
   const anchorsFor = new Map<number, Ports>()
   for (const [index, entry] of facing.entries()) {

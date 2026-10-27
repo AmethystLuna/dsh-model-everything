@@ -1765,17 +1765,30 @@ test('a rendered drawing carries no edge through a box', () => {
   ].join(String.fromCharCode(10))
   const { canvas } = paintWith(render({ source }).diagram)
   const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  // A port may sit inside its own box's bounding box: a symbol need not fill it, and a cylinder's cap apex is
+  // inside. So a segment that starts or ends strictly inside a box is that edge attaching to it; every other
+  // segment has to clear every box, including the two the edge joins.
+  const attaches = (point, box) =>
+    point.x > box.x + 0.5 && point.x < box.x + box.width - 0.5 && point.y > box.y + 0.5 && point.y < box.y + box.height - 0.5
   const crossings = []
   for (const shape of canvas.shapes) {
     if (shape.kind === 'link') {
-      for (const box of boxes) if (crossesBox(shape.x1, shape.y1, shape.x2, shape.y2, box)) crossings.push('a link crosses "' + box.label + '"')
+      const from = { x: shape.x1, y: shape.y1 }
+      const to = { x: shape.x2, y: shape.y2 }
+      for (const box of boxes) {
+        if (attaches(from, box) || attaches(to, box)) continue
+        if (crossesBox(from.x, from.y, to.x, to.y, box)) crossings.push('a link crosses "' + box.label + '"')
+      }
       continue
     }
     if (shape.kind !== 'path') continue
     for (let index = 0; index + 1 < shape.points.length; index += 1) {
       const a = shape.points[index]
       const b = shape.points[index + 1]
-      for (const box of boxes) if (crossesBox(a.x, a.y, b.x, b.y, box)) crossings.push('a path crosses "' + box.label + '"')
+      for (const box of boxes) {
+        if (attaches(a, box) || attaches(b, box)) continue
+        if (crossesBox(a.x, a.y, b.x, b.y, box)) crossings.push('a path crosses "' + box.label + '"')
+      }
     }
   }
   if (crossings.length > 0) throw new Error(crossings.join('; '))
@@ -1854,6 +1867,308 @@ test('a boundary orders its children by what connects to them, not by where they
   const first = boxes.find((box) => box.label === 'first')
   const later = boxes.find((box) => box.label === 'later')
   if (first.y >= later.y) throw new Error('the connected child was not placed above the unrelated one')
+})
+
+// ----------------------------------------------------------------------------------------------- shape ports
+//
+// A port is legal only where the symbol's own outline is. The rule is per symbol, so every case below names the
+// symbol's geometry independently - the four vertices, the ellipse's cardinal points, the cap curve - and asks the
+// painter to have used it. The geometry is recomputed here rather than imported, so a painter that agrees with a
+// mistaken helper still fails: what is asserted is the shape a reader sees.
+
+/** The four points a diamond is drawn through, from the box alone: top, right, bottom, left. */
+const diamondCorners = (box) => [
+  { x: box.x + box.width / 2, y: box.y },
+  { x: box.x + box.width, y: box.y + box.height / 2 },
+  { x: box.x + box.width / 2, y: box.y + box.height },
+  { x: box.x, y: box.y + box.height / 2 },
+]
+
+/** A point on one cubic Bezier at `t`: what "the top of the cap" means without asking the renderer. */
+const cubicAt = (p0, p1, p2, p3, t) => {
+  const u = 1 - t
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
+}
+
+/** How far a point is from a segment. Zero means it lies on it. */
+const distanceToSegment = (point, a, b) => {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const length = dx * dx + dy * dy
+  const t = length === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / length))
+  return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy))
+}
+
+/** How far a point is from a diamond's outline: zero means it lies on one of the four edges. */
+const distanceToDiamond = (box, point) => {
+  const corners = diamondCorners(box)
+  let best = Infinity
+  for (let index = 0; index < corners.length; index += 1) {
+    best = Math.min(best, distanceToSegment(point, corners[index], corners[(index + 1) % corners.length]))
+  }
+  return best
+}
+
+/** Is the point strictly inside the polygon - not on an edge's line, and on one side of every edge? */
+const strictlyInside = (polygon, point) => {
+  let sign = 0
+  for (let index = 0; index < polygon.length; index += 1) {
+    const a = polygon[index]
+    const b = polygon[(index + 1) % polygon.length]
+    const cross = (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x)
+    if (Math.abs(cross) < 1e-9) return false
+    const side = cross > 0 ? 1 : -1
+    if (sign === 0) sign = side
+    else if (side !== sign) return false
+  }
+  return true
+}
+
+/** The box an id was drawn as, paired through the label the fixture gave it. */
+const boxOfNode = (canvas, diagram, id) => {
+  const node = diagram.nodes.find((entry) => entry.id === id)
+  if (node === undefined) return undefined
+  return canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === labelOf(node))
+}
+
+/** The two points a route attaches with: its source end and its target end. */
+const endsOfRoute = (shape) => {
+  const points = routePointsOf(shape)
+  return [points[0], points[points.length - 1]]
+}
+
+test('a diamond has four legal points, so two edges on one side take the vertex', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'd',
+    caption: 'pass',
+    nodes: [{ id: 'd', role: 'normal', shape: 'diamond' }, { id: 'x', role: 'normal' }, { id: 'y', role: 'normal' }],
+    edges: [{ from: 'd', label: 'yes', to: 'x' }, { from: 'd', label: 'no', to: 'y' }],
+  }
+  const { canvas } = paintWith(diagram)
+  const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  if (diamond.shape !== 'diamond') throw new Error('the fixture did not draw a diamond')
+  const corners = diamondCorners(diamond)
+  const routes = routesOf(canvas)
+  if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
+  const anchors = routes.map((shape) => endsOfRoute(shape)[0])
+  for (const anchor of anchors) {
+    // A vertex, and nothing else: the four points are the only places the side meets the outline.
+    if (distanceToDiamond(diamond, anchor) > 0.01) {
+      throw new Error('a port is not on the diamond: ' + JSON.stringify(anchor))
+    }
+    if (!corners.some((corner) => Math.hypot(corner.x - anchor.x, corner.y - anchor.y) <= 0.01)) {
+      throw new Error('a port sits between two vertices: ' + JSON.stringify(anchor))
+    }
+  }
+  // Both edges leave the bottom side, and the bottom side's one legal point is the bottom vertex.
+  const bottom = corners[2]
+  for (const anchor of anchors) {
+    if (Math.hypot(anchor.x - bottom.x, anchor.y - bottom.y) > 0.01) {
+      throw new Error('a bottom-side port is not the bottom vertex: ' + JSON.stringify(anchor))
+    }
+  }
+  // The shared vertex is where the fan starts: the two edges are not one line drawn twice.
+  if (JSON.stringify(routePointsOf(routes[0])) === JSON.stringify(routePointsOf(routes[1]))) {
+    throw new Error('two statements about one diamond are drawn as one edge')
+  }
+})
+
+test('a circle has four legal points, so four edges land on the ellipse cardinal points', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'top1',
+    caption: 'pass',
+    nodes: [
+      { id: 'top1', role: 'normal' },
+      { id: 'top2', role: 'normal' },
+      { id: 'hub', role: 'normal', shape: 'circle' },
+      { id: 'lo1', role: 'normal' },
+      { id: 'lo2', role: 'normal' },
+    ],
+    edges: [
+      { from: 'top1', label: 'a', to: 'hub' },
+      { from: 'top2', label: 'b', to: 'hub' },
+      { from: 'hub', label: 'c', to: 'lo1' },
+      { from: 'hub', label: 'd', to: 'lo2' },
+    ],
+  }
+  const { canvas } = paintWith(diagram)
+  const hub = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'hub')
+  if (hub.shape !== 'circle') throw new Error('the fixture did not draw a circle')
+  const centre = { x: hub.x + hub.width / 2, y: hub.y + hub.height / 2 }
+  const cardinals = [
+    { x: centre.x, y: hub.y },
+    { x: hub.x + hub.width, y: centre.y },
+    { x: centre.x, y: hub.y + hub.height },
+    { x: hub.x, y: centre.y },
+  ]
+  const routes = routesOf(canvas)
+  if (routes.length !== 4) throw new Error('edges drawn: ' + String(routes.length))
+  const used = new Set()
+  routes.forEach((shape, index) => {
+    const edge = diagram.edges[index]
+    for (const [id, point] of [[edge.from, endsOfRoute(shape)[0]], [edge.to, endsOfRoute(shape)[1]]]) {
+      if (id !== 'hub') continue
+      const at = cardinals.findIndex((cardinal) => Math.hypot(cardinal.x - point.x, cardinal.y - point.y) <= 0.01)
+      if (at === -1) throw new Error('a port is not an ellipse cardinal point: ' + JSON.stringify(point))
+      used.add(at)
+    }
+  })
+  // Two edges arrive at the top and two leave the bottom, and each pair shares its cardinal point.
+  if (!used.has(0) || !used.has(2)) throw new Error('the fixture no longer exercises the top and bottom cardinals: ' + JSON.stringify([...used]))
+})
+
+test('a wrapped column edge meets a circle at the left and right cardinal points', () => {
+  // Twelve boxes wrap into two columns, so the crossing edge is read sideways: it leaves the last box of one column
+  // and arrives at the first of the next. Those two sides of a circle are cardinal points, not a spread.
+  const nodes = []
+  const edges = []
+  for (let index = 0; index < 12; index += 1) {
+    nodes.push({ id: 'n' + String(index), role: 'normal', ...(index === 5 || index === 6 ? { shape: 'circle' } : {}) })
+    if (index + 1 < 12) edges.push({ from: 'n' + String(index), label: '', to: 'n' + String(index + 1) })
+  }
+  const diagram = { kind: 'graph', title: 't', init: 'n0', nodes, edges, caption: 'pass' }
+  const { canvas } = paintWith(diagram)
+  const routes = routesOf(canvas)
+  if (routes.length !== edges.length) throw new Error('a route was dropped, so the edges and the routes no longer pair up')
+  const circles = new Set(['n5', 'n6'])
+  const used = new Set()
+  routes.forEach((shape, index) => {
+    const edge = edges[index]
+    for (const [id, point] of [[edge.from, endsOfRoute(shape)[0]], [edge.to, endsOfRoute(shape)[1]]]) {
+      if (!circles.has(id)) continue
+      const box = boxOfNode(canvas, diagram, id)
+      const cardinals = [
+        { x: box.x + box.width / 2, y: box.y },
+        { x: box.x + box.width, y: box.y + box.height / 2 },
+        { x: box.x + box.width / 2, y: box.y + box.height },
+        { x: box.x, y: box.y + box.height / 2 },
+      ]
+      const at = cardinals.findIndex((cardinal) => Math.hypot(cardinal.x - point.x, cardinal.y - point.y) <= 0.01)
+      if (at === -1) throw new Error('a circle port is not a cardinal point: ' + JSON.stringify(point))
+      used.add(at)
+    }
+  })
+  // The crossing edge leaves by the right cardinal and arrives at the left one; if the drawing stopped wrapping, the
+  // case measured nothing and says so rather than passing quietly.
+  if (!used.has(1) || !used.has(3)) throw new Error('no edge crosses a column, so the left and right cardinals were not exercised: ' + JSON.stringify([...used]))
+})
+
+test('a rectangle still spreads two ports along one side', () => {
+  // The guard against over-constraining: the rule is per symbol, and a rectangle is the symbol that always had a
+  // side. Its two ports stay apart, one fan spacing apart, exactly where they were.
+  const { canvas } = paintWith(pairDiagram([{ label: '' }, { label: '' }]))
+  const target = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'b')
+  const ends = routesOf(canvas).map((shape) => endsOfRoute(shape)[1])
+  if (ends.length !== 2) throw new Error('edges drawn: ' + String(ends.length))
+  for (const end of ends) if (end.y !== target.y && end.y !== target.y + target.height) throw new Error('a port left the rectangle side: ' + JSON.stringify(end))
+  const middle = target.x + target.width / 2
+  const offsets = ends.map((end) => end.x - middle).sort((left, right) => left - right)
+  if (JSON.stringify(offsets) !== JSON.stringify([0, MULTI_EDGE_SPACING])) throw new Error('the rectangle did not spread its ports: ' + JSON.stringify(offsets))
+})
+
+test('a cylinder top port sits on its cap curve, not on the box edge', () => {
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'above',
+    caption: 'pass',
+    nodes: [{ id: 'above', role: 'normal' }, { id: 'store', role: 'normal', shape: 'cylinder' }, { id: 'below', role: 'normal' }],
+    edges: [{ from: 'above', label: 'write', to: 'store' }, { from: 'store', label: 'read', to: 'below' }],
+  }
+  const { canvas } = paintWith(diagram)
+  const store = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'store')
+  if (store.shape !== 'cylinder') throw new Error('the fixture did not draw a cylinder')
+  // The writer draws each cap as a cubic from one shoulder to the other, with the box's own edge as the control
+  // line; its apex is a quarter of the cap's depth inside the box, and that is the only point an edge may meet.
+  const cap = Math.min(10, store.height / 3)
+  const apexTop = cubicAt(store.y + cap, store.y, store.y, store.y + cap, 0.5)
+  const apexBottom = cubicAt(store.y + store.height - cap, store.y + store.height, store.y + store.height, store.y + store.height - cap, 0.5)
+  const centre = store.x + store.width / 2
+  const routes = routesOf(canvas)
+  if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
+  const [entry, exit] = [endsOfRoute(routes[0])[1], endsOfRoute(routes[1])[0]]
+  if (Math.abs(entry.x - centre) > 0.01 || Math.abs(entry.y - apexTop) > 0.01) {
+    throw new Error('the top port is not the cap curve apex: ' + JSON.stringify(entry) + ' vs ' + JSON.stringify({ x: centre, y: apexTop }))
+  }
+  if (entry.y <= store.y + 0.01) throw new Error('the top port is on the box edge, which is off the cap: ' + String(entry.y))
+  if (Math.abs(exit.x - centre) > 0.01 || Math.abs(exit.y - apexBottom) > 0.01) {
+    throw new Error('the bottom port is not the cap curve apex: ' + JSON.stringify(exit) + ' vs ' + JSON.stringify({ x: centre, y: apexBottom }))
+  }
+})
+
+test('a rendered diamond carries no endpoint inside its outline, and every endpoint on it is a vertex', () => {
+  const source = [
+    'graph TD',
+    '  a[Idea] --> b{Feasible?}',
+    '  b -->|yes| c[Build]',
+    '  b -->|no| d[Revise]',
+    '  d -->|retry| a',
+    '  c --> b',
+  ].join(NL)
+  const rendered = render({ source })
+  const { canvas } = paintWith(rendered.diagram)
+  const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.shape === 'diamond')
+  if (diamond === undefined) throw new Error('the fixture no longer draws a diamond')
+  const corners = diamondCorners(diamond)
+  let attached = 0
+  routesOf(canvas).forEach((shape, index) => {
+    const edge = rendered.diagram.edges[index]
+    if (edge === undefined) return
+    const points = routePointsOf(shape)
+    const ends = [[edge.from, points[0]], [edge.to, points[points.length - 1]]]
+    for (const [id, point] of ends) {
+      if (id !== 'b') continue
+      attached += 1
+      if (strictlyInside(corners, point)) throw new Error('an edge endpoint falls inside the diamond: ' + JSON.stringify(point))
+      // "Not inside" is not enough: the endpoint has to be on the outline, and the side's only outline points are
+      // the vertices.
+      if (distanceToDiamond(diamond, point) > 0.01) throw new Error('an edge endpoint is off the diamond: ' + JSON.stringify(point))
+      if (!corners.some((corner) => Math.hypot(corner.x - point.x, corner.y - point.y) <= 0.01)) {
+        throw new Error('an edge endpoint is between two vertices: ' + JSON.stringify(point))
+      }
+    }
+  })
+  if (attached !== 4) throw new Error('the fixture attaches ' + String(attached) + ' endpoints to the diamond, expected four')
+})
+
+test('a stadium and a hexagon keep their ports on the flat run, not on a cap or a cut corner', () => {
+  // Both symbols own only part of the box's side: a stadium's ends are arcs, and a hexagon's ends are cut corners.
+  // Four edges between one pair fan out past that flat run, and what used to be a legal point on the box is now
+  // outside the symbol - so the spread has to stop at the run.
+  for (const shape of ['stadium', 'hexagon']) {
+    const diagram = {
+      kind: 'machine',
+      title: 't',
+      init: 'a',
+      caption: 'pass',
+      nodes: [{ id: 'a', role: 'normal' }, { id: 'b', role: 'normal', shape }],
+      edges: [
+        { from: 'a', label: 'one', to: 'b' },
+        { from: 'a', label: 'two', to: 'b' },
+        { from: 'a', label: 'three', to: 'b' },
+        { from: 'a', label: 'four', to: 'b' },
+      ],
+    }
+    const { canvas } = paintWith(diagram)
+    const box = canvas.shapes.find((entry) => entry.kind === 'box' && entry.label === 'b')
+    if (box.shape !== shape) throw new Error('the fixture did not draw a ' + shape)
+    const margin = shape === 'hexagon' ? Math.min(12, box.width / 4) : Math.min(box.height / 2, box.width / 2)
+    const low = box.x + margin
+    const high = box.x + box.width - margin
+    const ends = routesOf(canvas).map((route) => endsOfRoute(route)[1])
+    if (ends.length !== 4) throw new Error(shape + ': edges drawn ' + String(ends.length))
+    for (const end of ends) {
+      if (Math.abs(end.y - box.y) > 0.01) throw new Error(shape + ': a port did not arrive at the top side: ' + JSON.stringify(end))
+      if (end.x < low - 0.01 || end.x > high + 0.01) {
+        throw new Error(shape + ': a port is on the ' + (shape === 'hexagon' ? 'cut corner' : 'cap arc') + ': ' + JSON.stringify(end))
+      }
+    }
+    if (new Set(ends.map((end) => end.x)).size !== 4) throw new Error(shape + ': the spread collapsed onto one point')
+  }
 })
 
 if (failures > 0) {
