@@ -6,7 +6,7 @@
 // version of this code guessed wrong: the card said "no report yet" for a report that was right there.
 import { palette, roleForVerdict, schemeNames } from '../../lib/render/palette.js'
 import { rankStates } from '../../lib/render/layout.js'
-import { LABEL_HEIGHT, MULTI_EDGE_SPACING, paint, paintWith } from '../../lib/render/paint.js'
+import { LABEL_HEIGHT, MULTI_EDGE_SPACING, boxesCrossedBy, paint, paintWith, placeLabel } from '../../lib/render/paint.js'
 import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
@@ -2493,6 +2493,33 @@ const BENCH_FIXTURES = {
   symbols: ['graph TD', '  a[Start] --> b{Ready?}', '  b -->|yes| c[(Store)]', '  b -->|no| d([Retry])', '  c --> e[[Commit]]', '  d --> e', '  b --> e', '  e --> f<<Audit>>'],
   fanin: ['graph TD', '  s1[Alpha service] --> m[Merge]', '  s2[Beta service] --> m', '  s3[Gamma service] --> m', '  s4[Delta service] --> m'],
   circle: ['@startuml', 'usecase "Hub" as hub', 'component "Left" as l', 'component "Right" as r', 'component "Below" as below', 'hub --> l', 'hub --> r', 'hub --> below', 'l --> hub', '@enduml'],
+  // The dense drawing: three boundaries, long edges whose endpoints live inside them, a back edge across the whole
+  // drawing, and two labelled edges. It is the fixture that made a channel run reserved between two boundaries - and
+  // so measured in a strip outside them - draw a node's line through the boxes those boundaries contain.
+  dense: [
+    'graph TD',
+    '  subgraph Edge',
+    '    lb[Load balancer] --> api1[API node 1]',
+    '    lb --> api2[API node 2]',
+    '  end',
+    '  subgraph Services',
+    '    api1 --> auth[Auth]',
+    '    api2 --> auth',
+    '    api1 --> order[Order]',
+    '    api2 --> order',
+    '    order --> stock[Stock]',
+    '    order --> pay[Payment]',
+    '  end',
+    '  subgraph Data',
+    '    order --> db[(Orders DB)]',
+    '    stock --> db',
+    '    pay --> ledger[(Ledger)]',
+    '    auth --> cache[(Session cache)]',
+    '  end',
+    '  ledger --> report[Report]',
+    '  report -->|nightly| dw[(Warehouse)]',
+    '  dw -->|drift| order',
+  ],
 }
 
 test('the benchmark drawings carry no edge through a box', () => {
@@ -2506,6 +2533,175 @@ test('the benchmark drawings carry no edge through a box', () => {
     if (crossings.length > 0) throw new Error(name + ': ' + crossings.join('; '))
     const drawn = canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path').length
     if (drawn !== rendered.diagram.edges.length) throw new Error(name + ': ' + String(drawn) + ' routes for ' + String(rendered.diagram.edges.length) + ' edges')
+  }
+})
+
+test('the assembled drawing reports no route through a box, on every benchmark drawing', () => {
+  // The check is global on purpose. Every stage checks its own proposal, but only the assembled drawing knows every
+  // box, every port and every route, so the canvas carries the answer and the answer is empty.
+  for (const [name, lines] of Object.entries(BENCH_FIXTURES)) {
+    const rendered = render({ source: lines.join(NL) })
+    const { canvas } = paintWith(rendered.diagram)
+    if (!Array.isArray(canvas.routingFailures)) throw new Error(name + ': the drawing carries no routing report')
+    if (canvas.routingFailures.length > 0) {
+      throw new Error(
+        name + ': ' + canvas.routingFailures.map((failure) => failure.from + '->' + failure.to + ' x ' + failure.box).join('; '),
+      )
+    }
+    // The report is not allowed to disagree with the drawing: an independent walk of the segments finds nothing either.
+    const crossings = boxCrossings(canvas)
+    if (crossings.length > 0) throw new Error(name + ': ' + crossings.join('; '))
+  }
+})
+
+test('a segment through a box is reported, and a segment inside its own box is not', () => {
+  const source = { x: 0, y: 0, width: 10, height: 10 }
+  const target = { x: 0, y: 100, width: 10, height: 10 }
+  const wall = { x: -5, y: 40, width: 20, height: 10 }
+  // Out of the source's bottom, through the wall, into the target's top.
+  const through = boxesCrossedBy([{ x: 5, y: 10 }, { x: 5, y: 100 }], source, target, [source, target, wall])
+  if (through.length !== 1 || through[0] !== wall) throw new Error('the wall was not reported: ' + String(through.length))
+  // The same line with its first point inside the source: the source is the edge's own box, so it is not a defect.
+  const inside = boxesCrossedBy([{ x: 5, y: 5 }, { x: 5, y: 100 }], source, target, [source, target, wall])
+  if (inside.length !== 1 || inside[0] !== wall) throw new Error('the own box was counted: ' + String(inside.length))
+  // Nothing in the way is no failure.
+  if (boxesCrossedBy([{ x: 5, y: 10 }, { x: 5, y: 100 }], source, target, [source, target]).length !== 0) {
+    throw new Error('a clear route was reported')
+  }
+})
+
+test('the dense drawing puts both labels on their own line and clear of everything', () => {
+  const { canvas } = paintWith(render({ source: BENCH_FIXTURES.dense.join(NL) }).diagram)
+  const routes = routesOf(canvas)
+  const labelled = routes.filter((shape) => shape.label !== '')
+  if (labelled.length !== 2) throw new Error('the dense drawing carries ' + String(labelled.length) + ' labels, expected 2')
+  const boxes = canvas.shapes.filter((shape) => shape.kind === 'box')
+  const labels = labelRectsOf(canvas)
+  if (canvas.labelCollisions !== 0) throw new Error('the canvas reports ' + String(canvas.labelCollisions) + ' colliding labels')
+  for (const shape of labelled) {
+    // On its own line: the defect a label parked beside the line hides.
+    if (distanceToRoute(shape, { x: shape.labelX, y: shape.labelY }) > 2) {
+      throw new Error('label "' + shape.label + '" left its own edge')
+    }
+    if (shape.labelPlacement === undefined) throw new Error('label "' + shape.label + '" recorded no placement')
+    if (shape.labelPlacement.collisions !== 0) {
+      throw new Error('label "' + shape.label + '" still collides with ' + String(shape.labelPlacement.collisions) + ' thing(s)')
+    }
+  }
+  for (const label of labels) {
+    for (const box of boxes) {
+      const overlaps =
+        label.x - label.width / 2 < box.x + box.width + 2 &&
+        label.x + label.width / 2 > box.x - 2 &&
+        label.y - label.height / 2 < box.y + box.height + 2 &&
+        label.y + label.height / 2 > box.y - 2
+      if (overlaps) throw new Error('label "' + label.label + '" is drawn on box "' + String(box.label) + '"')
+    }
+    for (const other of labels) {
+      if (other === label) continue
+      if (labelsOverlap(label, other)) throw new Error('labels "' + label.label + '" and "' + other.label + '" overlap')
+    }
+    for (const [index, shape] of routes.entries()) {
+      if (shape.label === label.label) continue
+      const crossed = segmentsOfShape(shape).filter((segment) => labelHitsSegment(label, segment))
+      if (crossed.length > 0) {
+        throw new Error('label "' + label.label + '" is drawn across edge ' + String(index) + "'s line")
+      }
+    }
+  }
+})
+
+test('a label with no clear place keeps the fewest collisions and records what it could not avoid', () => {
+  // Two statements about one pair run one fan spacing apart, and both names are wider than that spacing: whatever
+  // place each label takes on its own line, its mask covers the other line. The label must stay on its edge and say
+  // how many things it could not clear, rather than slide onto a neighbouring edge to earn a zero.
+  const { canvas } = paintWith(
+    pairDiagram([
+      { label: 'the first long relation name' },
+      { label: 'the second long relation name', arrow: 'composition' },
+    ]),
+  )
+  const labelled = routesOf(canvas).filter((shape) => shape.label !== '')
+  if (labelled.length !== 2) throw new Error('labels: ' + String(labelled.length))
+  let crowded = 0
+  for (const shape of labelled) {
+    if (shape.labelPlacement === undefined) throw new Error('label "' + shape.label + '" recorded no placement')
+    const placement = shape.labelPlacement
+    if (placement.collisions !== placement.boxes + placement.labels + placement.edges) {
+      throw new Error('the placement of "' + shape.label + '" does not add up: ' + JSON.stringify(placement))
+    }
+    if (placement.collisions > 0) crowded += 1
+    if (distanceToRoute(shape, { x: shape.labelX, y: shape.labelY }) > 2) {
+      throw new Error('label "' + shape.label + '" left its own edge to look for a clearer place')
+    }
+  }
+  if (crowded === 0) throw new Error('the fixture was clear after all, so the fallback was not exercised')
+  if (canvas.labelCollisions !== crowded) {
+    throw new Error('the canvas counted ' + String(canvas.labelCollisions) + ' colliding labels, expected ' + String(crowded))
+  }
+})
+
+test('a label whose longest run cannot be cleared moves to another run of its own edge', () => {
+  // The shape of a dense drawing: the longest piece of the polyline runs along a box for its whole length, while a
+  // shorter piece turns away into open space. The label used to give up after the longest run and take a collision;
+  // it now reads the other runs of the same edge, and every place it considers is still on that edge.
+  const wall = { x: 40, y: 0, width: 20, height: 400 }
+  const points = [
+    { x: 50, y: 0 },
+    { x: 50, y: 400 },
+    { x: 300, y: 400 },
+  ]
+  const placement = placeLabel('event', points, [wall], [], [])
+  if (placement.run !== 1) throw new Error('the label took run ' + String(placement.run) + ', not the shorter run 1')
+  if (placement.collisions !== 0) throw new Error('the shorter run was clear but the label reports ' + String(placement.collisions) + ' collisions')
+  // The midpoint of the second run - a point of the edge - and never a point off it.
+  if (Math.abs(placement.x - 175) > 0.01 || Math.abs(placement.y - 400) > 0.01) {
+    throw new Error('the label did not sit on the shorter run: ' + JSON.stringify({ x: placement.x, y: placement.y }))
+  }
+  const onEdge =
+    (Math.abs(placement.x - 50) <= 0.01 && placement.y >= -0.01 && placement.y <= 400.01) ||
+    (Math.abs(placement.y - 400) <= 0.01 && placement.x >= 49.99 && placement.x <= 300.01)
+  if (!onEdge) throw new Error('the label left its own polyline')
+})
+
+test("Order's three arrows do not qualify for a trunk: only two share an entry side", () => {
+  // The count is the reason, not a rule that needs loosening. `api1` and `api2` enter Order's top; `dw` arrives from
+  // below and enters its bottom, which is a different direction of travel and a different trunk. Two same-side
+  // sources are below the three an accepted bundle needs, so the drawing correctly keeps three separate ports.
+  const rendered = render({ source: BENCH_FIXTURES.dense.join(NL) })
+  const { canvas, diagram } = rendered
+  const routes = routesOf(canvas)
+  const box = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'Order')
+  if (box === undefined) throw new Error('the drawing has no Order box')
+  const sideOf = (point) =>
+    [
+      ['top', Math.abs(point.y - box.y)],
+      ['bottom', Math.abs(point.y - (box.y + box.height))],
+      ['left', Math.abs(point.x - box.x)],
+      ['right', Math.abs(point.x - (box.x + box.width))],
+    ].sort((left, right) => left[1] - right[1])[0][0]
+  const incoming = new Map()
+  routes.forEach((shape, index) => {
+    const edge = diagram.edges[index]
+    if (edge === undefined || edge.to !== 'order') return
+    const points = routePointsOf(shape)
+    const side = sideOf(points[points.length - 1])
+    incoming.set(side, [...(incoming.get(side) ?? []), edge.from])
+  })
+  const top = incoming.get('top') ?? []
+  const bottom = incoming.get('bottom') ?? []
+  if (top.length !== 2) throw new Error('sources on the top side: ' + JSON.stringify(top))
+  if (bottom.length !== 1) throw new Error('sources on the bottom side: ' + JSON.stringify(bottom))
+  if (new Set(top).size !== 2) throw new Error('the top side does not carry two distinct sources: ' + JSON.stringify(top))
+  // Two is fewer than three, so no bundle is drawn; the rules stay as they are.
+  if (canvas.shapes.filter((shape) => shape.kind === 'junction').length !== 0) {
+    throw new Error('a trunk was drawn for a fan-in that does not qualify')
+  }
+  if (new Set(routes.filter((shape, index) => diagram.edges[index]?.to === 'order').map((shape) => {
+    const points = routePointsOf(shape)
+    return String(points[points.length - 1].x) + ',' + String(points[points.length - 1].y)
+  })).size !== 3) {
+    throw new Error('the three unmerged arrows did not keep a port each')
   }
 })
 

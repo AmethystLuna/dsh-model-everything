@@ -93,6 +93,28 @@ crossings 0→0、目标端口 4→1、`trunkGroups` 0→1；长度 549→725，
 `centredSingle`（单端口侧居中比例，容差 1 点）：crossings、弯数、长度、填充率四列对「端口沿自己的侧滑动」完全不可见。
 布局基准的 8 个 fixture 从 41/54 到 49/54，剩下的 5 个都是 0 弯直落，按弯预算让位。
 
+## 走线不变量：画完之后再判一次
+
+一条边只允许碰到它自己的两个端点盒子。这条规则以前分散在各阶段：run 只看「两侧是否异类」，
+lane / trunk 各自检查。覆盖率提交把 paint 的 run-vs-box 复查当作不可达分支删掉后，`dense` fixture
+暴露了真正的入口：`place` 在「层」的实体上分配 run，而当实体是边界时，run 的 y 是两个边界之间的
+空档，paint 的端口却属于边界内部的盒子。竖腿因此穿过 Stock / Auth / Payment / Session cache 等
+盒子，dense 上有 11 段。
+
+现在只有一条规则（`paint.ts` 的 `boxesCrossedBy`）：候选路线 —— channel run、lane、trunk branch、
+跨列侧读、router —— 画之前都过它；过不了就交给 router。画完之后对整个 drawing 再走一遍，结果放在
+`Canvas.routingFailures`。router 自己找不到路时边仍然要画（不能丢边），但会记进该字段，由测试与
+benchmark 断言为空。dense 的 `segmentsThroughBoxes` 从 11 到 0，其它 fixture 的 crossings / bends
+不变（布局指纹也不变）。
+
+标签同理：在边自己的每条 run 上找位置（最长优先），最长 run 整条被占时换短 run；都躲不开就取碰撞
+最少的位置，把 box / label / edge 三类碰撞数记进每条边的 `labelPlacement`，总数进
+`Canvas.labelCollisions`，但绝不离开自己的边。dense 的 `labelCollisions` 从 1 到 0（`drift` 原先
+压在 `pay→ledger` 上）。自环标签仍是唯一的例外：它按设计画在环外。
+
+`dense` 同时是 trunk 规则的反例检查：Order 收到三条入边，但 api1 / api2 进 top、dw 从下方进
+bottom，同侧只有 2 条（少于三条），所以不合并。这是规则的正确结果，不是需要放松的阈值。
+
 ## 一份模型
 
 `viewmodel.ts` 曾经自己声明一套 `Diagram` / `DiagramNode` / `DiagramEdge`，与 `model.ts` 重复；TypeScript 的

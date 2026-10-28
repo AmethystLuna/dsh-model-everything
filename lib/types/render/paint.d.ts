@@ -20,13 +20,22 @@
  * node with a run on its side keeps doing what it always did, because there the ports are places on the run and not
  * points at all. Sharing is the fallback, not the rule: two labelled branches of a decision leave by two vertices.
  *
- * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of the edge's longest straight
- * run, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
- * something is in the way. Labels are placed after every edge is drawn, because what a label has to avoid is the
- * whole picture.
+ * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of one of the edge's own straight
+ * runs, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
+ * something is in the way. It tries every run - the longest first - because on a dense drawing the longest one can be
+ * crowded for its whole length while a shorter run of the same edge is clear. A label that can clear nothing still
+ * stays on its edge, takes the place with the fewest collisions, and records what it could not avoid. Labels are
+ * placed after every edge is drawn, because what a label has to avoid is the whole picture.
+ *
+ * Every route is checked before it is drawn, and the assembled drawing is checked once more: a segment may touch no
+ * box except the two the edge terminates at. A route is a proposal - a channel run, a lane, a trunk branch, a wrapped
+ * column's sideways read - and any proposal that would cross a box is handed to the router instead. When even the
+ * router cannot clear a box, the failure is reported on the canvas rather than hidden: a drawing that says which edge
+ * could not be routed is worth more than one that quietly draws it through a box.
  *
  * Pure: a diagram in, shapes out, every decision assertable.
  */
+import { type Box } from './place.js';
 import { type ColourRole, type Palette, type PaletteOptions } from './palette.js';
 import { type Diagram, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js';
 export interface Point {
@@ -47,6 +56,22 @@ export interface BoxShape {
     colour: ColourRole;
     initial: boolean;
 }
+/**
+ * Why a label sits where it does.
+ *
+ * A clear label records `collisions: 0` and the run it chose. A label that could clear nothing records the collisions
+ * it could not avoid, so a reader of the drawing (or a test) can tell a crowded drawing from a placement bug. The
+ * label never leaves its own edge to earn any of these numbers.
+ */
+export interface LabelPlacement {
+    /** The straight run it sits on, 0 being the edge's longest. */
+    run: number;
+    /** Everything its mask overlaps: the other labels, boxes and edges it would have had to move off its line to clear. */
+    collisions: number;
+    boxes: number;
+    labels: number;
+    edges: number;
+}
 export interface LinkShape {
     kind: 'link';
     x1: number;
@@ -62,6 +87,8 @@ export interface LinkShape {
     dashed?: boolean;
     /** The arrow the source edge stated. Undefined means the plain arrow every edge has been drawn with. */
     arrow?: EdgeArrow;
+    /** Why the label sits where it does. Undefined on an edge with no label. */
+    labelPlacement?: LabelPlacement;
 }
 export interface PathShape {
     kind: 'path';
@@ -73,6 +100,8 @@ export interface PathShape {
     colour: ColourRole;
     dashed?: boolean;
     arrow?: EdgeArrow;
+    /** Why the label sits where it does. Undefined on an edge with no label. */
+    labelPlacement?: LabelPlacement;
 }
 /**
  * A junction dot: the place one branch of a merged bundle meets the bundle's trunk.
@@ -115,10 +144,32 @@ export interface TitleShape {
     colour: ColourRole;
 }
 export type Shape = GroupShape | BoxShape | LinkShape | PathShape | JunctionShape | CaptionShape | TitleShape;
+/** One segment of a drawn route that could not be kept out of a box it does not terminate at. */
+export interface RoutingFailure {
+    /** The edge's index in the diagram. */
+    edge: number;
+    from: string;
+    to: string;
+    /** The box the segment passes through. */
+    box: string;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+}
 export interface Canvas {
     width: number;
     height: number;
     shapes: Shape[];
+    /**
+     * Every place a drawn segment still passes through a box it does not terminate at, after every route was checked.
+     *
+     * A drawing should carry none. The field exists for the case where no stage and no router could find a way around:
+     * a route that cannot be drawn honestly is reported here rather than silently drawn through a box.
+     */
+    routingFailures: RoutingFailure[];
+    /** How many edge labels could not be placed clear of every box, label and other edge. */
+    labelCollisions: number;
 }
 /**
  * How far apart two edges that join the same pair are drawn.
@@ -136,8 +187,55 @@ export declare function roleOfNode(node: DiagramNode): ColourRole;
  * place, and the writer draws the rectangle that was reserved. A label with two sizes is a label half masked.
  */
 export declare const LABEL_HEIGHT = 12;
+/** A straight piece of an edge, as the collision test needs it. */
+interface Segment {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+}
+/** Where a label sits: the point it is centred on, and the rectangle its mask covers. */
+interface LabelSpot {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+/**
+ * The point an edge's label is drawn at.
+ *
+ * A label is not furniture parked beside the line: it names the transition, so it sits on the line - anchored on one
+ * of its own straight runs - and the writer masks the stretch of line it covers. Text beside a line can be read as
+ * belonging to whatever it happens to sit next to; text that interrupts its own line reads as part of it.
+ *
+ * The anchor then has to be earned. A mask over a box hides a border, over another label it makes both unreadable,
+ * and over a third edge's line it hides that line. So the label walks along a run in small steps, in both directions
+ * and bounded so its rectangle stays on that run, and takes the first place that is clear. It tries the longest run
+ * first and then the shorter ones: on a dense drawing the longest run can be crowded for its whole length while a
+ * shorter run of the same edge is empty, and a label that gives up after one run leaves the drawing with a collision
+ * it did not have to accept.
+ *
+ * When no run offers a clear place, the label takes the place with the fewest collisions - boxes and other labels
+ * first, because text over a border hides the border and text over text is unreadable, then other edges, which a mask
+ * merely interrupts. It never leaves its own edge: a label moved onto a neighbouring edge is a label that names the
+ * wrong thing. The choice is returned with the label, so a crowded drawing can be told from a placement bug.
+ *
+ * Exported because the choice is pure and worth asserting without a layout: a test can hand it one polyline, one box
+ * and one other route, and read which run it took and what it could not clear.
+ */
+export declare function placeLabel(label: string, points: Point[], boxes: Iterable<Box>, placed: LabelSpot[], otherRoutes: Segment[][]): LabelPlacement & LabelSpot;
+/**
+ * The boxes a polyline passes through other than the two it terminates at.
+ *
+ * This is the drawing's one clearance rule, and it is deliberately written once: a channel run, a lane, a trunk
+ * branch, a wrapped column's sideways step and the router's fallback all have to obey the same test. A box is skipped
+ * only when it is one of the edge's own two ends, so a port that sits inside its own symbol (a cylinder's cap apex)
+ * is allowed and a segment that ends inside somebody else's box is not.
+ */
+export declare function boxesCrossedBy(points: Point[], from: Box, to: Box, boxes: Iterable<Box>): Box[];
 export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>, options?: PaletteOptions): {
     canvas: Canvas;
     colours: Palette;
 };
 export declare function paint(diagram: Diagram, overrides?: Partial<Palette>): Canvas;
+export {};

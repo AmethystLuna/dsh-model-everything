@@ -20,10 +20,18 @@
  * node with a run on its side keeps doing what it always did, because there the ports are places on the run and not
  * points at all. Sharing is the fallback, not the rule: two labelled branches of a decision leave by two vertices.
  *
- * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of the edge's longest straight
- * run, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
- * something is in the way. Labels are placed after every edge is drawn, because what a label has to avoid is the
- * whole picture.
+ * An edge's name is drawn on the edge, not beside it: it is anchored at the midpoint of one of the edge's own straight
+ * runs, over a rectangle in the page colour that masks the line behind the text, and it slides along that run when
+ * something is in the way. It tries every run - the longest first - because on a dense drawing the longest one can be
+ * crowded for its whole length while a shorter run of the same edge is clear. A label that can clear nothing still
+ * stays on its edge, takes the place with the fewest collisions, and records what it could not avoid. Labels are
+ * placed after every edge is drawn, because what a label has to avoid is the whole picture.
+ *
+ * Every route is checked before it is drawn, and the assembled drawing is checked once more: a segment may touch no
+ * box except the two the edge terminates at. A route is a proposal - a channel run, a lane, a trunk branch, a wrapped
+ * column's sideways read - and any proposal that would cross a box is handed to the router instead. When even the
+ * router cannot clear a box, the failure is reported on the canvas rather than hidden: a drawing that says which edge
+ * could not be routed is worth more than one that quietly draws it through a box.
  *
  * Pure: a diagram in, shapes out, every decision assertable.
  */
@@ -57,6 +65,23 @@ export interface BoxShape {
   initial: boolean
 }
 
+/**
+ * Why a label sits where it does.
+ *
+ * A clear label records `collisions: 0` and the run it chose. A label that could clear nothing records the collisions
+ * it could not avoid, so a reader of the drawing (or a test) can tell a crowded drawing from a placement bug. The
+ * label never leaves its own edge to earn any of these numbers.
+ */
+export interface LabelPlacement {
+  /** The straight run it sits on, 0 being the edge's longest. */
+  run: number
+  /** Everything its mask overlaps: the other labels, boxes and edges it would have had to move off its line to clear. */
+  collisions: number
+  boxes: number
+  labels: number
+  edges: number
+}
+
 export interface LinkShape {
   kind: 'link'
   x1: number
@@ -72,6 +97,8 @@ export interface LinkShape {
   dashed?: boolean
   /** The arrow the source edge stated. Undefined means the plain arrow every edge has been drawn with. */
   arrow?: EdgeArrow
+  /** Why the label sits where it does. Undefined on an edge with no label. */
+  labelPlacement?: LabelPlacement
 }
 
 export interface PathShape {
@@ -84,6 +111,8 @@ export interface PathShape {
   colour: ColourRole
   dashed?: boolean
   arrow?: EdgeArrow
+  /** Why the label sits where it does. Undefined on an edge with no label. */
+  labelPlacement?: LabelPlacement
 }
 
 /**
@@ -139,10 +168,33 @@ interface Facing {
   at?: number
 }
 
+/** One segment of a drawn route that could not be kept out of a box it does not terminate at. */
+export interface RoutingFailure {
+  /** The edge's index in the diagram. */
+  edge: number
+  from: string
+  to: string
+  /** The box the segment passes through. */
+  box: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
 export interface Canvas {
   width: number
   height: number
   shapes: Shape[]
+  /**
+   * Every place a drawn segment still passes through a box it does not terminate at, after every route was checked.
+   *
+   * A drawing should carry none. The field exists for the case where no stage and no router could find a way around:
+   * a route that cannot be drawn honestly is reported here rather than silently drawn through a box.
+   */
+  routingFailures: RoutingFailure[]
+  /** How many edge labels could not be placed clear of every box, label and other edge. */
+  labelCollisions: number
 }
 
 /** Geometry constants in one place: a container with different proportions changes these, not the rules. */
@@ -281,26 +333,58 @@ interface LabelSpot {
   height: number
 }
 
-/** The point an edge's label is drawn at.
+/** A straight run of an edge: one of the pieces a label may sit on. */
+interface Run {
+  from: Point
+  to: Point
+  /** The run is axis-aligned, so its Manhattan length is its length. */
+  length: number
+  /** Where the run sits in the route, so two equal runs keep the order they are drawn in. */
+  index: number
+}
+
+/** The runs of one edge, longest first. A label prefers the run with the most room. */
+function runsOf(points: Point[]): Run[] {
+  const runs: Run[] = []
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    const from = points[index]
+    const to = points[index + 1]
+    const length = Math.abs(to.x - from.x) + Math.abs(to.y - from.y)
+    if (length < 1) continue
+    runs.push({ from, to, length, index })
+  }
+  return runs.sort((left, right) => right.length - left.length || left.index - right.index)
+}
+
+/**
+ * The point an edge's label is drawn at.
  *
- * A label is not furniture parked beside the line: it names the transition, so it sits on the line - anchored at
- * the middle of the longest straight run of its own edge - and the writer masks the stretch of line it covers.
- * Text beside a line can be read as belonging to whatever it happens to sit next to; text that interrupts its own
- * line reads as part of it.
+ * A label is not furniture parked beside the line: it names the transition, so it sits on the line - anchored on one
+ * of its own straight runs - and the writer masks the stretch of line it covers. Text beside a line can be read as
+ * belonging to whatever it happens to sit next to; text that interrupts its own line reads as part of it.
  *
- * The anchor then has to be earned. A mask over a box hides a border, over another label it makes both
- * unreadable, and over a third edge's line it hides that line. So the label walks along its own run in small
- * steps, in both directions and bounded so its rectangle stays on that run, and takes the first place that is
- * clear. It never leaves the run: a label moved onto a neighbouring edge is a label that names the wrong thing.
+ * The anchor then has to be earned. A mask over a box hides a border, over another label it makes both unreadable,
+ * and over a third edge's line it hides that line. So the label walks along a run in small steps, in both directions
+ * and bounded so its rectangle stays on that run, and takes the first place that is clear. It tries the longest run
+ * first and then the shorter ones: on a dense drawing the longest run can be crowded for its whole length while a
+ * shorter run of the same edge is empty, and a label that gives up after one run leaves the drawing with a collision
+ * it did not have to accept.
+ *
+ * When no run offers a clear place, the label takes the place with the fewest collisions - boxes and other labels
+ * first, because text over a border hides the border and text over text is unreadable, then other edges, which a mask
+ * merely interrupts. It never leaves its own edge: a label moved onto a neighbouring edge is a label that names the
+ * wrong thing. The choice is returned with the label, so a crowded drawing can be told from a placement bug.
+ *
+ * Exported because the choice is pure and worth asserting without a layout: a test can hand it one polyline, one box
+ * and one other route, and read which run it took and what it could not clear.
  */
-function placeLabel(
+export function placeLabel(
   label: string,
-  from: Point,
-  to: Point,
+  points: Point[],
   boxes: Iterable<Box>,
   placed: LabelSpot[],
-  segments: Segment[],
-): LabelSpot {
+  otherRoutes: Segment[][],
+): LabelPlacement & LabelSpot {
   const width = textWidth(label)
   const height = LABEL_HEIGHT
   const spotAt = (x: number, y: number): LabelSpot => ({ x, y, width, height })
@@ -321,42 +405,60 @@ function placeLabel(
     spot.x - spot.width / 2 < Math.max(segment.x1, segment.x2) + LABEL_PAD &&
     spot.y + spot.height / 2 > Math.min(segment.y1, segment.y2) - LABEL_PAD &&
     spot.y - spot.height / 2 < Math.max(segment.y1, segment.y2) + LABEL_PAD
-  const clearOfBoxes = (spot: LabelSpot): boolean => {
-    for (const box of boxes) if (hitsBox(spot, box)) return false
-    for (const earlier of placed) if (hitsSpot(spot, earlier)) return false
-    return true
+  /** Everything one candidate place overlaps, counted by the thing it covers rather than by the segment that draws it. */
+  const collisionsAt = (spot: LabelSpot, run: number): LabelPlacement => {
+    let boxHits = 0
+    let labelHits = 0
+    let edgeHits = 0
+    for (const box of boxes) if (hitsBox(spot, box)) boxHits += 1
+    for (const earlier of placed) if (hitsSpot(spot, earlier)) labelHits += 1
+    for (const route of otherRoutes) {
+      for (const segment of route) {
+        if (!hitsSegment(spot, segment)) continue
+        edgeHits += 1
+        break
+      }
+    }
+    return { run, collisions: boxHits + labelHits + edgeHits, boxes: boxHits, labels: labelHits, edges: edgeHits }
   }
-  const clearOfEdges = (spot: LabelSpot): boolean => {
-    for (const segment of segments) if (hitsSegment(spot, segment)) return false
-    return true
+
+  const runs = runsOf(points)
+  if (runs.length === 0) {
+    // A route with no straight piece has no line to sit on: keep the label at the route's own point rather than move
+    // it into the air. Only a degenerate route reaches this, and the writer still draws its mask.
+    const point = points[0] ?? { x: 0, y: 0 }
+    return { ...spotAt(point.x, point.y), run: -1, collisions: 0, boxes: 0, labels: 0, edges: 0 }
   }
-  const middle = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
-  // The run is axis-aligned, so its Manhattan length is its length.
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const length = Math.abs(dx) + Math.abs(dy)
-  const ux = dx / length
-  const uy = dy / length
-  // The walk is bounded so the label's own rectangle stays on the run that names it: a mask that hangs off the
-  // end of its segment would be half over the next thing and would not read as sitting on this edge.
-  const along = (Math.abs(ux) * width) / 2 + (Math.abs(uy) * height) / 2
-  const bound = Math.max(0, length / 2 - along)
-  const walk: number[] = [0]
-  for (let step = LABEL_STEP; step <= bound + 0.001; step += LABEL_STEP) walk.push(step, -step)
-  const at = (offset: number): LabelSpot => spotAt(middle.x + ux * offset, middle.y + uy * offset)
-  for (const offset of walk) {
-    const spot = at(offset)
-    if (clearOfBoxes(spot) && clearOfEdges(spot)) return spot
+
+  let best: (LabelPlacement & LabelSpot) | undefined
+  for (const [runIndex, run] of runs.entries()) {
+    const dx = run.to.x - run.from.x
+    const dy = run.to.y - run.from.y
+    const ux = dx / run.length
+    const uy = dy / run.length
+    const middle = { x: (run.from.x + run.to.x) / 2, y: (run.from.y + run.to.y) / 2 }
+    // The walk is bounded so the label's own rectangle stays on the run that names it: a mask that hangs off the
+    // end of its segment would be half over the next thing and would not read as sitting on this edge.
+    const along = (Math.abs(ux) * width) / 2 + (Math.abs(uy) * height) / 2
+    const bound = Math.max(0, run.length / 2 - along)
+    const walk: number[] = [0]
+    for (let step = LABEL_STEP; step <= bound + 0.001; step += LABEL_STEP) walk.push(step, -step)
+    for (const offset of walk) {
+      const spot = spotAt(middle.x + ux * offset, middle.y + uy * offset)
+      const placement = collisionsAt(spot, runIndex)
+      // A clear place is the answer, and the first one is the preferred one: the search order is already the
+      // drawing's preference - longest run, own midpoint, then either side.
+      if (placement.collisions === 0) return { ...spot, ...placement }
+      if (
+        best === undefined ||
+        placement.collisions < best.collisions ||
+        (placement.collisions === best.collisions && placement.boxes + placement.labels < best.boxes + best.labels)
+      ) {
+        best = { ...spot, ...placement }
+      }
+    }
   }
-  // Nothing on the run is clear of every other edge - two runs may lie side by side for their whole length, and
-  // then no place on one is clear of the other. Covering a neighbour's line is the least of the three: text over
-  // a line still reads, while text over a box hides the box and text over text is unreadable. The label stays
-  // on its own edge, which is the one thing it may not give up.
-  for (const offset of walk) {
-    const spot = at(offset)
-    if (clearOfBoxes(spot)) return spot
-  }
-  return at(0)
+  return best as LabelPlacement & LabelSpot
 }
 
 
@@ -395,6 +497,27 @@ function drawnExtent(shapes: Shape[]): { width: number; height: number } {
   return { width, height }
 }
 
+/**
+ * The boxes a polyline passes through other than the two it terminates at.
+ *
+ * This is the drawing's one clearance rule, and it is deliberately written once: a channel run, a lane, a trunk
+ * branch, a wrapped column's sideways step and the router's fallback all have to obey the same test. A box is skipped
+ * only when it is one of the edge's own two ends, so a port that sits inside its own symbol (a cylinder's cap apex)
+ * is allowed and a segment that ends inside somebody else's box is not.
+ */
+export function boxesCrossedBy(points: Point[], from: Box, to: Box, boxes: Iterable<Box>): Box[] {
+  const crossed: Box[] = []
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    const a = points[index]
+    const b = points[index + 1]
+    for (const box of boxes) {
+      if (box === from || box === to) continue
+      if (crossesBox(a.x, a.y, b.x, b.y, box)) crossed.push(box)
+    }
+  }
+  return crossed
+}
+
 export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, options: PaletteOptions = {}): { canvas: Canvas; colours: Palette } {
   const colours = palette(overrides, options)
   const shapes: Shape[] = []
@@ -425,8 +548,15 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const drawn = new Set<string>()
   // A Map iterator is consumed by the first pass: collision checks need a list.
   const boxList = Array.from(boxes.values())
+  /** One drawn edge: the shape, its index in the diagram, and whether its label was fixed rather than placed. */
+  interface DrawnRoute {
+    shape: LinkShape | PathShape
+    edge: number
+    /** A self loop's label is drawn beside the loop by design; the placement pass leaves it alone. */
+    fixed: boolean
+  }
   /** The edges drawn as lines, in paint order: their labels are placed once every one of them is known. */
-  const routes: Array<LinkShape | PathShape> = []
+  const routes: DrawnRoute[] = []
   for (const node of diagram.nodes) {
     // A state id may repeat in a malformed model: the first placement wins and the repeat is skipped.
     if (drawn.has(node.id)) continue
@@ -1129,18 +1259,6 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const sharedEntry = new Map<number, Point>()
   for (const group of trunks.groups) sharedEntry.set(group.id, pointOn(group.target, group.side, group.entryAlong))
 
-  /** The longest straight run of a polyline: where a label has the most room. */
-  const longestRun = (points: Point[]): { from: Point; to: Point } => {
-    let best = { from: points[0], to: points[points.length - 1], length: -1 }
-    for (let index = 0; index + 1 < points.length; index += 1) {
-      const from = points[index]
-      const to = points[index + 1]
-      const length = Math.abs(to.x - from.x) + Math.abs(to.y - from.y)
-      if (length > best.length) best = { from, to, length }
-    }
-    return best
-  }
-
   /** The points a drawn edge passes through, whichever of the two shapes carries it. */
   const pointsOfRoute = (shape: LinkShape | PathShape): Point[] =>
     shape.kind === 'path' ? shape.points : [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }]
@@ -1158,7 +1276,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   /** Paint one edge as a polyline. Its label is placed once every edge is drawn; see the pass after the loop. */
-  const paintPath = (edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
+  const paintPath = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     const shape: PathShape = {
       kind: 'path',
       points,
@@ -1170,13 +1288,13 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
     }
     shapes.push(shape)
-    routes.push(shape)
+    routes.push({ shape, edge: edgeIndex, fixed: false })
   }
 
   /** Two points are a line and more of them are a polyline; both are an edge carrying a label. */
-  const paintRoute = (edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
+  const paintRoute = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     if (points.length > 2) {
-      paintPath(edge, points, colour)
+      paintPath(edgeIndex, edge, points, colour)
       return
     }
     const exit = points[0]
@@ -1195,8 +1313,17 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
     }
     shapes.push(shape)
-    routes.push(shape)
+    routes.push({ shape, edge: edgeIndex, fixed: false })
   }
+
+  /**
+   * Is this route clear of every box it does not terminate at?
+   *
+   * One test, used by every stage. A run, a lane and a trunk branch are proposals made from the layout; when the
+   * proposal meets a box - which happens when the layout reserved a run between two boundaries while the painter
+   * draws the boxes inside them - the proposal is refused and the router gets the edge.
+   */
+  const clearOfBoxes = (points: Point[], from: Box, to: Box): boolean => boxesCrossedBy(points, from, to, boxList).length === 0
 
   /**
    * The polyline through a run: out of one port, across the strip between two rows, and into the other, square to
@@ -1242,19 +1369,6 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     return true
   }
 
-  /** Does the route pass through a box it does not attach to? A run is an empty strip; a step out of a side may not be. */
-  const clearsBoxes = (points: Point[], from: Box, to: Box): boolean => {
-    for (let at = 0; at + 1 < points.length; at += 1) {
-      const a = points[at]
-      const b = points[at + 1]
-      for (const box of boxList) {
-        if (box === from || box === to) continue
-        if (crossesBox(a.x, a.y, b.x, b.y, box)) return false
-      }
-    }
-    return true
-  }
-
   /** Where a branch meets its trunk, one per merged edge. They are drawn after every line, so no line covers one. */
   const junctions: JunctionShape[] = []
   for (const [edgeIndex, edge] of diagram.edges.entries()) {
@@ -1266,7 +1380,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (edge.from === edge.to) {
       const x = source.x + source.width
       const y = source.y + source.height / 2
-      shapes.push({
+      const shape: PathShape = {
         kind: 'path',
         points: [
           { x, y: y - 9 },
@@ -1282,7 +1396,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         colour,
         ...(edge.dashed === undefined ? {} : { dashed: edge.dashed }),
         ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
-      })
+      }
+      shapes.push(shape)
+      routes.push({ shape, edge: edgeIndex, fixed: true })
       continue
     }
 
@@ -1291,7 +1407,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // A branch of an accepted bundle: out of its own port, square onto the trunk, along the trunk to the bundle's one
     // port, and in. The last leg is shared with every other branch of the group, so the target is entered once; the
     // branch still draws its own head and its own label. The junction is recorded where the branch meets the trunk,
-    // because a reader who is not shown the join reads the two lines as one line that was broken.
+    // because a reader who is not shown the join reads the two lines as one line that was broken. A branch that would
+    // cross a box is refused here as well: the planner checked it, but the painter is the last stage that knows every
+    // box the drawing actually carries.
     const groupId = trunks.groupOf.get(edgeIndex)
     if (groupId !== undefined && anchors !== undefined) {
       const group = trunks.groups[groupId] as TrunkGroup
@@ -1299,12 +1417,15 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       const branch: Point[] = isVerticalSide(group.side)
         ? [anchors.exit, { x: anchors.exit.x, y: group.at }, { x: entry.x, y: group.at }, entry]
         : [anchors.exit, { x: group.at, y: anchors.exit.y }, { x: group.at, y: entry.y }, entry]
-      paintRoute(edge, simplify(branch), colour)
-      // The join itself, read off the two ports rather than off the emitted points: a branch that drops straight into
-      // the shared port is drawn as one segment, and its junction is still where the trunk crosses it.
-      const meet = isVerticalSide(group.side) ? { x: anchors.exit.x, y: group.at } : { x: group.at, y: anchors.exit.y }
-      junctions.push({ kind: 'junction', x: meet.x, y: meet.y, colour, trunk: group.id })
-      continue
+      const points = simplify(branch)
+      if (clearOfBoxes(points, source, target)) {
+        paintRoute(edgeIndex, edge, points, colour)
+        // The join itself, read off the two ports rather than off the emitted points: a branch that drops straight
+        // into the shared port is drawn as one segment, and its junction is still where the trunk crosses it.
+        const meet = isVerticalSide(group.side) ? { x: anchors.exit.x, y: group.at } : { x: group.at, y: anchors.exit.y }
+        junctions.push({ kind: 'junction', x: meet.x, y: meet.y, colour, trunk: group.id })
+        continue
+      }
     }
 
     // A long edge follows the lane the channel stage gave it: down the exit stub, across to the lane's x on the run
@@ -1324,44 +1445,93 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       }
       if (Math.abs(previous.x - anchors.entry.x) > 0.5 && Math.abs(previous.y - anchors.entry.y) > 0.5) points.push({ x: anchors.entry.x, y: previous.y })
       points.push(anchors.entry)
-      paintPath(edge, simplify(points), colour)
-      continue
-    }
-
-    // Two rows with nothing between them: the edge is the two-bend run the channel stage stacked. A run sits in the
-    // empty strip between its own two rows and inside its own component's column, so it cannot meet a box - unless a
-    // port on a side steps out of it, and then the step is checked and a route that would meet a box is the router's.
-    const runY = placement.runs.get(edgeIndex)
-    if (runY !== undefined && anchors !== undefined && runFits(anchors, runY)) {
-      const points = runRoute(anchors, runY)
-      const mixed = isVerticalSide(anchors.exitSide) !== isVerticalSide(anchors.entrySide)
-      if (!mixed || clearsBoxes(points, source, target)) {
-        paintRoute(edge, points, colour)
+      const simplified = simplify(points)
+      if (clearOfBoxes(simplified, source, target)) {
+        paintPath(edgeIndex, edge, simplified, colour)
         continue
       }
     }
 
-    paintRoute(edge, routeEdge(source, target, boxList, anchors).points, colour)
+    // Two rows with nothing between them: the edge is the two-bend run the channel stage stacked. The run's height is
+    // an empty strip only when the two rows it was measured between are the boxes actually drawn: a run reserved
+    // between two boundaries is a strip outside them, while the painter's ports belong to boxes inside them. So the
+    // proposal is checked, not trusted, and an edge whose legs would cross a box is the router's.
+    const runY = placement.runs.get(edgeIndex)
+    if (runY !== undefined && anchors !== undefined && runFits(anchors, runY)) {
+      const points = runRoute(anchors, runY)
+      if (clearOfBoxes(points, source, target)) {
+        paintRoute(edgeIndex, edge, points, colour)
+        continue
+      }
+    }
+
+    // The router is the last stage. Its own straight-line shortcut is already refused when a box is in the way; a
+    // search that cannot finish still returns a line, and the final pass over the assembled drawing reports it.
+    paintRoute(edgeIndex, edge, routeEdge(source, target, boxList, anchors).points, colour)
   }
 
   // The dots last of the lines: a dot marks a join, so no line of the drawing may be drawn over it.
   for (const dot of junctions) shapes.push(dot)
 
+  // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate
+  // at. Each candidate route was checked before it was emitted, so this pass is the assertion that no stage slipped a
+  // segment through a box - and the place a router that found no way round is reported rather than hidden.
+  const boxEntries = Array.from(boxes.entries())
+  const routingFailures: RoutingFailure[] = []
+  for (const { shape, edge } of routes) {
+    const diagramEdge = diagram.edges[edge] as DiagramEdge
+    const source = endBox(diagramEdge.from)
+    const target = endBox(diagramEdge.to)
+    if (source === undefined || target === undefined) continue
+    for (const segment of segmentsOfRoute(shape)) {
+      for (const [id, box] of boxEntries) {
+        if (box === source || box === target) continue
+        if (!crossesBox(segment.x1, segment.y1, segment.x2, segment.y2, box)) continue
+        routingFailures.push({
+          edge,
+          from: diagramEdge.from,
+          to: diagramEdge.to,
+          box: id,
+          x1: segment.x1,
+          y1: segment.y1,
+          x2: segment.x2,
+          y2: segment.y2,
+        })
+      }
+    }
+  }
+
   // Labels last. A label has to clear every other edge, and until the last edge is drawn the painter does not know
   // where those are: this is why the whole pass exists rather than a decision made edge by edge.
-  const routeSegments = routes.map((shape) => segmentsOfRoute(shape))
+  const routeSegments = routes.map(({ shape }) => segmentsOfRoute(shape))
   const placedLabels: LabelSpot[] = []
-  routes.forEach((shape, index) => {
-    const run = longestRun(pointsOfRoute(shape))
-    // The middle of the longest run is where the label belongs; a label with nothing to avoid stays exactly there.
-    let spot: LabelSpot = { x: (run.from.x + run.to.x) / 2, y: (run.from.y + run.to.y) / 2, width: textWidth(shape.label), height: LABEL_HEIGHT }
-    if (shape.label !== '') {
-      spot = placeLabel(shape.label, run.from, run.to, boxList, placedLabels, routeSegments.flatMap((list, at) => (at === index ? [] : list)))
-      placedLabels.push(spot)
+  routes.forEach(({ shape, fixed }, at) => {
+    if (fixed) {
+      if (shape.label !== '') {
+        placedLabels.push({ x: shape.labelX, y: shape.labelY, width: textWidth(shape.label), height: LABEL_HEIGHT })
+      }
+      return
     }
-    shape.labelX = spot.x
-    shape.labelY = spot.y
+    if (shape.label === '') return
+    const placement = placeLabel(
+      shape.label,
+      pointsOfRoute(shape),
+      boxList,
+      placedLabels,
+      routeSegments.filter((_, other) => other !== at),
+    )
+    shape.labelX = placement.x
+    shape.labelY = placement.y
+    shape.labelPlacement = {
+      run: placement.run,
+      collisions: placement.collisions,
+      boxes: placement.boxes,
+      labels: placement.labels,
+      edges: placement.edges,
+    }
+    placedLabels.push({ x: placement.x, y: placement.y, width: placement.width, height: placement.height })
   })
+  const labelCollisions = routes.reduce((total, { shape }) => total + ((shape.labelPlacement?.collisions ?? 0) > 0 ? 1 : 0), 0)
 
   shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12, text: diagram.title, colour: 'text' })
 
@@ -1389,7 +1559,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const canvasWidth = Math.max(width, extent.width + MARGIN)
   const canvasHeight = Math.max(height, extent.height + MARGIN)
 
-  return { canvas: { width: Math.round(canvasWidth), height: Math.round(canvasHeight), shapes }, colours }
+  return {
+    canvas: { width: Math.round(canvasWidth), height: Math.round(canvasHeight), shapes, routingFailures, labelCollisions },
+    colours,
+  }
 }
 
 export function paint(diagram: Diagram, overrides: Partial<Palette> = {}): Canvas {

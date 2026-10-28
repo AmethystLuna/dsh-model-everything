@@ -41,9 +41,14 @@ export interface Placement {
     groupRects: Map<string, Box>;
     width: number;
     lanes: Map<number, Lane>;
-    /** The height of the one horizontal run an edge between two adjacent rows needs. */
-    runs: Map<number, number>;
-    /** Edges whose two ends ended up in different wrapped columns: they are read across, not down. */
+    /**
+     * The height of the one horizontal run an edge between two adjacent rows needs.
+     *
+     * A run is measured between two rows of the level that produced it. When a row is a boundary, that strip is the space
+     * outside the boundary while the painter draws the boxes inside it, so the run is a proposal rather than a fact: the
+     * painter clears it against every box and hands the edge to the router when a leg would cross one.
+     */
+    runs: Map<number, number>; /** Edges whose two ends ended up in different wrapped columns: they are read across, not down. */
     across: Set<number>;
 }
 /** Geometry constants in one place: a container with different proportions changes these, not the rules. */
