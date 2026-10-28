@@ -22,6 +22,7 @@ question is what the picture shows.
 | "what changed between these two diagrams", "did this package move" | `diagram_diff`: boundaries added, removed, renamed or re-parented, and nodes that changed owner |
 | A source in a notation the plugin does not draw | Refused with the line number; `diagram_render` still draws everything else and reports what it skipped |
 | An edge whose straight line would cross a component | Routed around it on a sparse grid (candidate lines from each box edge, A* with a bend penalty), so a line never reads as a connection that is not there |
+| A batch of arrows into one component from the same side | Drawn as one **bundle**: a straight run outside the target, one shared entry, and a junction dot where each branch joins. Only ends agreeing on target, entry side and arrow meaning merge, from distinct sources, and three is the least that does - so a decision's two branches stay two lines and two relations between one pair stay apart |
 | A label with a hard line break, or one too long for its box | `<br>`, `<br/>` and a real newline end a line; anything longer than the drawing's line width wraps. The box is sized from the lines it draws. An edge label is drawn on its edge - centred on the middle of the edge's longest straight run, over a mask in the page colour - and slides along that run to clear a box, another label or another edge's line |
 | A diagram already in a file, to link from a document | `diagram_render` with `out`, then link the SVG |
 

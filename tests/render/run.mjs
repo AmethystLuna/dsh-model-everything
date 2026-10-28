@@ -11,8 +11,9 @@ import { toSvg } from '../../lib/render/svg.js'
 import { viewModel } from '../../lib/render/viewmodel.js'
 import { emptyDiagram, labelOf } from '../../lib/render/model.js'
 import { LINE_HEIGHT, MAX_LINE_CHARS, TEXT_PADDING, MAX_NODE_WIDTH, explicitLines, measure, textWidth, wrapLine } from '../../lib/render/text.js'
-import { anchor, approachSides, crossesBox, routeEdge, simplify } from '../../lib/render/route.js'
+import { anchor, approachSides, crossesBox, ROUTE_STUB, routeEdge, simplify } from '../../lib/render/route.js'
 import { render } from '../../lib/render/index.js'
+import { planTrunks } from '../../lib/render/trunk.js'
 
 let failures = 0
 const test = (name, body) => {
@@ -987,6 +988,8 @@ test('every drawn segment is axis-aligned, on every kind of drawing', () => {
     ['graph TD', '  subgraph Ingest', '    a[Gateway] --> b[Auth]', '    b --> c[Order service]', '  end', '  subgraph Fulfil', '    c --> d[(Orders)]', '    d --> e[Warehouse]', '  end', '  e --> f[Reconcile]', '  f -->|drift| a'].join(String.fromCharCode(10)),
     // A pair carrying three relations: the fan moves each edge, and a fan is still a run of axis-aligned segments.
     '@startuml\nAPI --> DB\nAPI *-- DB\nAPI o-- DB\n@enduml',
+    // A merged bundle: the trunk is perpendicular to the side it enters, so it is axis-aligned like any other run.
+    ['graph TD', '  s1[Alpha service] --> m[Merge]', '  s2[Beta service] --> m', '  s3[Gamma service] --> m', '  s4[Delta service] --> m'].join(String.fromCharCode(10)),
   ]
   for (const source of sources) {
     const { canvas } = paintWith(render({ source }).diagram)
@@ -2481,13 +2484,14 @@ const BENCH_FIXTURES = {
   mesh: ['graph TD', '  a[A] --> b[B]', '  a --> c[C]', '  b --> d[D]', '  c --> d', '  d --> e[E]', '  e -->|loop| b', '  a --> e'],
   multiedge: ['graph TD', '  a[API] --> b[DB]', '  a --> b'],
   symbols: ['graph TD', '  a[Start] --> b{Ready?}', '  b -->|yes| c[(Store)]', '  b -->|no| d([Retry])', '  c --> e[[Commit]]', '  d --> e', '  b --> e', '  e --> f<<Audit>>'],
+  fanin: ['graph TD', '  s1[Alpha service] --> m[Merge]', '  s2[Beta service] --> m', '  s3[Gamma service] --> m', '  s4[Delta service] --> m'],
   circle: ['@startuml', 'usecase "Hub" as hub', 'component "Left" as l', 'component "Right" as r', 'component "Below" as below', 'hub --> l', 'hub --> r', 'hub --> below', 'l --> hub', '@enduml'],
 }
 
 test('the benchmark drawings carry no edge through a box', () => {
-  // The seven fixtures the layout benchmark measures, drawn and checked. A cheaper pair may move a port to a side
-  // the channel stage did not plan for; what it may never do is send a segment through a box the edge does not
-  // attach to, and it may not drop an edge either.
+  // Every fixture the layout benchmark measures, drawn and checked. A cheaper pair may move a port to a side the
+  // channel stage did not plan for; what it may never do is send a segment through a box the edge does not attach
+  // to, and it may not drop an edge either.
   for (const [name, lines] of Object.entries(BENCH_FIXTURES)) {
     const rendered = render({ source: lines.join(NL) })
     const { canvas } = paintWith(rendered.diagram)
@@ -2717,6 +2721,287 @@ test('a degenerate arrowhead is not written rather than written wrong', () => {
   if (dropped !== 0) throw new Error('dropped: ' + String(dropped))
   if (markup.split('<polygon').length - 1 !== 1) throw new Error('the zero-length head was drawn')
   if (!markup.includes('go')) throw new Error('the labelled edge lost its label')
+})
+
+// ------------------------------------------------------------------------------------------------ fan-in trunks
+
+/** Four services in one row, all pointing at one node below them: the fan-in a trunk exists for. */
+const FANIN_SOURCES = [
+  'graph TD',
+  '  s1[Alpha service] --> m[Merge]',
+  '  s2[Beta service] --> m',
+  '  s3[Gamma service] --> m',
+  '  s4[Delta service] --> m',
+].join(NL)
+
+/** The junction dots a drawing carries, in paint order. */
+const junctionsOf = (canvas) => canvas.shapes.filter((shape) => shape.kind === 'junction')
+
+/** The point an edge ends at. */
+const endOf = (shape) => routePointsOf(shape)[routePointsOf(shape).length - 1]
+
+/** The point an edge starts from. */
+const startOf = (shape) => routePointsOf(shape)[0]
+
+/** The box with this label. */
+const boxNamed = (canvas, label) => {
+  const box = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === label)
+  if (box === undefined) throw new Error('no box labelled ' + label)
+  return box
+}
+
+/** The distinct points the edges of a drawing end at on `target`'s entry side. */
+const endsOn = (canvas, target) => {
+  const points = routesOf(canvas).map(endOf)
+  return new Set(points.map((point) => String(point.x) + ',' + String(point.y)))
+}
+
+test('four arrows into one side merge into one trunk, one port and a junction per branch', () => {
+  const { canvas } = paintWith(render({ source: FANIN_SOURCES }).diagram)
+  const routes = routesOf(canvas)
+  if (routes.length !== 4) throw new Error('edges drawn: ' + String(routes.length))
+  const target = boxNamed(canvas, 'Merge')
+  const ends = routes.map(endOf)
+  // One port: every branch ends at one point, which is how a reader sees one bundle instead of a comb of four.
+  const ports = new Set(ends.map((point) => String(point.x) + ',' + String(point.y)))
+  if (ports.size !== 1) throw new Error('the fan-in did not collapse onto one port: ' + [...ports].join(' '))
+  if (ends[0].y !== target.y) throw new Error('the shared port is not on the side the arrows arrive at')
+  // One trunk: every junction on one line, perpendicular to that side and one stub outside the box.
+  const dots = junctionsOf(canvas)
+  // One dot per branch meeting the trunk - four branches are four joins, not one dot per group.
+  if (dots.length !== 4) throw new Error('junctions: ' + String(dots.length) + ' for four branches')
+  if (new Set(dots.map((dot) => dot.y)).size !== 1) throw new Error('the junctions are not on one trunk')
+  if (new Set(dots.map((dot) => dot.trunk)).size !== 1) throw new Error('the four dots do not name one trunk')
+  const at = dots[0].y
+  if (Math.abs(target.y - ROUTE_STUB - at) > 0.01) throw new Error('the trunk is not one stub above the target: ' + String(target.y - at))
+  // Each junction is where a branch of its own meets the trunk, not the shared entry repeated four times.
+  const exitXs = [...new Set(routes.map((shape) => startOf(shape).x))].sort((left, right) => left - right)
+  const dotXs = [...new Set(dots.map((dot) => dot.x))].sort((left, right) => left - right)
+  if (dotXs.length !== 4) throw new Error('two branches joined the trunk at one point: ' + JSON.stringify(dotXs))
+  if (JSON.stringify(exitXs) !== JSON.stringify(dotXs)) throw new Error('a junction is not below its branch: ' + JSON.stringify([exitXs, dotXs]))
+  // The run itself: three branches travel along the trunk at the trunk's own height and reach the shared port; the
+  // fourth is the branch the port was taken from, and reaches it as the straight drop it already was.
+  let alongTheTrunk = 0
+  for (const shape of routes) {
+    const run = segmentsOfShape(shape).find((segment) => Math.abs(segment.y1 - at) < 0.01 && Math.abs(segment.y2 - at) < 0.01)
+    if (run === undefined) {
+      if (routePointsOf(shape).length !== 2 || startOf(shape).x !== ends[0].x) {
+        throw new Error('a branch neither joins the trunk nor is the straight entry: ' + JSON.stringify(routePointsOf(shape)))
+      }
+      continue
+    }
+    alongTheTrunk += 1
+    if (Math.min(run.x1, run.x2) > ends[0].x + 0.01 || Math.max(run.x1, run.x2) < ends[0].x - 0.01) {
+      throw new Error('the trunk does not reach the shared port')
+    }
+  }
+  if (alongTheTrunk !== 3) throw new Error('branches travelling along the trunk: ' + String(alongTheTrunk))
+  // The merge spends no bend it does not have to: three branches keep the two corners a run costs, and the branch the
+  // shared port was taken from is still the straight drop it was before the merge.
+  const bends = routes.reduce((total, shape) => total + Math.max(0, routePointsOf(shape).length - 2), 0)
+  if (bends > 6) throw new Error('the merge cost extra bends: ' + String(bends))
+  if (routes.filter((shape) => routePointsOf(shape).length === 2).length !== 1) {
+    throw new Error('the straight branch was not the one the shared port was taken from')
+  }
+})
+
+test('two arrows do not merge, and three are the least a trunk takes', () => {
+  const two = ['graph TD', '  s1[A] --> m[Merge]', '  s2[B] --> m'].join(NL)
+  const pair = paintWith(render({ source: two }).diagram)
+  if (junctionsOf(pair.canvas).length !== 0) throw new Error('two edges were merged, which reads as one thick line')
+  if (endsOn(pair.canvas, boxNamed(pair.canvas, 'Merge')).size !== 2) throw new Error('the two edges share a port')
+  // The boundary of the rule: a third arrow is the least a trunk takes, and it does merge.
+  const three = ['graph TD', '  s1[A] --> m[Merge]', '  s2[B] --> m', '  s3[C] --> m'].join(NL)
+  const merged = paintWith(render({ source: three }).diagram)
+  const dots = junctionsOf(merged.canvas)
+  if (dots.length !== 3) throw new Error('three arrows did not merge: ' + String(dots.length) + ' junctions')
+  if (new Set(dots.map((dot) => dot.trunk)).size !== 1) throw new Error('three branches did not share one trunk')
+  if (endsOn(merged.canvas, boxNamed(merged.canvas, 'Merge')).size !== 1) throw new Error('three arrows kept three ports')
+})
+
+test('two relations between one pair stay apart even beside a third arrow into the same node', () => {
+  // The multi-edge rule is older than the trunk, and a trunk may not undo it: a pair whose two statements were merged
+  // would read as one relation, which is the defect that rule exists to prevent.
+  const source = ['graph TD', '  a[A] --> t[Merge]', '  a --> t', '  b[B] --> t'].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  if (junctionsOf(canvas).length !== 0) throw new Error('a multi-edge was merged into a trunk')
+  const ends = routesOf(canvas).map(endOf)
+  const ports = new Set(ends.map((point) => String(point.x) + ',' + String(point.y)))
+  if (ports.size !== 3) throw new Error('the three arrows do not keep a port each: ' + JSON.stringify(ends))
+  if (ends[0].x === ends[1].x) throw new Error('the pair collapsed onto one port')
+})
+
+test('a composition and an association into one node are never merged with each other', () => {
+  // Three associations and one composition into one side. The associations are one bundle; the composition travels
+  // alone, because drawing it on their trunk would say one relation where the source stated two.
+  const source = [
+    '@startuml',
+    'component "S1" as s1',
+    'component "S2" as s2',
+    'component "S3" as s3',
+    'component "S4" as s4',
+    'component "M" as m',
+    's1 --> m',
+    's2 --> m',
+    's3 --> m',
+    's4 *-- m',
+    '@enduml',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const routes = routesOf(canvas)
+  if (routes.length !== 4) throw new Error('edges drawn: ' + String(routes.length))
+  const dots = junctionsOf(canvas)
+  if (dots.length !== 3) throw new Error('the three associations did not merge: ' + String(dots.length) + ' junctions')
+  if (new Set(dots.map((dot) => dot.trunk)).size !== 1) throw new Error('the associations did not share one trunk')
+  const composition = routes.find((shape) => shape.arrow === 'composition')
+  if (composition === undefined) throw new Error('the composition lost its arrow type')
+  const associations = routes.filter((shape) => shape.arrow !== 'composition')
+  const bundle = new Set(associations.map((shape) => String(endOf(shape).x) + ',' + String(endOf(shape).y)))
+  if (bundle.size !== 1) throw new Error('the associations do not share one port')
+  if (bundle.has(String(endOf(composition).x) + ',' + String(endOf(composition).y))) {
+    throw new Error('the composition was drawn into the associations\' shared port')
+  }
+  // Two ports on the target: one for the bundle, one for the relation that means something else.
+  if (endsOn(canvas, boxNamed(canvas, 'M')).size !== 2) throw new Error('the target does not keep the composition apart')
+})
+
+test('every merged edge keeps its own label and its own arrowhead', () => {
+  const source = [
+    '@startuml',
+    'component "S1" as s1',
+    'component "S2" as s2',
+    'component "S3" as s3',
+    'component "M" as m',
+    's1 --> m : one',
+    's2 --> m : two',
+    's3 --> m : three',
+    '@enduml',
+  ].join(NL)
+  const rendered = render({ source })
+  const routes = routesOf(rendered.canvas)
+  if (routes.length !== 3) throw new Error('edges drawn: ' + String(routes.length))
+  if (junctionsOf(rendered.canvas).length !== 3) throw new Error('the fixture did not merge')
+  const labels = routes.map((shape) => shape.label).sort()
+  if (JSON.stringify(labels) !== JSON.stringify(['one', 'three', 'two'])) throw new Error('a label was lost: ' + JSON.stringify(labels))
+  for (const shape of routes) {
+    if (shape.arrow !== 'association') throw new Error('a merged edge lost its arrow type: ' + String(shape.arrow))
+  }
+  const heads = headsOf(rendered.markup)
+  if (heads.length !== 3) throw new Error('heads drawn: ' + String(heads.length) + ' for three merged edges')
+  // Each label still sits on the edge it names, though the edge now ends on a trunk rather than on its own port.
+  for (const shape of routes) {
+    if (distanceToRoute(shape, { x: shape.labelX, y: shape.labelY }) > 2) {
+      throw new Error('label "' + shape.label + '" left its own branch')
+    }
+  }
+  // The labels are three different words on one bundle, and no two are drawn over each other.
+  const spots = labelRectsOf(rendered.canvas)
+  if (spots.length !== 3) throw new Error('labels placed: ' + String(spots.length))
+  for (let left = 0; left < spots.length; left += 1) {
+    for (let right = left + 1; right < spots.length; right += 1) {
+      if (labelsOverlap(spots[left], spots[right])) throw new Error('two labels of the bundle overlap')
+    }
+  }
+})
+
+test('a merged drawing is the same drawing twice', () => {
+  // The merge is a decision over maps and iteration order; a decision that depends on either is not a drawing.
+  const first = render({ source: FANIN_SOURCES })
+  const second = render({ source: FANIN_SOURCES })
+  if (first.markup !== second.markup) throw new Error('two renders of one source differ')
+  const shapes = JSON.stringify(first.canvas.shapes)
+  if (shapes !== JSON.stringify(second.canvas.shapes)) throw new Error('the shapes of two renders differ')
+  // And the dots a test counts are the ones the markup draws.
+  const circles = (first.markup.match(/<circle /g) ?? []).length
+  if (circles !== junctionsOf(first.canvas).length) throw new Error('markup circles: ' + String(circles))
+})
+
+// The planner's own decision table. What a drawn fixture can show is covered above; the rules that need boxes in
+// places a drawing does not put them - a run across a box, two bundles on one line - are decided here.
+const trunkNodes = () => ({
+  t: { x: 200, y: 200, width: 100, height: 27 },
+  a: { x: 100, y: 100, width: 50, height: 27 },
+  b: { x: 160, y: 100, width: 50, height: 27 },
+  c: { x: 220, y: 100, width: 50, height: 27 },
+  d: { x: 280, y: 100, width: 50, height: 27 },
+})
+
+/** One planner input: sources in one row above their targets, with the ports read off the boxes. */
+const trunkInput = (ends, { nodes = trunkNodes(), extra = [], ports = {} } = {}) => ({
+  ends,
+  boxOf: (id) => nodes[id],
+  boxes: [...Object.values(nodes), ...extra],
+  exitPortOf: (index) => {
+    const source = nodes[ends[index].from]
+    return { x: source.x + source.width / 2, y: source.y + source.height }
+  },
+  entryPortOf: (index) => {
+    const target = nodes[ends[index].to]
+    return ports[ends[index].to] ?? { x: target.x + target.width / 2, y: target.y }
+  },
+})
+
+const trunkEndAt = (index, from, extra = {}) => ({ index, from, to: 't', exit: 'bottom', entry: 'top', runY: 160, ...extra })
+
+test('the trunk planner refuses an end for each rule, and only that end', () => {
+  const nodes = trunkNodes()
+  const three = [trunkEndAt(0, 'a'), trunkEndAt(1, 'b'), trunkEndAt(2, 'c')]
+  const plan = planTrunks(trunkInput(three))
+  if (plan.groups.length !== 1) throw new Error('the fixture does not merge')
+  const group = plan.groups[0]
+  if (group.at !== nodes.t.y - ROUTE_STUB) throw new Error('the trunk is not one stub outside the target: ' + String(group.at))
+  if (group.lead !== 2) throw new Error('the shared entry is not the straightest branch: ' + String(group.lead))
+  if (group.from !== 125 || group.to !== 250) throw new Error('the run does not span the branches and the port: ' + String([group.from, group.to]))
+
+  if (planTrunks(trunkInput(three.slice(0, 2))).groups.length !== 0) throw new Error('two ends merged')
+
+  const pair = [trunkEndAt(0, 'a'), trunkEndAt(1, 'a'), trunkEndAt(2, 'b')]
+  if (planTrunks(trunkInput(pair)).groups.length !== 0) throw new Error('a pair of relations about one node merged')
+
+  const four = [trunkEndAt(0, 'a'), trunkEndAt(1, 'b'), trunkEndAt(2, 'c'), trunkEndAt(3, 'd')]
+  const whole = planTrunks(trunkInput(four))
+  if (whole.groups.length !== 1 || whole.groups[0].members.length !== 4) throw new Error('four matching ends did not merge')
+  const split = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { arrow: 'composition' })]))
+  if (split.groups.length !== 1 || split.groups[0].members.includes(3)) throw new Error('a different arrow joined a trunk')
+
+  const mixed = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { exit: 'right' })]))
+  if (mixed.groups.length !== 1 || mixed.groups[0].members.includes(3)) throw new Error('an end on the other axis joined a trunk')
+  const away = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { exit: 'top' })]))
+  if (away.groups.length !== 1 || away.groups[0].members.includes(3)) throw new Error('an end facing away joined a trunk')
+  const lane = planTrunks(trunkInput([...four.slice(0, 3), { index: 3, from: 'd', to: 't', exit: 'bottom', entry: 'top' }]))
+  if (lane.groups.length !== 1 || lane.groups[0].members.includes(3)) throw new Error('an edge with no run of its own joined a trunk')
+
+  // A box across the run refuses the whole bundle: a trunk drawn over a box is worse than no trunk.
+  const blocked = planTrunks(trunkInput(three, { extra: [{ x: 150, y: 180, width: 25, height: 8 }] }))
+  if (blocked.groups.length !== 0) throw new Error('a trunk was drawn across a box')
+  // The same run with the box out of the way is accepted, so the refusal is the box and not the input.
+  if (planTrunks(trunkInput(three, { extra: [{ x: 150, y: 300, width: 25, height: 8 }] })).groups.length !== 1) {
+    throw new Error('a box out of the way refused the trunk')
+  }
+})
+
+test('two bundles are never drawn on one trunk line', () => {
+  /** A second target and its three sources, `base` being the target's left edge. */
+  const second = (base) => ({
+    t2: { x: base, y: 200, width: 100, height: 27 },
+    e: { x: base - 220, y: 100, width: 50, height: 27 },
+    f: { x: base - 180, y: 100, width: 50, height: 27 },
+    g: { x: base - 140, y: 100, width: 50, height: 27 },
+  })
+  const first = [trunkEndAt(0, 'a'), trunkEndAt(1, 'b'), trunkEndAt(2, 'c')]
+  const other = (start) => [
+    { index: start, from: 'e', to: 't2', exit: 'bottom', entry: 'top', runY: 160 },
+    { index: start + 1, from: 'f', to: 't2', exit: 'bottom', entry: 'top', runY: 160 },
+    { index: start + 2, from: 'g', to: 't2', exit: 'bottom', entry: 'top', runY: 160 },
+  ]
+  const ports = (base) => ({ t2: { x: base + 50, y: 200 } })
+  // The second bundle's run would lie on the first one's line: one line, one bundle, so the later one travels alone.
+  const onTop = planTrunks(trunkInput([...first, ...other(3)], { nodes: { ...trunkNodes(), ...second(340) }, ports: ports(340) }))
+  if (onTop.groups.length !== 1) throw new Error('two trunks were drawn on one line: ' + String(onTop.groups.length))
+  if (onTop.groups[0].target !== 't') throw new Error('the later group kept the line')
+  // Moved clear, both bundles are accepted: the refusal was the shared line, not the second target.
+  const apart = planTrunks(trunkInput([...first, ...other(3)], { nodes: { ...trunkNodes(), ...second(500) }, ports: ports(500) }))
+  if (apart.groups.length !== 2) throw new Error('a separate trunk was refused: ' + String(apart.groups.length))
 })
 
 if (failures > 0) {

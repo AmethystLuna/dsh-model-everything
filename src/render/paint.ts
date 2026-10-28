@@ -29,6 +29,7 @@
 import { MARGIN, place, textOf, type Box } from './place.js'
 import { PORT_INSET } from './channels.js'
 import { anchor, approachSides, crossesBox, normalOf, ROUTE_STUB, routeEdge, simplify, type Ports, type Side } from './route.js'
+import { planTrunks, type TrunkEnd, type TrunkGroup } from './trunk.js'
 import { cylinderApex, cylinderCaps, hasDiscretePorts, hexagonCut, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
@@ -83,6 +84,21 @@ export interface PathShape {
   arrow?: EdgeArrow
 }
 
+/**
+ * A junction dot: the place one branch of a merged bundle meets the bundle's trunk.
+ *
+ * The dot is not decoration. Two lines that meet at a right angle read as a crossing unless one of them is marked as
+ * joining the other, and a bundle whose branches are not marked reads as a set of broken lines rather than a merge.
+ */
+export interface JunctionShape {
+  kind: 'junction'
+  x: number
+  y: number
+  colour: ColourRole
+  /** The trunk the dot belongs to: one dot per branch, one trunk id per bundle. */
+  trunk: number
+}
+
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
   kind: 'group'
@@ -112,7 +128,7 @@ export interface TitleShape {
   colour: ColourRole
 }
 
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | JunctionShape | CaptionShape | TitleShape
 
 /** Which side of each box an edge leaves by and arrives at, and, for a long edge, the lane x it meets there. */
 interface Facing {
@@ -351,6 +367,9 @@ function drawnExtent(shapes: Shape[]): { width: number; height: number } {
       case 'caption':
       case 'title':
         consider(textWidth((shape as { lines?: string[]; text?: string }).lines?.[0] ?? '') + shape.x, shape.y + 12)
+        break
+      case 'junction':
+        // A dot sits on a line that already reaches further than it does: counting it would never widen the canvas.
         break
     }
   }
@@ -909,6 +928,39 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     })
   }
 
+  // A batch of arrows into one box from one side is one bundle, not a comb. The ports are placed above, so the
+  // decision is made here, from the ports the drawing actually gave: which ends may merge is the planner's answer
+  // (`trunk.ts` carries the rules), and this module supplies what only it knows - which edges have a run of their
+  // own, and where each port landed.
+  const trunkEnds: TrunkEnd[] = []
+  diagram.edges.forEach((edge, index) => {
+    const entry = facing[index]
+    const anchors = anchorsFor.get(index)
+    if (entry === undefined || anchors === undefined) return
+    const runY = placement.runs.get(index)
+    trunkEnds.push({
+      index,
+      from: edge.from,
+      to: edge.to,
+      exit: entry.exit,
+      entry: entry.entry,
+      ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
+      ...(runY === undefined ? {} : { runY }),
+    })
+  })
+  const trunks = planTrunks({
+    ends: trunkEnds,
+    // Only a node's own box is a trunk target: an arrow into a boundary points past it, not at it.
+    boxOf: (id) => boxes.get(id),
+    boxes: boxList,
+    exitPortOf: (index) => anchorsFor.get(index)?.exit,
+    entryPortOf: (index) => anchorsFor.get(index)?.entry,
+  })
+  // The one port each accepted bundle enters by: every branch of the group ends at the lead branch's own port, so the
+  // target carries one relation's worth of ports however many arrows point at it.
+  const sharedEntry = new Map<number, Point>()
+  for (const group of trunks.groups) sharedEntry.set(group.id, anchorsFor.get(group.lead)?.entry as Point)
+
   /** The longest straight run of a polyline: where a label has the most room. */
   const longestRun = (points: Point[]): { from: Point; to: Point } => {
     let best = { from: points[0], to: points[points.length - 1], length: -1 }
@@ -1035,6 +1087,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     return true
   }
 
+  /** Where a branch meets its trunk, one per merged edge. They are drawn after every line, so no line covers one. */
+  const junctions: JunctionShape[] = []
   for (const [edgeIndex, edge] of diagram.edges.entries()) {
     const source = endBox(edge.from)
     const target = endBox(edge.to)
@@ -1065,6 +1119,25 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     }
 
     const anchors = anchorsFor.get(edgeIndex)
+
+    // A branch of an accepted bundle: out of its own port, square onto the trunk, along the trunk to the bundle's one
+    // port, and in. The last leg is shared with every other branch of the group, so the target is entered once; the
+    // branch still draws its own head and its own label. The junction is recorded where the branch meets the trunk,
+    // because a reader who is not shown the join reads the two lines as one line that was broken.
+    const groupId = trunks.groupOf.get(edgeIndex)
+    if (groupId !== undefined && anchors !== undefined) {
+      const group = trunks.groups[groupId] as TrunkGroup
+      const entry = sharedEntry.get(groupId) as Point
+      const branch: Point[] = isVerticalSide(group.side)
+        ? [anchors.exit, { x: anchors.exit.x, y: group.at }, { x: entry.x, y: group.at }, entry]
+        : [anchors.exit, { x: group.at, y: anchors.exit.y }, { x: group.at, y: entry.y }, entry]
+      paintRoute(edge, simplify(branch), colour)
+      // The join itself, read off the two ports rather than off the emitted points: a branch that drops straight into
+      // the shared port is drawn as one segment, and its junction is still where the trunk crosses it.
+      const meet = isVerticalSide(group.side) ? { x: anchors.exit.x, y: group.at } : { x: group.at, y: anchors.exit.y }
+      junctions.push({ kind: 'junction', x: meet.x, y: meet.y, colour, trunk: group.id })
+      continue
+    }
 
     // A long edge follows the lane the channel stage gave it: down the exit stub, across to the lane's x on the run
     // the gap was assigned, down the lane, and across to the entry stub. The spine carries one point per gap, so the
@@ -1102,6 +1175,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
     paintRoute(edge, routeEdge(source, target, boxList, anchors).points, colour)
   }
+
+  // The dots last of the lines: a dot marks a join, so no line of the drawing may be drawn over it.
+  for (const dot of junctions) shapes.push(dot)
 
   // Labels last. A label has to clear every other edge, and until the last edge is drawn the painter does not know
   // where those are: this is why the whole pass exists rather than a decision made edge by edge.

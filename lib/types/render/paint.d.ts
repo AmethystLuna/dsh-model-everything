@@ -72,6 +72,20 @@ export interface PathShape {
     dashed?: boolean;
     arrow?: EdgeArrow;
 }
+/**
+ * A junction dot: the place one branch of a merged bundle meets the bundle's trunk.
+ *
+ * The dot is not decoration. Two lines that meet at a right angle read as a crossing unless one of them is marked as
+ * joining the other, and a bundle whose branches are not marked reads as a set of broken lines rather than a merge.
+ */
+export interface JunctionShape {
+    kind: 'junction';
+    x: number;
+    y: number;
+    colour: ColourRole;
+    /** The trunk the dot belongs to: one dot per branch, one trunk id per bundle. */
+    trunk: number;
+}
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
     kind: 'group';
@@ -98,7 +112,7 @@ export interface TitleShape {
     text: string;
     colour: ColourRole;
 }
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape;
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | JunctionShape | CaptionShape | TitleShape;
 export interface Canvas {
     width: number;
     height: number;

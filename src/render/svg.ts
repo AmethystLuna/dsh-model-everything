@@ -131,6 +131,10 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
       edgeLabel(shape.label, shape.labelX, shape.labelY, colours)
     )
   },
+  // A junction dot: the visible answer to "is this a join or a crossing?". Filled in the line's own colour, so it
+  // reads as the line thickening where a branch meets it rather than as a new mark on the page.
+  junction: (shape, colours) =>
+    '<circle cx="' + n(shape.x) + '" cy="' + n(shape.y) + '" r="2.5" fill="' + colours[shape.colour] + '" />',
   title: (shape, colours) => {
     return '<text x="' + n(shape.x) + '" y="' + n(shape.y) + '" font-size="12" fill="' + colours[shape.colour] + '">' + escape(shape.text) + '</text>'
   },
