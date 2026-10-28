@@ -690,8 +690,14 @@ test('two edges between one pair take a port each and share no segment', () => {
   for (const end of ends) if (end.y !== target.y) throw new Error('a port is not on the target top side: ' + JSON.stringify(end))
   if (ends[0].x === ends[1].x) throw new Error('the two edges share a target port: ' + String(ends[0].x))
   const middle = target.x + target.width / 2
-  if (ends[0].x !== middle) throw new Error('the first edge did not keep the middle: ' + String(ends[0].x) + ' vs ' + String(middle))
-  if (ends[1].x !== middle + MULTI_EDGE_SPACING) throw new Error('the second edge is not one spacing over: ' + String(ends[1].x))
+  // A side that carries two ports spreads them symmetrically about its middle, one fan spacing apart: the pair reads
+  // as one relation drawn twice only if both ports lean the same way, and the fan's offsets are (0, +d) otherwise.
+  if (Math.abs(ends[0].x - middle + (ends[1].x - middle)) > 0.01) {
+    throw new Error('the two ports are not symmetric about the middle: ' + JSON.stringify(ends.map((end) => end.x - middle)))
+  }
+  if (Math.abs(Math.abs(ends[0].x - ends[1].x) - MULTI_EDGE_SPACING) > 0.01) {
+    throw new Error('the two ports are not one spacing apart: ' + String(Math.abs(ends[0].x - ends[1].x)))
+  }
   // Both ends differ, not only the target: two edges that met at one box would still read as one edge there.
   const starts = routes.map((shape) => routePointsOf(shape)[0])
   if (starts[0].x === starts[1].x) throw new Error('the two edges share a source port')
@@ -2234,7 +2240,7 @@ test('a wrapped column edge meets a circle at the left and right cardinal points
 
 test('a rectangle still spreads two ports along one side', () => {
   // The guard against over-constraining: the rule is per symbol, and a rectangle is the symbol that always had a
-  // side. Its two ports stay apart, one fan spacing apart, exactly where they were.
+  // side. Its two ports stay apart, one fan spacing apart, and the pair is symmetric about the middle of the side.
   const { canvas } = paintWith(pairDiagram([{ label: '' }, { label: '' }]))
   const target = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'b')
   const ends = routesOf(canvas).map((shape) => endsOfRoute(shape)[1])
@@ -2242,7 +2248,8 @@ test('a rectangle still spreads two ports along one side', () => {
   for (const end of ends) if (end.y !== target.y && end.y !== target.y + target.height) throw new Error('a port left the rectangle side: ' + JSON.stringify(end))
   const middle = target.x + target.width / 2
   const offsets = ends.map((end) => end.x - middle).sort((left, right) => left - right)
-  if (JSON.stringify(offsets) !== JSON.stringify([0, MULTI_EDGE_SPACING])) throw new Error('the rectangle did not spread its ports: ' + JSON.stringify(offsets))
+  if (Math.abs(offsets[0] + offsets[1]) > 0.01) throw new Error('the rectangle did not spread its ports symmetrically: ' + JSON.stringify(offsets))
+  if (Math.abs(offsets[1] - offsets[0] - MULTI_EDGE_SPACING) > 0.01) throw new Error('the rectangle did not spread its ports one spacing apart: ' + JSON.stringify(offsets))
 })
 
 test('a cylinder top port sits on its cap curve, not on the box edge', () => {
@@ -2766,6 +2773,10 @@ test('four arrows into one side merge into one trunk, one port and a junction pe
   const ports = new Set(ends.map((point) => String(point.x) + ',' + String(point.y)))
   if (ports.size !== 1) throw new Error('the fan-in did not collapse onto one port: ' + [...ports].join(' '))
   if (ends[0].y !== target.y) throw new Error('the shared port is not on the side the arrows arrive at')
+  // The bundle's one port is the middle of that side: a side that carries one port is centred on it, and a merged
+  // entry is one port however many arrows it carries.
+  const middle = target.x + target.width / 2
+  if (Math.abs(ends[0].x - middle) > 0.01) throw new Error('the shared port is not the middle of its side: ' + String(ends[0].x) + ' vs ' + String(middle))
   // One trunk: every junction on one line, perpendicular to that side and one stub outside the box.
   const dots = junctionsOf(canvas)
   // One dot per branch meeting the trunk - four branches are four joins, not one dot per group.
@@ -2779,30 +2790,37 @@ test('four arrows into one side merge into one trunk, one port and a junction pe
   const dotXs = [...new Set(dots.map((dot) => dot.x))].sort((left, right) => left - right)
   if (dotXs.length !== 4) throw new Error('two branches joined the trunk at one point: ' + JSON.stringify(dotXs))
   if (JSON.stringify(exitXs) !== JSON.stringify(dotXs)) throw new Error('a junction is not below its branch: ' + JSON.stringify([exitXs, dotXs]))
-  // The run itself: three branches travel along the trunk at the trunk's own height and reach the shared port; the
-  // fourth is the branch the port was taken from, and reaches it as the straight drop it already was.
+  // The dots arrange around the centred port: the bundle is read from both sides, not as a comb that leans one way.
+  if (!dotXs.some((x) => x < middle - 0.5) || !dotXs.some((x) => x > middle + 0.5)) {
+    throw new Error('the junctions do not arrange around the shared port: ' + JSON.stringify(dotXs))
+  }
+  // Each source's bottom carries one edge, so each leaves from the middle of its own side.
+  const sources = ['Alpha service', 'Beta service', 'Gamma service', 'Delta service']
+  sources.forEach((label, index) => {
+    const box = boxNamed(canvas, label)
+    const exit = startOf(routes[index])
+    if (Math.abs(exit.x - (box.x + box.width / 2)) > 0.01) {
+      throw new Error(label + ' leaves off the middle of its side: ' + String(exit.x) + ' vs ' + String(box.x + box.width / 2))
+    }
+  })
+  // The run itself: every branch travels along the trunk at the trunk's own height and reaches the shared port. No
+  // branch is a straight drop, because the port is the middle of the target's side and no source sits there: two
+  // corners per branch is what one centred entry costs, and it is the least a branch can cost once the entry moved.
   let alongTheTrunk = 0
   for (const shape of routes) {
     const run = segmentsOfShape(shape).find((segment) => Math.abs(segment.y1 - at) < 0.01 && Math.abs(segment.y2 - at) < 0.01)
-    if (run === undefined) {
-      if (routePointsOf(shape).length !== 2 || startOf(shape).x !== ends[0].x) {
-        throw new Error('a branch neither joins the trunk nor is the straight entry: ' + JSON.stringify(routePointsOf(shape)))
-      }
-      continue
-    }
+    if (run === undefined) throw new Error('a branch does not join the trunk: ' + JSON.stringify(routePointsOf(shape)))
     alongTheTrunk += 1
     if (Math.min(run.x1, run.x2) > ends[0].x + 0.01 || Math.max(run.x1, run.x2) < ends[0].x - 0.01) {
       throw new Error('the trunk does not reach the shared port')
     }
+    if (Math.abs(routePointsOf(shape)[routePointsOf(shape).length - 1].x - middle) > 0.01) {
+      throw new Error('a branch does not end at the shared port')
+    }
   }
-  if (alongTheTrunk !== 3) throw new Error('branches travelling along the trunk: ' + String(alongTheTrunk))
-  // The merge spends no bend it does not have to: three branches keep the two corners a run costs, and the branch the
-  // shared port was taken from is still the straight drop it was before the merge.
+  if (alongTheTrunk !== 4) throw new Error('branches travelling along the trunk: ' + String(alongTheTrunk))
   const bends = routes.reduce((total, shape) => total + Math.max(0, routePointsOf(shape).length - 2), 0)
-  if (bends > 6) throw new Error('the merge cost extra bends: ' + String(bends))
-  if (routes.filter((shape) => routePointsOf(shape).length === 2).length !== 1) {
-    throw new Error('the straight branch was not the one the shared port was taken from')
-  }
+  if (bends !== 2 * routes.length) throw new Error('a branch does not spend exactly the two corners one centred entry costs: ' + String(bends))
 })
 
 test('two arrows do not merge, and three are the least a trunk takes', () => {
@@ -3002,6 +3020,143 @@ test('two bundles are never drawn on one trunk line', () => {
   // Moved clear, both bundles are accepted: the refusal was the shared line, not the second target.
   const apart = planTrunks(trunkInput([...first, ...other(3)], { nodes: { ...trunkNodes(), ...second(500) }, ports: ports(500) }))
   if (apart.groups.length !== 2) throw new Error('a separate trunk was refused: ' + String(apart.groups.length))
+})
+
+// --------------------------------------------------------------------------------------------- centred ports
+//
+// A side that carries one port is centred on it. The rule is written against the bend budget, so the cases come in
+// pairs: one where centring is free and the port moves to the middle, and one where it would cost a corner and the
+// port keeps the coordinate its route asked for. Crossings, bends, length and fill are all unchanged by a port
+// sliding along its own side, so no other column can see the defect these cases exist for.
+
+/** The middle of one side of a box: the coordinate a single port on that side is centred at. */
+const middleOfSide = (box, side) => (side === 'top' || side === 'bottom' ? box.x + box.width / 2 : box.y + box.height / 2)
+
+/** Which side of a box a point attaches to, read off the nearest of the box's four sides. */
+const sideOfPoint = (box, point) =>
+  [
+    ['top', Math.abs(point.y - box.y)],
+    ['bottom', Math.abs(point.y - (box.y + box.height))],
+    ['left', Math.abs(point.x - box.x)],
+    ['right', Math.abs(point.x - (box.x + box.width))],
+  ].sort((left, right) => left[1] - right[1])[0][0]
+
+/** Every edge end a drawing attaches to one side of one box. A cap curve is not a box side, so this reads rectangles. */
+const endsOnSide = (canvas, box, side) => {
+  const within = (value, low, high) => value >= low - 0.5 && value <= high + 0.5
+  const on = (point) => {
+    if (side === 'top') return Math.abs(point.y - box.y) <= 0.5 && within(point.x, box.x, box.x + box.width)
+    if (side === 'bottom') return Math.abs(point.y - (box.y + box.height)) <= 0.5 && within(point.x, box.x, box.x + box.width)
+    if (side === 'left') return Math.abs(point.x - box.x) <= 0.5 && within(point.y, box.y, box.y + box.height)
+    return Math.abs(point.x - (box.x + box.width)) <= 0.5 && within(point.y, box.y, box.y + box.height)
+  }
+  return routesOf(canvas)
+    .flatMap((shape) => [startOf(shape), endOf(shape)])
+    .filter(on)
+}
+
+test('one edge into a side lands on the centre of that side', () => {
+  // The decision's yes-branch leaves a vertex and enters a rectangle's top, and that top carries exactly one edge:
+  // the slot the packing gave it used to be the vertex's stub read across, so the arrow arrived beside the middle.
+  const { canvas } = paintWith(
+    render({ source: ['graph TD', '  a[Start] --> b{Ready?}', '  b -->|yes| c[Go]', '  b -->|no| d[Wait]', '  d -->|again| b'].join(NL) }).diagram,
+  )
+  const target = boxNamed(canvas, 'Go')
+  const ends = endsOnSide(canvas, target, 'top')
+  if (ends.length !== 1) throw new Error('the side carries ' + String(ends.length) + ' ends, so the case measures another rule')
+  if (Math.abs(ends[0].y - target.y) > 0.01) throw new Error('the port is not on the side it counts for: ' + JSON.stringify(ends[0]))
+  const middle = middleOfSide(target, 'top')
+  if (Math.abs(ends[0].x - middle) > 0.01) {
+    throw new Error('the one port on the side is not its middle: ' + String(ends[0].x) + ' vs ' + String(middle))
+  }
+})
+
+test('two ports on one side are symmetric about the centre of that side', () => {
+  // Two statements about one pair: the fan is 0 and +d, which reads as two lines leaning one way. A row of ports is
+  // translated as a whole, so the pair sits at -d/2 and +d/2 - and it is still one spacing apart.
+  const { canvas } = paintWith(pairDiagram([{ label: '' }, { label: '' }]))
+  for (const [label, side] of [
+    ['a', 'bottom'],
+    ['b', 'top'],
+  ]) {
+    const box = boxNamed(canvas, label)
+    const ends = endsOnSide(canvas, box, side)
+    if (ends.length !== 2) throw new Error(label + ' does not carry two ports on its ' + side + ': ' + String(ends.length))
+    const middle = middleOfSide(box, side)
+    const offsets = ends.map((end) => (side === 'top' || side === 'bottom' ? end.x : end.y) - middle).sort((left, right) => left - right)
+    if (Math.abs(offsets[0] + offsets[1]) > 0.01) throw new Error(label + ': the two ports are not symmetric about the centre: ' + JSON.stringify(offsets))
+    if (Math.abs(offsets[1] - offsets[0]) < MULTI_EDGE_SPACING - 0.01) throw new Error(label + ': the two ports are not a fan spacing apart: ' + JSON.stringify(offsets))
+  }
+})
+
+test('a merged trunk enters the target at the centre of its side', () => {
+  // A bundle is one port, so the rule for a side with one port applies to it: the trunk runs to the middle of the
+  // target's side and every branch joins it there, instead of the entry being whichever branch arrived straightest.
+  const { canvas } = paintWith(render({ source: FANIN_SOURCES }).diagram)
+  const target = boxNamed(canvas, 'Merge')
+  const ends = routesOf(canvas).map(endOf)
+  if (new Set(ends.map((point) => String(point.x) + ',' + String(point.y))).size !== 1) throw new Error('the fixture did not merge into one port')
+  const middle = middleOfSide(target, 'top')
+  if (Math.abs(ends[0].x - middle) > 0.01 || Math.abs(ends[0].y - target.y) > 0.01) {
+    throw new Error('the merged entry is not the middle of the side: ' + JSON.stringify(ends[0]) + ' vs ' + String(middle))
+  }
+  const dots = junctionsOf(canvas)
+  if (dots.length === 0) throw new Error('the fixture drew no junctions')
+  if (!dots.some((dot) => dot.x < middle - 0.5) || !dots.some((dot) => dot.x > middle + 0.5)) {
+    throw new Error('the junctions do not arrange around the centred entry: ' + JSON.stringify(dots.map((dot) => dot.x)))
+  }
+})
+
+test('a diamond or an ellipse keeps its single port on the point that is the middle of its side', () => {
+  // A diamond's side meets the symbol at its vertex, and an ellipse's at its cardinal point: both are already the
+  // middle of the side, and a rule about slots must leave them there rather than spread along a run that is not
+  // there.
+  const diamond = paintWith(render({ source: ['graph TD', '  a[Start] --> b{Ready?}', '  b -->|yes| c[Go]'].join(NL) }).diagram).canvas
+  const ready = boxNamed(diamond, 'Ready?')
+  if (ready.shape !== 'diamond') throw new Error('the fixture did not draw a diamond')
+  const entry = endOf(routesOf(diamond)[0])
+  const vertices = [
+    { x: ready.x + ready.width / 2, y: ready.y },
+    { x: ready.x + ready.width, y: ready.y + ready.height / 2 },
+    { x: ready.x + ready.width / 2, y: ready.y + ready.height },
+    { x: ready.x, y: ready.y + ready.height / 2 },
+  ]
+  if (!vertices.some((vertex) => Math.abs(vertex.x - entry.x) <= 0.01 && Math.abs(vertex.y - entry.y) <= 0.01)) {
+    throw new Error('the diamond port is not one of its vertices: ' + JSON.stringify(entry))
+  }
+  const ellipse = paintWith(render({ source: ['@startuml', 'usecase "Hub" as hub', 'component "Caller" as caller', 'caller --> hub', '@enduml'].join(NL) }).diagram).canvas
+  const hub = boxNamed(ellipse, 'Hub')
+  if (hub.shape !== 'circle') throw new Error('the fixture did not draw an ellipse')
+  const cardinal = endOf(routesOf(ellipse)[0])
+  const centre = { x: hub.x + hub.width / 2, y: hub.y + hub.height / 2 }
+  const cardinals = [
+    { x: centre.x, y: hub.y },
+    { x: hub.x + hub.width, y: centre.y },
+    { x: centre.x, y: hub.y + hub.height },
+    { x: hub.x, y: centre.y },
+  ]
+  if (!cardinals.some((point) => Math.abs(point.x - cardinal.x) <= 0.01 && Math.abs(point.y - cardinal.y) <= 0.01)) {
+    throw new Error('the ellipse port is not a cardinal point: ' + JSON.stringify(cardinal))
+  }
+  // Which is the middle of the side it sits on, so the rule and the symbol agree rather than fight.
+  const side = sideOfPoint(hub, cardinal)
+  const along = side === 'top' || side === 'bottom' ? cardinal.x : cardinal.y
+  if (Math.abs(along - middleOfSide(hub, side)) > 0.01) throw new Error('the cardinal point is not the middle of its side: ' + side)
+})
+
+test('the bend budget wins: a port on a straight run keeps its place instead of moving to the middle', () => {
+  // B's top carries one edge, and that edge is one straight drop from A: A's port is already on the same x. Centring
+  // B's port would turn the one segment into a Z with two corners, so the port keeps the coordinate the run gave it.
+  // The free counterpart of this case is the one above: centring a port that already sits in a Z costs nothing.
+  const { canvas } = paintWith(render({ source: BENCH_FIXTURES.mesh.join(NL) }).diagram)
+  const b = boxNamed(canvas, 'B')
+  const route = routesOf(canvas)[0]
+  const entry = endOf(route)
+  const middle = middleOfSide(b, 'top')
+  if (Math.abs(entry.y - b.y) > 0.01) throw new Error('the fixture edge does not arrive at the top of B')
+  if (routePointsOf(route).length !== 2) throw new Error('the edge is not one straight run, so the case measures nothing: ' + JSON.stringify(routePointsOf(route)))
+  if (Math.abs(startOf(route).x - entry.x) > 0.01) throw new Error('the two ports of the run do not share a line')
+  if (Math.abs(entry.x - middle) <= 1) throw new Error('the port was centred, which costs the straight run two corners: ' + String(entry.x))
 })
 
 if (failures > 0) {

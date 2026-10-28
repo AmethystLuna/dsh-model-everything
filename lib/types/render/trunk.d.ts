@@ -28,10 +28,15 @@
  * - **One trunk per line.** Two groups whose trunks would be drawn on one line would read as one bundle between two
  *   unrelated targets, so the later group is refused.
  *
- * The shared entry is the port of the branch that was already the straightest. Merging forces every other branch to
- * bend twice, so an unmerged drawing of `k` straight branches costs `2 * (n - k)` bends and a merged one costs
- * `2 * (n - 1)`; choosing the straightest branch for the shared entry is what keeps `k = 1` free and bounds the
- * change at one extra bend per straight branch beyond the first.
+ * The shared entry is the middle of the target's side. A bundle enters the target through one port, and a side that
+ * carries one port is centred on it, so the trunk runs to the middle and every branch joins it there: the branches
+ * that are not in the middle bend, which is the price of one entry that reads as centred rather than one that leans
+ * towards whichever branch happened to arrive straightest.
+ *
+ * Merging forces every branch but one to bend twice, so an unmerged drawing of `k` straight branches costs
+ * `2 * (n - k)` bends and a merged one costs `2 * (n - 1)`; the branch nearest the middle is the lead because it is
+ * the only one that can still reach the shared port without a horizontal leg, and on a target whose middle happens
+ * to fall on a branch's own line that branch is free, as before.
  *
  * What this module does not decide: the colour of a branch, the text of its label, and how a branch's own route
  * reaches the trunk. Those belong to the painter.
@@ -66,8 +71,6 @@ export interface TrunkInput {
     boxes: Iterable<Box>;
     /** Where an edge's own exit port sits, when it has one. The branch joins the trunk at that port's coordinate. */
     exitPortOf: (index: number) => TrunkPoint | undefined;
-    /** Where an edge's entry port sits. The branch whose port is already straightest becomes the shared entry. */
-    entryPortOf: (index: number) => TrunkPoint | undefined;
 }
 /** One accepted bundle: what it merges, where its run sits, and which branch the target is entered by. */
 export interface TrunkGroup {
@@ -77,10 +80,12 @@ export interface TrunkGroup {
     side: Side;
     /** The coordinate of the trunk line: a y when the trunk runs across, an x when it runs down. */
     at: number;
+    /** The coordinate of the one port the bundle enters by: the middle of the target's side. */
+    entryAlong: number;
     /** The two ends of the run, along the axis it moves on. A branch joins it between them. */
     from: number;
     to: number;
-    /** The member whose entry port is the shared one, and therefore the only branch that may still be a straight drop. */
+    /** The member whose own exit is nearest the shared entry, and therefore the only branch that may still be a straight drop. */
     lead: number;
     /** The edges in the bundle, in the order the source wrote them. */
     members: number[];

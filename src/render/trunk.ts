@@ -28,10 +28,15 @@
  * - **One trunk per line.** Two groups whose trunks would be drawn on one line would read as one bundle between two
  *   unrelated targets, so the later group is refused.
  *
- * The shared entry is the port of the branch that was already the straightest. Merging forces every other branch to
- * bend twice, so an unmerged drawing of `k` straight branches costs `2 * (n - k)` bends and a merged one costs
- * `2 * (n - 1)`; choosing the straightest branch for the shared entry is what keeps `k = 1` free and bounds the
- * change at one extra bend per straight branch beyond the first.
+ * The shared entry is the middle of the target's side. A bundle enters the target through one port, and a side that
+ * carries one port is centred on it, so the trunk runs to the middle and every branch joins it there: the branches
+ * that are not in the middle bend, which is the price of one entry that reads as centred rather than one that leans
+ * towards whichever branch happened to arrive straightest.
+ *
+ * Merging forces every branch but one to bend twice, so an unmerged drawing of `k` straight branches costs
+ * `2 * (n - k)` bends and a merged one costs `2 * (n - 1)`; the branch nearest the middle is the lead because it is
+ * the only one that can still reach the shared port without a horizontal leg, and on a target whose middle happens
+ * to fall on a branch's own line that branch is free, as before.
  *
  * What this module does not decide: the colour of a branch, the text of its label, and how a branch's own route
  * reaches the trunk. Those belong to the painter.
@@ -73,8 +78,6 @@ export interface TrunkInput {
   boxes: Iterable<Box>
   /** Where an edge's own exit port sits, when it has one. The branch joins the trunk at that port's coordinate. */
   exitPortOf: (index: number) => TrunkPoint | undefined
-  /** Where an edge's entry port sits. The branch whose port is already straightest becomes the shared entry. */
-  entryPortOf: (index: number) => TrunkPoint | undefined
 }
 
 /** One accepted bundle: what it merges, where its run sits, and which branch the target is entered by. */
@@ -85,10 +88,12 @@ export interface TrunkGroup {
   side: Side
   /** The coordinate of the trunk line: a y when the trunk runs across, an x when it runs down. */
   at: number
+  /** The coordinate of the one port the bundle enters by: the middle of the target's side. */
+  entryAlong: number
   /** The two ends of the run, along the axis it moves on. A branch joins it between them. */
   from: number
   to: number
-  /** The member whose entry port is the shared one, and therefore the only branch that may still be a straight drop. */
+  /** The member whose own exit is nearest the shared entry, and therefore the only branch that may still be a straight drop. */
   lead: number
   /** The edges in the bundle, in the order the source wrote them. */
   members: number[]
@@ -140,7 +145,7 @@ function keyOf(end: TrunkEnd): string {
   return end.to + '\u0000' + end.entry + '\u0000' + (end.arrow ?? '')
 }
 
-/** One end that has passed every per-edge rule, with the two ports its group is built from. */
+/** One end that has passed every per-edge rule, with the ports its group is built from. */
 interface Candidate {
   end: TrunkEnd
   source: Box
@@ -149,8 +154,6 @@ interface Candidate {
   /** The port the branch leaves by, and the coordinate it joins the trunk at. */
   exit: TrunkPoint
   branch: number
-  /** The coordinate of its own entry port, which the shared entry is chosen from. */
-  own: number
 }
 
 /** Is this axis-aligned segment clear of every box it does not attach to? */
@@ -192,11 +195,10 @@ export function planTrunks(input: TrunkInput): TrunkPlan {
     if (source === undefined || target === undefined) continue
     if (source === target) continue
     const exit = input.exitPortOf(end.index)
-    const entry = input.entryPortOf(end.index)
-    if (exit === undefined || entry === undefined) continue
+    if (exit === undefined) continue
     const at = trunkAt(target, end.entry)
     if (!facesTrunk(exit, end.exit, at)) continue
-    const candidate: Candidate = { end, source, target, at, exit, branch: alongSide(exit, end.exit), own: alongSide(entry, end.entry) }
+    const candidate: Candidate = { end, source, target, at, exit, branch: alongSide(exit, end.exit) }
     const key = keyOf(end)
     const list = buckets.get(key)
     if (list === undefined) buckets.set(key, [candidate])
@@ -220,13 +222,15 @@ export function planTrunks(input: TrunkInput): TrunkPlan {
     const side = members[0].end.entry
     const at = members[0].at
 
-    // The shared entry is the port of the branch that was already the straightest: |own - branch| smallest, and the
-    // source's order for a tie. That keeps the merge from spending a bend it does not have to.
+    // The shared entry is the middle of the target's side. A side that carries one port is centred on it, and a bundle
+    // enters through one port, so the run reaches the middle rather than whichever branch asked for the middle first.
+    const entryAlong = isVerticalSide(side) ? target.x + target.width / 2 : target.y + target.height / 2
+    // The lead is the branch nearest that middle: the only member that can reach the shared port without a lateral
+    // leg. The source's order breaks a tie, so the answer does not depend on map iteration.
     let lead = members[0]
     for (const candidate of members) {
-      if (Math.abs(candidate.own - candidate.branch) < Math.abs(lead.own - lead.branch) - 1e-9) lead = candidate
+      if (Math.abs(candidate.branch - entryAlong) < Math.abs(lead.branch - entryAlong) - 1e-9) lead = candidate
     }
-    const entryAlong = lead.own
     // The run: the whole stretch the branches and the one port span, so every branch joins a line that reaches it.
     let low = entryAlong
     let high = entryAlong
@@ -258,6 +262,7 @@ export function planTrunks(input: TrunkInput): TrunkPlan {
       target: members[0].end.to,
       side,
       at,
+      entryAlong,
       from: low,
       to: high,
       lead: lead.end.index,

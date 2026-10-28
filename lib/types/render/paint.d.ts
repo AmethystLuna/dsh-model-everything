@@ -11,7 +11,9 @@
  * route, not picked by comparing the boxes' centres: a route between two rows arrives vertically, so the endpoint
  * is snapped onto the top or bottom perimeter in the direction the route approaches. Where along that side it sits
  * follows the symbol: a rectangle spreads its ports along the side, a cylinder's top port sits on its cap curve, and a
- * diamond or a circle has four legal points and no side to spread along at all.
+ * diamond or a circle has four legal points and no side to spread along at all. A side that carries one port is
+ * centred on it, and a side that carries several spreads them symmetrically about the middle; the bend budget comes
+ * first, so a port that is the end of a straight run or of a lane keeps the coordinate its route asked for.
  *
  * A symbol with discrete points gives each of its edges a point of its own: the point whose outward normal faces the
  * box at the other end is the one that edge takes, and an edge only shares a point when all four are spoken for. A
