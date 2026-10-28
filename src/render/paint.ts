@@ -450,155 +450,6 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     endsAt.set(edge.to, (endsAt.get(edge.to) ?? 0) + 1)
   }
 
-  /** The side each edge end's port is on, where the port is a point rather than a place along a run. */
-  const claimed = new Map<string, Side>()
-  const claimedAt = new Map<string, Side[]>()
-  const claim = (id: string, index: number, end: 'exit' | 'entry', side: Side): void => {
-    claimed.set(endKey(index, end), side)
-    claimedAt.set(id, [...(claimedAt.get(id) ?? []), side])
-  }
-
-  /**
-   * The side a discrete port takes: the one whose outward normal points most nearly at the other box.
-   *
-   * The score is the cosine of the angle between the normal and the direction to the other box, so 1 is dead ahead
-   * and the four sides of a diamond rank by how much of the way to the target each one faces. Equal scores are broken
-   * by the point nearest the other box - the port the route has least ground to cover from - and then by the order the
-   * sides are drawn in. That last tie-break is what "the earlier edge keeps the earlier point" means in practice: the
-   * edges are walked in source order, and each one takes the best side still free.
-   */
-  const bestSide = (id: string, other: Box): Side | undefined => {
-    const box = endBox(id) as Box
-    const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-    const toward = { x: other.x + other.width / 2 - centre.x, y: other.y + other.height / 2 - centre.y }
-    const reach = Math.hypot(toward.x, toward.y)
-    const taken = claimedAt.get(id) ?? []
-    let best: { side: Side; score: number; near: number } | undefined
-    for (const side of PORT_SIDES) {
-      if (taken.includes(side)) continue
-      const normal = normalOf(side)
-      const score = reach === 0 ? 0 : (normal.x * toward.x + normal.y * toward.y) / reach
-      // How far the point is from the other box's rectangle: the nearest port is the one the edge reaches first.
-      const point = anchor(box, side)
-      const near = Math.hypot(
-        Math.max(other.x - point.x, 0, point.x - (other.x + other.width)),
-        Math.max(other.y - point.y, 0, point.y - (other.y + other.height)),
-      )
-      const better =
-        best === undefined ||
-        score > best.score + 1e-9 ||
-        (Math.abs(score - best.score) <= 1e-9 && near < best.near - 1e-9)
-      if (better) best = { side, score, near }
-    }
-    return best?.side
-  }
-
-  // A side the drawing has already decided is claimed first, because a point there would point the route away from
-  // the corridor it has to run in: a long edge leaves by the side its lane starts from, and an edge read across two
-  // wrapped columns leaves and arrives on the sides the reading order turns at.
-  diagram.edges.forEach((edge, index) => {
-    if (edge.from === edge.to) return
-    const source = endBox(edge.from)
-    const target = endBox(edge.to)
-    if (source === undefined || target === undefined) return
-    if (placement.across.has(index)) {
-      claim(edge.from, index, 'exit', 'right')
-      claim(edge.to, index, 'entry', 'left')
-      return
-    }
-    const lane = placement.lanes.get(index)
-    if (lane === undefined || lane.points.length === 0) return
-    const down = target.y > source.y
-    claim(edge.from, index, 'exit', down ? 'bottom' : 'top')
-    claim(edge.to, index, 'entry', down ? 'top' : 'bottom')
-  })
-
-  // Then a symbol with four legal points gives every edge end a point of its own, in source order, until the four are
-  // gone. Only a node that needs one port, or one whose points are all spoken for, keeps the old answer - the side the
-  // route approaches by - and then two edges share that side's single point and fan apart later. That is the fallback,
-  // and it is why a decision with two labelled branches no longer draws both of them from one vertex.
-  diagram.edges.forEach((edge, index) => {
-    if (edge.from === edge.to) return
-    const source = endBox(edge.from)
-    const target = endBox(edge.to)
-    if (source === undefined || target === undefined) return
-    for (const end of ['exit', 'entry'] as const) {
-      if (claimed.has(endKey(index, end))) continue
-      const id = end === 'exit' ? edge.from : edge.to
-      if ((endsAt.get(id) ?? 0) < 2) continue
-      if (!hasDiscretePorts(shapeOf(id))) continue
-      const side = bestSide(id, end === 'exit' ? target : source)
-      if (side === undefined) continue
-      claim(id, index, end, side)
-    }
-  })
-
-  const facing = diagram.edges.map((edge, index): Facing | undefined => {
-    const source = endBox(edge.from)
-    const target = endBox(edge.to)
-    if (source === undefined || target === undefined || edge.from === edge.to) return undefined
-    // A wrapped drawing is read in columns: the edge from one column to the next leaves and arrives at the side,
-    // which is the direction that reading order travels. A column is always to the right of the one before it.
-    const sides = placement.across.has(index)
-      ? { exit: 'right' as Side, entry: 'left' as Side }
-      : approachSides(source, target)
-    const lane = placement.lanes.get(index)
-    if (lane === undefined || lane.points.length === 0) {
-      return {
-        exit: claimed.get(endKey(index, 'exit')) ?? sides.exit,
-        entry: claimed.get(endKey(index, 'entry')) ?? sides.entry,
-      }
-    }
-    // A lane runs down the page, so its ends face the rows above and below wherever the box centres are.
-    const down = target.y > source.y
-    return {
-      exit: claimed.get(endKey(index, 'exit')) ?? (down ? 'bottom' : 'top'),
-      entry: claimed.get(endKey(index, 'entry')) ?? (down ? 'top' : 'bottom'),
-      at: lane.points[0].x,
-    }
-  })
-  // A long edge's lane is where the whole edge runs, so a fan moves the lane instead of bending the edge twice at its
-  // ends. It tries the place that keeps the set evenly spaced first, then its own place moved by the same offset; a
-  // move that would cross a box is refused, because an edge through a box is the worse defect. Refused, the edge keeps
-  // its lane - the two ports still differ, because every long edge already has a lane of its own.
-  const laneClear = (points: Point[], x: number, from: Box, to: Box): boolean => {
-    for (let at = 0; at + 1 < points.length; at += 1) {
-      for (const box of boxList) {
-        if (box === from || box === to) continue
-        if (crossesBox(x, points[at].y, x, points[at + 1].y, box)) return false
-      }
-    }
-    return true
-  }
-  const laneShift = new Map<number, number>()
-  for (const list of multiEdgeSets.values()) {
-    if (list.length < 2) continue
-    const lead = placement.lanes.get(list[0] as number)
-    if (lead === undefined || lead.points.length === 0) continue
-    const base = (lead.points[0] as Point).x
-    const taken = new Set<number>()
-    for (const index of list) {
-      const lane = placement.lanes.get(index) as { points: Point[] }
-      const own = lane.points[0].x
-      const offset = fanOf.get(index) ?? 0
-      const edge = diagram.edges[index] as DiagramEdge
-      const from = endBox(edge.from) as Box
-      const to = endBox(edge.to) as Box
-      let target = own
-      if (offset !== 0) {
-        for (const candidate of [base + offset, own + offset]) {
-          if (taken.has(candidate) || !laneClear(lane.points, candidate, from, to)) continue
-          target = candidate
-          break
-        }
-      }
-      taken.add(target)
-      if (target !== own) laneShift.set(index, target - own)
-    }
-  }
-
-  const wanted = new Map<string, number>()
-  const slotKey = (boxId: string, side: Side, index: number): string => boxId + ':' + side + ':' + String(index)
   /**
    * Where a port may sit on one side of one node, as the interval its coordinate may take.
    *
@@ -660,6 +511,296 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (side === 'top') return { x: along, y: shapeOf(boxId) === 'cylinder' ? cylinderApex(box, 'top').y : box.y }
     return { x: along, y: shapeOf(boxId) === 'cylinder' ? cylinderApex(box, 'bottom').y : box.y + box.height }
   }
+  /** The side each edge end's port is on, where the port is a point rather than a place along a run. */
+  const claimed = new Map<string, Side>()
+  const claimedAt = new Map<string, Array<{ index: number; side: Side }>>()
+  const claim = (id: string, index: number, end: 'exit' | 'entry', side: Side): void => {
+    claimed.set(endKey(index, end), side)
+    claimedAt.set(id, [...(claimedAt.get(id) ?? []), { index, side }])
+  }
+  /** The sides of one node another edge already holds. An edge is not crowded by its own other end. */
+  const takenSides = (id: string, except: number): Side[] =>
+    (claimedAt.get(id) ?? []).filter((entry) => entry.index !== except).map((entry) => entry.side)
+
+  /** The middle of one side: the coordinate that side's point sits at when nothing has moved it. */
+  const sideMiddle = (box: Box, side: Side): number => (isVerticalSide(side) ? box.x + box.width / 2 : box.y + box.height / 2)
+
+  /** The point a side offers at its middle: a symbol's own point, or the middle of the run it spreads along. */
+  const sidePoint = (boxId: string, side: Side): Point => pointOn(boxId, side, sideMiddle(endBox(boxId) as Box, side))
+
+  /** Does this side face away from the box at the other end? A route leaving it has to come back round its own box. */
+  const facesAway = (box: Box, other: Box, side: Side): boolean => {
+    const out = normalOf(side)
+    const dx = other.x + other.width / 2 - (box.x + box.width / 2)
+    const dy = other.y + other.height / 2 - (box.y + box.height / 2)
+    return out.x * dx + out.y * dy < 0
+  }
+
+  /** The coordinate a free side takes when the other end is pinned: the pinned port's stub, read on the free axis. */
+  const stubAlong = (pinnedId: string, pinnedSide: Side, freeSide: Side): number => {
+    const point = sidePoint(pinnedId, pinnedSide)
+    const out = normalOf(pinnedSide)
+    return isVerticalSide(freeSide) ? point.x + out.x * ROUTE_STUB : point.y + out.y * ROUTE_STUB
+  }
+
+  /** Can this side put a port at `value`? A point-side offers exactly one coordinate; a run offers an interval. */
+  const offers = (boxId: string, side: Side, value: number): boolean => {
+    const span = spanOf(boxId, side, true)
+    return value >= span.low - 0.01 && value <= span.high + 0.01
+  }
+
+  /**
+   * The bend budget a candidate (exit side, entry side) pair spends on the orthogonal route it implies, before a lane
+   * or a router is consulted. The numbers, and what each one is:
+   *
+   *   0  the two stubs share a line: both on vertical sides whose x can be the same, or both on horizontal sides
+   *      whose y can be the same, with each stub pointing the way the edge travels. One straight run, no corner.
+   *   1  an L: the two sides are perpendicular and the one that can still move can be placed exactly where the pinned
+   *      side's stub ends, so the route turns once. It is the rung between the straight run and the Z: an L never
+   *      beats a run that shares a line, and always beats a Z.
+   *   2  a Z: the stubs are perpendicular but cannot meet at one corner, or they are parallel and offset. Out, across,
+   *      in: two corners.
+   *   4  a U: a side faces away from the box at the other end, so the route has to wrap a box - out, round, back
+   *      in. The canonical U has both sides facing away; one is already enough to force the wrap, and a pair that
+   *      has to come back the way it went is never worth a pair that does not.
+   *
+   * "Can be the same" is the symbol's own answer (`spanOf`): a rectangle offers its whole side, a diamond one point, a
+   * cylinder's top the apex of its cap. Two rectangles facing each other therefore share a line wherever they sit; two
+   * diamonds only when their vertices line up. This is a budget, not the final polyline: the router still adds the
+   * length an obstacle demands, and the channel stage still decides which lanes exist.
+   *
+   * A side another edge already holds is charged for the L it costs: the packer has to move this pair's port at least
+   * a port separation along the side, which turns the one corner the pair counted on into a jog. A Z is not charged -
+   * it was already off the line, and a port that moves along its side does not add a corner to it.
+   */
+  const bendBudget = (fromId: string, toId: string, exit: Side, entry: Side, index: number): number => {
+    const from = endBox(fromId) as Box
+    const to = endBox(toId) as Box
+    if (facesAway(from, to, exit) || facesAway(to, from, entry)) return 4
+    if (isVerticalSide(exit) === isVerticalSide(entry)) {
+      // Parallel: a straight run only when the two stubs travel the same way and the sides can meet on one line.
+      const out = normalOf(exit)
+      const into = normalOf(entry)
+      const sameWay = out.x === -into.x && out.y === -into.y
+      const fromSpan = spanOf(fromId, exit, true)
+      const toSpan = spanOf(toId, entry, true)
+      const meet = fromSpan.low <= toSpan.high + 0.01 && toSpan.low <= fromSpan.high + 0.01
+      return sameWay && meet ? 0 : 2
+    }
+    // Perpendicular: one corner when the vertical side can be placed at the horizontal side's stub end.
+    const horizontalId = isVerticalSide(exit) ? toId : fromId
+    const horizontalSide = isVerticalSide(exit) ? entry : exit
+    const verticalId = isVerticalSide(exit) ? fromId : toId
+    const verticalSide = isVerticalSide(exit) ? exit : entry
+    if (!offers(verticalId, verticalSide, stubAlong(horizontalId, horizontalSide, verticalSide))) return 2
+    const crowded = takenSides(fromId, index).includes(exit) || takenSides(toId, index).includes(entry)
+    return crowded ? 2 : 1
+  }
+
+  /**
+   * The side a discrete port takes: the point whose pair with the edge's other end bends least.
+   *
+   * `partner` is the side the other end holds - the side it was claimed, or, until it is claimed, the side the route
+   * approaches by. The bend budget comes first. Equal budgets fall back to the rule that was here before: the cosine
+   * of the outward normal against the direction to the other box, then the point nearest that box, then the ground
+   * between the two points - the small length term. So a case that already read well does not move, and a point that
+   * costs an extra corner loses even when it faces the target more squarely.
+   */
+  const bestSide = (id: string, otherId: string, end: 'exit' | 'entry', partner: Side, index: number): Side | undefined => {
+    const box = endBox(id) as Box
+    const other = endBox(otherId) as Box
+    const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+    const toward = { x: other.x + other.width / 2 - centre.x, y: other.y + other.height / 2 - centre.y }
+    const reach = Math.hypot(toward.x, toward.y)
+    const taken = takenSides(id, index)
+    let best: { side: Side; bends: number; score: number; near: number; ground: number } | undefined
+    for (const side of PORT_SIDES) {
+      if (taken.includes(side)) continue
+      const bends = end === 'exit' ? bendBudget(id, otherId, side, partner, index) : bendBudget(otherId, id, partner, side, index)
+      const normal = normalOf(side)
+      const score = reach === 0 ? 0 : (normal.x * toward.x + normal.y * toward.y) / reach
+      // How far the point is from the other box's rectangle: the nearest port is the one the edge reaches first.
+      const point = anchor(box, side)
+      const near = Math.hypot(
+        Math.max(other.x - point.x, 0, point.x - (other.x + other.width)),
+        Math.max(other.y - point.y, 0, point.y - (other.y + other.height)),
+      )
+      const partnerPoint = anchor(other, partner)
+      const ground = Math.abs(point.x - partnerPoint.x) + Math.abs(point.y - partnerPoint.y)
+      const better =
+        best === undefined ||
+        bends < best.bends ||
+        (bends === best.bends &&
+          (score > best.score + 1e-9 ||
+            (Math.abs(score - best.score) <= 1e-9 &&
+              (near < best.near - 1e-9 || (Math.abs(near - best.near) <= 1e-9 && ground < best.ground - 1e-9)))))
+      if (better) best = { side, bends, score, near, ground }
+    }
+    return best?.side
+  }
+
+  /**
+   * The sides an edge leaves and enters by when no claimed point decides either end: the pair the budget likes best.
+   *
+   * Only the two same-kind pairs are offered. Both ends here spread their ports along a side, so the choice is which
+   * side of the box the edge travels on; a pair that turns the corner one side further is the case `bestEnd` decides,
+   * where a claimed point has already fixed the near end. A pair strictly cheaper than the one the route approaches by
+   * wins; an equal pair keeps the approach, which leaves a drawing that was already right exactly as it was.
+   */
+  const bestPair = (fromId: string, toId: string, index: number): { exit: Side; entry: Side } => {
+    const approach = approachSides(endBox(fromId) as Box, endBox(toId) as Box)
+    const pairs: Array<{ exit: Side; entry: Side }> = [
+      { exit: 'bottom', entry: 'top' },
+      { exit: 'top', entry: 'bottom' },
+      { exit: 'right', entry: 'left' },
+      { exit: 'left', entry: 'right' },
+    ]
+    let best = approach
+    let bestBends = bendBudget(fromId, toId, approach.exit, approach.entry, index)
+    for (const pair of pairs) {
+      const bends = bendBudget(fromId, toId, pair.exit, pair.entry, index)
+      if (bends >= bestBends) continue
+      best = pair
+      bestBends = bends
+    }
+    return best
+  }
+
+  /**
+   * The side one end takes when the other end has already been decided: the cheapest of the four.
+   *
+   * The side the route approaches by wins a tie, for the same reason as `bestPair` - a drawing that already read well
+   * does not move for a pair the budget cannot tell apart.
+   */
+  const bestEnd = (id: string, otherId: string, end: 'exit' | 'entry', partner: Side, index: number): Side => {
+    const approach =
+      end === 'exit'
+        ? approachSides(endBox(id) as Box, endBox(otherId) as Box).exit
+        : approachSides(endBox(otherId) as Box, endBox(id) as Box).entry
+    let best = approach
+    let bestBends = end === 'exit' ? bendBudget(id, otherId, approach, partner, index) : bendBudget(otherId, id, partner, approach, index)
+    for (const side of PORT_SIDES) {
+      const bends = end === 'exit' ? bendBudget(id, otherId, side, partner, index) : bendBudget(otherId, id, partner, side, index)
+      if (bends >= bestBends) continue
+      best = side
+      bestBends = bends
+    }
+    return best
+  }
+
+  // A side the drawing has already decided is claimed first, because a point there would point the route away from
+  // the corridor it has to run in: a long edge leaves by the side its lane starts from, and an edge read across two
+  // wrapped columns leaves and arrives on the sides the reading order turns at.
+  diagram.edges.forEach((edge, index) => {
+    if (edge.from === edge.to) return
+    const source = endBox(edge.from)
+    const target = endBox(edge.to)
+    if (source === undefined || target === undefined) return
+    if (placement.across.has(index)) {
+      claim(edge.from, index, 'exit', 'right')
+      claim(edge.to, index, 'entry', 'left')
+      return
+    }
+    const lane = placement.lanes.get(index)
+    if (lane === undefined || lane.points.length === 0) return
+    const down = target.y > source.y
+    claim(edge.from, index, 'exit', down ? 'bottom' : 'top')
+    claim(edge.to, index, 'entry', down ? 'top' : 'bottom')
+  })
+
+  // Then a symbol with four legal points gives every edge end a point of its own, in source order, until the four are
+  // gone. Only a node that needs one port, or one whose points are all spoken for, keeps the old answer - the side the
+  // route approaches by - and then two edges share that side's single point and fan apart later. That is the fallback,
+  // and it is why a decision with two labelled branches no longer draws both of them from one vertex.
+  diagram.edges.forEach((edge, index) => {
+    if (edge.from === edge.to) return
+    const source = endBox(edge.from)
+    const target = endBox(edge.to)
+    if (source === undefined || target === undefined) return
+    for (const end of ['exit', 'entry'] as const) {
+      if (claimed.has(endKey(index, end))) continue
+      const id = end === 'exit' ? edge.from : edge.to
+      if ((endsAt.get(id) ?? 0) < 2) continue
+      if (!hasDiscretePorts(shapeOf(id))) continue
+      // The side the other end holds, or will hold if nothing claims it first.
+      const approached = approachSides(source, target)
+      const partner =
+        claimed.get(endKey(index, end === 'exit' ? 'entry' : 'exit')) ??
+        (end === 'exit' ? approached.entry : approached.exit)
+      const side = bestSide(id, end === 'exit' ? edge.to : edge.from, end, partner, index)
+      if (side === undefined) continue
+      claim(id, index, end, side)
+    }
+  })
+
+  const facing = diagram.edges.map((edge, index): Facing | undefined => {
+    const source = endBox(edge.from)
+    const target = endBox(edge.to)
+    if (source === undefined || target === undefined || edge.from === edge.to) return undefined
+    // A wrapped drawing is read in columns: the edge from one column to the next leaves and arrives at the side,
+    // which is the direction that reading order travels. A column is always to the right of the one before it.
+    if (placement.across.has(index)) return { exit: 'right', entry: 'left' }
+    const lane = placement.lanes.get(index)
+    // A lane runs down the page, so its ends face the rows above and below wherever the box centres are.
+    const down = target.y > source.y
+    if (lane !== undefined && lane.points.length > 0) {
+      return {
+        exit: claimed.get(endKey(index, 'exit')) ?? (down ? 'bottom' : 'top'),
+        entry: claimed.get(endKey(index, 'entry')) ?? (down ? 'top' : 'bottom'),
+        at: lane.points[0].x,
+      }
+    }
+    // No claimed point and no lane: an end that was claimed keeps its point, the other one takes the side the budget
+    // likes best against it; with neither claimed, the pair is chosen together.
+    const exit = claimed.get(endKey(index, 'exit'))
+    const entry = claimed.get(endKey(index, 'entry'))
+    if (exit !== undefined && entry !== undefined) return { exit, entry }
+    if (exit !== undefined) return { exit, entry: bestEnd(edge.to, edge.from, 'entry', exit, index) }
+    if (entry !== undefined) return { exit: bestEnd(edge.from, edge.to, 'exit', entry, index), entry }
+    return bestPair(edge.from, edge.to, index)
+  })
+  // A long edge's lane is where the whole edge runs, so a fan moves the lane instead of bending the edge twice at its
+  // ends. It tries the place that keeps the set evenly spaced first, then its own place moved by the same offset; a
+  // move that would cross a box is refused, because an edge through a box is the worse defect. Refused, the edge keeps
+  // its lane - the two ports still differ, because every long edge already has a lane of its own.
+  const laneClear = (points: Point[], x: number, from: Box, to: Box): boolean => {
+    for (let at = 0; at + 1 < points.length; at += 1) {
+      for (const box of boxList) {
+        if (box === from || box === to) continue
+        if (crossesBox(x, points[at].y, x, points[at + 1].y, box)) return false
+      }
+    }
+    return true
+  }
+  const laneShift = new Map<number, number>()
+  for (const list of multiEdgeSets.values()) {
+    if (list.length < 2) continue
+    const lead = placement.lanes.get(list[0] as number)
+    if (lead === undefined || lead.points.length === 0) continue
+    const base = (lead.points[0] as Point).x
+    const taken = new Set<number>()
+    for (const index of list) {
+      const lane = placement.lanes.get(index) as { points: Point[] }
+      const own = lane.points[0].x
+      const offset = fanOf.get(index) ?? 0
+      const edge = diagram.edges[index] as DiagramEdge
+      const from = endBox(edge.from) as Box
+      const to = endBox(edge.to) as Box
+      let target = own
+      if (offset !== 0) {
+        for (const candidate of [base + offset, own + offset]) {
+          if (taken.has(candidate) || !laneClear(lane.points, candidate, from, to)) continue
+          target = candidate
+          break
+        }
+      }
+      taken.add(target)
+      if (target !== own) laneShift.set(index, target - own)
+    }
+  }
+
+  const wanted = new Map<string, number>()
+  const slotKey = (boxId: string, side: Side, index: number): string => boxId + ':' + side + ':' + String(index)
   for (const [index, entry] of facing.entries()) {
     if (entry === undefined) continue
     const edge = diagram.edges[index]
@@ -691,16 +832,16 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       exitWanted = clampTo(edge.from, entry.exit, chosen, corner)
       entryWanted = clampTo(edge.to, entry.entry, chosen, corner)
     } else {
-      // The two ports sit on sides of different kinds, which only a discrete point causes. The end that is fixed on
-      // its symbol's point keeps that point's coordinate; the other one sits where the route actually arrives - one
-      // step out of the fixed port along its own normal - so the two legs of the route meet in a straight drop
-      // instead of jogging sideways to reach a middle that the route never passes.
+      // The two ports sit on sides of different kinds, which a discrete point causes. The end that is fixed on its
+      // symbol's point keeps that point's coordinate; the other one sits where the route actually arrives - one step
+      // out of the fixed port along that port's own normal, read on the free side's axis - so the two legs of the
+      // route meet in one corner instead of jogging sideways to reach a middle the route never passes.
       exitWanted = hasDiscretePorts(shapeOf(edge.from))
         ? fromMiddle
-        : clampTo(edge.from, entry.exit, anchor(to, entry.entry).x + normalOf(entry.entry).x * ROUTE_STUB, false) + offset
+        : clampTo(edge.from, entry.exit, stubAlong(edge.to, entry.entry, entry.exit), false) + offset
       entryWanted = hasDiscretePorts(shapeOf(edge.to))
         ? toMiddle
-        : clampTo(edge.to, entry.entry, anchor(from, entry.exit).x + normalOf(entry.exit).x * ROUTE_STUB, false) + offset
+        : clampTo(edge.to, entry.entry, stubAlong(edge.from, entry.exit, entry.entry), false) + offset
     }
     wanted.set(slotKey(edge.from, entry.exit, index), exitWanted)
     wanted.set(slotKey(edge.to, entry.entry, index), entryWanted)
@@ -849,10 +990,16 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const runRoute = (ports: Ports, runY: number): Point[] => {
     const out = isVerticalSide(ports.exitSide) ? 0 : normalOf(ports.exitSide).x * ROUTE_STUB
     const into = isVerticalSide(ports.entrySide) ? 0 : normalOf(ports.entrySide).x * ROUTE_STUB
+    // A sideways port and a vertical one meet where the other port already is, if that is the way the stub points: the
+    // stub is the straight run out of the port, and it is worth more than a stub to avoid the point-wide jog that
+    // meeting at the nominal length leaves behind - a jog the edge would be charged a bend for and a reader for
+    // nothing. Only when the other port is on the far side does the stub have to overshoot.
+    const exitRun = out !== 0 && into === 0 && Math.sign(ports.entry.x - ports.exit.x) === Math.sign(out) ? ports.entry.x : ports.exit.x + out
+    const entryRun = into !== 0 && out === 0 && Math.sign(ports.exit.x - ports.entry.x) === Math.sign(into) ? ports.exit.x : ports.entry.x + into
     const points: Point[] = [ports.exit]
-    if (out !== 0) points.push({ x: ports.exit.x + out, y: ports.exit.y })
-    points.push({ x: ports.exit.x + out, y: runY }, { x: ports.entry.x + into, y: runY })
-    if (into !== 0) points.push({ x: ports.entry.x + into, y: ports.entry.y })
+    if (out !== 0) points.push({ x: exitRun, y: ports.exit.y })
+    points.push({ x: exitRun, y: runY }, { x: entryRun, y: runY })
+    if (into !== 0) points.push({ x: entryRun, y: ports.entry.y })
     points.push(ports.entry)
     return simplify(points)
   }

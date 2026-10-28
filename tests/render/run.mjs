@@ -1562,22 +1562,22 @@ test('a label is centred on its own line', () => {
 
 test('a label whose midpoint sits across another line moves off the crossing', () => {
   // Clearing a box and clearing another label are two of the three collisions. The third is another edge's line:
-  // a label lying across one hides it, and the mask makes that worse than text next to it. In this drawing the
-  // left branch's midpoint lies across the right branch's drop, and there is room above it on the same run.
+  // a label lying across one hides it, and the mask makes that worse than text next to it. In this drawing the retry
+  // edge's midpoint lies across the give-up edge's drop, and there is room along the retry run on either side of it.
   const source = [
     'graph TD',
-    '  a[Start here] --> b{Choice?}',
-    '  b -->|left, with a longer name| c[Left]',
-    '  b -->|right, also long| d[Right]',
-    '  c --> e[Merge]',
-    '  d --> e',
-    '  e -->|return| a',
+    '  a[Reader] -->|request| b{Valid?}',
+    '  b -->|yes| c[(Store)]',
+    '  b -->|no| d[Reject]',
+    '  d -->|retry| a',
+    '  c -->|done| e[Reply]',
+    '  d -->|give up| e',
   ].join(NL)
   const { canvas } = paintWith(render({ source }).diagram)
   const routes = routesOf(canvas)
-  const shape = routes.find((route) => route.label === 'left, with a longer name')
-  if (shape === undefined) throw new Error('the labelled branch was lost')
-  const label = labelRectsOf(canvas).find((entry) => entry.label === 'left, with a longer name')
+  const shape = routes.find((route) => route.label === 'retry')
+  if (shape === undefined) throw new Error('the labelled back edge was lost')
+  const label = labelRectsOf(canvas).find((entry) => entry.label === 'retry')
   const points = routePointsOf(shape)
   let longest = { from: points[0], to: points[1], length: -1 }
   for (let index = 0; index + 1 < points.length; index += 1) {
@@ -2112,10 +2112,11 @@ test('a rectangle with four outgoing edges still spreads them along one side', (
   if (new Set(ends.map((end) => end.x)).size !== 4) throw new Error('the four ports are not four places: ' + JSON.stringify(ends.map((end) => end.x)))
 })
 
-test('two edges that tie for a point keep the order they were written in', () => {
-  // Mirror-image targets score the bottom vertex equally - the same drop, the same sideways distance either way - so
-  // the rule has to say which edge keeps it: the one written first, and the later edge takes the side nearest its own
-  // target. This is what makes the assignment deterministic, and it is the only reason edge order is read at all.
+test('mirror-image branches take the two lateral vertices, whichever edge was written first', () => {
+  // Two targets mirrored about the decision, one each side. The budget prefers the lateral vertex on each side - one
+  // corner, because its stub meets the target's top - over the free bottom vertex, which is a Z: the diamond's
+  // middle is off both targets' whole top sides. So each branch leaves by the point nearest its own target, and the
+  // drawing does not depend on which edge the source happened to write first.
   const cornersOf = (canvas) => {
     const box = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
     return diamondCorners(box)
@@ -2125,16 +2126,21 @@ test('two edges that tie for a point keep the order they were written in', () =>
     ...branchDiagram('diamond', ['l', 'r']),
     edges: [{ from: 'd', label: 'branch 1', to: 'r' }, { from: 'd', label: 'branch 2', to: 'l' }],
   }).canvas
-  const bottom = SIDES_BY_CORNER.indexOf('bottom')
   const right = SIDES_BY_CORNER.indexOf('right')
   const left = SIDES_BY_CORNER.indexOf('left')
   const usedIn = (canvas) => routesOf(canvas).map((shape) => cornerAt(cornersOf(canvas), endsOfRoute(shape)[0]))
   const written = usedIn(first)
   const reversed = usedIn(swapped)
-  if (written[0] !== bottom) throw new Error('the first edge did not keep the point the two tie for: ' + JSON.stringify(written))
-  if (written[1] !== right) throw new Error('the later edge did not take the side nearest its target: ' + JSON.stringify(written))
-  if (reversed[0] !== bottom) throw new Error('rewriting the edges moved the tied point off the first one: ' + JSON.stringify(reversed))
-  if (reversed[1] !== left) throw new Error('the later edge did not take the side nearest its target: ' + JSON.stringify(reversed))
+  if (JSON.stringify(written) !== JSON.stringify([left, right])) {
+    throw new Error('the branches did not take the two lateral vertices: ' + JSON.stringify(written))
+  }
+  if (JSON.stringify(reversed) !== JSON.stringify([right, left])) {
+    throw new Error('rewriting the edges did not move the points with their own targets: ' + JSON.stringify(reversed))
+  }
+  // One corner each: the lateral stub and the drop meet once, where the bottom vertex would have needed a Z.
+  for (const shape of routesOf(first)) {
+    if (routePointsOf(shape).length !== 3) throw new Error('a branch is not a single corner: ' + JSON.stringify(routePointsOf(shape)))
+  }
 })
 
 test('a circle has four legal points, so four edges land on the ellipse cardinal points', () => {
@@ -2334,6 +2340,224 @@ test('a stadium and a hexagon keep their ports on the flat run, not on a cap or 
       }
     }
     if (new Set(ends.map((end) => end.x)).size !== 4) throw new Error(shape + ': the spread collapsed onto one point')
+  }
+})
+
+// -------------------------------------------------------------------------------------------- bend-aware ports
+//
+// Which point or side a connection uses is a bend budget, not a cosine: 0 when the stubs share a line, 1 for a single
+// corner, 2 for a Z, 4 for a wrap. The cases below hold the budget to what a reader sees - the corners of the drawn
+// route - and each one states the fixture's own geometry first, so a painter that agrees with a mistaken helper still
+// fails.
+
+/** The corners of a drawn route: one per direction change, which is what its simplified points carry. */
+const cornersOfRoute = (shape) => routePointsOf(shape).length - 2
+
+test('a branch whose facing side would need a Z leaves by the side that meets the other box in one corner', () => {
+  // Two targets sit half a width either side of the decision, so the diamond's middle is off both targets' whole top
+  // sides: a drop from the facing bottom vertex cannot be straight, it would be a Z (two corners), while the lateral
+  // vertex's stub meets the target's top in one corner. The budget prefers the corner of the two, and the painter
+  // follows it. A straight run (0) is what the offset rules out, which is why the rung below the Z is the L here.
+  const { canvas } = paintWith(branchDiagram('diamond', ['l', 'r']))
+  const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  const corners = diamondCorners(diamond)
+  const middle = diamond.x + diamond.width / 2
+  const boxes = new Map(canvas.shapes.filter((shape) => shape.kind === 'box').map((box) => [box.label, box]))
+  for (const target of [boxes.get('l'), boxes.get('r')]) {
+    if (middle >= target.x && middle <= target.x + target.width) {
+      throw new Error('the fixture lets the facing vertex drop straight into ' + target.label + ', so the case measures nothing')
+    }
+  }
+  for (const shape of routesOf(canvas)) {
+    const points = routePointsOf(shape)
+    if (cornersOfRoute(shape) !== 1) throw new Error('a branch is not one corner: ' + JSON.stringify(points))
+    const at = cornerAt(corners, points[0])
+    if (at !== SIDES_BY_CORNER.indexOf('left') && at !== SIDES_BY_CORNER.indexOf('right')) {
+      throw new Error('a branch left by ' + JSON.stringify(points[0]) + ', not a lateral vertex')
+    }
+    // The corner is square to the vertex's own side: the first leg runs out along that side's normal.
+    if (Math.abs(points[1].y - points[0].y) > 0.01) throw new Error('the first leg of a branch is not square to its side')
+  }
+})
+
+test('a diamond with two branches still uses two distinct vertices, each the cheapest pair left', () => {
+  // The pair each branch takes is the cheapest one still free: the lateral vertex on its own side (one corner) over
+  // the free bottom vertex (a Z), and the two branches still take a vertex each rather than one point between them.
+  const { canvas } = paintWith(branchDiagram('diamond', ['l', 'r']))
+  const diamond = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  const corners = diamondCorners(diamond)
+  const routes = routesOf(canvas)
+  const used = routes.map((shape) => cornerAt(corners, endsOfRoute(shape)[0]))
+  if (used.some((at) => at === -1)) throw new Error('a port is not a vertex: ' + JSON.stringify(used))
+  if (new Set(used).size !== 2) throw new Error('the two branches did not take two vertices: ' + JSON.stringify(used))
+  if (used.includes(SIDES_BY_CORNER.indexOf('bottom'))) {
+    throw new Error('a branch took the Z vertex while a one-corner vertex was free: ' + JSON.stringify(used))
+  }
+  for (const shape of routes) {
+    const points = routePointsOf(shape)
+    if (cornersOfRoute(shape) !== 1) throw new Error('a branch is not a single corner: ' + JSON.stringify(points))
+    if (!meetsSquare(corners, points[0], points[1])) throw new Error('a branch does not leave its vertex square: ' + JSON.stringify(points.slice(0, 3)))
+  }
+})
+
+test('a fifth edge on a circle shares a cardinal point, because the four are taken', () => {
+  // The fallback is not diamond-only. A circle's four cardinals are one edge each; the fifth branch has nowhere of
+  // its own to go and shares one of them rather than invent a fifth point in the air.
+  const diagram = {
+    kind: 'machine',
+    title: 't',
+    init: 'hub',
+    caption: 'pass',
+    nodes: [{ id: 'hub', role: 'normal', shape: 'circle' }, ...['t1', 't2', 't3', 't4', 't5'].map((id) => ({ id, role: 'normal' }))],
+    edges: ['t1', 't2', 't3', 't4', 't5'].map((id, index) => ({ from: 'hub', label: 'edge ' + String(index + 1), to: id })),
+  }
+  const { canvas } = paintWith(diagram)
+  const hub = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'hub')
+  const centre = { x: hub.x + hub.width / 2, y: hub.y + hub.height / 2 }
+  const cardinals = [
+    { x: centre.x, y: hub.y },
+    { x: hub.x + hub.width, y: centre.y },
+    { x: centre.x, y: hub.y + hub.height },
+    { x: hub.x, y: centre.y },
+  ]
+  const routes = routesOf(canvas)
+  if (routes.length !== 5) throw new Error('edges drawn: ' + String(routes.length))
+  const used = routes.map((shape) => cardinals.findIndex((cardinal) => Math.hypot(cardinal.x - endsOfRoute(shape)[0].x, cardinal.y - endsOfRoute(shape)[0].y) <= 0.01))
+  if (used.some((at) => at === -1)) throw new Error('a port is not a cardinal point: ' + JSON.stringify(used.map((at, index) => [at, endsOfRoute(routes[index])[0]])))
+  if (new Set(used).size !== 4) throw new Error('the fifth edge did not fall back to sharing: ' + JSON.stringify(used))
+  const shared = used.find((at, index) => used.indexOf(at) !== index)
+  if (shared === undefined) throw new Error('no point is shared: ' + JSON.stringify(used))
+  const pair = routes.filter((shape, index) => used[index] === shared)
+  for (const shape of pair) {
+    const points = routePointsOf(shape)
+    if (!meetsSquare(cardinals, points[0], points[1])) throw new Error('a shared branch does not leave its cardinal square: ' + JSON.stringify(points.slice(0, 3)))
+  }
+})
+
+test('a rectangle whose candidate pairs all cost the same keeps its ports on the facing side', () => {
+  // The guard against over-correcting. The far targets share no x with the source, so a drop is a Z and a sideways
+  // run would be one too: the budget cannot separate the two axes, so the side the route approaches by stays, and the
+  // ports stay spread along it rather than moving to a lateral side on a coin toss.
+  const { canvas } = paintWith(branchDiagram('rect', ['far left', 'near left', 'near right', 'far right']))
+  const source = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'd')
+  const boxes = new Map(canvas.shapes.filter((shape) => shape.kind === 'box').map((box) => [box.label, box]))
+  for (const id of ['far left', 'far right']) {
+    const target = boxes.get(id)
+    const apart = source.x + source.width <= target.x || target.x + target.width <= source.x
+    if (!apart) throw new Error('the fixture lets the source and ' + id + ' share an x, so the pairs do not all cost the same')
+  }
+  const ends = routesOf(canvas).map((shape) => endsOfRoute(shape)[0])
+  if (ends.length !== 4) throw new Error('edges drawn: ' + String(ends.length))
+  for (const end of ends) {
+    if (Math.abs(end.y - (source.y + source.height)) > 0.01) throw new Error('a port left the facing side: ' + JSON.stringify(end))
+    if (end.x < source.x || end.x > source.x + source.width) throw new Error('a port is off the source side: ' + JSON.stringify(end))
+  }
+  if (new Set(ends.map((end) => end.x)).size !== 4) throw new Error('the spread collapsed onto one point: ' + JSON.stringify(ends.map((end) => end.x)))
+  const ordered = [...ends].sort((left, right) => left.x - right.x)
+  if (JSON.stringify(ordered) !== JSON.stringify(ends)) throw new Error('the ports are not in the order of their targets: ' + JSON.stringify(ends.map((end) => end.x)))
+})
+
+// The drawings the layout benchmark measures, shared by the cases that check them.
+const BENCH_FIXTURES = {
+  decision: ['graph TD', '  a[Idea] --> b{Feasible?}', '  b -->|yes| c[Build]', '  b -->|no| d[Revise]', '  d -->|retry| a'],
+  grouped: [
+    'graph TD',
+    '  subgraph Ingest',
+    '    a[Gateway] --> b[Auth]',
+    '    b --> c[Order service]',
+    '  end',
+    '  subgraph Fulfil',
+    '    c --> d[(Orders)]',
+    '    d --> e[Warehouse]',
+    '  end',
+    '  e --> f[Reconcile]',
+    '  f -->|drift| a',
+  ],
+  chain: (() => {
+    const lines = ['graph TD']
+    for (let index = 0; index < 8; index += 1) lines.push('  n' + String(index) + '[Step ' + String(index) + '] --> n' + String(index + 1) + '[Step ' + String(index + 1) + ']')
+    return lines
+  })(),
+  mesh: ['graph TD', '  a[A] --> b[B]', '  a --> c[C]', '  b --> d[D]', '  c --> d', '  d --> e[E]', '  e -->|loop| b', '  a --> e'],
+  multiedge: ['graph TD', '  a[API] --> b[DB]', '  a --> b'],
+  symbols: ['graph TD', '  a[Start] --> b{Ready?}', '  b -->|yes| c[(Store)]', '  b -->|no| d([Retry])', '  c --> e[[Commit]]', '  d --> e', '  b --> e', '  e --> f<<Audit>>'],
+  circle: ['@startuml', 'usecase "Hub" as hub', 'component "Left" as l', 'component "Right" as r', 'component "Below" as below', 'hub --> l', 'hub --> r', 'hub --> below', 'l --> hub', '@enduml'],
+}
+
+test('the benchmark drawings carry no edge through a box', () => {
+  // The seven fixtures the layout benchmark measures, drawn and checked. A cheaper pair may move a port to a side
+  // the channel stage did not plan for; what it may never do is send a segment through a box the edge does not
+  // attach to, and it may not drop an edge either.
+  for (const [name, lines] of Object.entries(BENCH_FIXTURES)) {
+    const rendered = render({ source: lines.join(NL) })
+    const { canvas } = paintWith(rendered.diagram)
+    const crossings = boxCrossings(canvas)
+    if (crossings.length > 0) throw new Error(name + ': ' + crossings.join('; '))
+    const drawn = canvas.shapes.filter((shape) => shape.kind === 'link' || shape.kind === 'path').length
+    if (drawn !== rendered.diagram.edges.length) throw new Error(name + ': ' + String(drawn) + ' routes for ' + String(rendered.diagram.edges.length) + ' edges')
+  }
+})
+
+test('no edge is drawn with a segment too short to read', () => {
+  // A sideways port and a vertical one meet where the other port is, not at a nominal stub length: the stub is the
+  // straight run out of the port, and stopping it a point short leaves a point-wide jog - a segment no reader can read
+  // as anything, drawn only because two coordinates were rounded apart. None of the benchmark drawings may carry one.
+  for (const [name, lines] of Object.entries(BENCH_FIXTURES)) {
+    const { canvas } = paintWith(render({ source: lines.join(NL) }).diagram)
+    for (const shape of canvas.shapes) {
+      if (shape.kind !== 'path') continue
+      for (let index = 0; index + 1 < shape.points.length; index += 1) {
+        const from = shape.points[index]
+        const to = shape.points[index + 1]
+        const length = Math.abs(to.x - from.x) + Math.abs(to.y - from.y)
+        if (length < 2) throw new Error(name + ': a segment of ' + length.toFixed(2) + ' points at ' + JSON.stringify(from))
+      }
+    }
+  }
+})
+
+/** Do two axis-aligned segments cross at a point inside both? Meeting at an end does not count as a crossing. */
+const segmentsCross = (left, right) => {
+  const horizontal = (segment) => Math.abs(segment.y1 - segment.y2) < 0.5
+  if (horizontal(left) && !horizontal(right)) {
+    const x = right.x1
+    const y = left.y1
+    return (
+      x > Math.min(left.x1, left.x2) + 0.5 &&
+      x < Math.max(left.x1, left.x2) - 0.5 &&
+      y > Math.min(right.y1, right.y2) + 0.5 &&
+      y < Math.max(right.y1, right.y2) - 0.5
+    )
+  }
+  if (!horizontal(left) && horizontal(right)) return segmentsCross(right, left)
+  return false
+}
+
+test('a branch leaves by the point that does not cross the edge already holding that side', () => {
+  // The retry edge leaves Revise's top for the decision above it, so that side already has a port. The no-branch
+  // enters the same side: if it counted the side as empty it would take the corner the retry port sits on and draw a
+  // stub across it, which is a crossing a reader reads as a junction. The budget charges the held side the corner,
+  // the branch leaves by the bottom vertex instead, and no segment of the two edges meets another.
+  const source = ['graph TD', '  a[Idea] --> b{Feasible?}', '  b -->|yes| c[Build]', '  b -->|no| d[Revise]', '  d -->|retry| a'].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const routes = routesOf(canvas)
+  const branch = routes.find((shape) => shape.label === 'no')
+  const retry = routes.find((shape) => shape.label === 'retry')
+  const target = canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === 'Revise')
+  const branchPoints = routePointsOf(branch)
+  const retryPoints = routePointsOf(retry)
+  // The fixture: both edges meet one side of Revise from outside it, a port separation apart.
+  const onTop = (point) => Math.abs(point.y - target.y) <= 0.01
+  const branchEntry = branchPoints[branchPoints.length - 1]
+  const retryExit = retryPoints[0]
+  if (!onTop(branchEntry) || !onTop(retryExit)) throw new Error('the fixture does not put both ports on one side')
+  if (Math.abs(branchEntry.x - retryExit.x) < 14) throw new Error('the two ports are not a separation apart: ' + JSON.stringify([branchEntry.x, retryExit.x]))
+  const branchSegments = segmentsOfShape(branch)
+  const retrySegments = segmentsOfShape(retry)
+  for (const one of branchSegments) {
+    for (const other of retrySegments) {
+      if (segmentsCross(one, other)) throw new Error('the branch crosses the edge that already holds the side')
+    }
   }
 })
 

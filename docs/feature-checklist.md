@@ -206,7 +206,7 @@ And the gates around it:
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 97 | a flowchart becomes boxes and labelled arrows |
 | `client` | 12 | the declared client export is the built bundle the loader can execute |
-| `render` | 152 | every verdict earns its own role |
+| `render` | 159 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
 | `layering` | 19 | a chain is one row per box |
 | `ordering` | 10 | two edges that end in opposite order cross, and two in the same order do not |
