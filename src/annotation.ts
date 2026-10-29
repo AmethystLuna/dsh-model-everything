@@ -155,7 +155,20 @@ export function fillComposer(doc: DocumentLike | undefined, text: string): Place
     // assignment only where the page has no editing command at all.
     if (composer.focus !== undefined) composer.focus()
     const editing = globalThis as { document?: { execCommand?: (command: string, showUi: boolean, value: string) => boolean } }
-    const inserted = editing.document?.execCommand?.('insertText', false, text) === true
+    // One insertText per line, with a paragraph between them: a rich editor stores line breaks in its own
+    // model, so a single insertText carrying a newline lands as one run of characters - which is exactly
+    // what the first live test showed.
+    const insertLines = (): boolean => {
+      const command = editing.document?.execCommand
+      if (command === undefined || editing.document === undefined) return false
+      const lines = text.split(String.fromCharCode(10))
+      for (let index = 0; index < lines.length; index += 1) {
+        if (index > 0 && command.call(editing.document, 'insertParagraph', false, '') !== true) return false
+        if (lines[index] !== '' && command.call(editing.document, 'insertText', false, lines[index]) !== true) return false
+      }
+      return true
+    }
+    const inserted = insertLines()
     if (!inserted) {
       const current = typeof composer.textContent === 'string' ? composer.textContent : ''
       composer.textContent = current.trim() === '' ? text : current.replace(/\s*$/, '') + '\n\n' + text

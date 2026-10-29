@@ -360,6 +360,23 @@ test('an empty box takes the note as it is, with no stray blank line', () => {
   if (blank.value !== 'note') throw new Error('a whitespace draft was kept: ' + JSON.stringify(blank.value))
 })
 
+test('a rich editor gets one paragraph per line, not one long run', () => {
+  const calls = []
+  const previous = globalThis.document
+  globalThis.document = { execCommand: (command, _ui, value) => { calls.push([command, value]); return true } }
+  try {
+    const editable = { tagName: 'DIV', textContent: '', dispatchEvent: () => true, focus: () => {} }
+    const doc = { querySelector: (selector) => (selector.includes('contenteditable') ? editable : null) }
+    if (fillComposer(doc, 'a' + String.fromCharCode(10) + 'b' + String.fromCharCode(10) + 'c') !== 'filled') throw new Error('the surface was not filled')
+    const texts = calls.filter(([command]) => command === 'insertText').map(([, value]) => value)
+    if (texts.join('|') !== 'a|b|c') throw new Error('inserted as: ' + JSON.stringify(texts))
+    const paragraphs = calls.filter(([command]) => command === 'insertParagraph').length
+    if (paragraphs !== 2) throw new Error('paragraph breaks: ' + String(paragraphs))
+  } finally {
+    globalThis.document = previous
+  }
+})
+
 test('a writing surface with no value is filled through its text', () => {
   const editable = { tagName: 'DIV', textContent: '', dispatchEvent: () => true, focus: () => {} }
   if (fillComposer({ querySelector: () => editable }, 'note') !== 'filled') throw new Error('the surface was not filled')
