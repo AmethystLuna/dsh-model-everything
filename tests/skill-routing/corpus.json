@@ -481,6 +481,14 @@
         {
           "utterance": "this mermaid subgraph lost its edges when I pasted it, can you draw it",
           "expected": "model-everything-diagram"
+        },
+        {
+          "utterance": "show this module layout as a picture so the team can follow it",
+          "expected": "model-everything-diagram"
+        },
+        {
+          "utterance": "turn these boundaries into a picture I can put in the review doc",
+          "expected": "model-everything-diagram"
         }
       ],
       "nearMisses": [
@@ -494,6 +502,10 @@
         },
         {
           "utterance": "does this mermaid state machine ever deadlock",
+          "expected": "model-everything"
+        },
+        {
+          "utterance": "explain in words why this job retries twice",
           "expected": "model-everything"
         }
       ]

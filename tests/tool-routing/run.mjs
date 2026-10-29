@@ -35,7 +35,7 @@ function check(name, body) {
 function toolDescription(name) {
   // The shipped descriptions, read from the built plugin: a corpus written against a stale description is
   // measuring text that no model will ever see.
-  const modules = ['automaton-tool', 'compose-tool', 'concurrency-tool', 'data-tool', 'design-tool', 'edit-tool', 'export-tool', 'report-diff-tool', 'structure-tool', 'uml-tool', 'tool']
+  const modules = ['automaton-tool', 'compose-tool', 'concurrency-tool', 'data-tool', 'design-tool', 'edit-tool', 'export-tool', 'report-diff-tool', 'structure-tool', 'uml-tool', 'tool', 'diagram-render-tool', 'diagram-review-tool', 'diagram-diff-tool']
   return async () => {
     for (const file of modules) {
       const mod = await import('../../lib/' + file + '.js')

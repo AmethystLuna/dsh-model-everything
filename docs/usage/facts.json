@@ -5,12 +5,12 @@
     "resourceHint": "Load referenced resources only as needed.\"];\n\tswitch (base.kind) {\n\t\tcase \"directory\""
   },
   "surfaces": {
-    "catalog": 3545,
-    "bodies": 85607,
+    "catalog": 3706,
+    "bodies": 86993,
     "references": 177052,
     "referenceFiles": 13,
-    "toolChars": 30357,
-    "toolCount": 14
+    "toolChars": 34067,
+    "toolCount": 17
   },
   "toolsWithWhen": 1,
   "routingFamilies": [
@@ -77,6 +77,18 @@
     {
       "name": "model_verify",
       "chars": 1426
+    },
+    {
+      "name": "diagram_render",
+      "chars": 766
+    },
+    {
+      "name": "diagram_review",
+      "chars": 567
+    },
+    {
+      "name": "diagram_diff",
+      "chars": 408
     }
   ]
 }

@@ -25,7 +25,7 @@ function limitsOf(args: { maxMembers?: unknown; maxDepth?: unknown; maxNodes?: u
 export const diagramReviewTool = defineTool({
   name: DIAGRAM_REVIEW_TOOL_NAME,
   description:
-    'Review the structure of a diagram from its source text: how wide each boundary is, how deep they nest, and how many nodes the drawing holds, against budgets you can set. Accepts the same Mermaid and PlantUML subset as diagram_render and reports what it measured, so an empty report cannot be mistaken for a clean one. Read `verdict`, never `ok`. This reviews structure; it does not draw (diagram_render does) and it does not check behaviour (model_verify does).',
+    'Review the structure of a diagram from its source text: how wide each boundary is, how deep they nest, and how many nodes the drawing holds, against budgets you can set. Run it before a drawing goes in front of a reader: a picture that needs scrolling is no longer a summary. Accepts the same Mermaid and PlantUML subset as diagram_render and reports what it measured, so an empty report cannot be mistaken for a clean one. Read `verdict`, never `ok`. This reviews structure; it does not draw (diagram_render does) and it does not check behaviour (model_verify does).',
   parameters: {
     source: {
       type: 'string',

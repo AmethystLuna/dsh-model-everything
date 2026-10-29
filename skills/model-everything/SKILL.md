@@ -413,7 +413,7 @@ Skip logic-primitive verification when:
 
 ### Routing to the Sibling Skills
 
-This skill owns behavioural claims. Three neighbouring domains have their own skill, and loading the wrong one wastes the verification:
+This skill owns behavioural claims. The neighbouring domains have their own skill, and loading the wrong one wastes the verification:
 
 | Domain | Skill |
 |---|---|
@@ -421,6 +421,7 @@ This skill owns behavioural claims. Three neighbouring domains have their own sk
 | Reviewing architecture, module structure or a dependency diagram (isolated nodes, dangling endpoints, cycles, allowed-dependency and layer violations, missing required edges) | `model-everything-structure` |
 | Concurrency, synchrony and async claims — "thread-safe", "lock-free", "no data race", "ISR-safe", "non-blocking", `async`/`await` — mined and routed to TSan/Helgrind/CBMC/TLA+/UPPAAL, never proven here; a shared-location update is decided here by `model_compose_verify` (C5) | `model-everything-interleaving` |
 | Entities, fields, relationships, data invariants, schema migrations (DS1-DS4, DA1-DA12, DD1-DD4) | `model-everything-datamodel` |
+| Showing a result as a picture — drawing Mermaid or PlantUML, putting the drawing in front of a reader, or checking that it fits the page (structure budgets, containment diffs, every refused line named) | `model-everything-diagram` |
 
 ---
 

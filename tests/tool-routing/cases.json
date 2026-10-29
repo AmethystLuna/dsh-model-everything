@@ -238,6 +238,27 @@
       "mustNot": "model_verify",
       "why": "the question is about the drawing's modelling; whether the machine behaves that way is the next question",
       "ambiguous": true
+    },
+    {
+      "prompt": "This flowchart is sixty boxes. Draw it and tell me whether it still reads on one page.",
+      "expect": "diagram_render",
+      "mustNot": "diagram_review",
+      "why": "the drawing is what was asked for; whether it still reads is the budget question, and only the wording says the picture comes first",
+      "ambiguous": true
+    },
+    {
+      "prompt": "Our component diagram nests four packages deep and every box holds a dozen children. Is it still one figure?",
+      "expect": "diagram_review",
+      "mustNot": "uml_review",
+      "why": "width and depth are measured rather than judged; whether the modelling is sound is uml_review's question",
+      "ambiguous": true
+    },
+    {
+      "prompt": "What moved between last quarter's architecture picture and this one?",
+      "expect": "diagram_diff",
+      "mustNot": "report_diff",
+      "why": "one drawing against another; report_diff compares reports, and the prompt names pictures",
+      "ambiguous": true
     }
   ]
 }

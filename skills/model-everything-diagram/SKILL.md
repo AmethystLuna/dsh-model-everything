@@ -1,6 +1,6 @@
 ---
 name: model-everything-diagram
-description: "Use when drawing a diagram from its source text or checking its structure: Mermaid and PlantUML subsets, structure budgets, and containment diffs. Every line it cannot draw is refused by number. The drawing proves layout, not design. Doctrine: the model-everything skill.""
+description: "Use when drawing a diagram from its source text, showing one to a reader, or checking its structure: Mermaid and PlantUML subsets, structure budgets, and containment diffs. Reach for it when an explanation is clearer shown than told - a layout, a flow, a change - and put the picture beside the explanation. Every line it cannot draw is refused by number. The drawing proves layout, not design. Doctrine: the model-everything skill.""
 ---
 
 # Model Everything — Drawing
@@ -12,6 +12,21 @@ it looks complete. This skill covers the drawing half: it renders the subset it 
 The doctrine it inherits — say what a result does and does not prove, read `verdict` and never `ok` — lives in the
 `model-everything` skill. Load that one when the question is whether a design is *correct*; load this one when the
 question is what the picture shows.
+
+## Draw to explain, not to decorate
+
+A reader takes a layout, a flow, a boundary and a change between two of them from a picture. So the trigger
+is not the phrase "draw" — it is an answer that has that shape: reach for `diagram_render` when the
+explanation would otherwise spell out positions and connections in prose, and put the drawing beside the
+explanation rather than in place of it.
+
+| Where the reader sees it | What it shows | How it starts |
+|---|---|---|
+| the file you wrote | the SVG at full size, kept next to the document it belongs to | `diagram_render` with `out`, then hand the file over with `present` |
+| the whiteboard tab | any source, editable and zoomable, with the colour schemes | the reader opens the tab and pastes; it holds none of the session's data |
+
+Before a drawing goes in front of a reader, run `diagram_review`: a picture that needs scrolling is no
+longer a summary. When you present one, say what it shows — the layout, not whether the design is right.
 
 ## When This Skill Applies
 

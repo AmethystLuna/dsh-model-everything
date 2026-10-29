@@ -1,13 +1,13 @@
 mindmap
 root((how a model learns to use this plugin))
   four orders of magnitude, and only two of them are free
-    the catalog: 3545 characters, always visible
+    the catalog: 3706 characters, always visible
       8 rows, the longest at 483 of 500
         a row past 500 loses its tail to the model, silently
-    the tool descriptions: 30357 characters, always visible
-      14 descriptions, the longest at 3382 characters
+    the tool descriptions: 34067 characters, always visible
+      17 descriptions, the longest at 3382 characters
         no ceiling here, so a description grows without anything objecting
-    a skill body: the bodies together are 85607 characters, loaded one at a time
+    a skill body: the bodies together are 86993 characters, loaded one at a time
       the model chooses it from the row alone
     the references: 177052 characters, on follow-through
       the only part paid for by need rather than by default
@@ -23,7 +23,7 @@ root((how a model learns to use this plugin))
       the budget is why: space spent on praise is space not spent on a trigger
   where each property stands today
     skill rows: 8 of 8 name a sibling, 8 of 8 state a non-goal
-    tool descriptions: 14 of 14 name a sibling, 14 of 14 state a non-goal
+    tool descriptions: 17 of 17 name a sibling, 17 of 17 state a non-goal
       the ones that name none: 
     and the result routes onward in 6 of 6 families
       that is the only channel that can redirect a model mid-task
@@ -56,6 +56,12 @@ root((how a model learns to use this plugin))
       not this: the claim is about behaviour rather than the drawing - that is model_verify
     model_verify: one machine: reachable states, invariants, deadlock, and a before/after regression
       not this: two or more machines must handshake or share a location - that is model_compose_verify
+    diagram_render: one drawing: source text in, a laid-out SVG out, every refused line named
+      not this: the drawing has to fit a budget or a pane before a reader sees it - that is diagram_review
+    diagram_review: the structure of one drawing against budgets: boundary width, nesting depth, node count
+      not this: the diagram has to be read as a model, and its modelling judged - that is uml_review
+    diagram_diff: what moved between two drawings: boundaries added, removed, renamed or re-parented
+      not this: two reports have to be compared rather than two drawings - that is report_diff
   the five routes that do not need luck
     a rejection names the tool that would accept the input
       the model is already holding the wrong one when it finds out
@@ -79,6 +85,9 @@ root((how a model learns to use this plugin))
     uml_render - 0 tokens, instead: uml_review, uml_parse
     uml_review - 0 tokens, instead: model_verify
     model_verify - 0 tokens, instead: model_compose_verify
+    diagram_render - 0 tokens, instead: uml_parse, uml_review
+    diagram_review - 0 tokens, instead: model_verify
+    diagram_diff - 0 tokens, sends you nowhere else
     every description states its boundary
   why a map rather than a paragraph
     the budget is spatial, so the picture has to be spatial

@@ -44,7 +44,7 @@ for (const skill of skills) {
 
 // --------------------------------------------------------------------- the tools, from the objects --
 
-const modules = ['automaton-tool.js', 'compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'edit-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js']
+const modules = ['automaton-tool.js', 'compose-tool.js', 'concurrency-tool.js', 'data-tool.js', 'design-tool.js', 'edit-tool.js', 'export-tool.js', 'report-diff-tool.js', 'structure-tool.js', 'uml-tool.js', 'tool.js', 'diagram-render-tool.js', 'diagram-review-tool.js', 'diagram-diff-tool.js']
 const tools = []
 for (const file of modules) {
   const mod = await import(libUrl + file)

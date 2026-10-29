@@ -1,10 +1,10 @@
 {
-  "catalogChars": 3545,
+  "catalogChars": 3706,
   "catalogRows": [
     {
       "skill": "model-everything",
       "chars": 366,
-      "body": 32791
+      "body": 33024
     },
     {
       "skill": "model-everything-datamodel",
@@ -18,8 +18,8 @@
     },
     {
       "skill": "model-everything-diagram",
-      "chars": 272,
-      "body": 6900
+      "chars": 433,
+      "body": 8053
     },
     {
       "skill": "model-everything-interleaving",
@@ -42,7 +42,7 @@
       "body": 8203
     }
   ],
-  "toolChars": 30357,
+  "toolChars": 34067,
   "tools": [
     {
       "name": "model_automaton_verify",
@@ -99,19 +99,31 @@
     {
       "name": "model_verify",
       "chars": 2824
+    },
+    {
+      "name": "diagram_render",
+      "chars": 1614
+    },
+    {
+      "name": "diagram_review",
+      "chars": 1276
+    },
+    {
+      "name": "diagram_diff",
+      "chars": 820
     }
   ],
   "perTurn": {
-    "chars": 33902,
-    "tokens": 8476
+    "chars": 37773,
+    "tokens": 9443
   },
   "routing": {
     "rowsWithSibling": 8,
     "rowsWithNonGoal": 8,
     "rowCount": 8,
-    "toolsWithSibling": 14,
-    "toolsWithNonGoal": 14,
-    "toolCount": 14,
+    "toolsWithSibling": 17,
+    "toolsWithNonGoal": 17,
+    "toolCount": 17,
     "toolsWithoutSibling": [],
     "familiesRoutingOnward": 6,
     "familyCount": 6
@@ -241,6 +253,29 @@
         "instead": [
           "model_compose_verify"
         ],
+        "statesBoundary": true
+      },
+      {
+        "name": "diagram_render",
+        "tokens": 0,
+        "instead": [
+          "uml_parse",
+          "uml_review"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "diagram_review",
+        "tokens": 0,
+        "instead": [
+          "model_verify"
+        ],
+        "statesBoundary": true
+      },
+      {
+        "name": "diagram_diff",
+        "tokens": 0,
+        "instead": [],
         "statesBoundary": true
       }
     ],
