@@ -46,7 +46,14 @@ export interface ToolCallProps {
 }
 
 /** Tool names this package answers. A key that never dispatches simply never renders. */
-export const TOOL_NAMES: string[] = ['model_verify']
+/**
+ * The drawing tool's wire name. A literal, not an import: the client bundle must not pull in the tool
+ * surface, which imports the host's tool SDK.
+ */
+const DRAWING_TOOL = 'diagram_render'
+
+/** Tool names this package answers. A key that never dispatches simply never renders. */
+export const TOOL_NAMES: string[] = ['model_verify', DRAWING_TOOL]
 
 /**
  * Which surface the page is painting the drawing on.
@@ -91,6 +98,50 @@ export const WHITEBOARD_ID = 'model-everything-diagram'
 export const WHITEBOARD_SAMPLE = ['graph TD', '  a[Idea] --> b{Feasible?}', '  b -->|yes| c[Build]', '  b -->|no| d[Revise]', '  d --> a'].join('\n')
 
 /**
+ * One argument out of the host's lazy arguments view.
+ *
+ * A settled call exposes `value(key)`; a plain object (a test, or a replayed call) is read directly. The
+ * view answers `undefined` until the field closes, which is exactly when a drawing should be attempted.
+ */
+function argOf(args: unknown, key: string): unknown {
+  if (args === null || typeof args !== 'object') return undefined
+  const view = args as { value?: (name: string) => unknown }
+  if (typeof view.value === 'function') return view.value(key)
+  return (args as Record<string, unknown>)[key]
+}
+
+/**
+ * The card for a drawing: the source the call carried, drawn by the renderer that wrote the file.
+ *
+ * Drawing it here rather than replaying the SVG means the card and the file are one picture from one
+ * engine, and it costs the result nothing. Lines the renderer refused are listed under the drawing: a
+ * card that hid them would show a picture that is missing something, which is the failure the tool
+ * exists to prevent.
+ */
+function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<Palette>): unknown {
+  const block = (props.block ?? {}) as { args?: unknown }
+  const source = argOf(block.args, 'source')
+  const asked = argOf(block.args, 'scheme')
+  const scheme = schemeNames().includes(asked as PaletteScheme) ? (asked as PaletteScheme) : 'default'
+  if (typeof source !== 'string' || source.trim() === '') {
+    return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'the drawing appears when the call settles')
+  }
+  const drawn = render({ source, folded: [] }, overrides, { mode: themeMode(), scheme })
+  // The pane decides the width: a drawing wider than the card scrolls nowhere, so it scales instead.
+  const scaled = drawn.markup.replace('<svg ', '<svg style="width: 100%; height: auto; display: block" ')
+  const refused =
+    drawn.refused.length === 0
+      ? null
+      : React.createElement('pre', { style: { fontSize: '11px', color: '#b7791f', whiteSpace: 'pre-wrap', margin: '6px 0' } }, drawn.refused.join('\n'))
+  return React.createElement(
+    'div',
+    { style: { background: drawn.colours.background, color: drawn.colours.text, borderRadius: '6px', overflow: 'auto' } },
+    React.createElement('div', { dangerouslySetInnerHTML: { __html: scaled } }),
+    refused,
+  )
+}
+
+/**
  * The view for one tool name.
  *
  * The drawing is emitted as markup, so React receives it through `dangerouslySetInnerHTML`. That is safe
@@ -99,6 +150,8 @@ export const WHITEBOARD_SAMPLE = ['graph TD', '  a[Idea] --> b{Feasible?}', '  b
  */
 export function viewFor(React: ReactLike, overrides: Partial<Palette> = {}): (props: ToolCallProps) => unknown {
   return (props: ToolCallProps): unknown => {
+    // A drawing is not a report: its card is the source, drawn by the renderer that wrote the file.
+    if (props.toolName === DRAWING_TOOL) return drawingCard(React, props, overrides)
     // The whole block goes to the view model: the host shapes it differently per phase (a lazy arguments
     // view while running, content blocks once settled), and only that module knows how to read it.
     const diagram = viewModel({ phase: props.phase, toolName: props.toolName, block: props.block })

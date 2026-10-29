@@ -186,7 +186,7 @@ cb:
 
 ## 与工具卡片互不牵连
 
-白板只读自己的文本框，不读任何工具结果，所以卡片那条线的未解问题（`active:false`）不影响它。这也说明**客户端半本身是能加载的**——右栏标签出现即为证据；问题只在 `tool.call.toolview` 那一个注册上。
+白板只读自己的文本框，不读任何工具结果，所以卡片那条线的未解问题（`active:false`）不影响它。2026-10-29 补上了 `diagram_render` 自己的卡片视图（`src/client.ts` 的 `drawingCard`），白板依旧不依赖它。这也说明**客户端半本身是能加载的**——右栏标签出现即为证据；问题只在 `tool.call.toolview` 那一个注册上。
 
 ## 三个容器的进度
 
@@ -194,5 +194,5 @@ cb:
 |---|---|---|
 | 文件导出（`diagram_render` 的 `out`） | 可用 | 无 |
 | 右栏白板 | 可用 | 客户端半（已验证） |
-| 对话内嵌卡片 | 未验证 | `tool.call.toolview` 的激活 |
+| 对话内嵌卡片 | 已实现，未在页面上验证 | `tool.call.toolview` 按 `diagram_render` 这个 key 接管：卡片用调用自带的 source 重画（与写文件的同一个渲染器），拒绝的行列在下面 |
 | 全屏 | 未做 | 白板 + `sidebarRight.openTab(id, { fullscreen: true })` |

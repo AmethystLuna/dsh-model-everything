@@ -88,8 +88,9 @@ test('apply binds one view per tool name, keyed by the wire name', () => {
   const { registered } = applyWithSeats(registrations[0].factory(() => stubReact))
   const views = registered.filter((entry) => entry.options.name === 'tool.call.toolview')
   if (views.length === 0) throw new Error('no tool view registered')
+  const keys = views.map((entry) => String(entry.options.key)).sort().join(',')
+  if (keys !== 'diagram_render,model_verify') throw new Error('keys registered: ' + keys)
   for (const entry of views) {
-    if (entry.options.key !== 'model_verify') throw new Error('wrong key: ' + String(entry.options.key))
     if (entry.options.id !== undefined) throw new Error('a keyed slot declares only key; id would be ignored: ' + String(entry.options.id))
     if (typeof entry.component !== 'function') throw new Error('the view is not a component')
   }
@@ -217,6 +218,55 @@ test('the whiteboard tab is registered once the sidebar service appears later', 
   pending()
   if (tabs.length !== 1) throw new Error('tabs after the retry: ' + String(tabs.length))
   if (!registered.some((options) => options.name === 'sidebar.right.pane.tab')) throw new Error('the body was never registered')
+})
+
+test('the drawing card draws the source the call carried', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  const element = component({
+    phase: 'result',
+    toolName: 'diagram_render',
+    block: { args: { source: 'graph TD\n  a[Draft] --> b[Ship]', scheme: 'print' } },
+  })
+  if (element === null || typeof element !== 'object') throw new Error('the drawing card returned nothing')
+  const html = JSON.stringify(element)
+  if (!html.includes('<svg')) throw new Error('the card drew no svg')
+  if (!html.includes('Draft') || !html.includes('Ship')) throw new Error('the drawing lost its nodes')
+  if (!html.includes('width: 100%')) throw new Error('the drawing does not scale to the pane')
+})
+
+test('the drawing card lists the lines the renderer refused', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  const element = component({
+    phase: 'result',
+    toolName: 'diagram_render',
+    block: { args: { source: 'sequenceDiagram\n  A->>B: hi' } },
+  })
+  const html = JSON.stringify(element)
+  if (!html.includes('line 1')) throw new Error('the refused line is not shown: ' + html.slice(0, 160))
+})
+
+test('the drawing card survives a call whose source has not arrived', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  for (const props of [{ phase: 'preparing', toolName: 'diagram_render' }, { phase: 'start', toolName: 'diagram_render', block: {} }, { toolName: 'diagram_render' }]) {
+    const element = component(props)
+    if (element === null || typeof element !== 'object') throw new Error('no element for ' + JSON.stringify(props))
+  }
+})
+
+test('the drawing key is the name the shipped tool declares', () => {
+  // The client cannot import the tool (it would pull the host SDK into the bundle), so the name is a
+  // literal there. This is the check that keeps the literal and the tool from drifting apart.
+  const built = readFileSync(repo + 'lib/diagram-render-tool.js', 'utf8')
+  if (!/DIAGRAM_TOOL_NAME = 'diagram_render'/.test(built)) throw new Error('the tool no longer declares diagram_render')
 })
 
 if (failures > 0) {

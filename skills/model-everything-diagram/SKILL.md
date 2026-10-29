@@ -23,6 +23,7 @@ explanation rather than in place of it.
 | Where the reader sees it | What it shows | How it starts |
 |---|---|---|
 | the file you wrote | the SVG at full size, kept next to the document it belongs to | `diagram_render` with `out`, then hand the file over with `present` |
+| the card in the conversation | the drawing, redrawn from the call's own source, with the refused lines under it | nothing to do: the card is keyed to `diagram_render` and appears where the call was |
 | the whiteboard tab | any source, editable and zoomable, with the colour schemes | the reader opens the tab and pastes; it holds none of the session's data |
 
 Before a drawing goes in front of a reader, run `diagram_review`: a picture that needs scrolling is no
