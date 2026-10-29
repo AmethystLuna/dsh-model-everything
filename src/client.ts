@@ -13,11 +13,11 @@
  */
 
 import { paintWith } from './render/paint.js'
-import { schemeNames, type Palette, type PaletteMode, type PaletteScheme } from './render/palette.js'
+import { palette, schemeNames, type Palette, type PaletteMode, type PaletteScheme } from './render/palette.js'
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationMessage, fillComposer, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationMessage, fillComposer, pageCensus, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -188,8 +188,13 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const source = argOf(block.args, 'source')
   const asked = argOf(block.args, 'scheme')
   const scheme = schemeNames().includes(asked as PaletteScheme) ? (asked as PaletteScheme) : 'default'
+  // The arguments are the lazy view while the call runs; by the time it settles the host may hand back only
+  // the result. Both carry the drawing, so the card reads whichever one is there.
+  const payload = (props.block as { result?: unknown } | undefined)?.result
+  const returned = payload !== null && typeof payload === 'object' ? (payload as { svg?: unknown }).svg : undefined
+  const markup = typeof returned === 'string' && returned !== '' ? returned : null
   const useState = React.useState
-  if (useState === undefined) return cardSurface(React, source, scheme, overrides, null, null, null)
+  if (useState === undefined) return cardSurface(React, source, markup, scheme, overrides, null, null, null)
   const [annotate, setAnnotate] = useState(false)
   const [picked, setPicked] = useState<{ id: string } | null>(null)
   const [note, setNote] = useState('')
@@ -211,18 +216,22 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     ? annotationPanel(
         (type, options, ...children) => React.createElement(type, options, ...children),
         { picked, note, status },
-        { onNote: setNote, onPlace: () => setStatus(pushNote(document, picked, note, caption, false)), onSend: () => { if (picked === null) return; setStatus('正在发送…'); void probePush(annotationMessage({ nodeId: picked.id, note, caption })).then((outcome) => setStatus(outcome === 'ok' ? '已发送（会话命令）' : pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome)) }, onClear: () => { setPicked(null); setNote(''); setStatus('') } },
+        { onNote: setNote, onPlace: () => setStatus(pushNote(document, picked, note, caption, false)), onSend: () => { if (picked === null) return; setStatus('正在发送…'); void probePush(annotationMessage({ nodeId: picked.id, note, caption })).then((outcome) => setStatus(outcome === 'ok' ? '已发送（会话命令）' : pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome + ' · 页面：' + pageCensus(document))) }, onClear: () => { setPicked(null); setNote(''); setStatus('') } },
       )
     : null
-  return cardSurface(React, source, scheme, overrides, onPick, toggle, panel)
+  return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel)
 }
 
 /** The drawing itself, plus whatever the reader is doing to it. One surface, drawn once. */
-function cardSurface(React: ReactLike, source: unknown, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown): unknown {
-  if (typeof source !== 'string' || source.trim() === '') {
+function cardSurface(React: ReactLike, source: unknown, returned: string | null, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown): unknown {
+  if (returned === null && (typeof source !== 'string' || source.trim() === '')) {
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'the drawing appears when the call settles')
   }
-  const drawn = render({ source, folded: [] }, overrides, { mode: themeMode(), scheme })
+  // A settled result already carries the drawing the file got; a running call has only its source. Either way
+  // it is the same picture from the same renderer.
+  const drawn = returned === null
+    ? render({ source: String(source), folded: [] }, overrides, { mode: themeMode(), scheme })
+    : { markup: returned, refused: [] as string[], colours: palette(overrides, { mode: themeMode(), scheme }) }
   // The pane decides the width: a drawing wider than the card scrolls nowhere, so it scales instead.
   const scaled = drawn.markup.replace('<svg ', '<svg style="width: 100%; height: auto; display: block" ')
   const refused =
@@ -354,7 +363,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
         if (outcome === 'ok') { setStatus('已发送（会话命令）'); return }
         // The probe's reason travels with the fallback: it is the only way a reader can tell us why the
         // command channel is closed on this host.
-        setStatus(pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome)
+        setStatus(pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome + ' · 页面：' + pageCensus(document))
       })
     }
     const textarea = h('textarea', {

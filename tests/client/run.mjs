@@ -13,7 +13,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
-const { annotationMessage, fillComposer, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
+const { annotationMessage, fillComposer, pageCensus, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
@@ -265,6 +265,28 @@ test('the drawing card survives a call whose source has not arrived', () => {
     const element = component(props)
     if (element === null || typeof element !== 'object') throw new Error('no element for ' + JSON.stringify(props))
   }
+})
+
+test('the card draws from the result when the settled call no longer carries its arguments', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  const element = component({
+    phase: 'result',
+    toolName: 'diagram_render',
+    block: { result: { svg: '<svg xmlns="http://www.w3.org/2000/svg"><g data-node-id="a"><rect width="4" height="4" /></g></svg>', caption: 'one box' } },
+  })
+  const html = JSON.stringify(element)
+  if (!html.includes('<svg')) throw new Error('the settled result was ignored')
+  if (!html.includes('data-node-id')) throw new Error('the returned drawing lost its node ids')
+})
+
+test('the page census counts what a probe cannot see', () => {
+  const doc = { querySelector: () => null, querySelectorAll: () => [1, 2] }
+  const said = pageCensus(doc)
+  if (!said.includes('textarea=2')) throw new Error('the census said: ' + said)
+  if (!said.includes('focus-flow=no')) throw new Error('the census said: ' + said)
 })
 
 test('the drawing card offers the annotation button when the host has hooks', () => {

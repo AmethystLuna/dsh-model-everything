@@ -42,6 +42,7 @@ export function annotationMessage(annotation: Annotation): string {
 /** The parts of the page this module touches, so the client bundle needs no DOM lib and a test can fake them. */
 export interface ElementLike {
   value?: unknown
+  querySelector?: (selector: string) => unknown
   textContent?: unknown
   focus?: () => void
   dispatchEvent?: (event: unknown) => boolean
@@ -51,6 +52,7 @@ export interface ElementLike {
 
 export interface DocumentLike {
   querySelector: (selector: string) => unknown
+  querySelectorAll?: (selector: string) => ArrayLike<unknown>
 }
 
 /**
@@ -59,15 +61,42 @@ export interface DocumentLike {
  * The host marks its composer with `data-focus-flow`; the board's own source box does not carry it, which is
  * what keeps an annotation from being typed into the diagram it describes.
  */
-const COMPOSER = '[data-focus-flow]'
+/** The marks a page may put on the box a reader types into, most specific first. */
+const COMPOSER_MARKS = ['[data-focus-flow] textarea', 'textarea[data-focus-flow]', '[data-focus-flow] [contenteditable="true"]', '[data-focus-flow][contenteditable="true"]']
 
 export function findComposer(doc: DocumentLike | undefined): ElementLike | undefined {
   if (doc === undefined) return undefined
   try {
-    const found = doc.querySelector(COMPOSER)
-    return found === null || typeof found !== 'object' ? undefined : (found as ElementLike)
+    for (const mark of COMPOSER_MARKS) {
+      const found = doc.querySelector(mark)
+      if (found !== null && typeof found === 'object') return found as ElementLike
+    }
+    // The mark may sit on the composer's wrapper rather than on the writing surface itself.
+    const marked = doc.querySelector('[data-focus-flow]')
+    if (marked !== null && typeof marked === 'object') {
+      const inner = (marked as ElementLike).querySelector?.('textarea, [contenteditable="true"]')
+      if (inner !== null && inner !== undefined && typeof inner === 'object') return inner as ElementLike
+    }
+    return undefined
   } catch {
     return undefined
+  }
+}
+
+/**
+ * What the page has, for a status line: a probe with no console needs one place to report from.
+ *
+ * Counts only. A reader's draft is never read into the report.
+ */
+export function pageCensus(doc: DocumentLike | undefined): string {
+  if (doc === undefined) return 'no document'
+  try {
+    const textareas = doc.querySelectorAll === undefined ? -1 : doc.querySelectorAll('textarea').length
+    const editables = doc.querySelectorAll === undefined ? -1 : doc.querySelectorAll('[contenteditable="true"]').length
+    const focus = doc.querySelector('[data-focus-flow]') !== null ? 'yes' : 'no'
+    return 'textarea=' + String(textareas) + ' editable=' + String(editables) + ' focus-flow=' + focus
+  } catch {
+    return 'census failed'
   }
 }
 

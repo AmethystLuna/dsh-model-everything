@@ -30,6 +30,7 @@ export declare function annotationMessage(annotation: Annotation): string;
 /** The parts of the page this module touches, so the client bundle needs no DOM lib and a test can fake them. */
 export interface ElementLike {
     value?: unknown;
+    querySelector?: (selector: string) => unknown;
     textContent?: unknown;
     focus?: () => void;
     dispatchEvent?: (event: unknown) => boolean;
@@ -38,8 +39,15 @@ export interface ElementLike {
 }
 export interface DocumentLike {
     querySelector: (selector: string) => unknown;
+    querySelectorAll?: (selector: string) => ArrayLike<unknown>;
 }
 export declare function findComposer(doc: DocumentLike | undefined): ElementLike | undefined;
+/**
+ * What the page has, for a status line: a probe with no console needs one place to report from.
+ *
+ * Counts only. A reader's draft is never read into the report.
+ */
+export declare function pageCensus(doc: DocumentLike | undefined): string;
 /** What a write did, so the caller can say something true instead of something hopeful. */
 export type Placed = 'filled' | 'no-composer';
 /**
