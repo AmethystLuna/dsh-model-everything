@@ -17,6 +17,7 @@ import { schemeNames, type Palette, type PaletteMode, type PaletteScheme } from 
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
+import { annotationMessage, fillComposer, submitComposer, type DocumentLike } from './annotation.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -199,7 +200,25 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [scheme, setScheme] = useState<PaletteScheme>('default')
     const [fit, setFit] = useState(true)
     const [folded, setFolded] = useState<string[]>([])
+    const [annotate, setAnnotate] = useState(false)
+    const [picked, setPicked] = useState<{ id: string } | null>(null)
+    const [note, setNote] = useState('')
+    const [status, setStatus] = useState('')
     const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme, folded)
+    // Where the note goes: the host's composer, marked with `data-focus-flow`. The board's own box above is not
+    // the composer, which is what keeps an annotation from being typed into the diagram it describes.
+    const document = (globalThis as { document?: DocumentLike }).document
+    const caption = source.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? ''
+    const place = (): boolean => {
+      if (picked === null) return false
+      const written = fillComposer(document, annotationMessage({ nodeId: picked.id, note, caption }))
+      setStatus(written === 'filled' ? '已放入输入框' : '没找到输入框：先把图贴进会话，或手动复制下面的文字')
+      return written === 'filled'
+    }
+    const send = (): void => {
+      if (!place()) return
+      setStatus(submitComposer(document) ? '已发送' : '已放入输入框：按一次回车发送')
+    }
     const textarea = h('textarea', {
       value: source,
       spellcheck: false,
@@ -213,6 +232,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.max(0.5, Math.round((Number(zoom) - 0.25) * 100) / 100)) } }, '−'),
       h('span', { style: { fontSize: '12px', opacity: 0.7 } }, fit ? 'fit' : String(Math.round(Number(zoom) * 100)) + '%'),
       h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) } }, '+'),
+      h('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } } }, annotate ? '批注: 开' : '批注'),
       h('button', { type: 'button', onClick: () => { setFit(false); setZoom(1) } }, 'reset'),
       h('button', { type: 'button', title: 'Scale to the pane width', onClick: () => setFit(!fit) }, fit ? 'fit: on' : 'fit: off'),
       folded.length === 0
@@ -234,6 +254,35 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       { style: { display: 'flex', flexDirection: 'column', gap: '4px', height: '100%', boxSizing: 'border-box', padding: '8px' } },
       textarea,
       controls,
+      // The note editor sits above the drawing rather than in a modal: the reader keeps seeing the node it is
+      // about while writing, and a zoom or a source edit does not dismiss what they typed.
+      annotate
+        ? h(
+            'div',
+            { style: { display: 'flex', flexDirection: 'column', gap: '4px', border: '1px solid rgba(127,127,127,0.35)', borderRadius: '6px', padding: '6px' } },
+            h('div', { style: { fontSize: '12px', opacity: 0.8 } }, picked === null ? '点一个节点，再写批注（也可以留空，只做标记）' : '节点 ' + picked.id),
+            picked === null
+              ? null
+              : h('textarea', {
+                  value: note,
+                  rows: 3,
+                  placeholder: '批注…（Ctrl+Enter 直接发送）',
+                  style: { width: '100%', font: '12px system-ui, sans-serif', padding: '6px', resize: 'vertical' },
+                  onInput: (event: { target?: { value?: unknown } }) => setNote(String(event?.target?.value ?? '')),
+                  onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
+                    if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); send() }
+                  },
+                }),
+            h(
+              'div',
+              { style: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
+              h('button', { type: 'button', disabled: picked === null, onClick: () => { place() } }, '放入输入框'),
+              h('button', { type: 'button', disabled: picked === null, onClick: () => send() }, '发送'),
+              h('button', { type: 'button', onClick: () => { setPicked(null); setNote(''); setStatus('') } }, '清空'),
+              status === '' ? null : h('span', { style: { fontSize: '11px', opacity: 0.75 } }, status),
+            ),
+          )
+        : null,
       // The drawing takes the rest of the pane and scrolls inside it, so an expanded tab uses its room.
       h(
         'div',
@@ -242,6 +291,12 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
           // A boundary carries its id in the markup, so one listener on the container is enough: no per-rect
           // handler, and the handling survives a re-render that replaced the whole SVG.
           onClick: (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }) => {
+            // In annotation mode a click marks a node instead of folding a boundary: one gesture, one meaning,
+            // chosen by the mode the reader just switched on.
+            if (annotate) {
+              const marked = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
+              if (typeof marked === 'string' && marked !== '') { setPicked({ id: marked }); setStatus(''); return }
+            }
             const hit = event?.target?.closest?.('[data-group-id]')
             const id = hit?.getAttribute?.('data-group-id')
             if (typeof id !== 'string' || id === '') return

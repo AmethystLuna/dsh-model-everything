@@ -44,6 +44,8 @@ export interface Point {
 }
 export interface BoxShape {
     kind: 'box';
+    /** Which node this box is. It travels into the markup, so a reader can target one node by delegation. */
+    id: string;
     x: number;
     y: number;
     width: number;

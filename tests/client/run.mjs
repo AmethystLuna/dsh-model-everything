@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 
 const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', '/').replace(/\/?$/, '/')
+
+// The annotation module is imported directly: it decides what the message says and where it goes, and
+// neither question needs a page.
+const { annotationMessage, fillComposer } = await import('../../lib/annotation.js')
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
 let failures = 0
@@ -267,6 +271,33 @@ test('the drawing key is the name the shipped tool declares', () => {
   // literal there. This is the check that keeps the literal and the tool from drifting apart.
   const built = readFileSync(repo + 'lib/diagram-render-tool.js', 'utf8')
   if (!/DIAGRAM_TOOL_NAME = 'diagram_render'/.test(built)) throw new Error('the tool no longer declares diagram_render')
+})
+
+test('the annotation message names the node, the drawing and the note', () => {
+  const text = annotationMessage({ nodeId: 'n1', label: 'Checkout', note: '这个判断应该拆开', caption: 'graph TD' })
+  if (!text.includes('Checkout (n1)')) throw new Error('the node is not named: ' + text)
+  if (!text.includes('graph TD')) throw new Error('the drawing is not named: ' + text)
+  if (!text.includes('这个判断应该拆开')) throw new Error('the note is not carried verbatim: ' + text)
+})
+
+test('a blank note still says the node was marked', () => {
+  const text = annotationMessage({ nodeId: 'n1' })
+  if (!text.includes('marked this node')) throw new Error('a silent note became silence: ' + text)
+  if (text.includes('no note — the reader marked this node\n')) throw new Error('unexpected trailing line')
+})
+
+test('filling the composer appends to the draft instead of replacing it', () => {
+  const element = { tagName: 'TEXTAREA', value: 'half a sentence', dispatchEvent: () => true, focus: () => {} }
+  const written = fillComposer({ querySelector: () => element }, 'Diagram annotation · node "a"')
+  if (written !== 'filled') throw new Error('the write reported ' + written)
+  if (!element.value.startsWith('half a sentence')) throw new Error('the draft was replaced: ' + element.value)
+  if (!element.value.includes('Diagram annotation')) throw new Error('the note did not land: ' + element.value)
+})
+
+test('no composer means no write, and the caller is told', () => {
+  const written = fillComposer({ querySelector: () => null }, 'text')
+  if (written !== 'no-composer') throw new Error('reported ' + written)
+  if (fillComposer(undefined, 'text') !== 'no-composer') throw new Error('an absent document was treated as a composer')
 })
 
 if (failures > 0) {

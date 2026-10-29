@@ -258,7 +258,11 @@ export function toSvg(canvas: Canvas, colours: Palette, label?: string): { marku
       dropped += 1
       continue
     }
-    body.push(writer(shape, colours))
+    const drawn = writer(shape, colours)
+    // A node carries its id in the markup, so a card or a board can target one node by delegation, the way a
+    // boundary already carries `data-group-id`, instead of working it out from the click's geometry.
+    const nodeId = (shape as { id?: unknown }).id
+    body.push(shape.kind === 'box' && typeof nodeId === 'string' ? '<g data-node-id="' + escape(nodeId) + '">' + drawn + '</g>' : drawn)
   }
   const header =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + n(canvas.width) + ' ' + n(canvas.height) +

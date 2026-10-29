@@ -26,6 +26,10 @@ explanation rather than in place of it.
 | the card in the conversation | the drawing, redrawn from the call's own source, with the refused lines under it | nothing to do: the card is keyed to `diagram_render` and appears where the call was |
 | the whiteboard tab | any source, editable and zoomable, with the colour schemes | the reader opens the tab and pastes; it holds none of the session's data |
 
+The reader can point at a node and send a note from the whiteboard or from the call's card. It arrives as an
+ordinary message that starts `Diagram annotation · node "…"`, and that is what it is: the reader marking one
+node of that drawing and saying something about it. Answer the node, not the whole picture.
+
 Before a drawing goes in front of a reader, run `diagram_review`: a picture that needs scrolling is no
 longer a summary. When you present one, say what it shows — the layout, not whether the design is right.
 
