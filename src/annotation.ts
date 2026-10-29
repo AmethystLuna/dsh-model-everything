@@ -28,15 +28,31 @@ export interface Annotation {
  * A blank note is not dropped - it says the node was marked - because "the reader pointed here" and "the
  * reader pointed here and said this" are different messages, and only one of them survives a silent trim.
  */
+/**
+ * The text that travels to the session: what was marked, what was said, and nothing invented.
+ *
+ * Structured on purpose. A note from a reader looking at a picture arrives without the picture, so the block
+ * carries three things the model cannot recover on its own: that these annotate a drawing, which drawing, and
+ * that each numbered item is a separate thing to answer. A blank note is not dropped - 'the reader marked this
+ * node' and 'the reader marked it and said this' are different messages.
+ */
+export function annotationBlock(annotations: Annotation[]): string {
+  const lines = ['Diagram annotations - answer each numbered item separately:']
+  const caption = (annotations[0]?.caption ?? '').trim()
+  if (caption !== '') lines.push('Drawing: ' + caption)
+  annotations.forEach((annotation, index) => {
+    const label = (annotation.label ?? '').trim()
+    const node = label === '' || label === annotation.nodeId ? annotation.nodeId : label + ' (' + annotation.nodeId + ')'
+    const note = (annotation.note ?? '').trim()
+    lines.push('', '[' + String(index + 1) + '] node ' + node)
+    lines.push(note === '' ? '(marked, no note)' : note)
+  })
+  return lines.join(String.fromCharCode(10))
+}
+
+/** One annotation, in the same block shape: a caller with a single note should not get a second format. */
 export function annotationMessage(annotation: Annotation): string {
-  const label = (annotation.label ?? '').trim()
-  const node = label === '' || label === annotation.nodeId ? annotation.nodeId : label + ' (' + annotation.nodeId + ')'
-  const lines = ['Diagram annotation · node "' + node + '"']
-  const caption = (annotation.caption ?? '').trim()
-  if (caption !== '') lines.push(caption)
-  const note = (annotation.note ?? '').trim()
-  lines.push(note === '' ? 'no note — the reader marked this node' : note)
-  return lines.join('\n')
+  return annotationBlock([annotation])
 }
 
 /** The parts of the page this module touches, so the client bundle needs no DOM lib and a test can fake them. */
@@ -225,4 +241,17 @@ export function sessionFromLocation(location: { pathname?: string; search?: stri
   if (bare !== null) return bare[0]
   const parameter = /[?&#](?:session|sessionId|id)=([A-Za-z0-9_-]+)/.exec(address)
   return parameter === null ? undefined : parameter[1]
+}
+/**
+ * Put a whole annotation block in the composer, and say what happened.
+ *
+ * The block is one message for N notes: the model is told to answer each item, and the reader's input box sees
+ * the structured text rather than N raw fragments. The same failure vocabulary as a single note.
+ */
+export function pushBlock(document: DocumentLike | undefined, annotations: Annotation[], caption: string, submit: boolean): string {
+  if (annotations.length === 0) return ''
+  const block = annotationBlock(annotations.map((annotation) => ({ ...annotation, caption })))
+  if (fillComposer(document, block) !== 'filled') return '没找到输入框：先把图贴进会话，或手动复制这段文字'
+  if (!submit) return '已放入输入框（' + String(annotations.length) + ' 条图注）'
+  return submitComposer(document) ? '已发送（' + String(annotations.length) + ' 条图注）' : '已放入输入框：按一次回车发送'
 }

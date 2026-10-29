@@ -339,8 +339,8 @@ test('the annotation message names the node, the drawing and the note', () => {
 
 test('a blank note still says the node was marked', () => {
   const text = annotationMessage({ nodeId: 'n1' })
-  if (!text.includes('marked this node')) throw new Error('a silent note became silence: ' + text)
-  if (text.includes('no note — the reader marked this node\n')) throw new Error('unexpected trailing line')
+  if (!text.includes('(marked, no note)')) throw new Error('a silent note became silence: ' + text)
+  if (!text.includes('[1] node n1')) throw new Error('the mark was not numbered: ' + text)
 })
 
 test('filling the composer appends to the draft instead of replacing it', () => {

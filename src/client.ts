@@ -17,7 +17,7 @@ import { palette, schemeNames, type Palette, type PaletteMode, type PaletteSchem
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationMessage, fillComposer, pageCensus, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationMessage, fillComposer, pageCensus, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -130,46 +130,79 @@ function argOf(args: unknown, key: string): unknown {
 /** A create-element function with this package's calling convention, so a shared builder fits both seats. */
 type H = (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
 
+/** The host's own colours, so the panel looks like the rest of the page instead of like a plugin. */
+const TOKEN = {
+  surface: 'var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-1, Canvas))',
+  border: 'var(--dsw-alias-border-l1, rgba(127,127,127,0.35))',
+  text: 'var(--dsw-alias-label-primary, CanvasText)',
+  dim: 'var(--dsw-alias-label-secondary, GrayText)',
+  accent: 'var(--dsw-alias-brand-primary, #2563eb)',
+}
+
 /** What an annotation editor shows, shared by the two surfaces that offer one. */
 export interface AnnotationState {
   picked: { id: string } | null
   note: string
+  pending: Array<{ nodeId: string; note: string }>
   status: string
 }
 
+export interface AnnotationActions {
+  onNote: (value: string) => void
+  onAdd: () => void
+  onAddAndSend: () => void
+  onSend: () => void
+  onClear: () => void
+  onCancel: () => void
+}
 
 /**
- * The note editor: one component for both seats, because the reader's question is the same at either.
+ * The annotation surface: a floating editor over the drawing, and a count of what is waiting.
  *
- * It sits beside the drawing rather than in a modal, so the node it is about stays visible while writing;
- * Return is a newline because notes are sentences, and Ctrl/Cmd+Enter is the shortcut for the button.
+ * Floating rather than inline, because the reader is looking at a picture and the editor must not move it.
+ * The notes stay in a list until one message is composed from them: the reader's input box is theirs, and N raw
+ * fragments in it would be exactly the mess this feature is meant to avoid. Colours come from the host's tokens,
+ * so light and dark themes need no separate code.
  */
-export function annotationPanel(h: H, state: AnnotationState, actions: { onNote: (value: string) => void; onPlace: () => void; onSend: () => void; onClear: () => void; hint?: string }): unknown {
-  return h(
-    'div',
-    { style: { display: 'flex', flexDirection: 'column', gap: '4px', border: '1px solid rgba(127,127,127,0.35)', borderRadius: '6px', padding: '6px' } },
-    h('div', { style: { fontSize: '12px', opacity: 0.8 } }, state.picked === null ? (actions.hint ?? '点一个节点，再写批注（也可以留空，只做标记）') : '节点 ' + state.picked.id),
-    state.picked === null
-      ? null
-      : h('textarea', {
+export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean } = {}): unknown {
+  const button = (label: string, onClick: () => void, accent = false): unknown =>
+    h('button', { type: 'button', onClick, style: { fontSize: '12px', padding: '2px 8px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: accent ? TOKEN.accent : TOKEN.text, cursor: 'pointer' } }, label)
+  const chips = state.pending.length === 0
+    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, state.picked === null ? '点一个节点开始批注' : '节点 ' + state.picked.id)
+    : h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '2px 4px', color: TOKEN.text } }, h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, '图注 ×' + String(state.pending.length)), button('发送', actions.onSend, true), button('清空', actions.onClear))
+  const editor = state.picked === null
+    ? null
+    : h(
+        'div',
+        {
+          style: {
+            ...(options.floating === false ? {} : { position: 'absolute', right: '10px', top: '10px', zIndex: 20 }),
+            width: '260px', boxSizing: 'border-box',
+            display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', borderRadius: '10px',
+            background: TOKEN.surface, border: '1px solid ' + TOKEN.border, color: TOKEN.text,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
+          },
+        },
+        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, '节点 ' + state.picked.id),
+        h('textarea', {
           'data-dme-own': '1',
           value: state.note,
           rows: 3,
-          placeholder: '批注…（Ctrl+Enter 直接发送）',
-          style: { width: '100%', font: '12px system-ui, sans-serif', padding: '6px', resize: 'vertical' },
+          placeholder: '批注…（Ctrl+Enter 加入并发送）',
+          style: { width: '100%', boxSizing: 'border-box', font: '12px system-ui, sans-serif', padding: '6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, resize: 'vertical' },
           onInput: (event: { target?: { value?: unknown } }) => actions.onNote(String(event?.target?.value ?? '')),
           onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
-            if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); actions.onSend() }
+            if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); actions.onAddAndSend() }
           },
         }),
-    h(
-      'div',
-      { style: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
-      h('button', { type: 'button', disabled: state.picked === null, onClick: () => actions.onPlace() }, '放入输入框'),
-      h('button', { type: 'button', disabled: state.picked === null, onClick: () => actions.onSend() }, '发送'),
-      h('button', { type: 'button', onClick: () => actions.onClear() }, '清空'),
-      state.status === '' ? null : h('span', { style: { fontSize: '11px', opacity: 0.75 } }, state.status),
-    ),
+        h('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, button('取消', actions.onCancel), button('加入', actions.onAdd), button('加入并发送', actions.onAddAndSend, true)),
+      )
+  return h(
+    'div',
+    { style: { position: 'relative', display: 'flex', flexDirection: 'column', gap: '2px', color: TOKEN.text } },
+    chips,
+    editor,
+    state.status === '' ? null : h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '0 4px' } }, state.status),
   )
 }
 
@@ -208,6 +241,12 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [status, setStatus] = useState('')
   const document = (globalThis as { document?: DocumentLike }).document
   const caption = typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''
+  const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
+  const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
+    const said = pushBlock(document, list, caption, true)
+    setStatus(said)
+    if (said.startsWith('已')) setPending([])
+  }
   const onPick = (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }): void => {
     if (!annotate) return
     const id = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
@@ -222,8 +261,16 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const panel = annotate
     ? annotationPanel(
         (type, options, ...children) => React.createElement(type, options, ...children),
-        { picked, note, status },
-        { onNote: setNote, onPlace: () => setStatus(pushNote(document, picked, note, caption, false)), onSend: () => { if (picked === null) return; setStatus('正在发送…'); void probePush(annotationMessage({ nodeId: picked.id, note, caption })).then((outcome) => setStatus(outcome === 'ok' ? '已发送（会话命令）' : pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome + ' · 页面：' + pageCensus(document))) }, onClear: () => { setPicked(null); setNote(''); setStatus('') } },
+        { picked, note, pending, status },
+        {
+          onNote: setNote,
+          onAdd: () => { if (picked === null) return; setPending([...pending, { nodeId: picked.id, note }]); setNote(''); setPicked(null); setStatus('已加入清单') },
+          onAddAndSend: () => { if (picked === null) return; const merged = [...pending, { nodeId: picked.id, note }]; setNote(''); setPicked(null); sendAll(merged) },
+          onSend: () => sendAll(pending),
+          onClear: () => { setPending([]); setStatus('') },
+          onCancel: () => { setPicked(null); setNote(''); setStatus('') },
+        },
+        { floating: false },
       )
     : null
   return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel)
@@ -357,21 +404,30 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [picked, setPicked] = useState<{ id: string } | null>(null)
     const [note, setNote] = useState('')
     const [status, setStatus] = useState('')
+    const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
     const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme, folded)
-    // Where the note goes: the host's composer, marked with `data-focus-flow`. The board's own box above is not
-    // the composer, which is what keeps an annotation from being typed into the diagram it describes.
     const document = (globalThis as { document?: DocumentLike }).document
-    const caption = source.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? ''
-    const place = (): void => setStatus(pushNote(document, picked, note, caption, false))
-    const send = (): void => {
+    const caption = source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? ''
+    // The notes accumulate here; one structured message leaves for the session, not one raw fragment per note.
+    const sendAll = (list: Array<{ nodeId: string; note: string }>, submit: boolean): void => {
+      const said = pushBlock(document, list, caption, submit)
+      setStatus(said)
+      if (said.startsWith('已')) setPending([])
+    }
+    const addDraft = (): boolean => {
+      if (picked === null) return false
+      setPending([...pending, { nodeId: picked.id, note }])
+      setNote('')
+      setPicked(null)
+      setStatus('已加入清单')
+      return true
+    }
+    const addAndSend = (): void => {
       if (picked === null) return
-      setStatus('正在发送…')
-      void probePush(annotationMessage({ nodeId: picked.id, note, caption })).then((outcome) => {
-        if (outcome === 'ok') { setStatus('已发送（会话命令）'); return }
-        // The probe's reason travels with the fallback: it is the only way a reader can tell us why the
-        // command channel is closed on this host.
-        setStatus(pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome + ' · 页面：' + pageCensus(document))
-      })
+      const merged = [...pending, { nodeId: picked.id, note }]
+      setNote('')
+      setPicked(null)
+      sendAll(merged, true)
     }
     const textarea = h('textarea', {
       'data-dme-own': '1',
@@ -409,21 +465,17 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       { style: { display: 'flex', flexDirection: 'column', gap: '4px', height: '100%', boxSizing: 'border-box', padding: '8px' } },
       textarea,
       controls,
-      // The note editor sits above the drawing rather than in a modal: the reader keeps seeing the node it is
-      // about while writing, and a zoom or a source edit does not dismiss what they typed.
-      annotate
-        ? annotationPanel(h, { picked, note, status }, {
-            onNote: setNote,
-            onPlace: place,
-            onSend: send,
-            onClear: () => { setPicked(null); setNote(''); setStatus('') },
-          })
-        : null,
-      // The drawing takes the rest of the pane and scrolls inside it, so an expanded tab uses its room.
+      // The drawing takes the rest of the pane and scrolls inside it; the annotation surface floats above it,
+      // so the picture keeps its size while the reader writes about it.
       h(
         'div',
         {
-          style: { flex: '1 1 auto', minHeight: '0', overflow: 'auto' },
+          style: { position: 'relative', flex: '1 1 auto', minHeight: '0', display: 'flex', flexDirection: 'column', gap: '2px' },
+        },
+        h(
+          'div',
+          {
+            style: { flex: '1 1 auto', minHeight: '0', overflow: 'auto' },
           // A boundary carries its id in the markup, so one listener on the container is enough: no per-rect
           // handler, and the handling survives a re-render that replaced the whole SVG.
           onClick: (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }) => {
@@ -439,7 +491,18 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
             setFolded(folded.includes(id) ? folded.filter((entry) => entry !== id) : [...folded, id])
           },
         },
-        drawn,
+          drawn,
+        ),
+        annotate
+          ? annotationPanel(h, { picked, note, pending, status }, {
+              onNote: setNote,
+              onAdd: () => { addDraft() },
+              onAddAndSend: addAndSend,
+              onSend: () => sendAll(pending, true),
+              onClear: () => { setPending([]); setStatus('') },
+              onCancel: () => { setPicked(null); setNote(''); setStatus('') },
+            })
+          : null,
       ),
     )
   }

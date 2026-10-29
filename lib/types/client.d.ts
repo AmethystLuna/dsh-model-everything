@@ -67,20 +67,30 @@ export interface AnnotationState {
         id: string;
     } | null;
     note: string;
+    pending: Array<{
+        nodeId: string;
+        note: string;
+    }>;
     status: string;
 }
-/**
- * The note editor: one component for both seats, because the reader's question is the same at either.
- *
- * It sits beside the drawing rather than in a modal, so the node it is about stays visible while writing;
- * Return is a newline because notes are sentences, and Ctrl/Cmd+Enter is the shortcut for the button.
- */
-export declare function annotationPanel(h: H, state: AnnotationState, actions: {
+export interface AnnotationActions {
     onNote: (value: string) => void;
-    onPlace: () => void;
+    onAdd: () => void;
+    onAddAndSend: () => void;
     onSend: () => void;
     onClear: () => void;
-    hint?: string;
+    onCancel: () => void;
+}
+/**
+ * The annotation surface: a floating editor over the drawing, and a count of what is waiting.
+ *
+ * Floating rather than inline, because the reader is looking at a picture and the editor must not move it.
+ * The notes stay in a list until one message is composed from them: the reader's input box is theirs, and N raw
+ * fragments in it would be exactly the mess this feature is meant to avoid. Colours come from the host's tokens,
+ * so light and dark themes need no separate code.
+ */
+export declare function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options?: {
+    floating?: boolean;
 }): unknown;
 export declare function viewFor(React: ReactLike, overrides?: Partial<Palette>): (props: ToolCallProps) => unknown;
 /**

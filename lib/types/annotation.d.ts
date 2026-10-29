@@ -26,6 +26,16 @@ export interface Annotation {
  * A blank note is not dropped - it says the node was marked - because "the reader pointed here" and "the
  * reader pointed here and said this" are different messages, and only one of them survives a silent trim.
  */
+/**
+ * The text that travels to the session: what was marked, what was said, and nothing invented.
+ *
+ * Structured on purpose. A note from a reader looking at a picture arrives without the picture, so the block
+ * carries three things the model cannot recover on its own: that these annotate a drawing, which drawing, and
+ * that each numbered item is a separate thing to answer. A blank note is not dropped - 'the reader marked this
+ * node' and 'the reader marked it and said this' are different messages.
+ */
+export declare function annotationBlock(annotations: Annotation[]): string;
+/** One annotation, in the same block shape: a caller with a single note should not get a second format. */
 export declare function annotationMessage(annotation: Annotation): string;
 /** The parts of the page this module touches, so the client bundle needs no DOM lib and a test can fake them. */
 export interface ElementLike {
@@ -81,3 +91,10 @@ export declare function sessionFromLocation(location: {
     search?: string;
     hash?: string;
 } | undefined): string | undefined;
+/**
+ * Put a whole annotation block in the composer, and say what happened.
+ *
+ * The block is one message for N notes: the model is told to answer each item, and the reader's input box sees
+ * the structured text rather than N raw fragments. The same failure vocabulary as a single note.
+ */
+export declare function pushBlock(document: DocumentLike | undefined, annotations: Annotation[], caption: string, submit: boolean): string;
