@@ -145,6 +145,8 @@ export interface AnnotationState {
   note: string
   pending: Array<{ nodeId: string; note: string }>
   status: string
+  /** Where the editor sits, in the drawing's own coordinates: beside the node the reader picked. */
+  anchor?: { left: number; top: number }
 }
 
 export interface AnnotationActions {
@@ -176,7 +178,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
         'div',
         {
           style: {
-            ...(options.floating === false ? {} : { position: 'absolute', right: '10px', top: '10px', zIndex: 20 }),
+            ...(options.floating === false ? {} : { position: 'absolute', left: (state.anchor?.left ?? 10) + 'px', top: (state.anchor?.top ?? 10) + 'px', zIndex: 20 }),
             width: '260px', boxSizing: 'border-box',
             display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', borderRadius: '10px',
             background: TOKEN.surface, border: '1px solid ' + TOKEN.border, color: TOKEN.text,
@@ -199,7 +201,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
       )
   return h(
     'div',
-    { style: { position: 'relative', display: 'flex', flexDirection: 'column', gap: '2px', color: TOKEN.text } },
+    { style: { display: 'flex', flexDirection: 'column', gap: '2px', color: TOKEN.text } },
     chips,
     editor,
     state.status === '' ? null : h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '0 4px' } }, state.status),
@@ -402,6 +404,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [folded, setFolded] = useState<string[]>([])
     const [annotate, setAnnotate] = useState(false)
     const [picked, setPicked] = useState<{ id: string } | null>(null)
+    const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
     const [note, setNote] = useState('')
     const [status, setStatus] = useState('')
     const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
@@ -482,8 +485,26 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
             // In annotation mode a click marks a node instead of folding a boundary: one gesture, one meaning,
             // chosen by the mode the reader just switched on.
             if (annotate) {
-              const marked = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
-              if (typeof marked === 'string' && marked !== '') { setPicked({ id: marked }); setStatus(''); return }
+              const node = event?.target?.closest?.('[data-node-id]') as {
+                getAttribute?: (name: string) => string | null
+                getBoundingClientRect?: () => { left: number; top: number; width: number; height: number }
+              } | null
+              const marked = node?.getAttribute?.('data-node-id')
+              if (typeof marked === 'string' && marked !== '') {
+                // Beside the node, not at a fixed corner: the note is about that box, and a window that jumps to
+                // the corner makes the reader look for it. Coordinates are the drawing's own, because the editor
+                // is positioned against the pane the drawing sits in.
+                const box = node?.getBoundingClientRect?.()
+                const frame = (event as { currentTarget?: { getBoundingClientRect?: () => { left: number; top: number } } })?.currentTarget?.getBoundingClientRect?.()
+                if (box !== undefined && frame !== undefined) {
+                  setAnchor({ left: Math.max(4, box.left - frame.left + box.width + 8), top: Math.max(4, box.top - frame.top) })
+                } else {
+                  setAnchor({ left: 10, top: 10 })
+                }
+                setPicked({ id: marked })
+                setStatus('')
+                return
+              }
             }
             const hit = event?.target?.closest?.('[data-group-id]')
             const id = hit?.getAttribute?.('data-group-id')
@@ -494,7 +515,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
           drawn,
         ),
         annotate
-          ? annotationPanel(h, { picked, note, pending, status }, {
+          ? annotationPanel(h, { picked, note, pending, status, anchor }, {
               onNote: setNote,
               onAdd: () => { addDraft() },
               onAddAndSend: addAndSend,

@@ -72,6 +72,11 @@ export interface AnnotationState {
         note: string;
     }>;
     status: string;
+    /** Where the editor sits, in the drawing's own coordinates: beside the node the reader picked. */
+    anchor?: {
+        left: number;
+        top: number;
+    };
 }
 export interface AnnotationActions {
     onNote: (value: string) => void;
