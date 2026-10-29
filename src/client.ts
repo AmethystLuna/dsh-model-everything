@@ -17,7 +17,7 @@ import { schemeNames, type Palette, type PaletteMode, type PaletteScheme } from 
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationMessage, fillComposer, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationMessage, fillComposer, pushNote, submitComposer, type DocumentLike } from './annotation.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -119,11 +119,98 @@ function argOf(args: unknown, key: string): unknown {
  * card that hid them would show a picture that is missing something, which is the failure the tool
  * exists to prevent.
  */
+/** A create-element function with this package's calling convention, so a shared builder fits both seats. */
+type H = (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
+
+/** What an annotation editor shows, shared by the two surfaces that offer one. */
+export interface AnnotationState {
+  picked: { id: string } | null
+  note: string
+  status: string
+}
+
+
+/**
+ * The note editor: one component for both seats, because the reader's question is the same at either.
+ *
+ * It sits beside the drawing rather than in a modal, so the node it is about stays visible while writing;
+ * Return is a newline because notes are sentences, and Ctrl/Cmd+Enter is the shortcut for the button.
+ */
+export function annotationPanel(h: H, state: AnnotationState, actions: { onNote: (value: string) => void; onPlace: () => void; onSend: () => void; onClear: () => void; hint?: string }): unknown {
+  return h(
+    'div',
+    { style: { display: 'flex', flexDirection: 'column', gap: '4px', border: '1px solid rgba(127,127,127,0.35)', borderRadius: '6px', padding: '6px' } },
+    h('div', { style: { fontSize: '12px', opacity: 0.8 } }, state.picked === null ? (actions.hint ?? '点一个节点，再写批注（也可以留空，只做标记）') : '节点 ' + state.picked.id),
+    state.picked === null
+      ? null
+      : h('textarea', {
+          value: state.note,
+          rows: 3,
+          placeholder: '批注…（Ctrl+Enter 直接发送）',
+          style: { width: '100%', font: '12px system-ui, sans-serif', padding: '6px', resize: 'vertical' },
+          onInput: (event: { target?: { value?: unknown } }) => actions.onNote(String(event?.target?.value ?? '')),
+          onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
+            if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); actions.onSend() }
+          },
+        }),
+    h(
+      'div',
+      { style: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
+      h('button', { type: 'button', disabled: state.picked === null, onClick: () => actions.onPlace() }, '放入输入框'),
+      h('button', { type: 'button', disabled: state.picked === null, onClick: () => actions.onSend() }, '发送'),
+      h('button', { type: 'button', onClick: () => actions.onClear() }, '清空'),
+      state.status === '' ? null : h('span', { style: { fontSize: '11px', opacity: 0.75 } }, state.status),
+    ),
+  )
+}
+
+/**
+ * The card for a drawing: the source the call carried, drawn by the renderer that wrote the file.
+ *
+ * Drawing it here rather than replaying the SVG means the card and the file are one picture from one
+ * engine, and it costs the result nothing. Lines the renderer refused are listed under the drawing: a
+ * card that hid them would show a picture that is missing something, which is the failure the tool
+ * exists to prevent.
+ *
+ * With hooks the card also annotates: the picture is the subject, so the editor stays behind one button
+ * until the reader asks for it, and a click then marks a node instead of doing nothing.
+ */
 function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<Palette>): unknown {
   const block = (props.block ?? {}) as { args?: unknown }
   const source = argOf(block.args, 'source')
   const asked = argOf(block.args, 'scheme')
   const scheme = schemeNames().includes(asked as PaletteScheme) ? (asked as PaletteScheme) : 'default'
+  const useState = React.useState
+  if (useState === undefined) return cardSurface(React, source, scheme, overrides, null, null, null)
+  const [annotate, setAnnotate] = useState(false)
+  const [picked, setPicked] = useState<{ id: string } | null>(null)
+  const [note, setNote] = useState('')
+  const [status, setStatus] = useState('')
+  const document = (globalThis as { document?: DocumentLike }).document
+  const caption = typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''
+  const onPick = (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }): void => {
+    if (!annotate) return
+    const id = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
+    if (typeof id === 'string' && id !== '') { setPicked({ id }); setStatus('') }
+  }
+  const toggle = React.createElement(
+    'div',
+    { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+    React.createElement('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } } }, annotate ? '批注: 开' : '批注'),
+    annotate && picked === null ? React.createElement('span', { style: { fontSize: '11px', opacity: 0.7 } }, '点一个节点') : null,
+  )
+  const panel = annotate
+    ? annotationPanel(
+        (type, options, ...children) => React.createElement(type, options, ...children),
+        { picked, note, status },
+        { onNote: setNote, onPlace: () => setStatus(pushNote(document, picked, note, caption, false)), onSend: () => setStatus(pushNote(document, picked, note, caption, true)), onClear: () => { setPicked(null); setNote(''); setStatus('') } },
+      )
+    : null
+  return cardSurface(React, source, scheme, overrides, onPick, toggle, panel)
+}
+
+/** The drawing itself, plus whatever the reader is doing to it. One surface, drawn once. */
+function cardSurface(React: ReactLike, source: unknown, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown): unknown {
   if (typeof source !== 'string' || source.trim() === '') {
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'the drawing appears when the call settles')
   }
@@ -133,12 +220,15 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const refused =
     drawn.refused.length === 0
       ? null
-      : React.createElement('pre', { style: { fontSize: '11px', color: '#b7791f', whiteSpace: 'pre-wrap', margin: '6px 0' } }, drawn.refused.join('\n'))
+      : React.createElement('pre', { style: { fontSize: '11px', color: '#b7791f', whiteSpace: 'pre-wrap', margin: '6px 0' } }, drawn.refused.join(String.fromCharCode(10)))
+  const drawing = onClick === null
+    ? React.createElement('div', { dangerouslySetInnerHTML: { __html: scaled } })
+    : React.createElement('div', { onClick: onClick as never, style: { cursor: 'crosshair' }, dangerouslySetInnerHTML: { __html: scaled } })
+  const children = [toggle, drawing, refused, panel].filter((child) => child !== null)
   return React.createElement(
     'div',
-    { style: { background: drawn.colours.background, color: drawn.colours.text, borderRadius: '6px', overflow: 'auto' } },
-    React.createElement('div', { dangerouslySetInnerHTML: { __html: scaled } }),
-    refused,
+    { style: { display: 'flex', flexDirection: 'column', gap: '4px', background: drawn.colours.background, color: drawn.colours.text, borderRadius: '6px', overflow: 'auto' } },
+    ...children,
   )
 }
 
@@ -209,16 +299,8 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     // the composer, which is what keeps an annotation from being typed into the diagram it describes.
     const document = (globalThis as { document?: DocumentLike }).document
     const caption = source.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? ''
-    const place = (): boolean => {
-      if (picked === null) return false
-      const written = fillComposer(document, annotationMessage({ nodeId: picked.id, note, caption }))
-      setStatus(written === 'filled' ? '已放入输入框' : '没找到输入框：先把图贴进会话，或手动复制下面的文字')
-      return written === 'filled'
-    }
-    const send = (): void => {
-      if (!place()) return
-      setStatus(submitComposer(document) ? '已发送' : '已放入输入框：按一次回车发送')
-    }
+    const place = (): void => setStatus(pushNote(document, picked, note, caption, false))
+    const send = (): void => setStatus(pushNote(document, picked, note, caption, true))
     const textarea = h('textarea', {
       value: source,
       spellcheck: false,
@@ -257,31 +339,12 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       // The note editor sits above the drawing rather than in a modal: the reader keeps seeing the node it is
       // about while writing, and a zoom or a source edit does not dismiss what they typed.
       annotate
-        ? h(
-            'div',
-            { style: { display: 'flex', flexDirection: 'column', gap: '4px', border: '1px solid rgba(127,127,127,0.35)', borderRadius: '6px', padding: '6px' } },
-            h('div', { style: { fontSize: '12px', opacity: 0.8 } }, picked === null ? '点一个节点，再写批注（也可以留空，只做标记）' : '节点 ' + picked.id),
-            picked === null
-              ? null
-              : h('textarea', {
-                  value: note,
-                  rows: 3,
-                  placeholder: '批注…（Ctrl+Enter 直接发送）',
-                  style: { width: '100%', font: '12px system-ui, sans-serif', padding: '6px', resize: 'vertical' },
-                  onInput: (event: { target?: { value?: unknown } }) => setNote(String(event?.target?.value ?? '')),
-                  onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
-                    if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); send() }
-                  },
-                }),
-            h(
-              'div',
-              { style: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
-              h('button', { type: 'button', disabled: picked === null, onClick: () => { place() } }, '放入输入框'),
-              h('button', { type: 'button', disabled: picked === null, onClick: () => send() }, '发送'),
-              h('button', { type: 'button', onClick: () => { setPicked(null); setNote(''); setStatus('') } }, '清空'),
-              status === '' ? null : h('span', { style: { fontSize: '11px', opacity: 0.75 } }, status),
-            ),
-          )
+        ? annotationPanel(h, { picked, note, status }, {
+            onNote: setNote,
+            onPlace: place,
+            onSend: send,
+            onClear: () => { setPicked(null); setNote(''); setStatus('') },
+          })
         : null,
       // The drawing takes the rest of the pane and scrolls inside it, so an expanded tab uses its room.
       h(

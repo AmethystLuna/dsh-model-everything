@@ -51,3 +51,13 @@ export type Placed = 'filled' | 'no-composer';
 export declare function fillComposer(doc: DocumentLike | undefined, text: string): Placed;
 /** Whether the page can take a Return key for the composer at all, so a button may promise it. */
 export declare function submitComposer(doc: DocumentLike | undefined): boolean;
+/**
+ * One note, two actions.
+ *
+ * Returns the sentence to show the reader: `sent` and `the box was not there` are different outcomes, and a
+ * button that reports the wrong one is worse than no button. The text is appended above a half-written draft,
+ * never in place of it.
+ */
+export declare function pushNote(document: DocumentLike | undefined, picked: {
+    id: string;
+} | null, note: string, caption: string, submit: boolean): string;

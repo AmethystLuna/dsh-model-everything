@@ -13,7 +13,8 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
-const { annotationMessage, fillComposer } = await import('../../lib/annotation.js')
+const { annotationMessage, fillComposer, pushNote } = await import('../../lib/annotation.js')
+
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
 let failures = 0
@@ -266,11 +267,36 @@ test('the drawing card survives a call whose source has not arrived', () => {
   }
 })
 
+test('the drawing card offers the annotation button when the host has hooks', () => {
+  const stateful = { createElement: stubReact.createElement, useState: (initial) => [initial, () => {}] }
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stateful)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  const element = component({ phase: 'result', toolName: 'diagram_render', block: { args: { source: 'graph TD\n  a[One] --> b[Two]' } } })
+  const html = JSON.stringify(element)
+  if (!html.includes('<svg')) throw new Error('the card lost its drawing')
+  if (!html.includes('批注')) throw new Error('the card has no annotation affordance')
+})
+
 test('the drawing key is the name the shipped tool declares', () => {
   // The client cannot import the tool (it would pull the host SDK into the bundle), so the name is a
   // literal there. This is the check that keeps the literal and the tool from drifting apart.
   const built = readFileSync(repo + 'lib/diagram-render-tool.js', 'utf8')
   if (!/DIAGRAM_TOOL_NAME = 'diagram_render'/.test(built)) throw new Error('the tool no longer declares diagram_render')
+})
+
+test('pushNote says what happened, and never claims a send it did not do', () => {
+  const element = { tagName: 'TEXTAREA', value: '', dispatchEvent: () => true, focus: () => {} }
+  const placed = pushNote({ querySelector: () => element }, { id: 'n1' }, 'note', 'graph TD', false)
+  if (placed !== '已放入输入框') throw new Error('reported: ' + placed)
+  if (!element.value.includes('n1') || !element.value.includes('note')) throw new Error('the note did not reach the composer')
+  const missing = pushNote({ querySelector: () => null }, { id: 'n1' }, 'note', 'g', false)
+  if (!missing.includes('没找到输入框')) throw new Error('a missing composer was reported as: ' + missing)
+  // No KeyboardEvent in this process, so the send cannot be claimed; the text still lands and says so.
+  const unclaimed = pushNote({ querySelector: () => element }, { id: 'n1' }, '', 'g', true)
+  if (!unclaimed.includes('按一次回车发送')) throw new Error('the send was overclaimed: ' + unclaimed)
+  if (pushNote(undefined, null, '', '', true) !== '') throw new Error('a missing pick should be silent')
 })
 
 test('the annotation message names the node, the drawing and the note', () => {

@@ -134,3 +134,19 @@ export function submitComposer(doc: DocumentLike | undefined): boolean {
     return false
   }
 }
+
+/**
+ * One note, two actions.
+ *
+ * Returns the sentence to show the reader: `sent` and `the box was not there` are different outcomes, and a
+ * button that reports the wrong one is worse than no button. The text is appended above a half-written draft,
+ * never in place of it.
+ */
+export function pushNote(document: DocumentLike | undefined, picked: { id: string } | null, note: string, caption: string, submit: boolean): string {
+  if (picked === null) return ''
+  if (fillComposer(document, annotationMessage({ nodeId: picked.id, note, caption })) !== 'filled') {
+    return '没找到输入框：先把图贴进会话，或手动复制这段文字'
+  }
+  if (!submit) return '已放入输入框'
+  return submitComposer(document) ? '已发送' : '已放入输入框：按一次回车发送'
+}

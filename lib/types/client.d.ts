@@ -53,6 +53,37 @@ export declare const WHITEBOARD_ID = "model-everything-diagram";
 /** What the whiteboard opens with: a diagram the reader can edit rather than an empty box. */
 export declare const WHITEBOARD_SAMPLE: string;
 /**
+ * The card for a drawing: the source the call carried, drawn by the renderer that wrote the file.
+ *
+ * Drawing it here rather than replaying the SVG means the card and the file are one picture from one
+ * engine, and it costs the result nothing. Lines the renderer refused are listed under the drawing: a
+ * card that hid them would show a picture that is missing something, which is the failure the tool
+ * exists to prevent.
+ */
+/** A create-element function with this package's calling convention, so a shared builder fits both seats. */
+type H = (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown;
+/** What an annotation editor shows, shared by the two surfaces that offer one. */
+export interface AnnotationState {
+    picked: {
+        id: string;
+    } | null;
+    note: string;
+    status: string;
+}
+/**
+ * The note editor: one component for both seats, because the reader's question is the same at either.
+ *
+ * It sits beside the drawing rather than in a modal, so the node it is about stays visible while writing;
+ * Return is a newline because notes are sentences, and Ctrl/Cmd+Enter is the shortcut for the button.
+ */
+export declare function annotationPanel(h: H, state: AnnotationState, actions: {
+    onNote: (value: string) => void;
+    onPlace: () => void;
+    onSend: () => void;
+    onClear: () => void;
+    hint?: string;
+}): unknown;
+/**
  * The view for one tool name.
  *
  * The drawing is emitted as markup, so React receives it through `dangerouslySetInnerHTML`. That is safe
@@ -81,3 +112,4 @@ export interface MountOptions {
  */
 export declare function mountWhiteboard(React: ReactLike, ctx: SlotContext, options?: MountOptions): unknown;
 export default function factory(require: (name: string) => unknown): PluginShape;
+export {};
