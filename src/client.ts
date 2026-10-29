@@ -170,11 +170,11 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
   const button = (label: string, onClick: () => void, accent = false): unknown =>
     h('button', { type: 'button', onClick, style: { fontSize: '12px', padding: '2px 8px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: accent ? TOKEN.accent : TOKEN.text, cursor: 'pointer' } }, label)
   const chips = state.pending.length === 0
-    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, state.picked === null ? '点一个节点开始批注' : '节点 ' + state.picked.id)
+    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, state.picked === null ? '批注模式：点一个节点' : '节点 ' + state.picked.id)
     : h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '2px 4px', color: TOKEN.text } }, h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, '图注 ×' + String(state.pending.length)), button('发送', actions.onSend, true), button('清空', actions.onClear))
-  // Always visible while the mode is on: a toggle that changes nothing on screen reads as a broken control,
-  // and the reader needs to see where the note will go before picking a node.
-  const editor = h(
+  // Only with a pick: an empty window over the drawing would cover the thing the reader is choosing a node on.
+  // The line below says the mode is on, which is the feedback the toggle owes without blocking the picture.
+  const editor = state.picked === null ? null : h(
         'div',
         {
           style: {
@@ -252,7 +252,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const onPick = (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }): void => {
     if (!annotate) return
     const id = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
-    if (typeof id === 'string' && id !== '') { setPicked({ id }); setStatus('') }
+    if (typeof id === 'string' && id !== '') { setPicked({ id }); setStatus(''); return }
+    if (note.trim() === '') setPicked(null)
   }
   const toggle = React.createElement(
     'div',
@@ -505,6 +506,10 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
                 setStatus('')
                 return
               }
+              // A click that lands on nothing closes the window only when it is empty: a miss is not a reason to
+              // lose words, and an empty window left open is clutter over the picture.
+              if (note.trim() === '') { setPicked(null); setAnchor(undefined) }
+              return
             }
             const hit = event?.target?.closest?.('[data-group-id]')
             const id = hit?.getAttribute?.('data-group-id')
