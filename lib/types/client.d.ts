@@ -12,6 +12,7 @@
  * compiled output in `window.__ModuleLoader__.load(...)`, which is the loader contract itself.
  */
 import { type Palette, type PaletteMode } from './render/palette.js';
+import { type DocumentLike } from './annotation.js';
 export interface ReactLike {
     createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown;
     useState?: <T>(initial: T) => [T, (next: T) => void];
@@ -72,6 +73,8 @@ export interface AnnotationState {
         note: string;
     }>;
     status: string;
+    /** Whether the pending list is expanded under the count. */
+    open?: boolean;
     /** Where the editor sits, in the drawing's own coordinates: beside the node the reader picked. */
     anchor?: {
         left: number;
@@ -85,6 +88,8 @@ export interface AnnotationActions {
     onSend: () => void;
     onClear: () => void;
     onCancel: () => void;
+    onToggle: () => void;
+    onRemove: (index: number) => void;
 }
 /**
  * The annotation surface: a floating editor over the drawing, and a count of what is waiting.
@@ -96,6 +101,7 @@ export interface AnnotationActions {
  */
 export declare function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options?: {
     floating?: boolean;
+    document?: DocumentLike;
 }): unknown;
 export declare function viewFor(React: ReactLike, overrides?: Partial<Palette>): (props: ToolCallProps) => unknown;
 /**

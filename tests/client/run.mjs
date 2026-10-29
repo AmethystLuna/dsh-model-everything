@@ -13,7 +13,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
-const { annotationMessage, fillComposer, pageCensus, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
+const { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
@@ -349,6 +349,30 @@ test('filling the composer appends to the draft instead of replacing it', () => 
   if (written !== 'filled') throw new Error('the write reported ' + written)
   if (!element.value.startsWith('half a sentence')) throw new Error('the draft was replaced: ' + element.value)
   if (!element.value.includes('Diagram annotation')) throw new Error('the note did not land: ' + element.value)
+})
+
+test('the block goes above the reader note, with a blank line between', () => {
+  const element = { tagName: 'TEXTAREA', value: 'half a thought', dispatchEvent: () => true, focus: () => {} }
+  const said = prependBlock({ querySelector: () => element }, [{ nodeId: 'a', note: 'note' }], 'graph TD')
+  if (!said.startsWith('已放入')) throw new Error('reported: ' + said)
+  const lines = element.value.split(String.fromCharCode(10))
+  if (!lines[0].startsWith('Diagram annotations')) throw new Error('the block is not first: ' + element.value)
+  if (!element.value.endsWith('half a thought')) throw new Error('the draft is not last: ' + element.value)
+  if (!element.value.includes(String.fromCharCode(10, 10) + 'half a thought')) throw new Error('no blank line between block and draft')
+})
+
+test('the block carries a line break per item, so the model can number them', () => {
+  const element = { tagName: 'TEXTAREA', value: '', dispatchEvent: () => true, focus: () => {} }
+  prependBlock({ querySelector: () => element }, [{ nodeId: 'a', note: 'one' }, { nodeId: 'b', note: '' }], 'graph TD')
+  const lines = element.value.split(String.fromCharCode(10))
+  if (!lines.includes('[1] node a') || !lines.includes('[2] node b')) throw new Error('items are not on their own lines: ' + JSON.stringify(lines))
+})
+
+test('the composer rect is read for the docked count, and absent without one', () => {
+  const element = { tagName: 'TEXTAREA', value: '', getBoundingClientRect: () => ({ left: 10, top: 20, width: 300, height: 40 }) }
+  const rect = composerRect({ querySelector: () => element })
+  if (rect === undefined || rect.left !== 10 || rect.top !== 20) throw new Error('rect: ' + JSON.stringify(rect))
+  if (composerRect({ querySelector: () => null }) !== undefined) throw new Error('a missing composer produced a rect')
 })
 
 test('an empty box takes the note as it is, with no stray blank line', () => {

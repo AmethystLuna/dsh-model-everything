@@ -17,7 +17,7 @@ import { palette, schemeNames, type Palette, type PaletteMode, type PaletteSchem
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationMessage, fillComposer, pageCensus, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -145,6 +145,8 @@ export interface AnnotationState {
   note: string
   pending: Array<{ nodeId: string; note: string }>
   status: string
+  /** Whether the pending list is expanded under the count. */
+  open?: boolean
   /** Where the editor sits, in the drawing's own coordinates: beside the node the reader picked. */
   anchor?: { left: number; top: number }
 }
@@ -156,6 +158,8 @@ export interface AnnotationActions {
   onSend: () => void
   onClear: () => void
   onCancel: () => void
+  onToggle: () => void
+  onRemove: (index: number) => void
 }
 
 /**
@@ -166,15 +170,12 @@ export interface AnnotationActions {
  * fragments in it would be exactly the mess this feature is meant to avoid. Colours come from the host's tokens,
  * so light and dark themes need no separate code.
  */
-export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean } = {}): unknown {
+export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean; document?: DocumentLike } = {}): unknown {
   const button = (label: string, onClick: () => void, accent = false): unknown =>
     h('button', { type: 'button', onClick, style: { fontSize: '12px', padding: '2px 8px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: accent ? TOKEN.accent : TOKEN.text, cursor: 'pointer' } }, label)
-  const chips = state.pending.length === 0
-    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, state.picked === null ? '批注模式：点一个节点' : '节点 ' + state.picked.id)
-    : h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '2px 4px', color: TOKEN.text } }, h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, '图注 ×' + String(state.pending.length)), button('发送', actions.onSend, true), button('清空', actions.onClear))
-  // Only with a pick: an empty window over the drawing would cover the thing the reader is choosing a node on.
-  // The line below says the mode is on, which is the feedback the toggle owes without blocking the picture.
-  const editor = state.picked === null ? null : h(
+  const editor = state.picked === null
+    ? null
+    : h(
         'div',
         {
           style: {
@@ -185,12 +186,12 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
             boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
           },
         },
-        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, state.picked === null ? '点一个节点标记它' : '节点 ' + state.picked.id),
+        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, '节点 ' + state.picked.id),
         h('textarea', {
           'data-dme-own': '1',
           value: state.note,
           rows: 3,
-          placeholder: state.picked === null ? '先点图里的一个节点' : '批注…（Ctrl+Enter 加入并发送）',
+          placeholder: '批注…（Ctrl+Enter 加入并发送）',
           style: { width: '100%', boxSizing: 'border-box', font: '12px system-ui, sans-serif', padding: '6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, resize: 'vertical' },
           onInput: (event: { target?: { value?: unknown } }) => actions.onNote(String(event?.target?.value ?? '')),
           onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
@@ -199,10 +200,51 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
         }),
         h('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, button('关闭', actions.onCancel), button('加入', actions.onAdd), button('加入并发送', actions.onAddAndSend, true)),
       )
+  // The pending count docks above the conversation's own input box, where the message will be sent from: the
+  // reader is about to press Return there, and the count has to be in sight without covering the box.
+  const docked = options.floating !== false && options.document !== undefined ? composerRect(options.document) : undefined
+  const chip = state.pending.length === 0
+    ? null
+    : h(
+        'div',
+        {
+          style: {
+            ...(options.floating === false ? {} : { position: 'fixed', left: (docked === undefined ? 16 : docked.left) + 'px', top: (docked === undefined ? 16 : Math.max(8, docked.top - 40)) + 'px', zIndex: 30 }),
+            display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 6px', borderRadius: '8px',
+            background: TOKEN.surface, border: '1px solid ' + TOKEN.border, color: TOKEN.text,
+            boxShadow: '0 6px 18px rgba(0,0,0,0.25)', font: '12px system-ui, sans-serif', maxWidth: '420px',
+          },
+        },
+        h(
+          'div',
+          { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+          h('button', { type: 'button', title: '展开，逐个删除', onClick: () => actions.onToggle(), style: { fontSize: '12px', padding: '1px 6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, '图注 ×' + String(state.pending.length)),
+          button('发送', actions.onSend, true),
+        ),
+        state.open
+          ? h(
+              'div',
+              { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
+              ...state.pending.map((item, index) =>
+                h(
+                  'div',
+                  { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                  h('span', { style: { color: TOKEN.dim, fontSize: '11px' } }, item.nodeId),
+                  h('span', { style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.note === '' ? '(只标记)' : item.note),
+                  button('删除', () => actions.onRemove(index)),
+                ),
+              ),
+            )
+          : null,
+      )
+  const mode = state.picked === null && state.pending.length === 0
+    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, '批注模式：点一个节点')
+    : null
   return h(
     'div',
     { style: { display: 'flex', flexDirection: 'column', gap: '2px', color: TOKEN.text } },
-    chips,
+    mode,
+    chip,
     editor,
     state.status === '' ? null : h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '0 4px' } }, state.status),
   )
@@ -244,10 +286,14 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const document = (globalThis as { document?: DocumentLike }).document
   const caption = typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
+  const [open, setOpen] = useState(false)
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
-    const said = pushBlock(document, list, caption, true)
+    // The block joins the message, it is not its own turn: one Return sends the annotations and the reader's words.
+    const said = prependBlock(document, list, caption)
     setStatus(said)
-    if (said.startsWith('已')) setPending([])
+    if (!said.startsWith('已')) return
+    setPending([])
+    submitComposer(document)
   }
   const onPick = (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }): void => {
     if (!annotate) return
@@ -272,6 +318,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
           onSend: () => sendAll(pending),
           onClear: () => { setPending([]); setStatus('') },
           onCancel: () => { setPicked(null); setNote(''); setStatus('') },
+          onToggle: () => setOpen(!open),
+          onRemove: (index: number) => setPending(pending.filter((_, at) => at !== index)),
         },
         { floating: false },
       )
@@ -409,14 +457,18 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [note, setNote] = useState('')
     const [status, setStatus] = useState('')
     const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
+    const [open, setOpen] = useState(false)
     const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme, folded)
     const document = (globalThis as { document?: DocumentLike }).document
     const caption = source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? ''
     // The notes accumulate here; one structured message leaves for the session, not one raw fragment per note.
     const sendAll = (list: Array<{ nodeId: string; note: string }>, submit: boolean): void => {
-      const said = pushBlock(document, list, caption, submit)
+      // Placed, not sent: the block joins the reader's own words in the box, and Return sends both together.
+      const said = prependBlock(document, list, caption)
       setStatus(said)
-      if (said.startsWith('已')) setPending([])
+      if (!said.startsWith('已')) return
+      setPending([])
+      if (submit) submitComposer(document)
     }
     const addDraft = (): boolean => {
       if (picked === null) return false
@@ -520,14 +572,21 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
           drawn,
         ),
         annotate
-          ? annotationPanel(h, { picked, note, pending, status, anchor }, {
-              onNote: setNote,
-              onAdd: () => { addDraft() },
-              onAddAndSend: addAndSend,
-              onSend: () => sendAll(pending, true),
-              onClear: () => { setPending([]); setStatus('') },
-              onCancel: () => { setPicked(null); setNote(''); setStatus('') },
-            })
+          ? annotationPanel(
+              h,
+              { picked, note, pending, status, anchor, open },
+              {
+                onNote: setNote,
+                onAdd: () => { addDraft() },
+                onAddAndSend: addAndSend,
+                onSend: () => sendAll(pending, true),
+                onClear: () => { setPending([]); setStatus('') },
+                onCancel: () => { setPicked(null); setNote(''); setStatus('') },
+                onToggle: () => setOpen(!open),
+                onRemove: (index: number) => setPending(pending.filter((_, at) => at !== index)),
+              },
+              { document },
+            )
           : null,
       ),
     )

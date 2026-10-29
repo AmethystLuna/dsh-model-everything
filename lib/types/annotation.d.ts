@@ -98,3 +98,19 @@ export declare function sessionFromLocation(location: {
  * the structured text rather than N raw fragments. The same failure vocabulary as a single note.
  */
 export declare function pushBlock(document: DocumentLike | undefined, annotations: Annotation[], caption: string, submit: boolean): string;
+export interface Rect {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+}
+/** Where the reader's input box is, for a widget that has to sit right above it. */
+export declare function composerRect(doc: DocumentLike | undefined): Rect | undefined;
+/**
+ * Put the block above what the reader has already typed, and say what happened.
+ *
+ * Above, because the annotations introduce the message: the reader's own words are the point, and a block
+ * appended after them reads as an afterthought. A rich editor has no portable way to insert at the start, so
+ * it takes the same path as an empty box - the block becomes the message and the reader's text follows it.
+ */
+export declare function prependBlock(document: DocumentLike | undefined, annotations: Annotation[], caption: string): string;
