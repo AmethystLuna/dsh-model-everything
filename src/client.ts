@@ -170,9 +170,9 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
   const chips = state.pending.length === 0
     ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, state.picked === null ? '点一个节点开始批注' : '节点 ' + state.picked.id)
     : h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '2px 4px', color: TOKEN.text } }, h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, '图注 ×' + String(state.pending.length)), button('发送', actions.onSend, true), button('清空', actions.onClear))
-  const editor = state.picked === null
-    ? null
-    : h(
+  // Always visible while the mode is on: a toggle that changes nothing on screen reads as a broken control,
+  // and the reader needs to see where the note will go before picking a node.
+  const editor = h(
         'div',
         {
           style: {
@@ -183,19 +183,19 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
             boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
           },
         },
-        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, '节点 ' + state.picked.id),
+        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, state.picked === null ? '点一个节点标记它' : '节点 ' + state.picked.id),
         h('textarea', {
           'data-dme-own': '1',
           value: state.note,
           rows: 3,
-          placeholder: '批注…（Ctrl+Enter 加入并发送）',
+          placeholder: state.picked === null ? '先点图里的一个节点' : '批注…（Ctrl+Enter 加入并发送）',
           style: { width: '100%', boxSizing: 'border-box', font: '12px system-ui, sans-serif', padding: '6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, resize: 'vertical' },
           onInput: (event: { target?: { value?: unknown } }) => actions.onNote(String(event?.target?.value ?? '')),
           onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
             if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); actions.onAddAndSend() }
           },
         }),
-        h('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, button('取消', actions.onCancel), button('加入', actions.onAdd), button('加入并发送', actions.onAddAndSend, true)),
+        h('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, button('关闭', actions.onCancel), button('加入', actions.onAdd), button('加入并发送', actions.onAddAndSend, true)),
       )
   return h(
     'div',
