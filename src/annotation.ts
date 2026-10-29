@@ -112,8 +112,16 @@ export function fillComposer(doc: DocumentLike | undefined, text: string): Place
     const current = typeof composer.value === 'string' ? composer.value : ''
     setValue(composer, current.trim() === '' ? text : current.replace(/\s*$/, '') + '\n\n' + text)
   } else {
-    const current = typeof composer.textContent === 'string' ? composer.textContent : ''
-    composer.textContent = current.trim() === '' ? text : current.replace(/\s*$/, '') + '\n\n' + text
+    // A contenteditable keeps its own document: assigning `textContent` looks right until the next keystroke,
+    // which restores what the editor thought was there. Insert the way a paste does, and fall back to the
+    // assignment only where the page has no editing command at all.
+    if (composer.focus !== undefined) composer.focus()
+    const editing = globalThis as { document?: { execCommand?: (command: string, showUi: boolean, value: string) => boolean } }
+    const inserted = editing.document?.execCommand?.('insertText', false, text) === true
+    if (!inserted) {
+      const current = typeof composer.textContent === 'string' ? composer.textContent : ''
+      composer.textContent = current.trim() === '' ? text : current.replace(/\s*$/, '') + '\n\n' + text
+    }
   }
   const input = eventOf('input', { bubbles: true })
   if (input !== undefined && composer.dispatchEvent !== undefined) composer.dispatchEvent(input)

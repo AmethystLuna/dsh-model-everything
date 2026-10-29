@@ -320,6 +320,21 @@ test('filling the composer appends to the draft instead of replacing it', () => 
   if (!element.value.includes('Diagram annotation')) throw new Error('the note did not land: ' + element.value)
 })
 
+test('an empty box takes the note as it is, with no stray blank line', () => {
+  const element = { tagName: 'TEXTAREA', value: '', dispatchEvent: () => true, focus: () => {} }
+  fillComposer({ querySelector: () => element }, 'Diagram annotation · node "a"')
+  if (element.value !== 'Diagram annotation · node "a"') throw new Error('the empty box was filled with: ' + JSON.stringify(element.value))
+  const blank = { tagName: 'TEXTAREA', value: '   ', dispatchEvent: () => true, focus: () => {} }
+  fillComposer({ querySelector: () => blank }, 'note')
+  if (blank.value !== 'note') throw new Error('a whitespace draft was kept: ' + JSON.stringify(blank.value))
+})
+
+test('a writing surface with no value is filled through its text', () => {
+  const editable = { tagName: 'DIV', textContent: '', dispatchEvent: () => true, focus: () => {} }
+  if (fillComposer({ querySelector: () => editable }, 'note') !== 'filled') throw new Error('the surface was not filled')
+  if (editable.textContent !== 'note') throw new Error('filled as: ' + JSON.stringify(editable.textContent))
+})
+
 test('no composer means no write, and the caller is told', () => {
   const written = fillComposer({ querySelector: () => null }, 'text')
   if (written !== 'no-composer') throw new Error('reported ' + written)
