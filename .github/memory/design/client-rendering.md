@@ -39,7 +39,7 @@ window.__ModuleLoader__.load({
 ```
 
 - `require` 只给基线模块（React 等），**没有打包器替我们解析相对导入**；
-- 因此纯逻辑必须**打成一个文件**：构建时用更轻的打包器把 `src/render/*` 与 `src/client.ts` 合成 `client.js`，`react` 保持外部。仓库目前没有打包器，这是加一个 devDependency 的理由。
+- 因此纯逻辑必须**打成一个文件**：`scripts/build-client.mjs` 用 esbuild 把 `src/render/*` 与 `src/client.ts` 合成 `lib/client.js`（`react` 保持外部），`npm run build` 会跑它。这个打包器后来进来了，所以这一条不再是待办的理由。
 
 ## 模块划分（为路径覆盖服务）
 

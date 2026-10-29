@@ -32,9 +32,9 @@ interface UmlFamilyModule<Model> {
 }
 ```
 
-- 已在册：`use-case`（`src/uml-usecase.ts`）、`class` / `object` / `package` / `component` / `deployment`（`src/uml-structure.ts`，五个族共用一个工厂，差别只在词汇）。
+- 已在册十一个族：`use-case`（`src/uml-usecase.ts`）、`timing`（`src/uml-timing.ts`）、`profile`（`src/uml-profile.ts`）、`composite-structure`（`src/uml-composite.ts`）、`communication`（`src/uml-communication.ts`）、`interaction-overview`（`src/uml-interaction-overview.ts`），以及 `class` / `object` / `package` / `component` / `deployment`（`src/uml-structure.ts`，五个族共用一个工厂，差别只在词汇）。注册表在 `src/uml.ts` 的 `FAMILY_MODULES`。
 - 机器族（state / activity / sequence）不走模块契约，保留 `src/uml.ts` 里的原有路径；能力矩阵对它们的判定与模块族一致。
-- 表里 `faithful` 但本构建尚无模块的族，由注册表按名拒绝（消息里点名图族与证据），不交给错的解析器。
+- **没有「本构建缺模块」的族了**：剩下的拒绝都是**记号能力**的拒绝（`profile` 与 `interaction-overview` 只画不读、`sequence` 的迹不能反推机器），由能力矩阵按名拒绝并点名理由，不交给错的解析器。
 
 ## 3. 模型与报告
 

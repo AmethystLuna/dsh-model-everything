@@ -13,7 +13,6 @@ metadata:
 |---|---|---|
 | [store-entry](design/store-entry.md) | 商店条目注册草稿：名称、中英描述、分类，以及文案为什么这么排 | 注册创意工坊条目、改卡片文案或调整分类时 |
 | [gate-injection](design/gate-injection.md) | 会话开头路由注入：第二个 loader 行、默认开是怎么定的、它替代不了什么、代价与「文档即指引」原则的关系、从同类插件借的三种写法 | 动 `src/gate.ts`、改注入文本或开关、判断「要不要开这条消息」时 |
-| [roadmap](design/roadmap.md) | 三版计划：0.5.0 设计期闭环（草图→判定→渲染回图）与现状可视化、0.6.0 工具面收敛与架构 diff、0.7.0 方案对比与设计记录；受众是使用 dsh 的软件架构师，层级为一等公民 | 决定下个版本做什么、或想动渲染与工具面之前 |
 | [client-rendering](design/client-rendering.md) | 客户端渲染通道已实测：槽位 `tool.call.toolview` 按工具名接管卡片、裸 JS 工厂与 props 契约、打包前提，以及为 100% 路径覆盖而定的模块划分 | 写渲染器、加客户端半、或怀疑「插件能不能画」之前 |
 | [architecture](design/architecture.md) | 记号语法引擎（记号表 / 图族表 / 能力矩阵）、图族模块契约、工具面按职责拆分与开闭点、schema 与命名约定、仅 dsh 的边界 | 加一个图族、改检测或能力判定、动工具参数与描述之前 |
 | [plugin-dev-spec](design/plugin-dev-spec.md) | dsh 插件开发规范的实测结论：bundle 与 patch 语义、一包多组件、配置 schema、技能注册、模型可见目录、商店元数据与 release 实测办法 | 改 cordis.patch.yml、动 package.json 的 dsh 块、加组件、动技能注册或 inspect provider、做发布挂载之前 |
@@ -25,4 +24,4 @@ metadata:
 | [context-cost](design/context-cost.md) | 上下文成本实测：插件把会话 token 抬到 2.6–7×、钱花在工具返回（技能正文 + 模型读插件源码）而不是报告、A/B/C/D 四组的正确率与成本、以及据此决定的「修技能不修引擎」 | 想压缩 token、判断该不该改报告格式或拆组件、或再跑一轮评测之前 |
 | [applicability](design/applicability.md) | 什么任务值这个价：可通读时我们纯亏，读不完时才成立 | 改技能触发条件、门禁文案、工具描述之前 |
 | [robustness-audit](design/robustness-audit.md) | 异常/非法输入专项审查的结论：以「拼错的名称静默关掉检查、再报正面全部通过」为主的一族缺陷、D1-D12 逐条位置、审查者未能判定的模糊点与覆盖缺口、按严重度的修复计划 | 修任何一条引擎的校验/引用解析、判断某个 `pass` 是否可信、或给引擎加新的声明式字段之前 |
-| [deployed-surface](design/deployed-surface.md) | 只在装进 profile 实跑时才现形的缺陷族：两种拒绝形状（`ran: true` 无 `errorCode` 的那种）与解读技能的说法冲突、并发扫描与跨族 diff 的静默通过、验证部署面的办法 | 判断一个 `pass` 是不是「其实什么都没看」、查「已解决」的 diff 可不可信、或装进 profile 验证改动时 |
+| [deployed-surface](design/deployed-surface.md) | 只在装进 profile 实跑时才现形的缺陷族：两种拒绝形状（`ran: true` 无 `errorCode` 的那种）与解读技能的说法冲突、两处静默读作通过、验证部署面的办法（2026-10-29 复核：缺陷已修，契约部分仍照它读） | 判断一个 `pass` 是不是「其实什么都没看」、查「已解决」的 diff 可不可信、或装进 profile 验证改动时 |

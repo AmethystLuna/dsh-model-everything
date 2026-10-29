@@ -29,7 +29,7 @@ on a finding has to know which one they are holding.
   <br>cited by skills/model-everything/references/logic-verification-guide.md
 - Clarke, Grumberg & Peled, *Model Checking*, MIT Press (1999)
   <br>cited by skills/model-everything/references/logic-verification-guide.md
-- Garey & Johnson, *Computers and Intractability*
+- Garey & Johnson, *Computers and Intractability*, 1979
   <br>cited by skills/model-everything/references/logic-verification-guide.md
 - Godefroid, *Partial-Order Methods for the Verification of Concurrent Systems*, LNCS 1032 (1996)
   <br>cited by skills/model-everything/references/logic-verification-guide.md
@@ -44,7 +44,7 @@ on a finding has to know which one they are holding.
 
 ## Data models and constraints
 
-- Codd, *A Relational Model of Data for Large Shared Data Banks*
+- Codd, *A Relational Model of Data for Large Shared Data Banks*, Communications of the ACM (1970)
   <br>cited by skills/model-everything-datamodel/references/data-model-guide.md
 - Codd, *Extending the Database Relational Model to Capture More Meaning*, ACM TODS 1979
   <br>cited by skills/model-everything-datamodel/references/data-model-guide.md
@@ -57,7 +57,7 @@ on a finding has to know which one they are holding.
   <br>cited by .github/memory/design/design-review.md, skills/model-everything-structure/references/structure-review-guide.md
 - Liskov & Wing, *A Behavioral Notion of Subtyping*, TOPLAS 1994
   <br>cited by .github/memory/design/design-review.md, skills/model-everything-design/SKILL.md
-- Martin, *Agile Software Development*
+- Martin, *Agile Software Development* (2002)
   <br>cited by .github/memory/design/design-review.md
 - Newman & Girvan 2004
   <br>cited by skills/model-everything-structure/references/structure-review-guide.md
@@ -92,7 +92,7 @@ on a finding has to know which one they are holding.
   <br>cited by skills/model-everything/references/architecture-domains.md
 - Kruchten, *The 4+1 View Model of Architecture*, IEEE Software (1995)
   <br>cited by skills/model-everything/references/architecture-views.md
-- Lamport, *Specifying Systems* (2002)
+- Lamport, *Specifying Systems*, Addison-Wesley (2002)
   <br>cited by skills/model-everything/references/architecture-domains.md
 - Lamport, *The Part-Time Parliament* (1998)
   <br>cited by skills/model-everything/references/architecture-domains.md

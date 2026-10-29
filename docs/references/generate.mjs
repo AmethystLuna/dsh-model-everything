@@ -44,6 +44,10 @@ const PATTERNS = [
   /[A-Z][A-Za-z]+(?:\s*(?:&|and|,)\s*[A-Z][A-Za-z]+)*,\s*\*[^*]+\*,\s*[^.|,()]{2,60}?\s(?:19|20)\d{2}/g,
   // Author, *Title* (Year)
   /[A-Z][A-Za-z]+(?:\s*(?:&|and)\s*[A-Z][A-Za-z]+)*,\s*\*[^*]+\*\s*\(\d{4}\)/g,
+  // Author(s), *Title*, YEAR - the year set off by a comma rather than a venue or parentheses
+  /[A-Z][A-Za-z]+(?:\s*(?:&|and|,)\s*[A-Z][A-Za-z]+)*,\s*\*[^*]+\*,\s*(?:19|20)\d{2}/g,
+  // Author(s), *Title*, Venue with an issue number, YEAR - "CACM 13(6), 1970"
+  /[A-Z][A-Za-z]+(?:\s*(?:&|and|,)\s*[A-Z][A-Za-z]+)*,\s*\*[^*]+\*,\s*[^.;|]{2,60}?,\s*(?:19|20)\d{2}/g,
   // Author, *Title* - a trailing clause names the work without a year, and the year is stated nearby
   /[A-Z][A-Za-z]+,\s*\*[^*]{8,90}\*/g,
   // Garey & Johnson, *Computers and Intractability* - two authors before the title
@@ -122,6 +126,30 @@ for (const group of byGroup.values()) {
     if (target === undefined) continue
     for (const source of entry.citedBy) target.citedBy.add(source)
     group.delete(key)
+  }
+}
+
+// Third pass: one work, one spelling. A title is cited from several tables, and a reader comparing
+// two sections should not have to work out that "CACM 13(6), 1970" and "Communications of the ACM
+// (1970)" are one paper. The spelling that names a year - and, among those, the fuller one - wins
+// across all groups, and every group displays it.
+const canonical = new Map()
+for (const group of byGroup.values()) {
+  for (const [key, entry] of group) {
+    if (!/\*[^*]+\*/.test(entry.citation)) continue
+    const existing = canonical.get(key)
+    const better = existing === undefined
+      || (entry.hasYear && !existing.hasYear)
+      || (entry.hasYear === existing.hasYear && entry.citation.length > existing.citation.length)
+    if (better) canonical.set(key, entry)
+  }
+}
+for (const group of byGroup.values()) {
+  for (const [key, entry] of group) {
+    const chosen = canonical.get(key)
+    if (chosen === undefined) continue
+    entry.citation = chosen.citation
+    entry.hasYear = chosen.hasYear
   }
 }
 

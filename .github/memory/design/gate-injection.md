@@ -9,12 +9,13 @@ metadata:
 
 ## 决定
 
-插件拆成**两行 loader**：
+插件拆成**三行 loader**（第三行是后来的画图组件，见[画图组件](diagram-component.md)）：
 
 | 行 id | 装什么 | 默认 |
 |---|---|---|
 | `dsh-model-everything` | 全部工具与技能 | 开 |
-| `dsh-model-everything-gate` | 会话第一条模型步注入的一条路由消息 | **关** |
+| `dsh-model-everything-gate` | 会话第一条模型步注入的一条路由消息 | **开**（见下节：默认值改过一次） |
+| `dsh-model-everything-diagram` | 画图工具与右栏白板 | 开 |
 
 `enabled` 是 live 字段（schemastery `.volatile()`）：**插件页（Plugins）上的开关对运行中的 host 立刻生效，不用重启**。这条是实测过的，而且证据在配置投影里——`Config.listConfigs` 查 `include:dsh-model-everything-gate`，返回的 schema 里有 `"enabled": { "x-cordis": { "volatile": true } }`，说明设置服务确实投影了它；`plugin_manager list_plugins` 里 `include:settings` 与 `include:config-editor` 都是 `enabled: true` / `fiberPhase: active`。
 

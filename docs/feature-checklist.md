@@ -84,6 +84,12 @@ the principle wins and this checklist is what should change.
 - Say what the notation can faithfully carry and what it approximates - the fidelity claim is part of the family.
 - Round-trip it: render, parse back, and require the model to survive.
 - No tool schema changes: the family table is what keeps the tool surface closed for modification.
+- The table entry and the module agree: a `faithful` row with no module, or a module that refuses its own family by name, is a breach of the table.
+- Model and validator: unknown keys and wrong types are refused with `UML_INPUT`, and a field the notation cannot carry does not enter the model.
+- Render deterministically, carry what the notation cannot say in `dsh-model-everything:` directives, and read those directives back.
+- Name every construct the parser drops in `discardedConstructs`; dropping one silently is the defect.
+- Open a fresh block of codes and record each one in `.github/memory/design/uml-check-coverage.md`.
+- White-box cases: a byte-stable round trip, hand-written text with no directives, one case per code, and one per validator refusal.
 
 ### A generated map or measured document
 

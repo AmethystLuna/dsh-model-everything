@@ -1,7 +1,7 @@
 # docs/ 里放什么，以及用什么语言写
 
 这个目录**不随 npm 包发布**（`package.json` 的 `files` 是 `lib src skills cordis.patch.yml examples
-locale`）。所以这里的读者**不是模型**，是维护者与贡献者。语言按**读者**定，不按目录定——
+gate locale diagram`）。所以这里的读者**不是模型**，是维护者与贡献者。语言按**读者**定，不按目录定——
 
 | 内容 | 读者 | 语言 | 为什么 |
 |---|---|---|---|
@@ -58,3 +58,7 @@ schema 串（`model-everything/verify/v1`）都是**标识符**——译了它�
 |---|---|---|
 | [`docs/report-reading/guide.md`](report-reading/guide.md) | [`guide.zh-CN.md`](report-reading/guide.zh-CN.md) | 报告阅读方法；英文那份同时被发布到 `skills/model-everything-report-reading/references/` |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | [`docs/contributing/guide.zh-CN.md`](contributing/guide.zh-CN.md) | 贡献指南，两种来件 |
+| [`skills/model-everything-interleaving/SKILL.md`](../skills/model-everything-interleaving/SKILL.md) | [`SKILL.zh-CN.md`](../skills/model-everything-interleaving/SKILL.zh-CN.md) | 技能正文的中文副本：同一份方法，给人读；模型只读 `SKILL.md` |
+| [`.github/ISSUE_TEMPLATE/*.md`](../.github/ISSUE_TEMPLATE/) | 同名 `.zh-CN.md` | 两种来件各一份，贡献者用母语填写 |
+
+这张表不是登记处：**登记处是 `tests/translation/run.mjs` 的 `PAIRS`**，漏登记一对，门禁就会说没人管它。表只是让人一眼看到有哪些。
