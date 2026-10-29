@@ -158,3 +158,20 @@ export function pushNote(document: DocumentLike | undefined, picked: { id: strin
   if (!submit) return '已放入输入框'
   return submitComposer(document) ? '已发送' : '已放入输入框：按一次回车发送'
 }
+/**
+ * The session a page is showing, read from its own address.
+ *
+ * The client services expose no "current session", and a slot's props are not guaranteed to carry one, but the
+ * page has to name the session in its URL to survive a reload - so the address is the one source that is always
+ * there. Both spellings are accepted: the `session-<uuid>` id this Harness mints and a bare uuid.
+ */
+export function sessionFromLocation(location: { pathname?: string; search?: string; hash?: string } | undefined): string | undefined {
+  if (location === undefined) return undefined
+  const address = [location.pathname ?? '', location.search ?? '', location.hash ?? ''].join(' ')
+  const named = /session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(address)
+  if (named !== null) return named[0]
+  const bare = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(address)
+  if (bare !== null) return bare[0]
+  const parameter = /[?&#](?:session|sessionId|id)=([A-Za-z0-9_-]+)/.exec(address)
+  return parameter === null ? undefined : parameter[1]
+}

@@ -13,7 +13,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
-const { annotationMessage, fillComposer, pushNote } = await import('../../lib/annotation.js')
+const { annotationMessage, fillComposer, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
@@ -297,6 +297,15 @@ test('pushNote says what happened, and never claims a send it did not do', () =>
   const unclaimed = pushNote({ querySelector: () => element }, { id: 'n1' }, '', 'g', true)
   if (!unclaimed.includes('按一次回车发送')) throw new Error('the send was overclaimed: ' + unclaimed)
   if (pushNote(undefined, null, '', '', true) !== '') throw new Error('a missing pick should be silent')
+})
+
+test('the session a page shows is read from its own address', () => {
+  const id = 'session-d966915c-56b0-4dd5-9c18-fae6e4b0ff99'
+  if (sessionFromLocation({ pathname: '/s/' + id }) !== id) throw new Error('the session- id was not read')
+  const bare = 'd966915c-56b0-4dd5-9c18-fae6e4b0ff99'
+  if (sessionFromLocation({ search: '?session=' + bare }) !== bare) throw new Error('a bare uuid was not read')
+  if (sessionFromLocation({ pathname: '/settings' }) !== undefined) throw new Error('a page with no session produced one')
+  if (sessionFromLocation(undefined) !== undefined) throw new Error('no location produced a session')
 })
 
 test('the annotation message names the node, the drawing and the note', () => {

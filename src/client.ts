@@ -17,7 +17,7 @@ import { schemeNames, type Palette, type PaletteMode, type PaletteScheme } from 
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationMessage, fillComposer, pushNote, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationMessage, fillComposer, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -40,6 +40,14 @@ export interface PluginShape {
 }
 
 /** A settled tool call, as the host hands it to a view. */
+/**
+ * The client context, kept from `apply`: a view has no other way to reach a client service.
+ *
+ * It is one module-level handle because there is one page. A null until `apply` runs, and every reader
+ * checks it, so a view that renders before the plugin mounts simply takes the composer path.
+ */
+let services: SlotContext | undefined
+
 export interface ToolCallProps {
   phase?: string
   toolName?: string
@@ -203,7 +211,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     ? annotationPanel(
         (type, options, ...children) => React.createElement(type, options, ...children),
         { picked, note, status },
-        { onNote: setNote, onPlace: () => setStatus(pushNote(document, picked, note, caption, false)), onSend: () => setStatus(pushNote(document, picked, note, caption, true)), onClear: () => { setPicked(null); setNote(''); setStatus('') } },
+        { onNote: setNote, onPlace: () => setStatus(pushNote(document, picked, note, caption, false)), onSend: () => { if (picked === null) return; setStatus('正在发送…'); void probePush(annotationMessage({ nodeId: picked.id, note, caption })).then((outcome) => setStatus(outcome === 'ok' ? '已发送（会话命令）' : pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome)) }, onClear: () => { setPicked(null); setNote(''); setStatus('') } },
       )
     : null
   return cardSurface(React, source, scheme, overrides, onPick, toggle, panel)
@@ -239,6 +247,45 @@ function cardSurface(React: ReactLike, source: unknown, scheme: PaletteScheme, o
  * only because the writer escapes every value that came from a report or a model, which the render suite
  * pins with an injection case.
  */
+/** Where the page thinks it is, short enough to read in a status line. */
+function shortAddress(location: { pathname?: string; search?: string } | undefined): string {
+  if (location === undefined) return 'no location'
+  return ((location.pathname ?? '') + (location.search ?? '')).slice(0, 80)
+}
+
+function reasonOf(error: unknown): string {
+  const message = (error as { message?: unknown } | null)?.message
+  return String(message ?? error).slice(0, 120)
+}
+
+/**
+ * Try the session-command channel, and answer either `'ok'` or the reason it stopped.
+ *
+ * The client half sees no host API directly: its only route is a client service, and the only session it can
+ * name is the one in the page's own address. Every step here answers with its reason, and the reader sees
+ * that reason - so one click says whether the channel exists at all, and where it broke.
+ */
+async function probePush(text: string): Promise<string> {
+  const location = (globalThis as { location?: { pathname?: string; search?: string; hash?: string } }).location
+  const session = sessionFromLocation(location)
+  if (session === undefined) return 'no session id in ' + shortAddress(location)
+  const sessions = services?.get?.('sessions') as { scope?: (id: string) => unknown } | undefined
+  if (sessions === undefined || typeof sessions.scope !== 'function') return 'no sessions service'
+  let scope: unknown
+  try { scope = sessions.scope(session) } catch (error) { return 'scope threw: ' + reasonOf(error) }
+  const remote = (scope as { remote?: { commands?: { execute?: unknown } } } | undefined)?.remote
+  if (remote === undefined) return 'the agent scope has no remote'
+  const commands = remote.commands
+  if (commands === undefined || typeof commands.execute !== 'function') return 'remote.commands.execute is missing'
+  const Controller = (globalThis as { AbortController?: new () => { signal: unknown } }).AbortController
+  try {
+    await (commands.execute as (agent: unknown, line: string, attachments: unknown[], signal: unknown) => Promise<unknown>).call(commands, { id: session }, '/annotate ' + text, [], Controller === undefined ? undefined : new Controller().signal)
+    return 'ok'
+  } catch (error) {
+    return 'execute threw: ' + reasonOf(error)
+  }
+}
+
 export function viewFor(React: ReactLike, overrides: Partial<Palette> = {}): (props: ToolCallProps) => unknown {
   return (props: ToolCallProps): unknown => {
     // A drawing is not a report: its card is the source, drawn by the renderer that wrote the file.
@@ -300,7 +347,16 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const document = (globalThis as { document?: DocumentLike }).document
     const caption = source.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? ''
     const place = (): void => setStatus(pushNote(document, picked, note, caption, false))
-    const send = (): void => setStatus(pushNote(document, picked, note, caption, true))
+    const send = (): void => {
+      if (picked === null) return
+      setStatus('正在发送…')
+      void probePush(annotationMessage({ nodeId: picked.id, note, caption })).then((outcome) => {
+        if (outcome === 'ok') { setStatus('已发送（会话命令）'); return }
+        // The probe's reason travels with the fallback: it is the only way a reader can tell us why the
+        // command channel is closed on this host.
+        setStatus(pushNote(document, picked, note, caption, true) + ' · 命令通道：' + outcome)
+      })
+    }
     const textarea = h('textarea', {
       value: source,
       spellcheck: false,
@@ -465,6 +521,7 @@ export default function factory(require: (name: string) => unknown): PluginShape
     inject: ['slots'],
     mount: (ctx: SlotContext, options: MountOptions = {}) => mountWhiteboard(React, ctx, options),
     apply(ctx: SlotContext) {
+      services = ctx
       for (const name of TOOL_NAMES) {
         // Only the options a keyed slot declares: `key`. An extra `id` is not part of this slot's
         // registration schema, and the working community reference (dsh-deepread) passes exactly this much.

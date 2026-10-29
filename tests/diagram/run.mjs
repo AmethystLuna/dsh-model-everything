@@ -10,6 +10,7 @@ import { diffStructure } from '../../lib/render/diff.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
 import { detectNotation, render } from '../../lib/render/index.js'
 import { writeSvg } from '../../lib/render/write.js'
+import { registerAnnotateCommand } from '../../lib/diagram.js'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -1172,6 +1173,31 @@ test('a node that joined a group is reported as coming from no group', () => {
   if (moved === undefined) throw new Error('no regroup finding')
   if (!moved.message.includes('from no group')) throw new Error('source: ' + moved.message)
   if (!moved.message.includes('"G"')) throw new Error('destination: ' + moved.message)
+})
+
+test('the annotate command turns its input into a follow-up message', () => {
+  const registered = []
+  registerAnnotateCommand({ get: (name) => (name === 'commands' ? { register: (definition) => registered.push(definition) } : undefined) })
+  if (registered.length !== 1) throw new Error('definitions registered: ' + String(registered.length))
+  const definition = registered[0]
+  if (definition.name !== 'annotate') throw new Error('named: ' + String(definition.name))
+  const sent = []
+  const result = definition.handler({ rawInput: 'Diagram annotation · node "a"', agent: { followup: (input) => sent.push(input) } })
+  if (result.kind !== 'success') throw new Error('answered: ' + JSON.stringify(result))
+  if (sent.length !== 1) throw new Error('follow-ups: ' + String(sent.length))
+  if (sent[0].content[0].text !== 'Diagram annotation · node "a"') throw new Error('carried: ' + JSON.stringify(sent[0]))
+  if (sent[0].source.kind !== 'user') throw new Error('the note was not sent as an ordinary message')
+})
+
+test('the annotate command refuses a host that cannot take a follow-up, and keeps the tools', () => {
+  const registered = []
+  registerAnnotateCommand({ get: () => ({ register: (definition) => registered.push(definition) }) })
+  if (registered[0].handler({ rawInput: 'x', agent: {} }).kind !== 'error') throw new Error('a host without follow-up accepted the note')
+  if (registered[0].handler({ rawInput: '', agent: { followup: () => {} } }).kind !== 'error') throw new Error('an empty note was accepted')
+  // A host whose register throws, or that has no commands service, must not take the drawing tools down.
+  registerAnnotateCommand({ get: () => ({ register: () => { throw new Error('nope') } }) })
+  registerAnnotateCommand({ get: () => undefined })
+  registerAnnotateCommand({})
 })
 
 if (failures > 0) {

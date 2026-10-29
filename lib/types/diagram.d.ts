@@ -31,4 +31,11 @@ export interface ComponentContext {
     };
 }
 export declare function apply(ctx: ComponentContext, config: Config): void;
+/**
+ * Offer an annotation as a session command, so a page can send one without a composer.
+ *
+ * Optional on purpose, and failure-tolerant on purpose: a host without the commands service keeps the
+ * composer path, and a registration that throws must not take the drawing tools down with it.
+ */
+export declare function registerAnnotateCommand(ctx: unknown): void;
 export declare const inject: string[];

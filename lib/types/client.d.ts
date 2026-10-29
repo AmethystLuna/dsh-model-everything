@@ -29,7 +29,6 @@ export interface PluginShape {
     /** The whiteboard mount, with its scheduler injectable. `apply` calls this with the default. */
     mount: (ctx: SlotContext, options?: MountOptions) => unknown;
 }
-/** A settled tool call, as the host hands it to a view. */
 export interface ToolCallProps {
     phase?: string;
     toolName?: string;
@@ -83,13 +82,6 @@ export declare function annotationPanel(h: H, state: AnnotationState, actions: {
     onClear: () => void;
     hint?: string;
 }): unknown;
-/**
- * The view for one tool name.
- *
- * The drawing is emitted as markup, so React receives it through `dangerouslySetInnerHTML`. That is safe
- * only because the writer escapes every value that came from a report or a model, which the render suite
- * pins with an injection case.
- */
 export declare function viewFor(React: ReactLike, overrides?: Partial<Palette>): (props: ToolCallProps) => unknown;
 /**
  * The whiteboard: paste a diagram, get a drawing, zoom it.

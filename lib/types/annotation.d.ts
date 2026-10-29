@@ -61,3 +61,15 @@ export declare function submitComposer(doc: DocumentLike | undefined): boolean;
 export declare function pushNote(document: DocumentLike | undefined, picked: {
     id: string;
 } | null, note: string, caption: string, submit: boolean): string;
+/**
+ * The session a page is showing, read from its own address.
+ *
+ * The client services expose no "current session", and a slot's props are not guaranteed to carry one, but the
+ * page has to name the session in its URL to survive a reload - so the address is the one source that is always
+ * there. Both spellings are accepted: the `session-<uuid>` id this Harness mints and a bare uuid.
+ */
+export declare function sessionFromLocation(location: {
+    pathname?: string;
+    search?: string;
+    hash?: string;
+} | undefined): string | undefined;
