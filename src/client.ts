@@ -261,9 +261,44 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
  * With hooks the card also annotates: the picture is the subject, so the editor stays behind one button
  * until the reader asks for it, and a click then marks a node instead of doing nothing.
  */
+/**
+ * The source of a drawing call, from whichever shape the host handed over.
+ *
+ * Measured, not assumed: a settled block carries `args`, `call`, `content` and `meta`, and which one holds the
+ * arguments differs by host version. Each is read in turn and the first non-empty text wins, so the card draws
+ * on a host that ships the lazy view, one that ships the call record, or one that ships a JSON string.
+ */
+function sourceOf(block: unknown): string | undefined {
+  const record = (value: unknown): Record<string, unknown> | undefined =>
+    value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : undefined
+  const asText = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() !== '' ? value : undefined)
+  const fromJson = (value: unknown): string | undefined => {
+    const raw = asText(value)
+    if (raw === undefined) return undefined
+    try {
+      return asText(record(JSON.parse(raw))?.source)
+    } catch {
+      return undefined
+    }
+  }
+  const frame = record(block)
+  if (frame === undefined) return undefined
+  const args = record(frame.args)
+  if (args !== undefined && typeof args.value === 'function') {
+    const lazy = asText((args as { value: (key: string) => unknown }).value('source'))
+    if (lazy !== undefined) return lazy
+  }
+  const plain = asText(args?.source) ?? fromJson(frame.args)
+  if (plain !== undefined) return plain
+  const call = record(frame.call)
+  const fromCall = asText(call?.source) ?? fromJson(call?.input) ?? fromJson(call?.arguments)
+  if (fromCall !== undefined) return fromCall
+  return asText(record(frame.meta)?.source)
+}
+
 function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<Palette>): unknown {
   const block = (props.block ?? {}) as { args?: unknown }
-  const source = argOf(block.args, 'source')
+  const source = sourceOf(props.block) ?? argOf(block.args, 'source')
   const asked = argOf(block.args, 'scheme')
   const scheme = schemeNames().includes(asked as PaletteScheme) ? (asked as PaletteScheme) : 'default'
   // The arguments are the lazy view while the call runs; by the time it settles the host may hand back only

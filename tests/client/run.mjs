@@ -282,6 +282,23 @@ test('the card draws from the result when the settled call no longer carries its
   if (!html.includes('data-node-id')) throw new Error('the returned drawing lost its node ids')
 })
 
+test('the card finds the source in whatever shape the settled block carries', () => {
+  const shapes = [
+    { args: { value: (key) => (key === 'source' ? 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' : undefined) } },
+    { args: JSON.stringify({ source: 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' }) },
+    { call: { input: JSON.stringify({ source: 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' }) } },
+  ]
+  for (const block of shapes) {
+    const { registrations } = loadBundle()
+    const plugin = registrations[0].factory(() => stubReact)
+    let component
+    plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+    const element = component({ phase: 'result', toolName: 'diagram_render', block })
+    const html = JSON.stringify(element)
+    if (!html.includes('<svg')) throw new Error('no drawing for block shape: ' + JSON.stringify(block).slice(0, 60))
+  }
+})
+
 test('the page census counts what a probe cannot see', () => {
   const doc = { querySelector: () => null, querySelectorAll: () => [1, 2] }
   const said = pageCensus(doc)
