@@ -152,6 +152,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: { onNote:
     state.picked === null
       ? null
       : h('textarea', {
+          'data-dme-own': '1',
           value: state.note,
           rows: 3,
           placeholder: '批注…（Ctrl+Enter 直接发送）',
@@ -193,6 +194,12 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const payload = (props.block as { result?: unknown } | undefined)?.result
   const returned = payload !== null && typeof payload === 'object' ? (payload as { svg?: unknown }).svg : undefined
   const markup = typeof returned === 'string' && returned !== '' ? returned : null
+  // A card with nothing to draw says what the call actually carried: the only way to learn the shape
+  // from a page this build cannot inspect.
+  if (markup === null && (typeof source !== 'string' || source.trim() === '')) {
+    const keys = props.block === null || typeof props.block !== 'object' ? 'none' : Object.keys(props.block as Record<string, unknown>).join(',')
+    return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call · block: ' + (keys === '' ? 'empty' : keys))
+  }
   const useState = React.useState
   if (useState === undefined) return cardSurface(React, source, markup, scheme, overrides, null, null, null)
   const [annotate, setAnnotate] = useState(false)
@@ -225,7 +232,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
 /** The drawing itself, plus whatever the reader is doing to it. One surface, drawn once. */
 function cardSurface(React: ReactLike, source: unknown, returned: string | null, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown): unknown {
   if (returned === null && (typeof source !== 'string' || source.trim() === '')) {
-    return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'the drawing appears when the call settles')
+    return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call')
   }
   // A settled result already carries the drawing the file got; a running call has only its source. Either way
   // it is the same picture from the same renderer.
@@ -367,6 +374,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       })
     }
     const textarea = h('textarea', {
+      'data-dme-own': '1',
       value: source,
       spellcheck: false,
       rows: Math.min(12, Math.max(4, String(source).split('\n').length)),

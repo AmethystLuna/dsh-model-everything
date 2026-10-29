@@ -62,7 +62,16 @@ export interface DocumentLike {
  * what keeps an annotation from being typed into the diagram it describes.
  */
 /** The marks a page may put on the box a reader types into, most specific first. */
-const COMPOSER_MARKS = ['[data-focus-flow] textarea', 'textarea[data-focus-flow]', '[data-focus-flow] [contenteditable="true"]', '[data-focus-flow][contenteditable="true"]']
+const COMPOSER_MARKS = [
+  '[data-focus-flow] textarea',
+  'textarea[data-focus-flow]',
+  '[data-focus-flow] [contenteditable="true"]',
+  '[data-focus-flow][contenteditable="true"]',
+  // No marker on this host - measured, not assumed. Everything this plugin writes carries
+  // `data-dme-own`, so what remains is somebody else's writing surface.
+  'textarea:not([data-dme-own])',
+  '[contenteditable="true"]:not([data-dme-own])',
+]
 
 export function findComposer(doc: DocumentLike | undefined): ElementLike | undefined {
   if (doc === undefined) return undefined
