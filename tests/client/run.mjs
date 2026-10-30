@@ -284,6 +284,7 @@ test('the card draws from the result when the settled call no longer carries its
 
 test('the card finds the source in whatever shape the settled block carries', () => {
   const shapes = [
+    { meta: { source: 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]', caption: 'graph, 2 boxes' } },
     { args: { value: (key) => (key === 'source' ? 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' : undefined) } },
     { args: JSON.stringify({ source: 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' }) },
     { call: { input: JSON.stringify({ source: 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' }) } },

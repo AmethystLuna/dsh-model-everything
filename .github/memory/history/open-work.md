@@ -57,9 +57,12 @@ provider 一起走，但入口技能的路由表还留着那条路）；工具�
 
 - 现象：卡片只显示 `no drawing in this call · block: …`，画不出图。
 - 原因：结算后的 `block` 是 `kind, seq, time, callId, parentCallId, name, args, call, callTime, content, meta,
-  isError, subCalls`，参数可能在 `args`（懒加载视图）、`call.input` 或 `meta` 里；卡片原先只读了一种。
-- 已改：`src/client.ts` 的 `sourceOf()` 依次读 懒加载视图 → `args.source` → JSON 字符串 → `call.input` →
-  `meta.source`，取第一个非空；`tests/client` 用三种形状各钉了一条。
+  isError, subCalls`。参数在 `args`（懒加载视图）里，但结算时读不到；**能读的是 `meta`** —— 那是宿主从
+  `output.presentationMeta` 持久化下来的载荷。对照：`dsh-deepread` 的卡片就是读 `block.meta`。
+- 已改：`diagram_render` 增加 `presentationMeta`，持久化 `{ source, scheme, caption }`；`src/client.ts` 的
+  `sourceOf()` 先读 `block.meta.source`，再退到懒加载视图 → `args.source` → JSON 字符串 → `call.input`。
+  `tests/client` 用四种形状各钉了一条。
+- **生效前提：重启 DSH。** `presentationMeta` 在宿主侧，Node 的 ESM 缓存不失效，只刷新页面不够。
 - 判据：刷新后 `annotation flow` 那张卡片画出 9 个节点，而不是那句占位话。
 
 #### 3.2 待发清单的吸附

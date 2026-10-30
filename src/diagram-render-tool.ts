@@ -62,6 +62,18 @@ export const diagramRenderTool = defineTool({
       }
       return [{ type: 'text' as const, text: lines.join('\n') }]
     },
+    // The card a UI shows. The host keeps this on the settled call as `block.meta`, which is the one place a
+    // view can find the drawing's own source: by then the arguments are gone. Measured against how
+    // dsh-deepread's card reads its payload - the same field.
+    presentationMeta(args, value) {
+      const result = value as Record<string, unknown>
+      const asked = args as { source?: unknown; scheme?: unknown }
+      return {
+        source: typeof asked.source === 'string' ? asked.source : '',
+        scheme: typeof asked.scheme === 'string' ? asked.scheme : 'default',
+        caption: typeof result.caption === 'string' ? result.caption : '',
+      }
+    },
   },
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,

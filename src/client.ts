@@ -283,6 +283,9 @@ function sourceOf(block: unknown): string | undefined {
   }
   const frame = record(block)
   if (frame === undefined) return undefined
+  // The payload the host persists from `presentationMeta`: the one field a settled call keeps on purpose.
+  const fromMeta = asText(record(frame.meta)?.source)
+  if (fromMeta !== undefined) return fromMeta
   const args = record(frame.args)
   if (args !== undefined && typeof args.value === 'function') {
     const lazy = asText((args as { value: (key: string) => unknown }).value('source'))
