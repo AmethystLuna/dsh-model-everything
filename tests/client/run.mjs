@@ -316,7 +316,9 @@ test('the drawing card offers the annotation button when the host has hooks', ()
   const element = component({ phase: 'result', toolName: 'diagram_render', block: { args: { source: 'graph TD\n  a[One] --> b[Two]' } } })
   const html = JSON.stringify(element)
   if (!html.includes('<svg')) throw new Error('the card lost its drawing')
-  if (!html.includes('批注')) throw new Error('the card has no annotation affordance')
+  if (!html.includes('Point at a node and send a note about it')) throw new Error('the card has no annotation affordance')
+  // No page language here, so the surface falls back to English: the same string is translated, not duplicated.
+  if (!html.includes('Note')) throw new Error('the annotation button is not translated')
 })
 
 test('the drawing key is the name the shipped tool declares', () => {

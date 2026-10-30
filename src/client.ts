@@ -131,6 +131,51 @@ function argOf(args: unknown, key: string): unknown {
 type H = (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
 
 /** The host's own colours, so the panel looks like the rest of the page instead of like a plugin. */
+/**
+ * The two languages this surface speaks, and the one place a sentence lives.
+ *
+ * The page states its language; the plugin has no locale service of its own, and a shipped string that cannot
+ * be translated is a string somebody has to read in a language they did not choose. Keys are the English
+ * sentence's sense, not its text, so a wording change never breaks a caller.
+ */
+const MESSAGES = {
+  note: { en: 'Note', zh: '批注' },
+  noteOn: { en: 'Note: on', zh: '批注: 开' },
+  noteHint: { en: 'Click a node to mark it', zh: '点一个节点标记它' },
+  node: { en: 'Node', zh: '节点' },
+  add: { en: 'Add', zh: '加入' },
+  addAndSend: { en: 'Add & send', zh: '加入并发送' },
+  close: { en: 'Close', zh: '关闭' },
+  send: { en: 'Send', zh: '发送' },
+  clear: { en: 'Clear', zh: '清空' },
+  remove: { en: 'Remove', zh: '删除' },
+  markedOnly: { en: '(marked only)', zh: '(只标记)' },
+  pending: { en: 'Notes', zh: '图注' },
+  zoomOut: { en: 'Zoom out', zh: '缩小' },
+  zoomIn: { en: 'Zoom in', zh: '放大' },
+  actualSize: { en: 'Actual size', zh: '实际大小' },
+  full: { en: '⤢ Full', zh: '⤢ 全屏' },
+  exitFull: { en: '⤡ Exit', zh: '⤡ 退出' },
+  diagram: { en: 'Diagram', zh: '图' },
+  fitOn: { en: 'fit: on', zh: 'fit: on' },
+  fitOff: { en: 'fit: off', zh: 'fit: off' },
+  scheme: { en: 'Colours', zh: '配色' },
+  unfold: { en: 'unfold', zh: '展开' },
+  placeholder: { en: 'A note about this node… (Ctrl+Enter adds and sends)', zh: '批注…（Ctrl+Enter 加入并发送）' },
+}
+
+type MessageKey = keyof typeof MESSAGES
+
+/** The page's language, as the two letter code this surface uses. */
+function languageOf(): 'en' | 'zh' {
+  const scope = globalThis as { navigator?: { language?: string }; document?: { documentElement?: { lang?: string } } }
+  const asked = (scope.document?.documentElement?.lang ?? scope.navigator?.language ?? 'en').toLowerCase()
+  return asked.startsWith('zh') ? 'zh' : 'en'
+}
+
+function t(key: MessageKey): string {
+  return MESSAGES[key][languageOf()]
+}
 const TOKEN = {
   surface: 'var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-1, Canvas))',
   border: 'var(--dsw-alias-border-l1, rgba(127,127,127,0.35))',
@@ -186,12 +231,12 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
             boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
           },
         },
-        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, '节点 ' + state.picked.id),
+        h('div', { style: { fontSize: '12px', color: TOKEN.dim } }, t('node') + ' ' + state.picked.id),
         h('textarea', {
           'data-dme-own': '1',
           value: state.note,
           rows: 3,
-          placeholder: '批注…（Ctrl+Enter 加入并发送）',
+          placeholder: t('placeholder'),
           style: { width: '100%', boxSizing: 'border-box', font: '12px system-ui, sans-serif', padding: '6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, resize: 'vertical' },
           onInput: (event: { target?: { value?: unknown } }) => actions.onNote(String(event?.target?.value ?? '')),
           onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
@@ -218,8 +263,8 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
         h(
           'div',
           { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-          h('button', { type: 'button', title: '展开，逐个删除', onClick: () => actions.onToggle(), style: { fontSize: '12px', padding: '1px 6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, '图注 ×' + String(state.pending.length)),
-          button('发送', actions.onSend, true),
+          h('button', { type: 'button', title: '展开，逐个删除', onClick: () => actions.onToggle(), style: { fontSize: '12px', padding: '1px 6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, t('pending') + ' ×' + String(state.pending.length)),
+          button(t('send'), actions.onSend, true),
         ),
         state.open
           ? h(
@@ -230,15 +275,15 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
                   'div',
                   { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
                   h('span', { style: { color: TOKEN.dim, fontSize: '11px' } }, item.nodeId),
-                  h('span', { style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.note === '' ? '(只标记)' : item.note),
-                  button('删除', () => actions.onRemove(index)),
+                  h('span', { style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.note === '' ? t('markedOnly') : item.note),
+                  button(t('remove'), () => actions.onRemove(index)),
                 ),
               ),
             )
           : null,
       )
   const mode = state.picked === null && state.pending.length === 0
-    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, '批注模式：点一个节点')
+    ? h('div', { style: { fontSize: '11px', color: TOKEN.dim, padding: '2px 4px' } }, t('noteHint'))
     : null
   return h(
     'div',
@@ -325,6 +370,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const caption = typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
   const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
   const [zoom, setZoom] = useState(1)
   const [full, setFull] = useState(false)
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
@@ -338,19 +384,28 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const onPick = (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }): void => {
     if (!annotate) return
     const id = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
-    if (typeof id === 'string' && id !== '') { setPicked({ id }); setStatus(''); return }
+    if (typeof id === 'string' && id !== '') {
+      const pointer = event as { clientX?: number; clientY?: number; currentTarget?: { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } } }
+      const frame = pointer.currentTarget?.getBoundingClientRect?.()
+      if (frame !== undefined && typeof pointer.clientX === 'number' && typeof pointer.clientY === 'number') {
+        setAnchor({ left: Math.max(4, Math.min(pointer.clientX - frame.left + 12, Math.max(4, frame.width - 250))), top: Math.max(4, Math.min(pointer.clientY - frame.top + 12, Math.max(4, frame.height - 20))) })
+      }
+      setPicked({ id })
+      setStatus('')
+      return
+    }
     if (note.trim() === '') setPicked(null)
   }
   const toggle = React.createElement(
     'div',
     { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
-    React.createElement('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } } }, annotate ? '批注: 开' : '批注'),
+    React.createElement('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } }, style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '5px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, annotate ? t('noteOn') : t('note')),
     annotate && picked === null ? React.createElement('span', { style: { fontSize: '11px', opacity: 0.7 } }, '点一个节点') : null,
   )
   const panel = annotate
     ? annotationPanel(
         (type, options, ...children) => React.createElement(type, options, ...children),
-        { picked, note, pending, status },
+        { picked, note, pending, status, anchor, open },
         {
           onNote: setNote,
           onAdd: () => { if (picked === null) return; setPending([...pending, { nodeId: picked.id, note }]); setNote(''); setPicked(null); setStatus('已加入清单') },
@@ -361,7 +416,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
           onToggle: () => setOpen(!open),
           onRemove: (index: number) => setPending(pending.filter((_, at) => at !== index)),
         },
-        { floating: false },
+        { document },
       )
     : null
   return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel, { zoom: Number(zoom), full: Boolean(full), onZoom: (next: number) => setZoom(next), onFull: (next: boolean) => setFull(next) })
@@ -392,15 +447,15 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
   const header = React.createElement(
     'div',
     { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 8px', borderBottom: '1px solid ' + TOKEN.border, fontSize: '12px', color: TOKEN.dim } },
-    React.createElement('span', null, 'Diagram'),
+    React.createElement('span', null, t('diagram')),
     React.createElement('span', { style: { opacity: 0.7 } }, typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''),
     React.createElement(
       'span',
       { style: { marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' } },
-      button('−', () => view.onZoom(Math.max(0.5, Math.round((view.zoom - 0.25) * 100) / 100)), '缩小'),
-      button(Math.round(view.zoom * 100) + '%', () => view.onZoom(1), '实际大小'),
-      button('+', () => view.onZoom(Math.min(3, Math.round((view.zoom + 0.25) * 100) / 100)), '放大'),
-      button(view.full ? '⤡ 退出' : '⤢ 全屏', () => view.onFull(!view.full), '全屏查看'),
+      button('−', () => view.onZoom(Math.max(0.5, Math.round((view.zoom - 0.25) * 100) / 100)), t('zoomOut')),
+      button(Math.round(view.zoom * 100) + '%', () => view.onZoom(1), t('actualSize')),
+      button('+', () => view.onZoom(Math.min(3, Math.round((view.zoom + 0.25) * 100) / 100)), t('zoomIn')),
+      button(view.full ? t('exitFull') : t('full'), () => view.onFull(!view.full), t('full')),
       toggle,
     ),
   )
@@ -417,13 +472,14 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
   )
   const body = React.createElement(
     'div',
-    { style: { background: drawn.colours.background, padding: '6px', maxHeight: view.full ? 'none' : '260px', overflow: 'auto', flex: '1 1 auto', minHeight: '0' } },
+    { style: { position: 'relative', background: drawn.colours.background, padding: '6px', maxHeight: view.full ? 'none' : '260px', overflow: 'auto', flex: '1 1 auto', minHeight: '0' } },
     drawing,
+    panel,
   )
   const frame = view.full
     ? { position: 'fixed' as const, inset: '16px', zIndex: 60, display: 'flex', flexDirection: 'column', ...chrome, boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }
     : { display: 'flex', flexDirection: 'column', ...chrome }
-  const children = [header, body, refused, panel].filter((child) => child !== null)
+  const children = [header, body, refused].filter((child) => child !== null)
   return React.createElement('div', { style: frame }, ...children)
 }
 
@@ -580,13 +636,13 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
         h('span', { style: { fontSize: '11px', color: TOKEN.dim, minWidth: '34px', textAlign: 'center' } }, fit ? 'fit' : String(Math.round(Number(zoom) * 100)) + '%'),
         control('+', () => { setFit(false); setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) }, '放大'),
         control('100%', () => { setFit(false); setZoom(1) }, '实际大小'),
-        control(fit ? 'fit: on' : 'fit: off', () => setFit(!fit), '按面板宽度缩放'),
-        folded.length === 0 ? null : control('unfold ' + String(folded.length), () => setFolded([]), '展开所有分组'),
+        control(fit ? t('fitOn') : t('fitOff'), () => setFit(!fit), t('fitOff')),
+        folded.length === 0 ? null : control(t('unfold') + ' ' + String(folded.length), () => setFolded([]), '展开所有分组'),
         h(
           'select',
           {
             value: scheme,
-            title: '配色',
+            title: t('scheme'),
             style: { marginLeft: 'auto', fontSize: '11px', padding: '1px 4px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text },
             onChange: (event: { target?: { value?: unknown } }) => setScheme(String(event?.target?.value ?? 'default') as PaletteScheme),
           },
@@ -596,8 +652,8 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       h(
         'div',
         { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
-        control(annotate ? '批注: 开' : '批注', () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } }, '点一个节点给它写批注'),
-        h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, annotate ? (picked === null ? '点一个节点' : '节点 ' + picked.id) : '点「批注」后点节点'),
+        control(annotate ? t('noteOn') : t('note'), () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } }, t('noteHint')),
+        h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, annotate ? (picked === null ? t('noteHint') : t('node') + ' ' + picked.id) : t('noteHint')),
       ),
     )
     return h(
