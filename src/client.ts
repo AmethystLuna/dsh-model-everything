@@ -378,9 +378,16 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     const keys = props.block === null || typeof props.block !== 'object' ? 'none' : Object.keys(props.block as Record<string, unknown>).join(',')
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call · block: ' + (keys === '' ? 'empty' : keys))
   }
+  // Every change to the list rewrites the draft, so the block is already there whenever the message leaves -
+  // whether this plugin sends it, the host's Enter handler does, or another plugin's handler composes the text.
+  const sync = (list: Array<{ nodeId: string; note: string }>): void => {
+    if (placeListBlock(list, caption)) return
+    // A host without the draft service still gets the composer path, at the cost of writing at send time.
+    if (list.length > 0) prependBlock(document, list, caption)
+  }
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
     if (list.length === 0) return
-    // Same order as the whiteboard: the host's draft writer keeps the line breaks, the composer is the fallback.
+    sync(list)
     if (placeBlock(annotationBlock(list.map((item) => ({ ...item, caption }))))) {
       setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
       setPending([])
@@ -420,13 +427,21 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
         { picked, note, pending, status, anchor, open },
         {
           onNote: setNote,
-          onAdd: () => { if (picked === null) return; setPending([...pending, { nodeId: picked.id, note }]); setNote(''); setPicked(null); setStatus('已加入清单') },
+          onAdd: () => {
+            if (picked === null) return
+            const merged = [...pending, { nodeId: picked.id, note }]
+            setPending(merged)
+            sync(merged)
+            setNote('')
+            setPicked(null)
+            setStatus('已放入输入框，直接回车即可')
+          },
           onAddAndSend: () => { if (picked === null) return; const merged = [...pending, { nodeId: picked.id, note }]; setNote(''); setPicked(null); sendAll(merged) },
           onSend: () => sendAll(pending),
-          onClear: () => { setPending([]); setStatus('') },
+          onClear: () => { setPending([]); sync([]); setStatus('') },
           onCancel: () => { setPicked(null); setNote(''); setStatus('') },
           onToggle: () => setOpen(!open),
-          onRemove: (index: number) => setPending(pending.filter((_, at) => at !== index)),
+          onRemove: (index: number) => { const merged = pending.filter((_, at) => at !== index); setPending(merged); sync(merged) },
         },
         { document },
       )
@@ -561,17 +576,49 @@ function draftShell(): DraftShell | undefined {
  * The composer's DOM is the wrong writer: a contenteditable keeps line breaks in its own model, and reaching into
  * it produced one long line. The host's draft setter is the same writer the reader's keystrokes use.
  */
-function placeBlock(text: string): boolean {
+/** What this plugin last put in the draft, so it can take it back out without touching the reader's words. */
+let placedText = ''
+
+/**
+ * Put the block in the draft, or take it out again, and keep the reader's own text exactly as it was.
+ *
+ * The block has to be in the draft BEFORE the message is sent, not at the moment this plugin decides to send.
+ * Any Enter handler on the composer - the host's, or another plugin's capture handler - composes the message
+ * from the draft it can see, so a block written after that point never reaches the model. Measured: with the
+ * annotation plugin active, a note committed at send time arrived as nothing at all.
+ *
+ * The write is a read-modify-write with the previous block removed first, so committing, adding another note
+ * and removing one all converge on one block instead of stacking.
+ */
+function replaceBlock(text: string): boolean {
   const shell = draftShell()
   if (shell === undefined || typeof shell.setDraft !== 'function') return false
-  const current = typeof shell.state?.getSnapshot?.()?.draft === 'string' ? String(shell.state.getSnapshot()!.draft) : ''
+  const snapshot = shell.state?.getSnapshot?.()
+  const current = typeof snapshot?.draft === 'string' ? String(snapshot.draft) : ''
+  let rest = current
+  if (placedText !== '' && rest.includes(placedText)) rest = rest.split(placedText).join('')
+  rest = rest.replace(/^[\r\n]+/, '').replace(/\s+$/, '')
+  const next = text === '' ? rest : (rest === '' ? text : text + String.fromCharCode(10, 10) + rest)
   try {
-    // With nothing typed, the question line would be the only thing left to read: drop it.
-    shell.setDraft(current.trim() === '' ? withoutEmptyQuestion(text) : text + String.fromCharCode(10, 10) + current)
+    shell.setDraft(next)
+    placedText = text
     return true
   } catch {
     return false
   }
+}
+
+/** The block for a list of notes, in the draft. An empty list removes it. */
+function placeListBlock(list: Array<{ nodeId: string; note: string }>, caption: string): boolean {
+  return replaceBlock(list.length === 0 ? '' : annotationBlock(list.map((item) => ({ ...item, caption }))))
+}
+
+function placeBlock(text: string): boolean {
+  // With nothing typed, a trailing question line would be the only thing left to read: drop it before placing.
+  const shell = draftShell()
+  const snapshot = shell?.state?.getSnapshot?.()
+  const current = typeof snapshot?.draft === 'string' ? String(snapshot.draft) : ''
+  return replaceBlock(current.trim() === '' ? withoutEmptyQuestion(text) : text)
 }
 
 /** Ask the host to submit the draft it now holds. */
@@ -704,15 +751,19 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     }
     const addDraft = (): boolean => {
       if (picked === null) return false
-      setPending([...pending, { nodeId: picked.id, note }])
+      const merged = [...pending, { nodeId: picked.id, note }]
+      setPending(merged)
+      // Into the draft now, not at send time: whatever sends this message composes it from the draft.
+      placeListBlock(merged, caption)
       setNote('')
       setPicked(null)
-      setStatus('已加入清单')
+      setStatus('已放入输入框，直接回车即可')
       return true
     }
     const addAndSend = (): void => {
       if (picked === null) return
       const merged = [...pending, { nodeId: picked.id, note }]
+      placeListBlock(merged, caption)
       setNote('')
       setPicked(null)
       sendAll(merged, true)
