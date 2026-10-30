@@ -333,6 +333,26 @@ test('a quote that is not an annotation is left alone', () => {
   if (quote.style.display !== undefined) throw new Error('an ordinary quote was hidden')
 })
 
+test('the card calls the same hooks whether or not a call has settled', () => {
+  // A running call has no source and a settled one does. A hook that appears between those renders throws
+  // 'rendered more hooks than during the previous render', and React takes the conversation view with it.
+  const counts = []
+  const counting = {
+    createElement: stubReact.createElement,
+    useState: (initial) => { counts[counts.length - 1] += 1; return [initial, () => {}] },
+  }
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => counting)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  counts.push(0)
+  component({ phase: 'running', toolName: 'diagram_render', block: {} })
+  counts.push(0)
+  component({ phase: 'result', toolName: 'diagram_render', block: { meta: { source: 'graph TD' + String.fromCharCode(10) + '  a[A] --> b[B]' } } })
+  if (counts[0] !== counts[1]) throw new Error('hooks per render changed: ' + JSON.stringify(counts))
+  if (counts[0] === 0) throw new Error('the card used no hooks at all, so the comparison proves nothing')
+})
+
 test('the page census counts what a probe cannot see', () => {
   const doc = { querySelector: () => null, querySelectorAll: () => [1, 2] }
   const said = pageCensus(doc)

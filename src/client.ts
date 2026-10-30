@@ -355,12 +355,10 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const payload = (props.block as { result?: unknown } | undefined)?.result
   const returned = payload !== null && typeof payload === 'object' ? (payload as { svg?: unknown }).svg : undefined
   const markup = typeof returned === 'string' && returned !== '' ? returned : null
-  // A card with nothing to draw says what the call actually carried: the only way to learn the shape
-  // from a page this build cannot inspect.
-  if (markup === null && (typeof source !== 'string' || source.trim() === '')) {
-    const keys = props.block === null || typeof props.block !== 'object' ? 'none' : Object.keys(props.block as Record<string, unknown>).join(',')
-    return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call · block: ' + (keys === '' ? 'empty' : keys))
-  }
+  // Nothing to draw yet, or nothing at all. The branch is taken after the hooks below, never before: a running
+  // call has no source and a settled one does, and a hook that disappears between those renders takes the whole
+  // conversation view down with it.
+  const hasDrawing = markup !== null || (typeof source === 'string' && source.trim() !== '')
   const useState = React.useState
   if (useState === undefined) return cardSurface(React, source, markup, scheme, overrides, null, null, null)
   const [annotate, setAnnotate] = useState(false)
@@ -374,6 +372,10 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
   const [zoom, setZoom] = useState(1)
   const [full, setFull] = useState(false)
+  if (!hasDrawing) {
+    const keys = props.block === null || typeof props.block !== 'object' ? 'none' : Object.keys(props.block as Record<string, unknown>).join(',')
+    return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call · block: ' + (keys === '' ? 'empty' : keys))
+  }
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
     if (list.length === 0) return
     // Same order as the whiteboard: the host's draft writer keeps the line breaks, the composer is the fallback.
