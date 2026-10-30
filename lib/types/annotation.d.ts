@@ -29,10 +29,14 @@ export interface Annotation {
 /**
  * The text that travels to the session: what was marked, what was said, and nothing invented.
  *
- * Structured on purpose. A note from a reader looking at a picture arrives without the picture, so the block
- * carries three things the model cannot recover on its own: that these annotate a drawing, which drawing, and
- * that each numbered item is a separate thing to answer. A blank note is not dropped - 'the reader marked this
- * node' and 'the reader marked it and said this' are different messages.
+ * One message for N notes, with a fixed opening so both the reader and the model know what they are looking
+ * at: a note arrives without the picture, so the block says what it is about, which drawing, and that every
+ * numbered item is a separate answer. The shape follows the annotation plugin this harness already ships - an
+ * opening sentence, numbered items, a question line - and it stays English: this is protocol between reader
+ * and model, not interface chrome that follows the page's language.
+ *
+ * Markdown-quoted, so the conversation renders it as a quote rather than as a wall of the reader's own words.
+ * A blank note is not dropped: 'marked, no note' and 'marked with this note' are different messages.
  */
 export declare function annotationBlock(annotations: Annotation[]): string;
 /** One annotation, in the same block shape: a caller with a single note should not get a second format. */

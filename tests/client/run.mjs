@@ -360,7 +360,8 @@ test('the annotation message names the node, the drawing and the note', () => {
 test('a blank note still says the node was marked', () => {
   const text = annotationMessage({ nodeId: 'n1' })
   if (!text.includes('(marked, no note)')) throw new Error('a silent note became silence: ' + text)
-  if (!text.includes('[1] node n1')) throw new Error('the mark was not numbered: ' + text)
+  if (!text.includes('> 1. node n1')) throw new Error('the mark was not numbered: ' + text)
+  if (!text.includes('start each answer with "Annotation N:"')) throw new Error('the block does not ask for item-by-item answers: ' + text)
 })
 
 test('filling the composer appends to the draft instead of replacing it', () => {
@@ -376,7 +377,7 @@ test('the block goes above the reader note, with a blank line between', () => {
   const said = prependBlock({ querySelector: () => element }, [{ nodeId: 'a', note: 'note' }], 'graph TD')
   if (!said.startsWith('已放入')) throw new Error('reported: ' + said)
   const lines = element.value.split(String.fromCharCode(10))
-  if (!lines[0].startsWith('Diagram annotations')) throw new Error('the block is not first: ' + element.value)
+  if (!lines[0].startsWith('> **Diagram annotations')) throw new Error('the block is not first: ' + element.value)
   if (!element.value.endsWith('half a thought')) throw new Error('the draft is not last: ' + element.value)
   if (!element.value.includes(String.fromCharCode(10, 10) + 'half a thought')) throw new Error('no blank line between block and draft')
 })
@@ -385,7 +386,7 @@ test('the block carries a line break per item, so the model can number them', ()
   const element = { tagName: 'TEXTAREA', value: '', dispatchEvent: () => true, focus: () => {} }
   prependBlock({ querySelector: () => element }, [{ nodeId: 'a', note: 'one' }, { nodeId: 'b', note: '' }], 'graph TD')
   const lines = element.value.split(String.fromCharCode(10))
-  if (!lines.includes('[1] node a') || !lines.includes('[2] node b')) throw new Error('items are not on their own lines: ' + JSON.stringify(lines))
+  if (!lines.includes('> 1. node a') || !lines.includes('> 2. node b')) throw new Error('items are not on their own lines: ' + JSON.stringify(lines))
 })
 
 test('the composer rect is read for the docked count, and absent without one', () => {

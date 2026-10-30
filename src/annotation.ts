@@ -31,22 +31,32 @@ export interface Annotation {
 /**
  * The text that travels to the session: what was marked, what was said, and nothing invented.
  *
- * Structured on purpose. A note from a reader looking at a picture arrives without the picture, so the block
- * carries three things the model cannot recover on its own: that these annotate a drawing, which drawing, and
- * that each numbered item is a separate thing to answer. A blank note is not dropped - 'the reader marked this
- * node' and 'the reader marked it and said this' are different messages.
+ * One message for N notes, with a fixed opening so both the reader and the model know what they are looking
+ * at: a note arrives without the picture, so the block says what it is about, which drawing, and that every
+ * numbered item is a separate answer. The shape follows the annotation plugin this harness already ships - an
+ * opening sentence, numbered items, a question line - and it stays English: this is protocol between reader
+ * and model, not interface chrome that follows the page's language.
+ *
+ * Markdown-quoted, so the conversation renders it as a quote rather than as a wall of the reader's own words.
+ * A blank note is not dropped: 'marked, no note' and 'marked with this note' are different messages.
  */
 export function annotationBlock(annotations: Annotation[]): string {
-  const lines = ['Diagram annotations - answer each numbered item separately:']
+  const count = annotations.length
+  const lines = [
+    '> **Diagram annotations - ' + String(count) + (count === 1 ? ' item' : ' items') + ' (numbers match the picture).**',
+    '> Please answer each item separately, and start each answer with "Annotation N:".',
+  ]
   const caption = (annotations[0]?.caption ?? '').trim()
-  if (caption !== '') lines.push('Drawing: ' + caption)
+  if (caption !== '') lines.push('> Drawing: ' + caption)
   annotations.forEach((annotation, index) => {
     const label = (annotation.label ?? '').trim()
     const node = label === '' || label === annotation.nodeId ? annotation.nodeId : label + ' (' + annotation.nodeId + ')'
     const note = (annotation.note ?? '').trim()
-    lines.push('', '[' + String(index + 1) + '] node ' + node)
-    lines.push(note === '' ? '(marked, no note)' : note)
+    lines.push('>')
+    lines.push('> ' + String(index + 1) + '. node ' + node)
+    lines.push('>    Note: ' + (note === '' ? '(marked, no note)' : note))
   })
+  lines.push('>', '> Question:')
   return lines.join(String.fromCharCode(10))
 }
 
