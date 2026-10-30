@@ -16,6 +16,7 @@ import { type DocumentLike } from './annotation.js';
 export interface ReactLike {
     createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown;
     useState?: <T>(initial: T) => [T, (next: T) => void];
+    useEffect?: (effect: () => void | (() => void), deps?: ReadonlyArray<unknown>) => void;
 }
 export interface SlotContext {
     slots: {
@@ -103,6 +104,13 @@ export declare function annotationPanel(h: H, state: AnnotationState, actions: A
     floating?: boolean;
     document?: DocumentLike;
 }): unknown;
+/**
+ * Tell this module when a message leaves, by watching the one signal the host gives: the draft empties.
+ *
+ * A note that was committed is in the draft, so after the send there is nothing left to keep - and a chip still
+ * counting a note that has already gone out is the plugin lying about its own state.
+ */
+export declare function onMessageSent(listener: () => void): () => void;
 export declare function viewFor(React: ReactLike, overrides?: Partial<Palette>): (props: ToolCallProps) => unknown;
 /**
  * The whiteboard: paste a diagram, get a drawing, zoom it.

@@ -23,6 +23,7 @@ import { startTranscriptDecoration, type TranscriptDocument as TranscriptDocumen
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
   useState?: <T>(initial: T) => [T, (next: T) => void]
+  useEffect?: (effect: () => void | (() => void), deps?: ReadonlyArray<unknown>) => void
 }
 
 export interface SlotContext {
@@ -372,6 +373,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
+  // A sent message leaves an empty draft; the notes went with it, so the count goes too.
+  React.useEffect?.(() => onMessageSent(() => { setPending([]); setStatus('') }), [])
   const [zoom, setZoom] = useState(1)
   const [full, setFull] = useState(false)
   if (!hasDrawing) {
@@ -552,7 +555,7 @@ function currentSessionId(): string | undefined {
 
 /** The conversation's draft, when this host exposes it: the one writer that keeps line breaks intact. */
 interface DraftShell {
-  state?: { getSnapshot?: () => { draft?: unknown } }
+  state?: { getSnapshot?: () => { draft?: unknown }; subscribe?: (listener: () => void) => unknown }
   setDraft?: (text: string) => void
   submit?: (mode?: string) => void
 }
@@ -619,6 +622,49 @@ function placeBlock(text: string): boolean {
   const snapshot = shell?.state?.getSnapshot?.()
   const current = typeof snapshot?.draft === 'string' ? String(snapshot.draft) : ''
   return replaceBlock(current.trim() === '' ? withoutEmptyQuestion(text) : text)
+}
+
+/** Listeners waiting for the message to leave. */
+let sentListeners: Array<() => void> = []
+let watchState: 'idle' | 'watching' | 'unavailable' = 'idle'
+let lastSeenDraft = ''
+
+/**
+ * Tell this module when a message leaves, by watching the one signal the host gives: the draft empties.
+ *
+ * A note that was committed is in the draft, so after the send there is nothing left to keep - and a chip still
+ * counting a note that has already gone out is the plugin lying about its own state.
+ */
+export function onMessageSent(listener: () => void): () => void {
+  sentListeners.push(listener)
+  watchDraft()
+  return () => { sentListeners = sentListeners.filter((item) => item !== listener) }
+}
+
+function watchDraft(): void {
+  if (watchState !== 'idle') return
+  const shell = draftShell()
+  const subscribe = shell?.state?.subscribe
+  if (typeof subscribe !== 'function') {
+    // A host that has not loaded its conversation yet is retried by the next caller, not by a timer.
+    return
+  }
+  watchState = 'watching'
+  try {
+    lastSeenDraft = String(shell?.state?.getSnapshot?.()?.draft ?? '')
+    subscribe(() => {
+      const draft = String(shell?.state?.getSnapshot?.()?.draft ?? '')
+      const before = lastSeenDraft
+      lastSeenDraft = draft
+      if (before.trim() === '' || draft.trim() !== '') return
+      placedText = ''
+      for (const listener of sentListeners.slice()) {
+        try { listener() } catch { /* one listener must not keep the others from hearing it */ }
+      }
+    })
+  } catch {
+    watchState = 'unavailable'
+  }
 }
 
 /** Ask the host to submit the draft it now holds. */
@@ -729,6 +775,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [status, setStatus] = useState('')
     const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
     const [open, setOpen] = useState(false)
+    React.useEffect?.(() => onMessageSent(() => { setPending([]); setStatus('') }), [])
     const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme, folded)
     const document = (globalThis as { document?: DocumentLike }).document
     const caption = source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? ''
