@@ -935,14 +935,16 @@ export default function factory(require: (name: string) => unknown): PluginShape
     mount: (ctx: SlotContext, options: MountOptions = {}) => mountWhiteboard(React, ctx, options),
     apply(ctx: SlotContext) {
       services = ctx
-      // Fold sent annotations behind their count. It edits text nodes and inserts a sibling, never an element's
-      // text: assigning `textContent` deletes an element's children, React reconciles from a tree that no longer
-      // matches, and whole turns come back mangled. That was one build's worth of a broken conversation.
-      try {
-        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'), t('carried'))
-      } catch {
-        // A page without a document (a test) has nothing to decorate.
-      }
+      // The transcript fold is parked, and this is the second time for a reason worth writing down.
+      //
+      // It worked as a static pass. Started from `apply` it watches the whole document and, per change, runs a
+      // selector over every div/p/span and a subtree scan per match; a streaming conversation changes the DOM many
+      // times a second, so the scan ran continuously and the conversation container stopped responding.
+      //
+      // To bring it back: scope the scan to a message container instead of the document, run it once per sent
+      // message rather than per mutation, and never from an interval. Until then the block stays visible in the
+      // bubble, which is what the host itself renders and costs nothing.
+      void startTranscriptDecoration
       for (const name of TOOL_NAMES) {
         // Only the options a keyed slot declares: `key`. An extra `id` is not part of this slot's
         // registration schema, and the working community reference (dsh-deepread) passes exactly this much.
