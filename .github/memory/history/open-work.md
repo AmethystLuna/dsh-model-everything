@@ -1,6 +1,6 @@
 ---
 name: open-work
-description: 交接待办清单：还没做完的两个决定、已完成项的去处、写文档前的那条纪律
+description: 交接待办清单：两个待定的决定、画图与批注的五项收尾（含判据）、已完成项的去处、写文档前的那条纪律
 metadata:
   type: project
 ---
@@ -48,6 +48,50 @@ provider 一起走，但入口技能的路由表还留着那条路）；工具�
 `model-everything` 一家（正文加参考）就占了一半以上。
 
 建议：只铺 `SKILL.md`，参考资料按需再议；入口技能单独作为一个决定（它一份顶其余六个）。
+
+### 3. 画图与批注的收尾（2026-10-30）
+
+卡片与白板现在都能画、能批注，但还没有一处「在页面上确认过」。下面五条按优先级排，每条都写了判据。
+
+#### 3.1 卡片画图（已改，待确认）
+
+- 现象：卡片只显示 `no drawing in this call · block: …`，画不出图。
+- 原因：结算后的 `block` 是 `kind, seq, time, callId, parentCallId, name, args, call, callTime, content, meta,
+  isError, subCalls`，参数可能在 `args`（懒加载视图）、`call.input` 或 `meta` 里；卡片原先只读了一种。
+- 已改：`src/client.ts` 的 `sourceOf()` 依次读 懒加载视图 → `args.source` → JSON 字符串 → `call.input` →
+  `meta.source`，取第一个非空；`tests/client` 用三种形状各钉了一条。
+- 判据：刷新后 `annotation flow` 那张卡片画出 9 个节点，而不是那句占位话。
+
+#### 3.2 待发清单的吸附
+
+- 现状：`position: fixed` + **渲染时量一次**输入框矩形（`composerRect`）。滚动、缩放、窗口变化后会漂。
+- 下一步：挂 `ResizeObserver` 与滚动监听，位置变了就重排；或改成把控件渲染进 composer 的定位容器。
+- 判据：把对话滚到底、把窗口拉窄再拉宽，控件始终贴在输入框上方 40px 内。
+
+#### 3.3 用户自己按回车时的拼接
+
+- 现状：只有点控件上的「发送」才把块插入并回车；用户直接按回车时，待发的图注不会进消息。
+- 下一步：在输入框上挂**捕获阶段** `keydown`（Enter、非 Shift、非 composing），先把块拼进草稿再放行；
+  受控输入框要用原型的 `value` setter + `input` 事件，否则 React 看不到变化。
+- 判据：有待发图注时，直接按回车，发出的消息里带着编号块。
+
+#### 3.4 命令通道（A）与会话 id
+
+- 现状：宿主侧已注册 `annotate` 命令（`src/diagram.ts` 的 `registerAnnotateCommand`，handler 走
+  `agent.followup`），客户端也能探测 `sessions.scope(id).remote.commands.execute`；**缺的是会话 id**——
+  页面地址是 `/`，客户端服务目录里没有「当前会话」。
+- 下一步：先从槽位 props 或 DOM 属性里找 id（客户端检查里能拿到 props 的只有槽位投影）；找不到就维持
+  输入框通道，把命令通道留作有 id 时的快路径。
+- 判据：状态行出现「已发送（会话命令）」，且会话里多出一条用户消息。
+
+#### 3.5 卡片与白板的布局、样式
+
+- 卡片：批注编辑器是内联的（`floating: false`），夹在图与按钮之间，间距与按钮排布还没和白板统一。
+- 白板：控制条（缩放 / 批注 / reset / fit / 配色）挤在一行，窄面板会折行；浮窗宽度写死 260px，窄面板会溢出。
+- 下一步：两处共用一套 token 与尺寸（颜色已经走 `--dsw-alias-*`，尺寸还没抽），控制条拆两行、浮窗宽度随容器。
+- 判据：把白板拉到最窄，控制条不折行、浮窗不超出面板；卡片与白板的按钮高度、圆角、间距一致。
+
+> 截至写这篇时，上面这些改动都在本地 `main` 上，领先 `origin/main` 16 个提交，**未推送**。
 
 ## 已结案的去处
 
