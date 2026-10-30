@@ -18,6 +18,7 @@ import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
 import { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
+import { startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -832,6 +833,12 @@ export default function factory(require: (name: string) => unknown): PluginShape
     mount: (ctx: SlotContext, options: MountOptions = {}) => mountWhiteboard(React, ctx, options),
     apply(ctx: SlotContext) {
       services = ctx
+      // A sent annotation is a long quote in the transcript; fold it behind its count as it appears.
+      try {
+        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'))
+      } catch {
+        // A page without a document (a test) has nothing to decorate.
+      }
       for (const name of TOOL_NAMES) {
         // Only the options a keyed slot declares: `key`. An extra `id` is not part of this slot's
         // registration schema, and the working community reference (dsh-deepread) passes exactly this much.

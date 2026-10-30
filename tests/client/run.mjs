@@ -14,6 +14,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
 const { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
+const { annotationCountOf, decorateTranscript } = await import('../../lib/transcript.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
@@ -298,6 +299,38 @@ test('the card finds the source in whatever shape the settled block carries', ()
     const html = JSON.stringify(element)
     if (!html.includes('<svg')) throw new Error('no drawing for block shape: ' + JSON.stringify(block).slice(0, 60))
   }
+})
+
+test('a sent annotation is folded behind its count, once', () => {
+  const inserted = []
+  const quote = {
+    textContent: 'Diagram annotations - 2 items (numbers match the picture).',
+    style: {},
+    attrs: {},
+    getAttribute(name) { return this.attrs[name] }, 
+    setAttribute(name, value) { this.attrs[name] = value },
+    parentNode: { insertBefore(node, before) { inserted.push([node, before]) } },
+  }
+  const chips = []
+  const doc = {
+    querySelectorAll: () => [quote],
+    createElement: () => { const chip = { style: {}, attrs: {}, setAttribute(name, value) { this.attrs[name] = value }, handlers: [], addEventListener(_type, handler) { this.handlers.push(handler) } }; chips.push(chip); return chip },
+  }
+  if (annotationCountOf(quote.textContent) !== 2) throw new Error('the count was not read')
+  if (decorateTranscript(doc, 'Notes') !== 1) throw new Error('nothing was folded')
+  if (quote.style.display !== 'none') throw new Error('the protocol block is still showing')
+  if (inserted.length !== 1) throw new Error('chips inserted: ' + String(inserted.length))
+  if (!chips[0].textContent.includes('×2')) throw new Error('the chip does not carry the count: ' + chips[0].textContent)
+  if (decorateTranscript(doc, 'Notes') !== 0) throw new Error('a second pass stacked another chip')
+  chips[0].handlers[0]()
+  if (quote.style.display !== '') throw new Error('the chip does not reveal the block')
+})
+
+test('a quote that is not an annotation is left alone', () => {
+  const quote = { textContent: 'just a quotation', style: {}, attrs: {}, getAttribute() { return null }, setAttribute() {}, parentNode: { insertBefore() {} } }
+  const doc = { querySelectorAll: () => [quote], createElement: () => ({ style: {}, setAttribute() {}, addEventListener() {} }) }
+  if (decorateTranscript(doc) !== 0) throw new Error('an ordinary quote was folded')
+  if (quote.style.display !== undefined) throw new Error('an ordinary quote was hidden')
 })
 
 test('the page census counts what a probe cannot see', () => {
