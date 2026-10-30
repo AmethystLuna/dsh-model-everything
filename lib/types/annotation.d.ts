@@ -119,3 +119,10 @@ export declare function composerRect(doc: DocumentLike | undefined): Rect | unde
  * it takes the same path as an empty box - the block becomes the message and the reader's text follows it.
  */
 export declare function prependBlock(document: DocumentLike | undefined, annotations: Annotation[], caption: string): string;
+/**
+ * The block without its question line, for a message that has no question.
+ *
+ * The line is an invitation for the reader's own words; with the box empty it is the last thing the bubble shows
+ * and the only thing a chip would be folded away from, so it goes.
+ */
+export declare function withoutEmptyQuestion(block: string): string;

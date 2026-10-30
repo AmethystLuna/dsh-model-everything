@@ -17,7 +17,7 @@ import { palette, schemeNames, type Palette, type PaletteMode, type PaletteSchem
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationBlock, annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationBlock, annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, withoutEmptyQuestion, type DocumentLike } from './annotation.js'
 import { startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
 
 export interface ReactLike {
@@ -152,6 +152,7 @@ const MESSAGES = {
   remove: { en: 'Remove', zh: '删除' },
   markedOnly: { en: '(marked only)', zh: '(只标记)' },
   pending: { en: 'Notes', zh: '图注' },
+  fold: { en: 'hide', zh: '收起' },
   zoomOut: { en: 'Zoom out', zh: '缩小' },
   zoomIn: { en: 'Zoom in', zh: '放大' },
   actualSize: { en: 'Actual size', zh: '实际大小' },
@@ -564,7 +565,8 @@ function placeBlock(text: string): boolean {
   if (shell === undefined || typeof shell.setDraft !== 'function') return false
   const current = typeof shell.state?.getSnapshot?.()?.draft === 'string' ? String(shell.state.getSnapshot()!.draft) : ''
   try {
-    shell.setDraft(current.trim() === '' ? text : text + String.fromCharCode(10, 10) + current)
+    // With nothing typed, the question line would be the only thing left to read: drop it.
+    shell.setDraft(current.trim() === '' ? withoutEmptyQuestion(text) : text + String.fromCharCode(10, 10) + current)
     return true
   } catch {
     return false
@@ -934,7 +936,7 @@ export default function factory(require: (name: string) => unknown): PluginShape
       services = ctx
       // A sent annotation is a long quote in the transcript; fold it behind its count as it appears.
       try {
-        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'))
+        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'), t('fold'))
       } catch {
         // A page without a document (a test) has nothing to decorate.
       }

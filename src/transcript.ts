@@ -57,15 +57,19 @@ export function questionOf(text: string): string {
   return at === -1 ? '' : text.slice(at + QUESTION.length).trim()
 }
 
-function chipFor(doc: TranscriptDocument, node: TranscriptNode, label: string): TranscriptNode | undefined {
+function chipFor(doc: TranscriptDocument, node: TranscriptNode, label: string, foldLabel: string): TranscriptNode | undefined {
   const chip = doc.createElement?.('div')
   if (chip === undefined) return undefined
   chip.textContent = label
   chip.setAttribute?.('role', 'button')
+  // A pill that sits in the reader's line, not a block that pushes it: the conversation is theirs, and the chip
+  // is a footnote to it.
   chip.style = {
-    display: 'inline-block', margin: '2px 0', padding: '0 6px', fontSize: '11px', lineHeight: '18px',
-    borderRadius: '6px', border: '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35))',
-    color: 'var(--dsw-alias-label-secondary, GrayText)', cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', height: '20px', padding: '0 8px', margin: '4px 0 0',
+    fontSize: '11px', lineHeight: '20px', borderRadius: '10px', verticalAlign: 'middle', userSelect: 'none',
+    border: '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35))',
+    background: 'var(--dsw-alias-bg-layer-2, rgba(127,127,127,0.10))',
+    color: 'var(--dsw-alias-label-secondary, GrayText)', cursor: 'pointer', maxWidth: '100%',
   }
   chip.addEventListener?.('click', () => {
     const open = node.getAttribute?.(COLLAPSED) === '0'
@@ -79,7 +83,7 @@ function chipFor(doc: TranscriptDocument, node: TranscriptNode, label: string): 
     } else {
       node.textContent = full
       node.setAttribute?.(COLLAPSED, '0')
-      chip.textContent = label + ' · hide'
+      chip.textContent = label + ' · ' + foldLabel
       if (node.appendChild !== undefined) node.appendChild(chip)
     }
   })
@@ -93,7 +97,7 @@ function chipFor(doc: TranscriptDocument, node: TranscriptNode, label: string): 
  * change without stacking chips. Only the deepest element carrying the marker is touched, because a container
  * would take the rest of the conversation with it.
  */
-export function decorateTranscript(doc: TranscriptDocument | undefined, label = 'Notes'): number {
+export function decorateTranscript(doc: TranscriptDocument | undefined, label = 'Notes', foldLabel = 'hide'): number {
   if (doc === undefined || typeof doc.querySelectorAll !== 'function') return 0
   let nodes: ArrayLike<TranscriptNode>
   try {
@@ -117,7 +121,7 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
     if (deeper) continue
     const count = annotationCountOf(text)
     const question = questionOf(text)
-    const chip = chipFor(doc, node, label + (count === null ? '' : ' ×' + String(count)))
+    const chip = chipFor(doc, node, label + (count === null ? '' : ' ×' + String(count)), foldLabel)
     if (chip === undefined) continue
     try {
       node.setAttribute?.(ORIGINAL, text)
@@ -139,13 +143,13 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
  * A sent message is rendered by the host, not by this plugin, so watching is the only way to act on it. The
  * observer is coalesced by the browser and the work is idempotent, so a busy transcript costs a scan per change.
  */
-export function startTranscriptDecoration(doc: TranscriptDocument | undefined, label = 'Notes'): () => void {
-  decorateTranscript(doc, label)
+export function startTranscriptDecoration(doc: TranscriptDocument | undefined, label = 'Notes', foldLabel = 'hide'): () => void {
+  decorateTranscript(doc, label, foldLabel)
   const Observer = (globalThis as { MutationObserver?: new (callback: () => void) => { observe: (target: unknown, options: unknown) => void; disconnect: () => void } }).MutationObserver
   if (doc === undefined || Observer === undefined) return () => {}
   let watcher: { disconnect: () => void } | undefined
   try {
-    const observer = new Observer(() => { decorateTranscript(doc, label) })
+    const observer = new Observer(() => { decorateTranscript(doc, label, foldLabel) })
     observer.observe(doc, { childList: true, subtree: true })
     watcher = observer
   } catch {

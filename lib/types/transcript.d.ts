@@ -43,11 +43,11 @@ export declare function questionOf(text: string): string;
  * change without stacking chips. Only the deepest element carrying the marker is touched, because a container
  * would take the rest of the conversation with it.
  */
-export declare function decorateTranscript(doc: TranscriptDocument | undefined, label?: string): number;
+export declare function decorateTranscript(doc: TranscriptDocument | undefined, label?: string, foldLabel?: string): number;
 /**
  * Fold now, and again whenever the conversation changes.
  *
  * A sent message is rendered by the host, not by this plugin, so watching is the only way to act on it. The
  * observer is coalesced by the browser and the work is idempotent, so a busy transcript costs a scan per change.
  */
-export declare function startTranscriptDecoration(doc: TranscriptDocument | undefined, label?: string): () => void;
+export declare function startTranscriptDecoration(doc: TranscriptDocument | undefined, label?: string, foldLabel?: string): () => void;

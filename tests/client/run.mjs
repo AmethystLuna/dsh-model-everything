@@ -13,7 +13,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
-const { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushNote, sessionFromLocation } = await import('../../lib/annotation.js')
+const { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushNote, sessionFromLocation, withoutEmptyQuestion } = await import('../../lib/annotation.js')
 const { annotationCountOf, decorateTranscript } = await import('../../lib/transcript.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
@@ -456,6 +456,13 @@ test('the block goes above the reader note, with a blank line between', () => {
   if (!lines[0].startsWith('Diagram annotations - ')) throw new Error('the block is not first: ' + element.value)
   if (!element.value.endsWith('half a thought')) throw new Error('the draft is not last: ' + element.value)
   if (!element.value.includes(String.fromCharCode(10, 10) + 'half a thought')) throw new Error('no blank line between block and draft')
+})
+
+test('a message with no question drops the question line', () => {
+  const block = annotationMessage({ nodeId: 'a', note: 'x' })
+  const bare = withoutEmptyQuestion(block)
+  if (bare.includes('Question:')) throw new Error('the empty invitation stayed: ' + bare)
+  if (!bare.includes('1. node a')) throw new Error('the block lost its item')
 })
 
 test('the block carries a line break per item, so the model can number them', () => {
