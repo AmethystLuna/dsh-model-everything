@@ -180,7 +180,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
         {
           style: {
             ...(options.floating === false ? {} : { position: 'absolute', left: (state.anchor?.left ?? 10) + 'px', top: (state.anchor?.top ?? 10) + 'px', zIndex: 20 }),
-            width: '260px', boxSizing: 'border-box',
+            width: 'min(260px, calc(100% - 16px))', boxSizing: 'border-box',
             display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', borderRadius: '10px',
             background: TOKEN.surface, border: '1px solid ' + TOKEN.border, color: TOKEN.text,
             boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
@@ -377,8 +377,9 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
   const drawn = returned === null
     ? render({ source: String(source), folded: [] }, overrides, { mode: themeMode(), scheme })
     : { markup: returned, refused: [] as string[], colours: palette(overrides, { mode: themeMode(), scheme }) }
-  // The pane decides the width: a drawing wider than the card scrolls nowhere, so it scales instead.
-  const scaled = drawn.markup.replace('<svg ', '<svg style="width: 100%; height: auto; display: block" ')
+  // The drawing keeps its own size and shrinks only when it has to: stretched to the card's width, a two-box
+  // diagram became a poster and the card stopped looking like the other cards. Zoom is the control for size.
+  const scaled = drawn.markup.replace('<svg ', '<svg style="max-width: 100%; height: auto; display: block; margin: 0 auto" ')
   const refused =
     drawn.refused.length === 0
       ? null
@@ -408,7 +409,8 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
   const drawing = React.createElement(
     'div',
     {
-      style: { width: Math.round(view.zoom * 100) + '%', cursor: onClick === null ? undefined : 'crosshair' },
+      // CSS zoom, not a transform: it reflows, so the scroll area grows with the picture and nothing is clipped.
+      style: { zoom: view.zoom as unknown as number, cursor: onClick === null ? undefined : 'crosshair' },
       onClick: onClick === null ? undefined : (onClick as never),
       dangerouslySetInnerHTML: { __html: scaled },
     },
@@ -561,30 +563,41 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       value: source,
       spellcheck: false,
       rows: Math.min(12, Math.max(4, String(source).split('\n').length)),
-      style: { width: '100%', font: '12px ui-monospace, SFMono-Regular, Menlo, monospace', padding: '6px', resize: 'vertical' },
+      style: { width: '100%', boxSizing: 'border-box', font: '12px ui-monospace, SFMono-Regular, Menlo, monospace', padding: '6px', resize: 'vertical', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text },
       onInput: (event: { target?: { value?: unknown } }) => setSource(String(event?.target?.value ?? '')),
     })
+    // Two rows: the tools that change the picture, then the mode and the scheme. One row folded on a narrow
+    // pane and pushed the scheme out of reach, which is the one control a reader looks for by name.
+    const controlStyle = { fontSize: '11px', lineHeight: '18px', padding: '1px 7px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' }
+    const control = (label: string, onPress: () => void, title?: string): unknown => h('button', { type: 'button', title, onClick: onPress, style: controlStyle }, label)
     const controls = h(
       'div',
-      { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 0', flexWrap: 'wrap' } },
-      h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.max(0.5, Math.round((Number(zoom) - 0.25) * 100) / 100)) } }, '−'),
-      h('span', { style: { fontSize: '12px', opacity: 0.7 } }, fit ? 'fit' : String(Math.round(Number(zoom) * 100)) + '%'),
-      h('button', { type: 'button', onClick: () => { setFit(false); setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) } }, '+'),
-      h('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } } }, annotate ? '批注: 开' : '批注'),
-      h('button', { type: 'button', onClick: () => { setFit(false); setZoom(1) } }, 'reset'),
-      h('button', { type: 'button', title: 'Scale to the pane width', onClick: () => setFit(!fit) }, fit ? 'fit: on' : 'fit: off'),
-      folded.length === 0
-        ? null
-        : h('button', { type: 'button', title: 'Unfold every group', onClick: () => setFolded([]) }, 'unfold ' + String(folded.length)),
+      { style: { display: 'flex', flexDirection: 'column', gap: '3px', padding: '2px 0' } },
       h(
-        'select',
-        {
-          value: scheme,
-          title: 'Colour scheme',
-          style: { marginLeft: 'auto', fontSize: '12px' },
-          onChange: (event: { target?: { value?: unknown } }) => setScheme(String(event?.target?.value ?? 'default') as PaletteScheme),
-        },
-        ...schemeNames().map((name) => h('option', { value: name, selected: name === scheme }, name)),
+        'div',
+        { style: { display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' } },
+        control('−', () => { setFit(false); setZoom(Math.max(0.5, Math.round((Number(zoom) - 0.25) * 100) / 100)) }, '缩小'),
+        h('span', { style: { fontSize: '11px', color: TOKEN.dim, minWidth: '34px', textAlign: 'center' } }, fit ? 'fit' : String(Math.round(Number(zoom) * 100)) + '%'),
+        control('+', () => { setFit(false); setZoom(Math.min(3, Math.round((Number(zoom) + 0.25) * 100) / 100)) }, '放大'),
+        control('100%', () => { setFit(false); setZoom(1) }, '实际大小'),
+        control(fit ? 'fit: on' : 'fit: off', () => setFit(!fit), '按面板宽度缩放'),
+        folded.length === 0 ? null : control('unfold ' + String(folded.length), () => setFolded([]), '展开所有分组'),
+        h(
+          'select',
+          {
+            value: scheme,
+            title: '配色',
+            style: { marginLeft: 'auto', fontSize: '11px', padding: '1px 4px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text },
+            onChange: (event: { target?: { value?: unknown } }) => setScheme(String(event?.target?.value ?? 'default') as PaletteScheme),
+          },
+          ...schemeNames().map((name) => h('option', { value: name, selected: name === scheme }, name)),
+        ),
+      ),
+      h(
+        'div',
+        { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+        control(annotate ? '批注: 开' : '批注', () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } }, '点一个节点给它写批注'),
+        h('span', { style: { fontSize: '11px', color: TOKEN.dim } }, annotate ? (picked === null ? '点一个节点' : '节点 ' + picked.id) : '点「批注」后点节点'),
       ),
     )
     return h(
