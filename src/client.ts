@@ -325,6 +325,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const caption = typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
   const [open, setOpen] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [full, setFull] = useState(false)
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
     // The block joins the message, it is not its own turn: one Return sends the annotations and the reader's words.
     const said = prependBlock(document, list, caption)
@@ -362,11 +364,11 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
         { floating: false },
       )
     : null
-  return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel)
+  return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel, { zoom: Number(zoom), full: Boolean(full), onZoom: (next: number) => setZoom(next), onFull: (next: boolean) => setFull(next) })
 }
 
 /** The drawing itself, plus whatever the reader is doing to it. One surface, drawn once. */
-function cardSurface(React: ReactLike, source: unknown, returned: string | null, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown): unknown {
+function cardSurface(React: ReactLike, source: unknown, returned: string | null, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown, view: { zoom: number; full: boolean; onZoom: (next: number) => void; onFull: (next: boolean) => void } = { zoom: 1, full: false, onZoom: () => {}, onFull: () => {} }): unknown {
   if (returned === null && (typeof source !== 'string' || source.trim() === '')) {
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call')
   }
@@ -380,16 +382,47 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
   const refused =
     drawn.refused.length === 0
       ? null
-      : React.createElement('pre', { style: { fontSize: '11px', color: '#b7791f', whiteSpace: 'pre-wrap', margin: '6px 0' } }, drawn.refused.join(String.fromCharCode(10)))
-  const drawing = onClick === null
-    ? React.createElement('div', { dangerouslySetInnerHTML: { __html: scaled } })
-    : React.createElement('div', { onClick: onClick as never, style: { cursor: 'crosshair' }, dangerouslySetInnerHTML: { __html: scaled } })
-  const children = [toggle, drawing, refused, panel].filter((child) => child !== null)
-  return React.createElement(
+      : React.createElement('pre', { style: { fontSize: '11px', color: '#b7791f', whiteSpace: 'pre-wrap', margin: '6px 8px' } }, drawn.refused.join(String.fromCharCode(10)))
+  // Chrome in the host's own colours and type, so the card reads as another code card rather than a plugin:
+  // a header line with the drawing's name and its controls, then the picture on its own background.
+  const chrome = { border: '1px solid ' + TOKEN.border, borderRadius: '8px', overflow: 'hidden', background: TOKEN.surface, color: TOKEN.text }
+  const button = (label: string, onPress: () => void, title: string): unknown =>
+    React.createElement('button', { type: 'button', title, onClick: onPress, style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '5px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, label)
+  const header = React.createElement(
     'div',
-    { style: { display: 'flex', flexDirection: 'column', gap: '4px', background: drawn.colours.background, color: drawn.colours.text, borderRadius: '6px', overflow: 'auto' } },
-    ...children,
+    { style: { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 8px', borderBottom: '1px solid ' + TOKEN.border, fontSize: '12px', color: TOKEN.dim } },
+    React.createElement('span', null, 'Diagram'),
+    React.createElement('span', { style: { opacity: 0.7 } }, typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''),
+    React.createElement(
+      'span',
+      { style: { marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' } },
+      button('−', () => view.onZoom(Math.max(0.5, Math.round((view.zoom - 0.25) * 100) / 100)), '缩小'),
+      button(Math.round(view.zoom * 100) + '%', () => view.onZoom(1), '实际大小'),
+      button('+', () => view.onZoom(Math.min(3, Math.round((view.zoom + 0.25) * 100) / 100)), '放大'),
+      button(view.full ? '⤡ 退出' : '⤢ 全屏', () => view.onFull(!view.full), '全屏查看'),
+      toggle,
+    ),
   )
+  // Zoom scales the wrapper, not the markup: the SVG is written at one size and the card is what has to fit a
+  // column, a split pane, or a screen.
+  const drawing = React.createElement(
+    'div',
+    {
+      style: { width: Math.round(view.zoom * 100) + '%', cursor: onClick === null ? undefined : 'crosshair' },
+      onClick: onClick === null ? undefined : (onClick as never),
+      dangerouslySetInnerHTML: { __html: scaled },
+    },
+  )
+  const body = React.createElement(
+    'div',
+    { style: { background: drawn.colours.background, padding: '6px', maxHeight: view.full ? 'none' : '260px', overflow: 'auto', flex: '1 1 auto', minHeight: '0' } },
+    drawing,
+  )
+  const frame = view.full
+    ? { position: 'fixed' as const, inset: '16px', zIndex: 60, display: 'flex', flexDirection: 'column', ...chrome, boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }
+    : { display: 'flex', flexDirection: 'column', ...chrome }
+  const children = [header, body, refused, panel].filter((child) => child !== null)
+  return React.createElement('div', { style: frame }, ...children)
 }
 
 /**
@@ -585,10 +618,15 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
                 // Beside the node, not at a fixed corner: the note is about that box, and a window that jumps to
                 // the corner makes the reader look for it. Coordinates are the drawing's own, because the editor
                 // is positioned against the pane the drawing sits in.
-                const box = node?.getBoundingClientRect?.()
-                const frame = (event as { currentTarget?: { getBoundingClientRect?: () => { left: number; top: number } } })?.currentTarget?.getBoundingClientRect?.()
-                if (box !== undefined && frame !== undefined) {
-                  setAnchor({ left: Math.max(4, box.left - frame.left + box.width + 8), top: Math.max(4, box.top - frame.top) })
+                // At the pointer, not at the node's corner: the reader clicked there, and a window that appears
+                // somewhere else makes them look for it. Clamped so it cannot leave the pane on the right.
+                const pointer = event as { clientX?: number; clientY?: number; currentTarget?: { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } } }
+                const frame = pointer.currentTarget?.getBoundingClientRect?.()
+                if (frame !== undefined && typeof pointer.clientX === 'number' && typeof pointer.clientY === 'number') {
+                  setAnchor({
+                    left: Math.max(4, Math.min(pointer.clientX - frame.left + 12, frame.width - 270)),
+                    top: Math.max(4, Math.min(pointer.clientY - frame.top + 12, Math.max(4, frame.height - 160))),
+                  })
                 } else {
                   setAnchor({ left: 10, top: 10 })
                 }
