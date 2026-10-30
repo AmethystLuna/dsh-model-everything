@@ -301,36 +301,59 @@ test('the card finds the source in whatever shape the settled block carries', ()
   }
 })
 
-test('a sent annotation is folded behind its count, once', () => {
-  const inserted = []
-  const quote = {
-    textContent: 'Diagram annotations - 2 items (numbers match the picture).',
-    style: {},
-    attrs: {},
-    getAttribute(name) { return this.attrs[name] }, 
-    setAttribute(name, value) { this.attrs[name] = value },
-    parentNode: { insertBefore(node, before) { inserted.push([node, before]) } },
-  }
+test('a sent annotation is folded to the reader question, behind its count, once', () => {
+  const block = [
+    'Diagram annotations - 2 items (numbers match the picture).',
+    'Please answer each item separately, and start each answer with "Annotation N:".',
+    'Drawing: graph LR',
+    '',
+    '1. node D',
+    '   Note: 测试',
+    '',
+    'Question: 这里为什么要拆开？',
+  ].join(String.fromCharCode(10))
   const chips = []
-  const doc = {
-    querySelectorAll: () => [quote],
-    createElement: () => { const chip = { style: {}, attrs: {}, setAttribute(name, value) { this.attrs[name] = value }, handlers: [], addEventListener(_type, handler) { this.handlers.push(handler) } }; chips.push(chip); return chip },
+  const node = {
+    textContent: block,
+    attrs: {},
+    children: [],
+    getAttribute(name) { return this.attrs[name] },
+    setAttribute(name, value) { this.attrs[name] = value },
+    querySelector() { return null },
+    appendChild(child) { this.children.push(child) },
   }
-  if (annotationCountOf(quote.textContent) !== 2) throw new Error('the count was not read')
+  const doc = {
+    querySelectorAll: () => [node],
+    createElement: () => {
+      const chip = { textContent: '', attrs: {}, handlers: [], setAttribute(name, value) { this.attrs[name] = value }, addEventListener(_type, handler) { this.handlers.push(handler) } }
+      chips.push(chip)
+      return chip
+    },
+  }
+  if (annotationCountOf(block) !== 2) throw new Error('the count was not read')
   if (decorateTranscript(doc, 'Notes') !== 1) throw new Error('nothing was folded')
-  if (quote.style.display !== 'none') throw new Error('the protocol block is still showing')
-  if (inserted.length !== 1) throw new Error('chips inserted: ' + String(inserted.length))
+  if (node.textContent !== '这里为什么要拆开？') throw new Error('the bubble kept the protocol: ' + JSON.stringify(node.textContent))
   if (!chips[0].textContent.includes('×2')) throw new Error('the chip does not carry the count: ' + chips[0].textContent)
   if (decorateTranscript(doc, 'Notes') !== 0) throw new Error('a second pass stacked another chip')
   chips[0].handlers[0]()
-  if (quote.style.display !== '') throw new Error('the chip does not reveal the block')
+  if (node.textContent !== block) throw new Error('the chip does not put the block back')
+  chips[0].handlers[0]()
+  if (node.textContent !== '这里为什么要拆开？') throw new Error('the chip does not fold again')
 })
 
-test('a quote that is not an annotation is left alone', () => {
-  const quote = { textContent: 'just a quotation', style: {}, attrs: {}, getAttribute() { return null }, setAttribute() {}, parentNode: { insertBefore() {} } }
-  const doc = { querySelectorAll: () => [quote], createElement: () => ({ style: {}, setAttribute() {}, addEventListener() {} }) }
-  if (decorateTranscript(doc) !== 0) throw new Error('an ordinary quote was folded')
-  if (quote.style.display !== undefined) throw new Error('an ordinary quote was hidden')
+test('a message that is not an annotation is left alone', () => {
+  const node = { textContent: 'just a sentence', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelector() { return null }, appendChild() {} }
+  const doc = { querySelectorAll: () => [node], createElement: () => ({ setAttribute() {}, addEventListener() {} }) }
+  if (decorateTranscript(doc) !== 0) throw new Error('an ordinary message was folded')
+  if (node.textContent !== 'just a sentence') throw new Error('an ordinary message was rewritten')
+})
+
+test('a container that also holds the marker is not the element to touch', () => {
+  const inner = { textContent: 'Diagram annotations - 1 item. Question: why?', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelector() { return null }, appendChild() {} }
+  const outer = { textContent: inner.textContent, attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelector() { return inner }, appendChild() {} }
+  const doc = { querySelectorAll: () => [outer, inner], createElement: () => ({ setAttribute() {}, addEventListener() {} }) }
+  if (decorateTranscript(doc) !== 1) throw new Error('the wrong number of elements was folded')
+  if (outer.textContent !== 'Diagram annotations - 1 item. Question: why?') throw new Error('the container was rewritten')
 })
 
 test('the card calls the same hooks whether or not a call has settled', () => {
