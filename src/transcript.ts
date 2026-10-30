@@ -36,6 +36,7 @@ export interface TranscriptNode {
   removeAttribute?: (name: string) => void
   addEventListener?: (type: string, handler: () => void) => void
   querySelector?: (selector: string) => TranscriptNode | null
+  querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>
   appendChild?: (node: TranscriptNode) => unknown
   parentNode?: { insertBefore?: (node: TranscriptNode, before: TranscriptNode) => unknown } | null
 }
@@ -55,6 +56,16 @@ export function annotationCountOf(text: string): number | null {
 export function questionOf(text: string): string {
   const at = text.lastIndexOf(QUESTION)
   return at === -1 ? '' : text.slice(at + QUESTION.length).trim()
+}
+
+function holdsAnotherBlock(node: TranscriptNode): boolean {
+  const inner = node.querySelectorAll?.(SELECTOR)
+  if (inner === undefined || inner === null) return false
+  for (let index = 0; index < inner.length; index += 1) {
+    const text = inner[index].textContent
+    if (typeof text === 'string' && text.indexOf(TRANSCRIPT_MARKER) !== -1) return true
+  }
+  return false
 }
 
 function chipFor(doc: TranscriptDocument, node: TranscriptNode, label: string, foldLabel: string): TranscriptNode | undefined {
@@ -111,14 +122,10 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
     const text = typeof node.textContent === 'string' ? node.textContent : ''
     if (!text.includes(TRANSCRIPT_MARKER)) continue
     if (node.getAttribute?.(HANDLED) === '1') continue
-    // A container also contains the marker; the deepest element is the one holding the message's own text.
-    let deeper = false
-    try {
-      deeper = node.querySelector?.(SELECTOR) !== null && node.querySelector?.(SELECTOR) !== undefined
-    } catch {
-      deeper = false
-    }
-    if (deeper) continue
+    // A container holds the marker too, and rewriting its text would take the rest of the message with it. What
+    // makes it a container is not that it has children - every bubble has children - but that a descendant is
+    // itself a block.
+    if (holdsAnotherBlock(node)) continue
     const count = annotationCountOf(text)
     const question = questionOf(text)
     const chip = chipFor(doc, node, label + (count === null ? '' : ' ×' + String(count)), foldLabel)

@@ -23,6 +23,7 @@ export interface TranscriptNode {
     removeAttribute?: (name: string) => void;
     addEventListener?: (type: string, handler: () => void) => void;
     querySelector?: (selector: string) => TranscriptNode | null;
+    querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>;
     appendChild?: (node: TranscriptNode) => unknown;
     parentNode?: {
         insertBefore?: (node: TranscriptNode, before: TranscriptNode) => unknown;

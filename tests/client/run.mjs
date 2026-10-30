@@ -319,7 +319,7 @@ test('a sent annotation is folded to the reader question, behind its count, once
     children: [],
     getAttribute(name) { return this.attrs[name] },
     setAttribute(name, value) { this.attrs[name] = value },
-    querySelector() { return null },
+    querySelectorAll() { return [] },
     appendChild(child) { this.children.push(child) },
   }
   const doc = {
@@ -342,15 +342,15 @@ test('a sent annotation is folded to the reader question, behind its count, once
 })
 
 test('a message that is not an annotation is left alone', () => {
-  const node = { textContent: 'just a sentence', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelector() { return null }, appendChild() {} }
+  const node = { textContent: 'just a sentence', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [] }, appendChild() {} }
   const doc = { querySelectorAll: () => [node], createElement: () => ({ setAttribute() {}, addEventListener() {} }) }
   if (decorateTranscript(doc) !== 0) throw new Error('an ordinary message was folded')
   if (node.textContent !== 'just a sentence') throw new Error('an ordinary message was rewritten')
 })
 
 test('a container that also holds the marker is not the element to touch', () => {
-  const inner = { textContent: 'Diagram annotations - 1 item. Question: why?', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelector() { return null }, appendChild() {} }
-  const outer = { textContent: inner.textContent, attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelector() { return inner }, appendChild() {} }
+  const inner = { textContent: 'Diagram annotations - 1 item. Question: why?', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [] }, appendChild() {} }
+  const outer = { textContent: inner.textContent, attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [inner] }, appendChild() {} }
   const doc = { querySelectorAll: () => [outer, inner], createElement: () => ({ setAttribute() {}, addEventListener() {} }) }
   if (decorateTranscript(doc) !== 1) throw new Error('the wrong number of elements was folded')
   if (outer.textContent !== 'Diagram annotations - 1 item. Question: why?') throw new Error('the container was rewritten')
