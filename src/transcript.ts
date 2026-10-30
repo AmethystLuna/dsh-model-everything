@@ -27,6 +27,25 @@ const ORIGINAL = 'data-dme-annotation-text'
 /** Elements whose text can be the message. Nested containers are excluded by the descendant test below. */
 const SELECTOR = 'div, p, span, li'
 
+/**
+ * Another plugin's territory, which this one must never touch.
+ *
+ * The shipped annotation plugin marks its own nodes `data-annotation-*` and folds its own blocks by their own
+ * markers. Two plugins doing DOM work in the same transcript collide in exactly three ways: they fight over the
+ * same message element, they overwrite each other's chip, and they both react to the other's mutations. The
+ * rules this file follows, and that a future change here has to keep:
+ *
+ * 1. only our own marker starts work - `Diagram annotations -`, never a generic word like "annotation";
+ * 2. every attribute we add is `data-dme-*`, and anything already carrying `data-annotation-*` is skipped;
+ * 3. our inserted nodes carry `data-dme-own`, so a neighbouring plugin can skip them as easily as we skip its;
+ * 4. one pass over a message, marked, so a second plugin's re-render cannot make us fold the same block twice.
+ *
+ * The draft is the fourth surface: both plugins write it through the host's `setDraft`, and a blind overwrite
+ * would drop the other's block. `placeBlock` re-reads the draft immediately before writing and prepends,
+ * keeping the rest verbatim - never a replace.
+ */
+const FOREIGN = '[data-annotation-for-dsh], [data-annotation-overlay], [data-annotation-chip], [data-annotation-tip-layer]'
+
 const BORDER = '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35))'
 
 export interface TranscriptNode {
@@ -39,6 +58,7 @@ export interface TranscriptNode {
   addEventListener?: (type: string, handler: () => void) => void
   querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>
   getBoundingClientRect?: () => { left: number; top: number; width: number; height: number }
+  closest?: (selector: string) => TranscriptNode | null
   childNodes?: ArrayLike<TranscriptNode>
   nextSibling?: TranscriptNode | null
   appendChild?: (node: TranscriptNode) => unknown
@@ -128,6 +148,14 @@ export function cutTextNodes(nodes: TranscriptNode[], cut: number): boolean {
     position += length
   }
   return done
+}
+
+/** Whether another plugin owns this node, or any of its ancestors. */
+function isForeign(node: TranscriptNode): boolean {
+  const inside = node.closest?.(FOREIGN)
+  if (inside !== undefined && inside !== null) return true
+  const marked = node.getAttribute?.('data-annotation-for-dsh')
+  return marked !== undefined && marked !== null
 }
 
 function holdsAnotherBlock(node: TranscriptNode): boolean {
@@ -248,6 +276,9 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
     const text = typeof element.textContent === 'string' ? element.textContent : ''
     if (!text.includes(TRANSCRIPT_MARKER)) continue
     if (element.getAttribute?.(HANDLED) === '1') continue
+    // Another plugin's node: it may be folding its own block in the same message, and two folders would take
+    // turns rewriting each other's text.
+    if (isForeign(element)) continue
     if (holdsAnotherBlock(element)) continue
     const texts = textNodesOf(element)
     if (texts.length === 0) continue

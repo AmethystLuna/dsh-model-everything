@@ -379,6 +379,26 @@ test('a container that also holds the marker is not the element to touch', () =>
   if (innerText.nodeValue !== 'why?') throw new Error('the deepest element was not the one folded: ' + JSON.stringify(innerText.nodeValue))
 })
 
+test('a node another plugin owns is left to that plugin', () => {
+  // The shipped annotation plugin marks its nodes data-annotation-*; two folders on one message would take
+  // turns rewriting each other's text.
+  const block = 'Diagram annotations - 1 item. Question: why?'
+  const textNode = { nodeType: 3, nodeValue: block }
+  const node = {
+    textContent: block,
+    attrs: {},
+    childNodes: [textNode],
+    parentNode: { insertBefore() {} },
+    getAttribute(name) { return this.attrs[name] },
+    setAttribute(name, value) { this.attrs[name] = value },
+    querySelectorAll() { return [] },
+    closest(selector) { return selector.includes('data-annotation') ? {} : null },
+  }
+  const doc = { querySelectorAll: () => [node], createElement: () => ({ textContent: '', style: {}, setAttribute() {}, addEventListener() {}, appendChild() {} }) }
+  if (decorateTranscript(doc) !== 0) throw new Error('a foreign node was folded')
+  if (textNode.nodeValue !== block) throw new Error('a foreign node was rewritten')
+})
+
 test('the card calls the same hooks whether or not a call has settled', () => {
   // A running call has no source and a settled one does. A hook that appears between those renders throws
   // 'rendered more hooks than during the previous render', and React takes the conversation view with it.

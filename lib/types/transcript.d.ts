@@ -30,6 +30,7 @@ export interface TranscriptNode {
         width: number;
         height: number;
     };
+    closest?: (selector: string) => TranscriptNode | null;
     childNodes?: ArrayLike<TranscriptNode>;
     nextSibling?: TranscriptNode | null;
     appendChild?: (node: TranscriptNode) => unknown;
