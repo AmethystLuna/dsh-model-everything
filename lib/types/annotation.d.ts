@@ -31,11 +31,12 @@ export interface Annotation {
  *
  * One message for N notes, with a fixed opening so both the reader and the model know what they are looking
  * at: a note arrives without the picture, so the block says what it is about, which drawing, and that every
- * numbered item is a separate answer. The shape follows the annotation plugin this harness already ships - an
- * opening sentence, numbered items, a question line - and it stays English: this is protocol between reader
- * and model, not interface chrome that follows the page's language.
+ * numbered item is a separate answer. The shape follows the annotation plugin this harness already ships -
+ * an opening sentence, numbered items, a question line - and it stays English: this is protocol between
+ * reader and model, not interface chrome that follows the page's language.
  *
- * Markdown-quoted, so the conversation renders it as a quote rather than as a wall of the reader's own words.
+ * Plain lines, not a markdown quote: the reader's bubble is rendered as one text node, so a quote never
+ * becomes a quote there - it would only show its own `>` characters. The bubble is folded afterwards.
  * A blank note is not dropped: 'marked, no note' and 'marked with this note' are different messages.
  */
 export declare function annotationBlock(annotations: Annotation[]): string;

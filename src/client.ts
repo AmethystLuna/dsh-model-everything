@@ -17,7 +17,7 @@ import { palette, schemeNames, type Palette, type PaletteMode, type PaletteSchem
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
+import { annotationBlock, annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, type DocumentLike } from './annotation.js'
 import { startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
 
 export interface ReactLike {
@@ -375,7 +375,14 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [zoom, setZoom] = useState(1)
   const [full, setFull] = useState(false)
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
-    // The block joins the message, it is not its own turn: one Return sends the annotations and the reader's words.
+    if (list.length === 0) return
+    // Same order as the whiteboard: the host's draft writer keeps the line breaks, the composer is the fallback.
+    if (placeBlock(annotationBlock(list.map((item) => ({ ...item, caption }))))) {
+      setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+      setPending([])
+      submitDraft()
+      return
+    }
     const said = prependBlock(document, list, caption)
     setStatus(said)
     if (!said.startsWith('已')) return
@@ -492,6 +499,88 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
  * pins with an injection case.
  */
 /** Where the page thinks it is, short enough to read in a status line. */
+/**
+ * The session the page is showing, asked of the client services in the order that actually answers.
+ *
+ * The address carries no id on this host; the store does. Fourth place is the host's own recorded selection,
+ * which is what the shipped annotation plugin falls back to when the first three are silent - a session id is
+ * the one thing every path here needs.
+ */
+function currentSessionId(): string | undefined {
+  const sessions = services?.get?.('sessions') as { list?: { getSnapshot?: () => { current?: unknown } } } | undefined
+  const snapshot = sessions?.list?.getSnapshot?.()
+  if (typeof snapshot?.current === 'string' && snapshot.current !== '') return snapshot.current
+  const workspace = services?.get?.('uiWorkspace') as {
+    mainReference?: { sessionId?: unknown }
+    selection?: { getSnapshot?: () => { sessionId?: unknown } }
+  } | undefined
+  const main = workspace?.mainReference?.sessionId
+  if (typeof main === 'string' && main !== '') return main
+  const picked = workspace?.selection?.getSnapshot?.()?.sessionId
+  if (typeof picked === 'string' && picked !== '') return picked
+  const storage = (globalThis as { localStorage?: { getItem?: (key: string) => string | null } }).localStorage
+  const raw = storage?.getItem?.('dsh.sessions.current')
+  if (typeof raw === 'string' && raw !== '') {
+    try {
+      const parsed = JSON.parse(raw) as { sessionId?: unknown }
+      if (typeof parsed?.sessionId === 'string' && parsed.sessionId !== '') return parsed.sessionId
+    } catch {
+      // A key that is not the shape we expect is simply not an answer.
+    }
+  }
+  return undefined
+}
+
+/** The conversation's draft, when this host exposes it: the one writer that keeps line breaks intact. */
+interface DraftShell {
+  state?: { getSnapshot?: () => { draft?: unknown } }
+  setDraft?: (text: string) => void
+  submit?: (mode?: string) => void
+}
+
+function draftShell(): DraftShell | undefined {
+  const conversation = services?.get?.('conversation') as { input?: { for?: (scope: unknown) => DraftShell } } | undefined
+  const sessions = services?.get?.('sessions') as { scope?: (id: string) => unknown } | undefined
+  if (conversation?.input?.for === undefined || sessions?.scope === undefined) return undefined
+  const id = currentSessionId()
+  if (id === undefined) return undefined
+  try {
+    return conversation.input.for(sessions.scope(id))
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Put the block at the top of the draft through the host, and answer whether it landed.
+ *
+ * The composer's DOM is the wrong writer: a contenteditable keeps line breaks in its own model, and reaching into
+ * it produced one long line. The host's draft setter is the same writer the reader's keystrokes use.
+ */
+function placeBlock(text: string): boolean {
+  const shell = draftShell()
+  if (shell === undefined || typeof shell.setDraft !== 'function') return false
+  const current = typeof shell.state?.getSnapshot?.()?.draft === 'string' ? String(shell.state.getSnapshot()!.draft) : ''
+  try {
+    shell.setDraft(current.trim() === '' ? text : text + String.fromCharCode(10, 10) + current)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Ask the host to submit the draft it now holds. */
+function submitDraft(): boolean {
+  const shell = draftShell()
+  if (shell === undefined || typeof shell.submit !== 'function') return false
+  try {
+    shell.submit('queue')
+    return true
+  } catch {
+    return false
+  }
+}
+
 function shortAddress(location: { pathname?: string; search?: string } | undefined): string {
   if (location === undefined) return 'no location'
   return ((location.pathname ?? '') + (location.search ?? '')).slice(0, 80)
@@ -593,7 +682,15 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const caption = source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? ''
     // The notes accumulate here; one structured message leaves for the session, not one raw fragment per note.
     const sendAll = (list: Array<{ nodeId: string; note: string }>, submit: boolean): void => {
-      // Placed, not sent: the block joins the reader's own words in the box, and Return sends both together.
+      if (list.length === 0) return
+      // The host's own draft writer first: it is the writer the reader's keystrokes use, so line breaks survive.
+      // The composer is the fallback for a host that exposes no conversation service.
+      if (placeBlock(annotationBlock(list.map((item) => ({ ...item, caption }))))) {
+        setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+        setPending([])
+        if (submit) submitDraft()
+        return
+      }
       const said = prependBlock(document, list, caption)
       setStatus(said)
       if (!said.startsWith('已')) return
