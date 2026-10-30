@@ -438,10 +438,28 @@ test('an empty box takes the note as it is, with no stray blank line', () => {
   if (blank.value !== 'note') throw new Error('a whitespace draft was kept: ' + JSON.stringify(blank.value))
 })
 
-test('a rich editor gets one paragraph per line, not one long run', () => {
+test('a rich editor gets the block as html, with breaks kept and the quote marker escaped', () => {
   const calls = []
   const previous = globalThis.document
   globalThis.document = { execCommand: (command, _ui, value) => { calls.push([command, value]); return true } }
+  try {
+    const editable = { tagName: 'DIV', textContent: '', dispatchEvent: () => true, focus: () => {} }
+    const doc = { querySelector: (selector) => (selector.includes('contenteditable') ? editable : null) }
+    const block = '> a' + String.fromCharCode(10) + '> b'
+    if (fillComposer(doc, block) !== 'filled') throw new Error('the surface was not filled')
+    const html = calls.filter(([command]) => command === 'insertHTML').map(([, value]) => value)
+    if (html.length !== 1) throw new Error('html inserts: ' + String(html.length))
+    if (!html[0].includes('<br>')) throw new Error('the line break was dropped: ' + html[0])
+    if (!html[0].includes('&gt; a')) throw new Error('the quote marker was not escaped: ' + html[0])
+  } finally {
+    globalThis.document = previous
+  }
+})
+
+test('an editor that refuses html still gets one paragraph per line', () => {
+  const calls = []
+  const previous = globalThis.document
+  globalThis.document = { execCommand: (command, _ui, value) => { calls.push([command, value]); return command !== 'insertHTML' } }
   try {
     const editable = { tagName: 'DIV', textContent: '', dispatchEvent: () => true, focus: () => {} }
     const doc = { querySelector: (selector) => (selector.includes('contenteditable') ? editable : null) }

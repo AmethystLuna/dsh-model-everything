@@ -184,6 +184,17 @@ export function fillComposer(doc: DocumentLike | undefined, text: string): Place
     // One insertText per line, with a paragraph between them: a rich editor stores line breaks in its own
     // model, so a single insertText carrying a newline lands as one run of characters - which is exactly
     // what the first live test showed.
+    // HTML first: an editor that accepts `insertHTML` keeps the breaks as breaks, and the `>` that opens a
+    // markdown quote arrives as text because it is escaped. The measured failure before this was a block that
+    // reached the session as one long line with its quotes glued together.
+    const escapeHtml = (value: string): string =>
+      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const insertHtml = (): boolean => {
+      const command = editing.document?.execCommand
+      if (command === undefined || editing.document === undefined) return false
+      const html = text.split(String.fromCharCode(10)).map(escapeHtml).join('<br>')
+      return command.call(editing.document, 'insertHTML', false, html) === true
+    }
     const insertLines = (): boolean => {
       const command = editing.document?.execCommand
       if (command === undefined || editing.document === undefined) return false
@@ -194,7 +205,7 @@ export function fillComposer(doc: DocumentLike | undefined, text: string): Place
       }
       return true
     }
-    const inserted = insertLines()
+    const inserted = insertHtml() || insertLines()
     if (!inserted) {
       const current = typeof composer.textContent === 'string' ? composer.textContent : ''
       composer.textContent = current.trim() === '' ? text : current.replace(/\s*$/, '') + '\n\n' + text
