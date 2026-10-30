@@ -6,9 +6,9 @@
  * note about one node, and what landed is a page of protocol.
  *
  * The host renders a user message as one text node, not as markdown, so there is nothing to address by tag: the
- * decorator finds the element whose text starts with the block's opening line, cuts the block out of that text and
- * leaves the reader's question with a chip that can put the block back. This is the same trade the shipped
- * annotation plugin makes, and it is the only hook a bundle has on a message it did not render.
+ * decorator finds the deepest element whose text carries the block's opening line, cuts the block out of that
+ * text, and leaves the reader's question plus a count. Hovering the count opens a card that lists the notes - the
+ * shape the shipped annotation plugin uses, and the only hook a bundle has on a message it did not render.
  *
  * Everything here is defensive: a page without the elements, an element without text, an element already handled.
  * A decorator that throws would take a render pass with it.
@@ -20,10 +20,15 @@ export interface TranscriptNode {
     style?: Record<string, string | undefined>;
     setAttribute?: (name: string, value: string) => void;
     getAttribute?: (name: string) => string | null;
-    removeAttribute?: (name: string) => void;
     addEventListener?: (type: string, handler: () => void) => void;
     querySelector?: (selector: string) => TranscriptNode | null;
     querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>;
+    getBoundingClientRect?: () => {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+    };
     appendChild?: (node: TranscriptNode) => unknown;
     parentNode?: {
         insertBefore?: (node: TranscriptNode, before: TranscriptNode) => unknown;
@@ -33,22 +38,34 @@ export interface TranscriptDocument {
     querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>;
     createElement?: (tag: string) => TranscriptNode;
 }
+/** One note as the block states it. */
+export interface AnnotationItem {
+    index: number;
+    node: string;
+    note: string;
+}
 /** The count in the opening line, for the chip; null when the line says something unexpected. */
 export declare function annotationCountOf(text: string): number | null;
 /** The reader's own words: what follows the question line, or nothing when the note was the whole message. */
 export declare function questionOf(text: string): string;
 /**
+ * The notes the block carries, read back out of its lines.
+ *
+ * The card shows the same items the model received, not a summary of them: a reader who wants to check what was
+ * sent should see exactly what was sent.
+ */
+export declare function itemsOf(text: string): AnnotationItem[];
+/**
  * Fold every annotation message in the transcript behind its count, and answer how many were folded.
  *
  * Idempotent: an element that already carries the marker is skipped, so the observer can call this on every
- * change without stacking chips. Only the deepest element carrying the marker is touched, because a container
- * would take the rest of the conversation with it.
+ * change without stacking chips. Only the element whose text is the message is touched, never a container.
  */
-export declare function decorateTranscript(doc: TranscriptDocument | undefined, label?: string, foldLabel?: string): number;
+export declare function decorateTranscript(doc: TranscriptDocument | undefined, label?: string, title?: string): number;
 /**
  * Fold now, and again whenever the conversation changes.
  *
  * A sent message is rendered by the host, not by this plugin, so watching is the only way to act on it. The
  * observer is coalesced by the browser and the work is idempotent, so a busy transcript costs a scan per change.
  */
-export declare function startTranscriptDecoration(doc: TranscriptDocument | undefined, label?: string, foldLabel?: string): () => void;
+export declare function startTranscriptDecoration(doc: TranscriptDocument | undefined, label?: string, title?: string): () => void;

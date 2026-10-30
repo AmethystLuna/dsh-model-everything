@@ -153,6 +153,7 @@ const MESSAGES = {
   markedOnly: { en: '(marked only)', zh: '(只标记)' },
   pending: { en: 'Notes', zh: '图注' },
   fold: { en: 'hide', zh: '收起' },
+  carried: { en: 'Notes in this message', zh: '本消息携带图注' },
   zoomOut: { en: 'Zoom out', zh: '缩小' },
   zoomIn: { en: 'Zoom in', zh: '放大' },
   actualSize: { en: 'Actual size', zh: '实际大小' },
@@ -936,7 +937,7 @@ export default function factory(require: (name: string) => unknown): PluginShape
       services = ctx
       // A sent annotation is a long quote in the transcript; fold it behind its count as it appears.
       try {
-        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'), t('fold'))
+        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'), t('carried'))
       } catch {
         // A page without a document (a test) has nothing to decorate.
       }

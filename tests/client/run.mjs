@@ -14,7 +14,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 // The annotation module is imported directly: it decides what the message says and where it goes, and
 // neither question needs a page.
 const { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushNote, sessionFromLocation, withoutEmptyQuestion } = await import('../../lib/annotation.js')
-const { annotationCountOf, decorateTranscript } = await import('../../lib/transcript.js')
+const { annotationCountOf, decorateTranscript, itemsOf } = await import('../../lib/transcript.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
@@ -312,33 +312,43 @@ test('a sent annotation is folded to the reader question, behind its count, once
     '',
     'Question: 这里为什么要拆开？',
   ].join(String.fromCharCode(10))
-  const chips = []
-  const node = {
-    textContent: block,
+  const made = []
+  const element = () => ({
+    textContent: '',
     attrs: {},
     children: [],
+    style: {},
+    handlers: {},
     getAttribute(name) { return this.attrs[name] },
     setAttribute(name, value) { this.attrs[name] = value },
-    querySelectorAll() { return [] },
+    addEventListener(type, handler) { (this.handlers[type] = this.handlers[type] ?? []).push(handler) },
     appendChild(child) { this.children.push(child) },
-  }
+    getBoundingClientRect() { return { left: 40, top: 100, width: 60, height: 20 } },
+  })
+  const node = element()
+  node.textContent = block
+  node.querySelectorAll = () => []
   const doc = {
     querySelectorAll: () => [node],
-    createElement: () => {
-      const chip = { textContent: '', attrs: {}, handlers: [], setAttribute(name, value) { this.attrs[name] = value }, addEventListener(_type, handler) { this.handlers.push(handler) } }
-      chips.push(chip)
-      return chip
-    },
+    createElement: () => { const next = element(); made.push(next); return next },
   }
   if (annotationCountOf(block) !== 2) throw new Error('the count was not read')
+  const items = itemsOf(block)
+  if (items.length !== 1 || items[0].node !== 'D' || items[0].note !== '测试') throw new Error('the items were not read back: ' + JSON.stringify(items))
   if (decorateTranscript(doc, 'Notes') !== 1) throw new Error('nothing was folded')
   if (node.textContent !== '这里为什么要拆开？') throw new Error('the bubble kept the protocol: ' + JSON.stringify(node.textContent))
-  if (!chips[0].textContent.includes('×2')) throw new Error('the chip does not carry the count: ' + chips[0].textContent)
+  const chip = made.find((entry) => String(entry.textContent).includes('×2'))
+  if (chip === undefined) throw new Error('the chip does not carry the count')
   if (decorateTranscript(doc, 'Notes') !== 0) throw new Error('a second pass stacked another chip')
-  chips[0].handlers[0]()
-  if (node.textContent !== block) throw new Error('the chip does not put the block back')
-  chips[0].handlers[0]()
-  if (node.textContent !== '这里为什么要拆开？') throw new Error('the chip does not fold again')
+  // Hovering shows the card and hovering off hides it; the click path is for a touch screen.
+  chip.handlers.mouseenter[0]()
+  const card = chip.children[0]
+  if (card === undefined) throw new Error('the chip carries no card')
+  if (card.style.display !== 'block') throw new Error('hovering did not open the card: ' + card.style.display)
+  chip.handlers.mouseleave[0]()
+  if (card.style.display !== 'none') throw new Error('leaving did not close the card')
+  chip.handlers.click[0]()
+  if (card.style.display !== 'block') throw new Error('a click did not open the card')
 })
 
 test('a message that is not an annotation is left alone', () => {
