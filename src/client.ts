@@ -935,12 +935,11 @@ export default function factory(require: (name: string) => unknown): PluginShape
     mount: (ctx: SlotContext, options: MountOptions = {}) => mountWhiteboard(React, ctx, options),
     apply(ctx: SlotContext) {
       services = ctx
-      // A sent annotation is a long quote in the transcript; fold it behind its count as it appears.
-      try {
-        startTranscriptDecoration((globalThis as { document?: TranscriptDocumentForClient }).document, t('pending'), t('carried'))
-      } catch {
-        // A page without a document (a test) has nothing to decorate.
-      }
+      // The transcript fold is off. Rewriting the text of a message element changes DOM that React owns, and the
+      // conversation then renders from a virtual tree that no longer matches: whole assistant turns came back as
+      // one line. The decorator stays built and tested, but it is not started until there is a place to put a chip
+      // without touching a node the host manages.
+      void startTranscriptDecoration
       for (const name of TOOL_NAMES) {
         // Only the options a keyed slot declares: `key`. An extra `id` is not part of this slot's
         // registration schema, and the working community reference (dsh-deepread) passes exactly this much.
