@@ -325,8 +325,14 @@ test('a sent annotation is folded to the reader question, behind its count, once
     appendChild(child) { this.children.push(child) },
     getBoundingClientRect() { return { left: 40, top: 100, width: 60, height: 20 } },
   })
+  const textNode = { nodeType: 3, nodeValue: block }
+  const inserted = []
+  const parent = { insertBefore(node, before) { inserted.push([node, before]) } }
   const node = element()
   node.textContent = block
+  node.childNodes = [textNode]
+  node.parentNode = parent
+  node.nextSibling = 'sibling'
   node.querySelectorAll = () => []
   const doc = {
     querySelectorAll: () => [node],
@@ -336,7 +342,11 @@ test('a sent annotation is folded to the reader question, behind its count, once
   const items = itemsOf(block)
   if (items.length !== 1 || items[0].node !== 'D' || items[0].note !== '测试') throw new Error('the items were not read back: ' + JSON.stringify(items))
   if (decorateTranscript(doc, 'Notes') !== 1) throw new Error('nothing was folded')
-  if (node.textContent !== '这里为什么要拆开？') throw new Error('the bubble kept the protocol: ' + JSON.stringify(node.textContent))
+  // The text node is the only thing edited: the element keeps its children, which is what keeps React in step.
+  if (textNode.nodeValue !== '这里为什么要拆开？') throw new Error('the text node kept the protocol: ' + JSON.stringify(textNode.nodeValue))
+  if (node.childNodes.length !== 1) throw new Error('the element lost a child')
+  if (inserted.length !== 1) throw new Error('the chip was not inserted as a sibling: ' + String(inserted.length))
+  if (inserted[0][1] !== 'sibling') throw new Error('the chip was not placed after the element')
   const chip = made.find((entry) => String(entry.textContent).includes('×2'))
   if (chip === undefined) throw new Error('the chip does not carry the count')
   if (decorateTranscript(doc, 'Notes') !== 0) throw new Error('a second pass stacked another chip')
@@ -359,11 +369,14 @@ test('a message that is not an annotation is left alone', () => {
 })
 
 test('a container that also holds the marker is not the element to touch', () => {
-  const inner = { textContent: 'Diagram annotations - 1 item. Question: why?', attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [] }, appendChild() {} }
-  const outer = { textContent: inner.textContent, attrs: {}, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [inner] }, appendChild() {} }
-  const doc = { querySelectorAll: () => [outer, inner], createElement: () => ({ setAttribute() {}, addEventListener() {} }) }
+  const block = 'Diagram annotations - 1 item. Question: why?'
+  const innerText = { nodeType: 3, nodeValue: block }
+  const inner = { textContent: block, attrs: {}, childNodes: [innerText], nextSibling: null, parentNode: { insertBefore() {} }, getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [] } }
+  const outer = { textContent: block, attrs: {}, childNodes: [], getAttribute(name) { return this.attrs[name] }, setAttribute(name, value) { this.attrs[name] = value }, querySelectorAll() { return [inner] } }
+  const doc = { querySelectorAll: () => [outer, inner], createElement: () => ({ textContent: '', style: {}, setAttribute() {}, addEventListener() {}, appendChild() {} }) }
   if (decorateTranscript(doc) !== 1) throw new Error('the wrong number of elements was folded')
-  if (outer.textContent !== 'Diagram annotations - 1 item. Question: why?') throw new Error('the container was rewritten')
+  if (outer.textContent !== block) throw new Error('the container was rewritten')
+  if (innerText.nodeValue !== 'why?') throw new Error('the deepest element was not the one folded: ' + JSON.stringify(innerText.nodeValue))
 })
 
 test('the card calls the same hooks whether or not a call has settled', () => {

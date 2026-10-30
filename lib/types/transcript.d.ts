@@ -5,23 +5,24 @@
  * own words. That is the right thing for the model and the wrong thing to read as a human - the reader wrote one
  * note about one node, and what landed is a page of protocol.
  *
- * The host renders a user message as one text node, not as markdown, so there is nothing to address by tag: the
- * decorator finds the deepest element whose text carries the block's opening line, cuts the block out of that
- * text, and leaves the reader's question plus a count. Hovering the count opens a card that lists the notes - the
- * shape the shipped annotation plugin uses, and the only hook a bundle has on a message it did not render.
+ * The host renders a user message as text inside elements it owns and re-renders. So this never assigns an
+ * element's text: that deletes its children, React reconciles from a tree that no longer matches, and whole
+ * turns come back mangled. It edits the text NODES instead - trim the run before the cut, remove the runs that
+ * held the block - and puts the chip in as a sibling, exactly the way the shipped annotation plugin does it.
  *
- * Everything here is defensive: a page without the elements, an element without text, an element already handled.
- * A decorator that throws would take a render pass with it.
+ * Everything here is defensive: a page without the elements, an element without text nodes, an element already
+ * handled. A decorator that throws would take a render pass with it.
  */
 /** The first words of every annotation block, used to recognise one in the transcript. */
 export declare const TRANSCRIPT_MARKER = "Diagram annotations -";
 export interface TranscriptNode {
+    nodeType?: number;
+    nodeValue?: string | null;
     textContent?: string | null;
     style?: Record<string, string | undefined>;
     setAttribute?: (name: string, value: string) => void;
     getAttribute?: (name: string) => string | null;
     addEventListener?: (type: string, handler: () => void) => void;
-    querySelector?: (selector: string) => TranscriptNode | null;
     querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>;
     getBoundingClientRect?: () => {
         left: number;
@@ -29,9 +30,13 @@ export interface TranscriptNode {
         width: number;
         height: number;
     };
+    childNodes?: ArrayLike<TranscriptNode>;
+    nextSibling?: TranscriptNode | null;
     appendChild?: (node: TranscriptNode) => unknown;
+    removeChild?: (node: TranscriptNode) => unknown;
     parentNode?: {
-        insertBefore?: (node: TranscriptNode, before: TranscriptNode) => unknown;
+        insertBefore?: (node: TranscriptNode, before: TranscriptNode | null) => unknown;
+        removeChild?: (node: TranscriptNode) => unknown;
     } | null;
 }
 export interface TranscriptDocument {
@@ -48,24 +53,25 @@ export interface AnnotationItem {
 export declare function annotationCountOf(text: string): number | null;
 /** The reader's own words: what follows the question line, or nothing when the note was the whole message. */
 export declare function questionOf(text: string): string;
-/**
- * The notes the block carries, read back out of its lines.
- *
- * The card shows the same items the model received, not a summary of them: a reader who wants to check what was
- * sent should see exactly what was sent.
- */
+/** The notes the block carries, read back out of its lines, so a reader sees what the model saw. */
 export declare function itemsOf(text: string): AnnotationItem[];
+/**
+ * Drop everything before the cut from the text nodes, and leave the reader's own words.
+ *
+ * The nodes are the only thing written: an element's `textContent` would take its child elements with it.
+ */
+export declare function cutTextNodes(nodes: TranscriptNode[], cut: number): boolean;
 /**
  * Fold every annotation message in the transcript behind its count, and answer how many were folded.
  *
  * Idempotent: an element that already carries the marker is skipped, so the observer can call this on every
- * change without stacking chips. Only the element whose text is the message is touched, never a container.
+ * change without stacking chips. Only the element whose text is the message is touched, and only its text nodes.
  */
 export declare function decorateTranscript(doc: TranscriptDocument | undefined, label?: string, title?: string): number;
 /**
  * Fold now, and again whenever the conversation changes.
  *
- * A sent message is rendered by the host, not by this plugin, so watching is the only way to act on it. The
- * observer is coalesced by the browser and the work is idempotent, so a busy transcript costs a scan per change.
+ * A sent message is rendered by the host, so watching is the only way to act on it. The observer is coalesced by
+ * the browser, the work is idempotent, and a slow interval covers a page whose observer misses a batch.
  */
 export declare function startTranscriptDecoration(doc: TranscriptDocument | undefined, label?: string, title?: string): () => void;

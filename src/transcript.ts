@@ -5,13 +5,13 @@
  * own words. That is the right thing for the model and the wrong thing to read as a human - the reader wrote one
  * note about one node, and what landed is a page of protocol.
  *
- * The host renders a user message as one text node, not as markdown, so there is nothing to address by tag: the
- * decorator finds the deepest element whose text carries the block's opening line, cuts the block out of that
- * text, and leaves the reader's question plus a count. Hovering the count opens a card that lists the notes - the
- * shape the shipped annotation plugin uses, and the only hook a bundle has on a message it did not render.
+ * The host renders a user message as text inside elements it owns and re-renders. So this never assigns an
+ * element's text: that deletes its children, React reconciles from a tree that no longer matches, and whole
+ * turns come back mangled. It edits the text NODES instead - trim the run before the cut, remove the runs that
+ * held the block - and puts the chip in as a sibling, exactly the way the shipped annotation plugin does it.
  *
- * Everything here is defensive: a page without the elements, an element without text, an element already handled.
- * A decorator that throws would take a render pass with it.
+ * Everything here is defensive: a page without the elements, an element without text nodes, an element already
+ * handled. A decorator that throws would take a render pass with it.
  */
 
 /** The first words of every annotation block, used to recognise one in the transcript. */
@@ -30,16 +30,23 @@ const SELECTOR = 'div, p, span, li'
 const BORDER = '1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35))'
 
 export interface TranscriptNode {
+  nodeType?: number
+  nodeValue?: string | null
   textContent?: string | null
   style?: Record<string, string | undefined>
   setAttribute?: (name: string, value: string) => void
   getAttribute?: (name: string) => string | null
   addEventListener?: (type: string, handler: () => void) => void
-  querySelector?: (selector: string) => TranscriptNode | null
   querySelectorAll?: (selector: string) => ArrayLike<TranscriptNode>
   getBoundingClientRect?: () => { left: number; top: number; width: number; height: number }
+  childNodes?: ArrayLike<TranscriptNode>
+  nextSibling?: TranscriptNode | null
   appendChild?: (node: TranscriptNode) => unknown
-  parentNode?: { insertBefore?: (node: TranscriptNode, before: TranscriptNode) => unknown } | null
+  removeChild?: (node: TranscriptNode) => unknown
+  parentNode?: {
+    insertBefore?: (node: TranscriptNode, before: TranscriptNode | null) => unknown
+    removeChild?: (node: TranscriptNode) => unknown
+  } | null
 }
 
 export interface TranscriptDocument {
@@ -66,16 +73,10 @@ export function questionOf(text: string): string {
   return at === -1 ? '' : text.slice(at + QUESTION.length).trim()
 }
 
-/**
- * The notes the block carries, read back out of its lines.
- *
- * The card shows the same items the model received, not a summary of them: a reader who wants to check what was
- * sent should see exactly what was sent.
- */
+/** The notes the block carries, read back out of its lines, so a reader sees what the model saw. */
 export function itemsOf(text: string): AnnotationItem[] {
   const items: AnnotationItem[] = []
-  const lines = text.split(String.fromCharCode(10))
-  for (const raw of lines) {
+  for (const raw of text.split(String.fromCharCode(10))) {
     const line = raw.trim()
     const head = /^(\d+)\. node (.+)$/.exec(line)
     if (head !== null) {
@@ -88,6 +89,47 @@ export function itemsOf(text: string): AnnotationItem[] {
   return items
 }
 
+/** Every text node inside an element, in document order. */
+function textNodesOf(root: TranscriptNode): TranscriptNode[] {
+  const out: TranscriptNode[] = []
+  const visit = (node: TranscriptNode): void => {
+    const children = node.childNodes
+    if (children === undefined || children === null || children.length === 0) {
+      if (typeof node.nodeValue === 'string') out.push(node)
+      return
+    }
+    for (let index = 0; index < children.length; index += 1) visit(children[index])
+  }
+  visit(root)
+  return out
+}
+
+/**
+ * Drop everything before the cut from the text nodes, and leave the reader's own words.
+ *
+ * The nodes are the only thing written: an element's `textContent` would take its child elements with it.
+ */
+export function cutTextNodes(nodes: TranscriptNode[], cut: number): boolean {
+  let position = 0
+  let done = false
+  for (const node of nodes) {
+    const value = typeof node.nodeValue === 'string' ? node.nodeValue : ''
+    const length = value.length
+    if (done) {
+      position += length
+      continue
+    }
+    if (cut <= position + length) {
+      node.nodeValue = value.slice(cut - position).replace(/^\s+/, '')
+      done = true
+    } else {
+      node.nodeValue = ''
+    }
+    position += length
+  }
+  return done
+}
+
 function holdsAnotherBlock(node: TranscriptNode): boolean {
   const inner = node.querySelectorAll?.(SELECTOR)
   if (inner === undefined || inner === null) return false
@@ -98,8 +140,8 @@ function holdsAnotherBlock(node: TranscriptNode): boolean {
   return false
 }
 
-/** A card listing the notes, styled from the host's tokens so it reads as part of the page. */
-function cardFor(doc: TranscriptDocument, items: AnnotationItem[], title: string, full: string, ref: TranscriptDocument): TranscriptNode | undefined {
+/** The card listing the notes, styled from the host's tokens so it reads as part of the page. */
+function cardFor(doc: TranscriptDocument, items: AnnotationItem[], title: string, full: string): TranscriptNode | undefined {
   const card = doc.createElement?.('div')
   if (card === undefined) return undefined
   card.style = {
@@ -139,7 +181,6 @@ function cardFor(doc: TranscriptDocument, items: AnnotationItem[], title: string
     }
     card.appendChild?.(row)
   }
-  // The block itself is one click away, for a reader checking what exactly was sent.
   const more = doc.createElement?.('div')
   if (more !== undefined) {
     more.textContent = full
@@ -149,7 +190,6 @@ function cardFor(doc: TranscriptDocument, items: AnnotationItem[], title: string
     }
     card.appendChild?.(more)
   }
-  void ref
   return card
 }
 
@@ -166,30 +206,24 @@ function chipFor(doc: TranscriptDocument, label: string, title: string, text: st
     border: BORDER, background: 'var(--dsw-alias-bg-layer-2, rgba(127,127,127,0.10))',
     color: 'var(--dsw-alias-label-secondary, GrayText)', cursor: 'pointer', maxWidth: '100%',
   }
-  const items = itemsOf(text)
-  const card = cardFor(doc, items, title, text, doc)
+  const card = cardFor(doc, itemsOf(text), title, text)
   if (card === undefined) return chip
   const place = (): void => {
     const box = chip.getBoundingClientRect?.()
-    const cardStyle = card.style ?? {}
-    cardStyle.display = 'block'
-    if (box === undefined) return
-    cardStyle.left = String(Math.max(8, box.left)) + 'px'
-    cardStyle.top = String(box.top + box.height + 6) + 'px'
-    card.style = cardStyle
+    const next: Record<string, string | undefined> = { ...(card.style ?? {}), display: 'block' }
+    if (box !== undefined) {
+      next.left = String(Math.max(8, box.left)) + 'px'
+      next.top = String(box.top + box.height + 6) + 'px'
+    }
+    card.style = next
   }
-  const hide = (): void => {
-    const cardStyle = card.style ?? {}
-    cardStyle.display = 'none'
-    card.style = cardStyle
-  }
+  const hide = (): void => { card.style = { ...(card.style ?? {}), display: 'none' } }
   chip.addEventListener?.('mouseenter', place)
   chip.addEventListener?.('mouseleave', hide)
   chip.addEventListener?.('click', () => {
-    const shown = (card.style ?? {}).display === 'block'
-    if (shown) { hide() } else { place() }
+    if ((card.style ?? {}).display === 'block') { hide() } else { place() }
   })
-  // The chip carries its card with it, so a bubble that re-renders cannot leave a card behind.
+  // The card travels with the chip, so a bubble that re-renders cannot leave one behind.
   chip.appendChild?.(card)
   return chip
 }
@@ -198,7 +232,7 @@ function chipFor(doc: TranscriptDocument, label: string, title: string, text: st
  * Fold every annotation message in the transcript behind its count, and answer how many were folded.
  *
  * Idempotent: an element that already carries the marker is skipped, so the observer can call this on every
- * change without stacking chips. Only the element whose text is the message is touched, never a container.
+ * change without stacking chips. Only the element whose text is the message is touched, and only its text nodes.
  */
 export function decorateTranscript(doc: TranscriptDocument | undefined, label = 'Notes', title = 'Notes in this message'): number {
   if (doc === undefined || typeof doc.querySelectorAll !== 'function') return 0
@@ -210,21 +244,27 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
   }
   let folded = 0
   for (let index = 0; index < nodes.length; index += 1) {
-    const node = nodes[index]
-    const text = typeof node.textContent === 'string' ? node.textContent : ''
+    const element = nodes[index]
+    const text = typeof element.textContent === 'string' ? element.textContent : ''
     if (!text.includes(TRANSCRIPT_MARKER)) continue
-    if (node.getAttribute?.(HANDLED) === '1') continue
-    // A container holds the marker too, and rewriting its text would take the rest of the message with it. What
-    // makes it a container is not that it has children - every bubble has them - but that a descendant is a block.
-    if (holdsAnotherBlock(node)) continue
-    const count = annotationCountOf(text)
-    const chip = chipFor(doc, label + (count === null ? '' : ' ×' + String(count)), title, text)
+    if (element.getAttribute?.(HANDLED) === '1') continue
+    if (holdsAnotherBlock(element)) continue
+    const texts = textNodesOf(element)
+    if (texts.length === 0) continue
+    const joined = texts.map((node) => (typeof node.nodeValue === 'string' ? node.nodeValue : '')).join('')
+    if (!joined.includes(TRANSCRIPT_MARKER)) continue
+    const at = joined.lastIndexOf(QUESTION)
+    const cut = at === -1 ? joined.length : at + QUESTION.length
+    const count = annotationCountOf(joined)
+    const chip = chipFor(doc, label + (count === null ? '' : ' ×' + String(count)), title, joined)
     if (chip === undefined) continue
     try {
-      node.setAttribute?.(ORIGINAL, text)
-      node.setAttribute?.(HANDLED, '1')
-      node.textContent = questionOf(text)
-      node.appendChild?.(chip)
+      if (!cutTextNodes(texts, cut)) continue
+      element.setAttribute?.(ORIGINAL, joined)
+      element.setAttribute?.(HANDLED, '1')
+      const parent = element.parentNode
+      if (parent?.insertBefore !== undefined) parent.insertBefore(chip, element.nextSibling ?? null)
+      else element.appendChild?.(chip)
       folded += 1
     } catch {
       // A page that refuses the write keeps the plain message, which reads on its own.
@@ -236,20 +276,30 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
 /**
  * Fold now, and again whenever the conversation changes.
  *
- * A sent message is rendered by the host, not by this plugin, so watching is the only way to act on it. The
- * observer is coalesced by the browser and the work is idempotent, so a busy transcript costs a scan per change.
+ * A sent message is rendered by the host, so watching is the only way to act on it. The observer is coalesced by
+ * the browser, the work is idempotent, and a slow interval covers a page whose observer misses a batch.
  */
 export function startTranscriptDecoration(doc: TranscriptDocument | undefined, label = 'Notes', title = 'Notes in this message'): () => void {
   decorateTranscript(doc, label, title)
-  const Observer = (globalThis as { MutationObserver?: new (callback: () => void) => { observe: (target: unknown, options: unknown) => void; disconnect: () => void } }).MutationObserver
-  if (doc === undefined || Observer === undefined) return () => {}
-  let watcher: { disconnect: () => void } | undefined
-  try {
-    const observer = new Observer(() => { decorateTranscript(doc, label, title) })
-    observer.observe(doc, { childList: true, subtree: true })
-    watcher = observer
-  } catch {
-    return () => {}
+  const scope = globalThis as {
+    MutationObserver?: new (callback: () => void) => { observe: (target: unknown, options: unknown) => void; disconnect: () => void }
+    setInterval?: (handler: () => void, delay: number) => unknown
+    clearInterval?: (handle: unknown) => void
   }
-  return () => { watcher?.disconnect() }
+  if (doc === undefined) return () => {}
+  let watcher: { disconnect: () => void } | undefined
+  if (scope.MutationObserver !== undefined) {
+    try {
+      const observer = new scope.MutationObserver(() => { decorateTranscript(doc, label, title) })
+      observer.observe(doc, { childList: true, subtree: true })
+      watcher = observer
+    } catch {
+      watcher = undefined
+    }
+  }
+  const timer = scope.setInterval?.(() => { decorateTranscript(doc, label, title) }, 1000)
+  return () => {
+    watcher?.disconnect()
+    if (timer !== undefined) scope.clearInterval?.(timer)
+  }
 }
