@@ -69,9 +69,11 @@ export declare function cutTextNodes(nodes: TranscriptNode[], cut: number): bool
  */
 export declare function decorateTranscript(doc: TranscriptDocument | undefined, label?: string, title?: string): number;
 /**
- * Fold now, and again whenever the conversation changes.
+ * One pass, and nothing that keeps running.
  *
- * A sent message is rendered by the host, so watching is the only way to act on it. The observer is coalesced by
- * the browser, the work is idempotent, and a slow interval covers a page whose observer misses a batch.
+ * There is deliberately no observer and no timer here. Both were tried: an observer over the document plus a
+ * one-second interval turns every DOM change into a full selector scan, and a streaming conversation changes the
+ * DOM many times a second - the container stopped responding. A caller that wants the fold has to decide when
+ * to run it, on a container it chose.
  */
 export declare function startTranscriptDecoration(doc: TranscriptDocument | undefined, label?: string, title?: string): () => void;

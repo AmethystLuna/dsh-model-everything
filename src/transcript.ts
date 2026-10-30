@@ -274,32 +274,14 @@ export function decorateTranscript(doc: TranscriptDocument | undefined, label = 
 }
 
 /**
- * Fold now, and again whenever the conversation changes.
+ * One pass, and nothing that keeps running.
  *
- * A sent message is rendered by the host, so watching is the only way to act on it. The observer is coalesced by
- * the browser, the work is idempotent, and a slow interval covers a page whose observer misses a batch.
+ * There is deliberately no observer and no timer here. Both were tried: an observer over the document plus a
+ * one-second interval turns every DOM change into a full selector scan, and a streaming conversation changes the
+ * DOM many times a second - the container stopped responding. A caller that wants the fold has to decide when
+ * to run it, on a container it chose.
  */
 export function startTranscriptDecoration(doc: TranscriptDocument | undefined, label = 'Notes', title = 'Notes in this message'): () => void {
   decorateTranscript(doc, label, title)
-  const scope = globalThis as {
-    MutationObserver?: new (callback: () => void) => { observe: (target: unknown, options: unknown) => void; disconnect: () => void }
-    setInterval?: (handler: () => void, delay: number) => unknown
-    clearInterval?: (handle: unknown) => void
-  }
-  if (doc === undefined) return () => {}
-  let watcher: { disconnect: () => void } | undefined
-  if (scope.MutationObserver !== undefined) {
-    try {
-      const observer = new scope.MutationObserver(() => { decorateTranscript(doc, label, title) })
-      observer.observe(doc, { childList: true, subtree: true })
-      watcher = observer
-    } catch {
-      watcher = undefined
-    }
-  }
-  const timer = scope.setInterval?.(() => { decorateTranscript(doc, label, title) }, 1000)
-  return () => {
-    watcher?.disconnect()
-    if (timer !== undefined) scope.clearInterval?.(timer)
-  }
+  return () => {}
 }
