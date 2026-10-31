@@ -404,7 +404,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
       }
       sync(list)
       if (placeBlock(text)) {
-        setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+        setStatus('已放入输入框（' + String(list.length) + ' 条图注；命令通道：' + commandWhy + '）')
         setPending([])
         submitDraft()
         return
@@ -689,21 +689,34 @@ function watchDraft(): void {
  * Returns the reason it worked, or undefined. Undefined means "use the composer": a command that silently did
  * nothing would lose the notes, and this function is the only thing standing between a note and the void.
  */
+let commandWhy = 'not tried'
+
 async function sendViaCommand(text: string): Promise<string | undefined> {
+  commandWhy = 'not tried'
   const sessions = services?.get?.('sessions') as { scope?: (id: string) => unknown } | undefined
   const id = currentSessionId()
-  if (id === undefined || typeof sessions?.scope !== 'function') return undefined
+  if (id === undefined) { commandWhy = 'no session id'; return undefined }
+  if (typeof sessions?.scope !== 'function') { commandWhy = 'no sessions service'; return undefined }
+  // The remote facade hangs off the CLIENT context, not off a session scope: page-side code writes
+  // `ctx.remote.commands.execute(sessionId, line, attachments)` and the facade resolves the agent itself
+  // (that is how ui-commands calls it). The scope route stays as a second door for a host that mounts it there.
   let commands: { execute?: unknown } | undefined
-  try {
-    commands = ((sessions.scope(id) as { remote?: { commands?: { execute?: unknown } } } | undefined)?.remote)?.commands
-  } catch {
-    return undefined
+  commands = (services as unknown as { remote?: { commands?: { execute?: unknown } } } | undefined)?.remote?.commands
+  if (commands === undefined || typeof commands.execute !== 'function') {
+    try {
+      commands = ((sessions.scope(id) as { remote?: { commands?: { execute?: unknown } } } | undefined)?.remote)?.commands
+    } catch {
+      return undefined
+    }
   }
-  if (commands === undefined || typeof commands.execute !== 'function') return undefined
+  if (commands === undefined || typeof commands.execute !== 'function') { commandWhy = 'no remote.commands.execute'; return undefined }
   try {
     const result = await (commands.execute as (session: string, line: string, attachments: unknown[]) => Promise<{ kind?: string } | undefined>)(id, '/annotate ' + text, [])
-    return result?.kind === 'success' ? '已通过会话命令发送（输入框未占用）' : undefined
-  } catch {
+    if (result?.kind === 'success') return '已通过会话命令发送（输入框未占用）'
+    commandWhy = 'execute said ' + String(result?.kind ?? 'nothing')
+    return undefined
+  } catch (error) {
+    commandWhy = 'execute threw: ' + String((error as { message?: unknown })?.message ?? error).slice(0, 60)
     return undefined
   }
 }
@@ -834,7 +847,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
         }
         // The host's own draft writer next: it is the writer the reader's keystrokes use, so line breaks survive.
         if (placeBlock(text)) {
-          setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+          setStatus('已放入输入框（' + String(list.length) + ' 条图注；命令通道：' + commandWhy + '）')
           setPending([])
           if (submit) submitDraft()
           return
