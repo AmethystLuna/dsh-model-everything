@@ -17,7 +17,7 @@ import { palette, schemeNames, type Palette, type PaletteMode, type PaletteSchem
 import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
-import { annotationBlock, annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, withoutEmptyQuestion, type DocumentLike } from './annotation.js'
+import { annotationBlock, annotationMessage, composerRect, fillComposer, findComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, withoutEmptyQuestion, type DocumentLike } from './annotation.js'
 import { startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
 
 export interface ReactLike {
@@ -373,6 +373,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
+  // What would leave with the next message: the chip shows it, and the draft stays empty until Enter.
+  setPendingBlock(pending.length === 0 ? '' : annotationBlock(pending.map((item) => ({ ...item, caption }))))
   // The count has to clear when the message leaves, and the subscription must not be able to take the card
   // down with it: a hook that throws here unmounts the drawing, which reads as "the card did not render".
   React.useEffect?.(() => {
@@ -612,6 +614,43 @@ function replaceBlock(text: string): boolean {
 }
 
 /** The block for a list of notes, in the draft. An empty list removes it. */
+/** The block waiting to leave. Empty when there is nothing to send. */
+let pendingBlock = ''
+let enterWatch: unknown = null
+
+/** Remember what would leave with the next message, and start watching for that message. */
+export function setPendingBlock(text: string): void {
+  pendingBlock = text
+  installEnterCapture()
+}
+
+/**
+ * Put the block into the message at the instant it leaves.
+ *
+ * This is the only moment that satisfies both requirements at once: the composer shows nothing while a note
+ * is being written, and the message still carries the block because the draft is filled before the host
+ * composes it. A capture-phase listener runs before the page's own Enter handling, which is why the write
+ * lands in time - and why this is the same trick the shipped annotation plugin uses.
+ */
+function installEnterCapture(): void {
+  if (pendingBlock === '') return
+  const doc = (globalThis as { document?: DocumentLike }).document
+  const composer = findComposer(doc)
+  if (composer === undefined || composer === null) return
+  if (enterWatch === composer) return
+  enterWatch = composer
+  const listen = (composer as { addEventListener?: (type: string, handler: (event: unknown) => void, capture?: boolean) => void }).addEventListener
+  if (typeof listen !== 'function') return
+  listen.call(composer, 'keydown', (event: unknown) => {
+    const key = event as { key?: string; shiftKey?: boolean; isComposing?: boolean }
+    if (key?.key !== 'Enter' || key.shiftKey === true || key.isComposing === true) return
+    if (pendingBlock === '') return
+    // Written, not submitted: the host's own Enter handling submits right after this returns.
+    replaceBlock(pendingBlock)
+    pendingBlock = ''
+  }, true)
+}
+
 function placeListBlock(list: Array<{ nodeId: string; note: string }>, caption: string): boolean {
   return replaceBlock(list.length === 0 ? '' : annotationBlock(list.map((item) => ({ ...item, caption }))))
 }

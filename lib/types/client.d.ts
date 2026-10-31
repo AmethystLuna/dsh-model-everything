@@ -104,6 +104,8 @@ export declare function annotationPanel(h: H, state: AnnotationState, actions: A
     floating?: boolean;
     document?: DocumentLike;
 }): unknown;
+/** Remember what would leave with the next message, and start watching for that message. */
+export declare function setPendingBlock(text: string): void;
 /**
  * Tell this module when a message leaves, by watching the one signal the host gives: the draft empties.
  *
