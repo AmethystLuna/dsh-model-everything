@@ -705,7 +705,20 @@ async function sendViaCommand(text: string): Promise<string | undefined> {
   }
   if (commands === undefined || typeof commands.execute !== 'function') { commandWhy = 'no remote.commands.execute'; return undefined }
   try {
-    const result = await (commands.execute as (session: string, line: string, attachments: unknown[]) => Promise<{ kind?: string } | undefined>)(id, '/annotate ' + text, [])
+    // A remote call that never settles would take the button with it: the note would sit in no draft and no
+    // message, and the reader would see a click that did nothing. The wait is bounded, and a timeout is just
+    // another reason to fall back to the composer.
+    const timeout = new Promise<string>((resolve) => {
+      const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
+      if (typeof timer === 'function') timer(() => resolve('timeout'), 1200)
+      else resolve('timeout')
+    })
+    const raced = await Promise.race([
+      (commands.execute as (session: string, line: string, attachments: unknown[]) => Promise<{ kind?: string } | undefined>)(id, '/annotate ' + text, []),
+      timeout,
+    ])
+    if (raced === 'timeout') { commandWhy = 'execute timed out'; return undefined }
+    const result = typeof raced === 'string' ? undefined : raced
     if (result?.kind === 'success') return '已通过会话命令发送（输入框未占用）'
     commandWhy = 'execute said ' + String(result?.kind ?? 'nothing')
     return undefined
