@@ -62,6 +62,8 @@ export declare function itemsOf(text: string): AnnotationItem[];
  * The nodes are the only thing written: an element's `textContent` would take its child elements with it.
  */
 export declare function cutTextNodes(nodes: TranscriptNode[], cut: number): boolean;
+/** Kept for the tests that assert the selector exists; the ancestor walk is deliberately not used. */
+export declare const FOREIGN_SELECTOR = "[data-annotation-for-dsh], [data-annotation-overlay], [data-annotation-chip], [data-annotation-tip-layer]";
 /**
  * Fold every annotation message in the transcript behind its count, and answer how many were folded.
  *

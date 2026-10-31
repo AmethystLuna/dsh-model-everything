@@ -153,12 +153,23 @@ export function cutTextNodes(nodes: TranscriptNode[], cut: number): boolean {
 }
 
 /** Whether another plugin owns this node, or any of its ancestors. */
+/**
+ * Whether this element IS another plugin's node.
+ *
+ * Only the element itself counts. An ancestor test looked safer and was wrong: that plugin marks the message
+ * container it has folded, so every message it touched also carried an ancestor marker - and this plugin then
+ * skipped the very message it was looking for.
+ */
 function isForeign(node: TranscriptNode): boolean {
-  const inside = node.closest?.(FOREIGN)
-  if (inside !== undefined && inside !== null) return true
-  const marked = node.getAttribute?.('data-annotation-for-dsh')
-  return marked !== undefined && marked !== null
+  for (const name of ['data-annotation-for-dsh', 'data-annotation-overlay', 'data-annotation-chip', 'data-annotation-tip-layer']) {
+    const value = node.getAttribute?.(name)
+    if (value !== undefined && value !== null) return true
+  }
+  return false
 }
+
+/** Kept for the tests that assert the selector exists; the ancestor walk is deliberately not used. */
+export const FOREIGN_SELECTOR = FOREIGN
 
 function holdsAnotherBlock(node: TranscriptNode): boolean {
   const inner = node.querySelectorAll?.(SELECTOR)

@@ -391,7 +391,8 @@ test('a node another plugin owns is left to that plugin', () => {
     getAttribute(name) { return this.attrs[name] },
     setAttribute(name, value) { this.attrs[name] = value },
     querySelectorAll() { return [] },
-    closest(selector) { return selector.includes('data-annotation') ? {} : null },
+    // The element ITSELF is one of that plugin's nodes, not merely inside one of its containers.
+    getAttribute(name) { return name === 'data-annotation-for-dsh' ? '1' : this.attrs[name] },
   }
   const doc = { querySelectorAll: () => [node], createElement: () => ({ textContent: '', style: {}, setAttribute() {}, addEventListener() {}, appendChild() {} }) }
   if (decorateTranscript(doc) !== 0) throw new Error('a foreign node was folded')
