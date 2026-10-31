@@ -372,6 +372,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const caption = typeof source === 'string' ? (source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? '') : ''
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
   const [open, setOpen] = useState(false)
+  // A note that left: this plugin's own chrome says so, where no other plugin works.
+  const [sent, setSent] = useState('')
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
   // What would leave with the next message: the chip shows it, and the draft stays empty until Enter.
   setPendingBlock(pending.length === 0 ? '' : annotationBlock(pending.map((item) => ({ ...item, caption }))))
@@ -394,6 +396,9 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
       // second attempt only after the note is already safe: a channel that hangs, refuses or silently does
       // nothing must never be the thing a click waits on. Measured: it hung, and the button looked dead.
       if (placeBlock(text)) {
+        const label = '图注 ×' + String(list.length)
+        setSent('已发送 ' + label)
+        attachSentChip(label)
         setStatus('已放入输入框并提交（' + String(list.length) + ' 条图注）')
         setPending([])
         submitDraft()
@@ -426,6 +431,9 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
     React.createElement('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } }, style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '5px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, annotate ? t('noteOn') : t('note')),
     annotate && picked === null ? React.createElement('span', { style: { fontSize: '11px', opacity: 0.7 } }, '点一个节点') : null,
+    sent === '' ? null : React.createElement('span', {
+      style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, color: TOKEN.dim, whiteSpace: 'nowrap' },
+    }, sent),
   )
   const panel = annotate
     ? annotationPanel(
@@ -646,6 +654,39 @@ function foldOnce(): void {
   timer(() => {
     try { decorateTranscript(doc as unknown as TranscriptDocumentForClient, t('pending'), t('carried')) } catch { /* the message keeps its block */ }
   }, 600)
+}
+
+/**
+ * Put the count beside the sent message, as an element - never by touching text.
+ *
+ * The annotation plugin folds a message by deleting the text nodes before its own marker, so anything this
+ * plugin wrote inside the message is gone by the time a scan could find it. An element inserted next to its
+ * chip is outside that surgery: text nodes are what it removes. When there is no anchor it inserts nothing -
+ * a missing chip is a smaller failure than a chip in the wrong place.
+ */
+function attachSentChip(label: string): void {
+  const doc = (globalThis as { document?: DocumentLike }).document
+  const timer = (globalThis as { setTimeout?: (handler: () => void, delay: number) => unknown }).setTimeout
+  if (doc === undefined || typeof timer !== 'function') return
+  let tries = 0
+  const attempt = (): void => {
+    tries += 1
+    const anchor = doc.querySelector?.('[data-annotation-chip]') as { parentNode?: { insertBefore?: (node: unknown, before: unknown) => unknown } | null; nextSibling?: unknown } | null | undefined
+    const parent = anchor?.parentNode
+    const made = (doc as unknown as { createElement?: (tag: string) => { textContent?: string; setAttribute?: (name: string, value: string) => void } }).createElement?.('span')
+    if (made !== undefined && parent !== undefined && parent !== null && typeof parent.insertBefore === 'function') {
+      made.textContent = label
+      made.setAttribute?.('data-dme-own', '1')
+      try {
+        parent.insertBefore(made, anchor?.nextSibling ?? null)
+        return
+      } catch {
+        // A refused insert is a chip not shown, not a broken message.
+      }
+    }
+    if (tries < 8) timer(attempt, 250)
+  }
+  timer(attempt, 300)
 }
 
 function installEnterCapture(): void {
