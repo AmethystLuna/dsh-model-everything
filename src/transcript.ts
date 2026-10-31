@@ -259,14 +259,11 @@ function chipFor(doc: TranscriptDocument, label: string, title: string, text: st
   if (card === undefined) return chip
   const place = (): void => {
     const box = chip.getBoundingClientRect?.()
-    const next: Record<string, string | undefined> = { ...(card.style ?? {}), display: 'block' }
-    if (box !== undefined) {
-      next.left = String(Math.max(8, box.left)) + 'px'
-      next.top = String(box.top + box.height + 6) + 'px'
-    }
-    card.style = next
+    styleOf(card, box === undefined
+      ? { display: 'block' }
+      : { display: 'block', left: String(Math.max(8, box.left)) + 'px', top: String(box.top + box.height + 6) + 'px' })
   }
-  const hide = (): void => { styleOf(card, { ...(card.style ?? {}), display: 'none' }) }
+  const hide = (): void => { styleOf(card, { display: 'none' }) }
   chip.addEventListener?.('mouseenter', place)
   chip.addEventListener?.('mouseleave', hide)
   chip.addEventListener?.('click', () => {
