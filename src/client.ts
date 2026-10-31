@@ -390,18 +390,31 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   }
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
     if (list.length === 0) return
-    sync(list)
-    if (placeBlock(annotationBlock(list.map((item) => ({ ...item, caption }))))) {
-      setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+    const text = annotationBlock(list.map((item) => ({ ...item, caption })))
+    void (async () => {
+      // The command channel first: it leaves the composer untouched. It answers undefined unless the host
+      // really executed the command, and then the draft path below is the only thing left that delivers.
+      const sent = await sendViaCommand(text)
+      if (sent !== undefined) {
+        // Sent out of band, so the copy waiting in the composer is now a duplicate: take it back out.
+        replaceBlock('')
+        setStatus(sent)
+        setPending([])
+        return
+      }
+      sync(list)
+      if (placeBlock(text)) {
+        setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+        setPending([])
+        submitDraft()
+        return
+      }
+      const said = prependBlock(document, list, caption)
+      setStatus(said)
+      if (!said.startsWith('已')) return
       setPending([])
-      submitDraft()
-      return
-    }
-    const said = prependBlock(document, list, caption)
-    setStatus(said)
-    if (!said.startsWith('已')) return
-    setPending([])
-    submitComposer(document)
+      submitComposer(document)
+    })()
   }
   const onPick = (event: { target?: { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null } }): void => {
     if (!annotate) return
@@ -667,6 +680,34 @@ function watchDraft(): void {
   }
 }
 
+/**
+ * Send the block through the session's command channel, which never touches the composer.
+ *
+ * The client cannot call a host service directly; the remote facade is the only route, and its signature is
+ * `execute(sessionId, line, attachments)` - the session id first, because the facade resolves the agent itself.
+ *
+ * Returns the reason it worked, or undefined. Undefined means "use the composer": a command that silently did
+ * nothing would lose the notes, and this function is the only thing standing between a note and the void.
+ */
+async function sendViaCommand(text: string): Promise<string | undefined> {
+  const sessions = services?.get?.('sessions') as { scope?: (id: string) => unknown } | undefined
+  const id = currentSessionId()
+  if (id === undefined || typeof sessions?.scope !== 'function') return undefined
+  let commands: { execute?: unknown } | undefined
+  try {
+    commands = ((sessions.scope(id) as { remote?: { commands?: { execute?: unknown } } } | undefined)?.remote)?.commands
+  } catch {
+    return undefined
+  }
+  if (commands === undefined || typeof commands.execute !== 'function') return undefined
+  try {
+    const result = await (commands.execute as (session: string, line: string, attachments: unknown[]) => Promise<{ kind?: string } | undefined>)(id, '/annotate ' + text, [])
+    return result?.kind === 'success' ? '已通过会话命令发送（输入框未占用）' : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** Ask the host to submit the draft it now holds. */
 function submitDraft(): boolean {
   const shell = draftShell()
@@ -782,19 +823,28 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     // The notes accumulate here; one structured message leaves for the session, not one raw fragment per note.
     const sendAll = (list: Array<{ nodeId: string; note: string }>, submit: boolean): void => {
       if (list.length === 0) return
-      // The host's own draft writer first: it is the writer the reader's keystrokes use, so line breaks survive.
-      // The composer is the fallback for a host that exposes no conversation service.
-      if (placeBlock(annotationBlock(list.map((item) => ({ ...item, caption }))))) {
-        setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+      const text = annotationBlock(list.map((item) => ({ ...item, caption })))
+      void (async () => {
+        const sent = await sendViaCommand(text)
+        if (sent !== undefined) {
+          replaceBlock('')
+          setStatus(sent)
+          setPending([])
+          return
+        }
+        // The host's own draft writer next: it is the writer the reader's keystrokes use, so line breaks survive.
+        if (placeBlock(text)) {
+          setStatus('已放入输入框（' + String(list.length) + ' 条图注）')
+          setPending([])
+          if (submit) submitDraft()
+          return
+        }
+        const said = prependBlock(document, list, caption)
+        setStatus(said)
+        if (!said.startsWith('已')) return
         setPending([])
-        if (submit) submitDraft()
-        return
-      }
-      const said = prependBlock(document, list, caption)
-      setStatus(said)
-      if (!said.startsWith('已')) return
-      setPending([])
-      if (submit) submitComposer(document)
+        if (submit) submitComposer(document)
+      })()
     }
     const addDraft = (): boolean => {
       if (picked === null) return false

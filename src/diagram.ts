@@ -11,6 +11,7 @@
  */
 
 import z from '@deepseek-ai/schemastery'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { diagramDiffTool } from './diagram-diff-tool.js'
 import { diagramRenderTool } from './diagram-render-tool.js'
 import { diagramReviewTool } from './diagram-review-tool.js'
@@ -72,11 +73,14 @@ export function registerAnnotateCommand(ctx: unknown): void {
     commands.register({
       name: 'annotate',
       description: 'Send a diagram annotation to this session',
-      handler: (invocation: { agent?: { followup?: (input: unknown) => unknown }; rawInput?: string }) => {
+      handler: (invocation: { agent?: { followup?: (input: unknown) => unknown }; rawInput?: string; commandId?: unknown; attachments?: unknown; signal?: unknown }) => {
         const raw = typeof invocation.rawInput === 'string' ? invocation.rawInput.trim().replace(/^\/?annotate\s*/i, '') : ''
-        const followup = invocation.agent?.followup
+        const agent = invocation.agent
+        const followup = agent?.followup
         if (raw === '' || typeof followup !== 'function') return { kind: 'error' as const, text: 'this host cannot take a follow-up note' }
-        void followup.call(invocation.agent, { content: [{ type: 'text', text: raw }], source: { kind: 'user' } })
+        // A follow-up takes a UserMessage, not a bag of fields: the runtime stamps the id and the time, and a
+        // hand-built object reaches the inbox without them. `createUserMessage` is the host's own constructor.
+        followup.call(agent, createUserMessage({ content: [{ type: 'text', text: raw }], source: { kind: 'user' } }))
         return { kind: 'success' as const, text: 'annotation sent' }
       },
     })
