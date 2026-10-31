@@ -307,8 +307,7 @@ test('a sent annotation is folded to the reader question, behind its count, once
     'Please answer each item separately, and start each answer with "Annotation N:".',
     'Drawing: graph LR',
     '',
-    '1. node D',
-    '   Note: 测试',
+    'Diagram note [1] node D - 测试',
     '',
     'Question: 这里为什么要拆开？',
   ].join(String.fromCharCode(10))
