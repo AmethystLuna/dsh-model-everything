@@ -388,18 +388,11 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     if (list.length === 0) return
     const text = annotationBlock(list.map((item) => ({ ...item, caption })))
     void (async () => {
-      // The command channel first: it leaves the composer untouched. It answers undefined unless the host
-      // really executed the command, and then the draft path below is the only thing left that delivers.
-      const sent = await sendViaCommand(text)
-      if (sent !== undefined) {
-        // Sent out of band, so the copy waiting in the composer is now a duplicate: take it back out.
-        replaceBlock('')
-        setStatus(sent)
-        setPending([])
-        return
-      }
+      // The draft path runs FIRST and synchronously enough to answer the click. The command channel is a
+      // second attempt only after the note is already safe: a channel that hangs, refuses or silently does
+      // nothing must never be the thing a click waits on. Measured: it hung, and the button looked dead.
       if (placeBlock(text)) {
-        setStatus('已放入输入框（' + String(list.length) + ' 条图注；命令通道：' + commandWhy + '）')
+        setStatus('已放入输入框并提交（' + String(list.length) + ' 条图注）')
         setPending([])
         submitDraft()
         return
@@ -845,16 +838,9 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       if (list.length === 0) return
       const text = annotationBlock(list.map((item) => ({ ...item, caption })))
       void (async () => {
-        const sent = await sendViaCommand(text)
-        if (sent !== undefined) {
-          replaceBlock('')
-          setStatus(sent)
-          setPending([])
-          return
-        }
-        // The host's own draft writer next: it is the writer the reader's keystrokes use, so line breaks survive.
+        // The draft writer first: it is the writer the reader's keystrokes use, so line breaks survive.
         if (placeBlock(text)) {
-          setStatus('已放入输入框（' + String(list.length) + ' 条图注；命令通道：' + commandWhy + '）')
+          setStatus('已放入输入框并提交（' + String(list.length) + ' 条图注）')
           setPending([])
           if (submit) submitDraft()
           return
