@@ -373,8 +373,11 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
-  // A sent message leaves an empty draft; the notes went with it, so the count goes too.
-  React.useEffect?.(() => onMessageSent(() => { setPending([]); setStatus('') }), [])
+  // The count has to clear when the message leaves, and the subscription must not be able to take the card
+  // down with it: a hook that throws here unmounts the drawing, which reads as "the card did not render".
+  React.useEffect?.(() => {
+    try { return onMessageSent(() => { setPending([]); setStatus('') }) } catch { return undefined }
+  }, [])
   const [zoom, setZoom] = useState(1)
   const [full, setFull] = useState(false)
   if (!hasDrawing) {
@@ -829,7 +832,7 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const [status, setStatus] = useState('')
     const [pending, setPending] = useState<Array<{ nodeId: string; note: string }>>([])
     const [open, setOpen] = useState(false)
-    React.useEffect?.(() => onMessageSent(() => { setPending([]); setStatus('') }), [])
+    React.useEffect?.(() => { try { return onMessageSent(() => { setPending([]); setStatus('') }) } catch { return undefined } }, [])
     const drawn = drawSample(React, overrides, source, fit ? 0 : zoom, scheme, folded)
     const document = (globalThis as { document?: DocumentLike }).document
     const caption = source.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line !== '') ?? ''
