@@ -244,10 +244,10 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
           style: { width: '100%', boxSizing: 'border-box', font: '12px system-ui, sans-serif', padding: '6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, resize: 'vertical' },
           onInput: (event: { target?: { value?: unknown } }) => actions.onNote(String(event?.target?.value ?? '')),
           onKeyDown: (event: { key?: string; ctrlKey?: boolean; metaKey?: boolean; preventDefault?: () => void }) => {
-            if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); actions.onAddAndSend() }
+            if (event?.key === 'Enter' && (event?.ctrlKey === true || event?.metaKey === true)) { event.preventDefault?.(); actions.onAdd() }
           },
         }),
-        h('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, button('关闭', actions.onCancel), button('加入', actions.onAdd), button('加入并发送', actions.onAddAndSend, true)),
+        h('div', { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } }, button('关闭', actions.onCancel), button('加入', actions.onAdd)),
       )
   // The pending count docks above the conversation's own input box, where the message will be sent from: the
   // reader is about to press Return there, and the count has to be in sight without covering the box.
@@ -384,13 +384,6 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     const keys = props.block === null || typeof props.block !== 'object' ? 'none' : Object.keys(props.block as Record<string, unknown>).join(',')
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call · block: ' + (keys === '' ? 'empty' : keys))
   }
-  // Every change to the list rewrites the draft, so the block is already there whenever the message leaves -
-  // whether this plugin sends it, the host's Enter handler does, or another plugin's handler composes the text.
-  const sync = (list: Array<{ nodeId: string; note: string }>): void => {
-    if (placeListBlock(list, caption)) return
-    // A host without the draft service still gets the composer path, at the cost of writing at send time.
-    if (list.length > 0) prependBlock(document, list, caption)
-  }
   const sendAll = (list: Array<{ nodeId: string; note: string }>): void => {
     if (list.length === 0) return
     const text = annotationBlock(list.map((item) => ({ ...item, caption })))
@@ -405,7 +398,6 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
         setPending([])
         return
       }
-      sync(list)
       if (placeBlock(text)) {
         setStatus('已放入输入框（' + String(list.length) + ' 条图注；命令通道：' + commandWhy + '）')
         setPending([])
@@ -450,17 +442,16 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
             if (picked === null) return
             const merged = [...pending, { nodeId: picked.id, note }]
             setPending(merged)
-            sync(merged)
             setNote('')
             setPicked(null)
             setStatus('已放入输入框，直接回车即可')
           },
           onAddAndSend: () => { if (picked === null) return; const merged = [...pending, { nodeId: picked.id, note }]; setNote(''); setPicked(null); sendAll(merged) },
           onSend: () => sendAll(pending),
-          onClear: () => { setPending([]); sync([]); setStatus('') },
+          onClear: () => { setPending([]); setStatus('') },
           onCancel: () => { setPicked(null); setNote(''); setStatus('') },
           onToggle: () => setOpen(!open),
-          onRemove: (index: number) => { const merged = pending.filter((_, at) => at !== index); setPending(merged); sync(merged) },
+          onRemove: (index: number) => setPending(pending.filter((_, at) => at !== index)),
         },
         { document },
       )
@@ -866,8 +857,6 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
       if (picked === null) return false
       const merged = [...pending, { nodeId: picked.id, note }]
       setPending(merged)
-      // Into the draft now, not at send time: whatever sends this message composes it from the draft.
-      placeListBlock(merged, caption)
       setNote('')
       setPicked(null)
       setStatus('已放入输入框，直接回车即可')
@@ -876,7 +865,6 @@ export function whiteboardFor(React: ReactLike, overrides: Partial<Palette> = {}
     const addAndSend = (): void => {
       if (picked === null) return
       const merged = [...pending, { nodeId: picked.id, note }]
-      placeListBlock(merged, caption)
       setNote('')
       setPicked(null)
       sendAll(merged, true)
