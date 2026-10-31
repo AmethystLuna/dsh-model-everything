@@ -646,7 +646,11 @@ function installEnterCapture(): void {
     if (key?.key !== 'Enter' || key.shiftKey === true || key.isComposing === true) return
     if (pendingBlock === '') return
     // Written, not submitted: the host's own Enter handling submits right after this returns.
-    replaceBlock(pendingBlock)
+    // With nothing typed, a bare "Question:" would be the message's last line and would invite an answer
+    // nobody asked for - the same rule the click path applies.
+    const shell = draftShell()
+    const draft = String(shell?.state?.getSnapshot?.()?.draft ?? '')
+    replaceBlock(draft.trim() === '' ? withoutEmptyQuestion(pendingBlock) : pendingBlock)
     pendingBlock = ''
   }, true)
 }
