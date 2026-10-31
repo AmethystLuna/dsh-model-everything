@@ -18,7 +18,7 @@ import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
 import { annotationBlock, annotationMessage, composerRect, fillComposer, findComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, withoutEmptyQuestion, type DocumentLike } from './annotation.js'
-import { startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
+import { decorateTranscript, startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
@@ -632,6 +632,22 @@ export function setPendingBlock(text: string): void {
  * composes it. A capture-phase listener runs before the page's own Enter handling, which is why the write
  * lands in time - and why this is the same trick the shipped annotation plugin uses.
  */
+/**
+ * Fold the message that just left, once, at a moment we chose.
+ *
+ * The earlier attempt started an observer over the document and scanned on every change; a streaming
+ * conversation then spent all its time in the selector. This runs one pass, half a second after our own send,
+ * and nothing else - the cost is a known single scan per message instead of a continuous one.
+ */
+function foldOnce(): void {
+  const doc = (globalThis as { document?: DocumentLike }).document
+  const timer = (globalThis as { setTimeout?: (handler: () => void, delay: number) => unknown }).setTimeout
+  if (doc === undefined || typeof timer !== 'function') return
+  timer(() => {
+    try { decorateTranscript(doc as unknown as TranscriptDocumentForClient, t('pending'), t('carried')) } catch { /* the message keeps its block */ }
+  }, 600)
+}
+
 function installEnterCapture(): void {
   if (pendingBlock === '') return
   const doc = (globalThis as { document?: DocumentLike }).document
@@ -651,6 +667,7 @@ function installEnterCapture(): void {
     const shell = draftShell()
     const draft = String(shell?.state?.getSnapshot?.()?.draft ?? '')
     replaceBlock(draft.trim() === '' ? withoutEmptyQuestion(pendingBlock) : pendingBlock)
+    foldOnce()
     pendingBlock = ''
   }, true)
 }
@@ -770,6 +787,7 @@ function submitDraft(): boolean {
   if (shell === undefined || typeof shell.submit !== 'function') return false
   try {
     shell.submit('queue')
+    foldOnce()
     return true
   } catch {
     return false
