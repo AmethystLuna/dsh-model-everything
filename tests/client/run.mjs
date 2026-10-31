@@ -478,7 +478,7 @@ test('the annotation message names the node, the drawing and the note', () => {
 test('a blank note still says the node was marked', () => {
   const text = annotationMessage({ nodeId: 'n1' })
   if (!text.includes('(marked, no note)')) throw new Error('a silent note became silence: ' + text)
-  if (!text.includes('1. node n1')) throw new Error('the mark was not numbered: ' + text)
+  if (!text.includes('Diagram note [1] node n1')) throw new Error('the mark was not numbered: ' + text)
   if (!text.includes('start each answer with "Annotation N:"')) throw new Error('the block does not ask for item-by-item answers: ' + text)
 })
 
@@ -504,14 +504,15 @@ test('a message with no question drops the question line', () => {
   const block = annotationMessage({ nodeId: 'a', note: 'x' })
   const bare = withoutEmptyQuestion(block)
   if (bare.includes('Question:')) throw new Error('the empty invitation stayed: ' + bare)
-  if (!bare.includes('1. node a')) throw new Error('the block lost its item')
+  if (!bare.includes('Diagram note [1] node a')) throw new Error('the block lost its item')
 })
 
 test('the block carries a line break per item, so the model can number them', () => {
   const element = { tagName: 'TEXTAREA', value: '', dispatchEvent: () => true, focus: () => {} }
   prependBlock({ querySelector: () => element }, [{ nodeId: 'a', note: 'one' }, { nodeId: 'b', note: '' }], 'graph TD')
   const lines = element.value.split(String.fromCharCode(10))
-  if (!lines.includes('1. node a') || !lines.includes('2. node b')) throw new Error('items are not on their own lines: ' + JSON.stringify(lines))
+  const own = (marker) => lines.some((line) => line.startsWith(marker))
+  if (!own('Diagram note [1] node a') || !own('Diagram note [2] node b')) throw new Error('items are not on their own lines: ' + JSON.stringify(lines))
 })
 
 test('the composer rect is read for the docked count, and absent without one', () => {
