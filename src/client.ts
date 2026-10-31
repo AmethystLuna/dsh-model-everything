@@ -667,7 +667,7 @@ function installEnterCapture(): void {
     const shell = draftShell()
     const draft = String(shell?.state?.getSnapshot?.()?.draft ?? '')
     replaceBlock(draft.trim() === '' ? withoutEmptyQuestion(pendingBlock) : pendingBlock)
-    // foldOnce() is off: see the note on foldOnce - the chip rendered as plain text, not as a component.
+    foldOnce()
     pendingBlock = ''
   }, true)
 }
@@ -787,6 +787,7 @@ function submitDraft(): boolean {
   if (shell === undefined || typeof shell.submit !== 'function') return false
   try {
     shell.submit('queue')
+    foldOnce()
     return true
   } catch {
     return false

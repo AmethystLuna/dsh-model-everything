@@ -172,39 +172,39 @@ function holdsAnotherBlock(node: TranscriptNode): boolean {
 function cardFor(doc: TranscriptDocument, items: AnnotationItem[], title: string, full: string): TranscriptNode | undefined {
   const card = doc.createElement?.('div')
   if (card === undefined) return undefined
-  card.style = {
+  styleOf(card, {
     position: 'fixed', zIndex: '40', display: 'none', maxWidth: '360px', padding: '8px 10px', borderRadius: '10px',
     background: 'var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-1, Canvas))',
     border: BORDER, boxShadow: '0 10px 30px rgba(0,0,0,0.28)',
     color: 'var(--dsw-alias-label-primary, CanvasText)', font: '12px system-ui, sans-serif',
-  }
+  })
   const head = doc.createElement?.('div')
   if (head !== undefined) {
     head.textContent = title
-    head.style = {
+    styleOf(head, {
       color: 'var(--dsw-alias-label-secondary, GrayText)', paddingBottom: '6px', marginBottom: '4px',
       borderBottom: BORDER, fontSize: '11px',
-    }
+    })
     card.appendChild?.(head)
   }
   for (const item of items) {
     const row = doc.createElement?.('div')
     if (row === undefined) continue
-    row.style = { display: 'flex', gap: '6px', alignItems: 'flex-start', padding: '3px 0' }
+    styleOf(row, { display: 'flex', gap: '6px', alignItems: 'flex-start', padding: '3px 0' })
     const badge = doc.createElement?.('span')
     if (badge !== undefined) {
       badge.textContent = String(item.index)
-      badge.style = {
+      styleOf(badge, {
         flex: '0 0 auto', width: '16px', height: '16px', lineHeight: '16px', textAlign: 'center',
         borderRadius: '8px', fontSize: '10px',
         background: 'var(--dsw-alias-brand-primary, #2563eb)', color: '#fff',
-      }
+      })
       row.appendChild?.(badge)
     }
     const body = doc.createElement?.('div')
     if (body !== undefined) {
       body.textContent = item.node + (item.note === '' ? '' : String.fromCharCode(10) + item.note)
-      body.style = { flex: '1 1 auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
+      styleOf(body, { flex: '1 1 auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' })
       row.appendChild?.(body)
     }
     card.appendChild?.(row)
@@ -212,13 +212,34 @@ function cardFor(doc: TranscriptDocument, items: AnnotationItem[], title: string
   const more = doc.createElement?.('div')
   if (more !== undefined) {
     more.textContent = full
-    more.style = {
+    styleOf(more, {
       display: 'none', marginTop: '6px', paddingTop: '6px', borderTop: BORDER, fontSize: '11px',
       whiteSpace: 'pre-wrap', color: 'var(--dsw-alias-label-secondary, GrayText)', maxHeight: '40vh', overflow: 'auto',
-    }
+    })
     card.appendChild?.(more)
   }
   return card
+}
+
+/**
+ * Apply a style map to a real element.
+ *
+ * Assigning an object to element.style applies nothing on a real element - the browser keeps its own
+ * CSSStyleDeclaration - which is why a chip built that way rendered as plain words. Each property goes through
+ * setProperty; a fake node without one keeps the map so a test can read it back.
+ */
+function styleOf(node: TranscriptNode, map: Record<string, string | undefined>): void {
+  const decl = node.style as unknown as { setProperty?: (name: string, value: string) => void } | undefined
+  if (typeof decl?.setProperty === 'function') {
+    const target = decl as unknown as { setProperty: (name: string, value: string) => void }
+    for (const key of Object.keys(map)) {
+      const value = map[key]
+      if (value === undefined) continue
+      target.setProperty(key.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase()), value)
+    }
+    return
+  }
+  node.style = map
 }
 
 function chipFor(doc: TranscriptDocument, label: string, title: string, text: string): TranscriptNode | undefined {
@@ -228,12 +249,12 @@ function chipFor(doc: TranscriptDocument, label: string, title: string, text: st
   chip.setAttribute?.('role', 'button')
   // A pill that sits in the reader's line, not a block that pushes it: the conversation is theirs, and the chip
   // is a footnote to it.
-  chip.style = {
+  styleOf(chip, {
     display: 'inline-flex', alignItems: 'center', height: '20px', padding: '0 8px', margin: '4px 0 0',
     fontSize: '11px', lineHeight: '20px', borderRadius: '10px', verticalAlign: 'middle', userSelect: 'none',
     border: BORDER, background: 'var(--dsw-alias-bg-layer-2, rgba(127,127,127,0.10))',
     color: 'var(--dsw-alias-label-secondary, GrayText)', cursor: 'pointer', maxWidth: '100%',
-  }
+  })
   const card = cardFor(doc, itemsOf(text), title, text)
   if (card === undefined) return chip
   const place = (): void => {
@@ -245,7 +266,7 @@ function chipFor(doc: TranscriptDocument, label: string, title: string, text: st
     }
     card.style = next
   }
-  const hide = (): void => { card.style = { ...(card.style ?? {}), display: 'none' } }
+  const hide = (): void => { styleOf(card, { ...(card.style ?? {}), display: 'none' }) }
   chip.addEventListener?.('mouseenter', place)
   chip.addEventListener?.('mouseleave', hide)
   chip.addEventListener?.('click', () => {
