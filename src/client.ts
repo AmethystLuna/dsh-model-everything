@@ -886,9 +886,15 @@ function getDockLayer(): any {
 }
 
 /** Keep the docked count in step with the pending list. */
+/**
+ * Keep the docked count in step with the pending list.
+ *
+ * Called from a render path, so it must never throw: an exception here unmounts the whole card, and the
+ * conversation falls back to the host's plain tool row - which is exactly how the card "disappeared" once.
+ */
 export function updateDockLayer(items: Array<{ nodeId: string; note: string }>, open: boolean, handlers: DockHandlers): void {
   dockReact = { count: items.length, open, items, handlers }
-  refreshDock()
+  try { refreshDock() } catch { /* the count is a convenience; the drawing is the point */ }
 }
 
 function installEnterCapture(): void {

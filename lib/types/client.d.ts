@@ -129,6 +129,12 @@ interface DockHandlers {
     onRemove: (index: number) => void;
 }
 /** Keep the docked count in step with the pending list. */
+/**
+ * Keep the docked count in step with the pending list.
+ *
+ * Called from a render path, so it must never throw: an exception here unmounts the whole card, and the
+ * conversation falls back to the host's plain tool row - which is exactly how the card "disappeared" once.
+ */
 export declare function updateDockLayer(items: Array<{
     nodeId: string;
     note: string;
