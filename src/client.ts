@@ -914,6 +914,17 @@ function updateDockChip(): void {
   // reader types on, in viewport coordinates. Nothing inferred, nothing constant.
   const surface = (findComposer(doc) ?? doc.querySelector('textarea, [contenteditable="true"]')) as any
   const rect = surface?.getBoundingClientRect?.()
+  // Every candidate left edge in one line, in the control itself: the reader's screenshot then says which one
+  // is the composer's box, instead of another round of guesses.
+  try {
+    const handleEl = doc.querySelector('[class*="widthHandle"], [class*="handle"]')
+    const colEl = doc.querySelector('[data-conversation-scroll]')
+    const read = (el: any): string => {
+      const r = el?.getBoundingClientRect?.()
+      return r === undefined || r === null ? '-' : String(Math.round(r.left))
+    }
+    toggle.textContent = toggle.textContent + ' s' + read(surface) + ' h' + read(handleEl) + ' c' + read(colEl)
+  } catch { /* the diagnostic is not the feature */ }
   const width = Number(el.offsetWidth) || 100
   const height = Number(el.offsetHeight) || 26
   if (rect === undefined) { el.style.left = '16px'; el.style.top = '16px'; return }
