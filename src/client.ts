@@ -464,10 +464,19 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     if (!annotate) return
     const id = event?.target?.closest?.('[data-node-id]')?.getAttribute?.('data-node-id')
     if (typeof id === 'string' && id !== '') {
-      const pointer = event as { clientX?: number; clientY?: number; currentTarget?: { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } } }
+      // The editor goes beside the node the reader picked, not beside the pointer: the pointer moves, the node
+      // does not, and an editor that lands wherever the click happened reads as "it does not follow".
+      const pointer = event as {
+        target?: { closest?: (selector: string) => { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } } | null }
+        currentTarget?: { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } }
+      }
       const frame = pointer.currentTarget?.getBoundingClientRect?.()
-      if (frame !== undefined && typeof pointer.clientX === 'number' && typeof pointer.clientY === 'number') {
-        setAnchor({ left: Math.max(4, Math.min(pointer.clientX - frame.left + 12, Math.max(4, frame.width - 250))), top: Math.max(4, Math.min(pointer.clientY - frame.top + 12, Math.max(4, frame.height - 20))) })
+      const node = pointer.target?.closest?.('[data-node-id]')?.getBoundingClientRect?.()
+      if (frame !== undefined && node !== undefined) {
+        const width = 250
+        const left = Math.max(4, Math.min(node.left - frame.left + node.width + 10, Math.max(4, frame.width - width)))
+        const top = Math.max(4, Math.min(node.top - frame.top, Math.max(4, frame.height - 40)))
+        setAnchor({ left, top })
       }
       setPicked({ id })
       setStatus('')
