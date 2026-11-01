@@ -1022,15 +1022,20 @@ function composerBox(doc: any): any {
   try {
     const marked = doc?.querySelector?.('[data-composer-card]')
     if (marked !== null && marked !== undefined) return marked
-    const surface = findComposer(doc) ?? doc?.querySelector?.('textarea, [contenteditable="true"]')
-    let node = surface
+    // The column is the full-width reference; the card is the widest ancestor of the writing surface that is
+    // narrower than that column. Measured both ways round - no constant, and a dragged divider changes both.
+    const column = doc?.querySelector?.('[data-conversation-scroll]')?.getBoundingClientRect?.()
+    let node = findComposer(doc) ?? doc?.querySelector?.('textarea, [contenteditable="true"]')
+    let card = node
     for (let depth = 0; depth < 8 && node !== null && node !== undefined; depth += 1) {
-      const radius = (globalThis as { getComputedStyle?: (el: unknown) => { borderRadius?: string; borderTopLeftRadius?: string } }).getComputedStyle?.(node)
-      const value = radius === undefined ? '' : String(radius.borderTopLeftRadius ?? radius.borderRadius ?? '')
-      if (value !== '' && value !== '0px') return node
+      const rect = node.getBoundingClientRect?.()
+      if (rect !== undefined && rect.width > 0) {
+        const inset = column === undefined ? false : rect.width < column.width - 4
+        if (inset) card = node
+      }
       node = node.parentElement
     }
-    return surface
+    return card
   } catch {
     return undefined
   }
