@@ -963,14 +963,22 @@ function dockSlotView(React: ReactLike): () => unknown {
       const measure = (): void => {
         try {
           const slot = doc?.querySelector?.('[data-dme-dock-slot]')
-          const card = doc?.querySelector?.('[data-composer-card]') ?? findComposer(doc)
+          // The card is the box the reader types in; hosts differ in what they mark. Try the attribute, then
+          // the scroll container, then the writing surface's own parent - the widest honest guess is still a
+          // measurement, not a constant.
+          const card = doc?.querySelector?.('[data-composer-card]')
+            ?? doc?.querySelector?.('[data-input-scroll]')
+            ?? (findComposer(doc) as { parentElement?: unknown } | undefined)?.parentElement
+            ?? findComposer(doc)
           if (slot === null || slot === undefined || card === null || card === undefined) return
           const s = slot.getBoundingClientRect()
           const c = card.getBoundingClientRect()
           setPad({ left: Math.max(0, Math.round(c.left - s.left)), right: Math.max(0, Math.round(s.right - c.right)) })
         } catch { /* unmeasured insets are a cosmetic miss */ }
       }
-      if (typeof timer === 'function') timer(measure, 0)
+      if (typeof timer === 'function') { timer(measure, 0); timer(measure, 120); timer(measure, 600) }
+      const scope = globalThis as { addEventListener?: (t: string, fn: () => void) => void; removeEventListener?: (t: string, fn: () => void) => void }
+      scope.addEventListener?.('resize', measure)
       const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void; disconnect: () => void } }).ResizeObserver
       let watcher: { observe: (t: unknown) => void; disconnect: () => void } | undefined
       if (Observer !== undefined) {
@@ -979,7 +987,7 @@ function dockSlotView(React: ReactLike): () => unknown {
           watcher.observe(doc?.body)
         } catch { watcher = undefined }
       }
-      return () => { watcher?.disconnect() }
+      return () => { watcher?.disconnect(); scope.removeEventListener?.('resize', measure) }
     }, [])
     const state = dockReact
     if (state === undefined || state.count === 0) return null
