@@ -254,21 +254,21 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
   // The pending count docks above the conversation's own input box, where the message will be sent from: the
   // reader is about to press Return there, and the count has to be in sight without covering the box.
   const docked = options.floating !== false && options.document !== undefined ? composerRect(options.document) : undefined
-  const chip = state.pending.length === 0
+  // A docked count is a body-level layer now; rendering it here as well put a second, unpositioned copy
+  // inside the card - which is what "the chip's coordinates ran off" was.
+  const chip = state.pending.length === 0 || options.floating !== true
     ? null
     : h(
         'div',
         {
           style: {
-            ...(options.floating === false ? {} : {
-              position: 'fixed', zIndex: 30,
+            position: 'fixed', zIndex: 30,
               left: (docked === undefined ? 16 : docked.left) + 'px',
               transform: 'translate(' + String(state.dockFix?.dx ?? 0) + 'px, ' + String(state.dockFix?.dy ?? 0) + 'px)',
               // Anchored to the composer's own top edge, in the gap above it: the count is in sight while the
               // reader is typing, and never covers the box they are typing into.
               top: (docked === undefined ? 16 : Math.max(8, docked.top - 46)) + 'px',
               // Hugs its two buttons. A fixed width turned the control into a wide empty bar across the composer.
-            }),
             display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 10px', borderRadius: '12px', width: 'max-content',
             // The composer's own surface and hairline: the control reads as part of that box, not as a dialog.
             background: 'var(--dsw-alias-bg-layer-1, ' + TOKEN.surface + ')',
