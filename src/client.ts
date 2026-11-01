@@ -757,152 +757,94 @@ interface DockHandlers { onToggle: () => void; onSend: () => void; onRemove: (in
 let dockLayer: { remove?: () => void } | undefined
 let dockReact: { count: number; open: boolean; items: Array<{ nodeId: string; note: string }>; handlers: DockHandlers } | undefined
 
-function refreshDock(): void {
-  const doc = (globalThis as { document?: DocumentLike }).document
-  const scope = globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }
-  if (doc === undefined || dockReact === undefined) return
-  const body = (doc as unknown as { body?: { appendChild?: (node: unknown) => unknown; removeChild?: (node: unknown) => unknown } }).body
-  const create = (doc as unknown as { createElement?: (tag: string) => any }).createElement
-  if (body === undefined || typeof create !== 'function') return
-  if (dockLayer === undefined) {
-    const layer = create('div')
-    layer.setAttribute('data-dme-own', '1')
-    layer.setAttribute('data-dme-dock', '1')
-    body.appendChild?.(layer)
-    dockLayer = { remove: () => { try { body.removeChild?.(layer) } catch { /* already gone */ } } }
-    if (dockReact.count === 0) { layer.style.setProperty('display', 'none') }
-  }
-  const layer = (body as unknown as { lastChild?: any }).lastChild
-  void layer
-  renderDockBody(doc, create)
-  const timer = scope.setTimeout
-  if (typeof timer === 'function') timer(() => { renderDockBody(doc, create) }, 0)
+let dockEl: any
+let dockObserver: { disconnect: () => void } | undefined
+let dockFrame: number | undefined
+
+/** The layer, created once. `cssText` is the form the reference plugin uses and the browser applies. */
+function ensureDock(): any {
+  if (dockEl !== undefined) return dockEl
+  const doc = (globalThis as { document?: any }).document
+  if (doc?.body === undefined || typeof doc.createElement !== 'function') return undefined
+  const el = doc.createElement('div')
+  el.setAttribute('data-dme-dock', '1')
+  el.setAttribute('data-dme-own', '1')
+  el.style.cssText = 'position:fixed;z-index:1150;display:none;align-items:center;gap:6px;padding:4px 8px;border-radius:11px;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35));background:var(--dsw-alias-bg-layer-1, #2c2c2e);box-shadow:0 8px 24px rgba(0,0,0,0.24);font:11px var(--dsw-font-family, system-ui);color:var(--dsw-alias-label-primary, #eee)'
+  doc.body.appendChild(el)
+  dockEl = el
+  return el
 }
 
-function renderDockBody(doc: DocumentLike, create: (tag: string) => any): void {
-  const layer = getDockLayer()
+/** One update per frame at most, the way the reference plugin schedules it. */
+function scheduleDock(): void {
+  const raf = (globalThis as { requestAnimationFrame?: (cb: () => void) => number }).requestAnimationFrame
+  if (dockFrame !== undefined || typeof raf !== 'function') { updateDockChip(); return }
+  dockFrame = raf(() => { dockFrame = undefined; updateDockChip() })
+}
+
+/** Anchors the layer on the composer card, and follows it when that card changes size. */
+function observeDockAnchor(): void {
+  const doc = (globalThis as { document?: any }).document
+  const card = doc?.querySelector?.('[data-composer-card]')
+  if (card === null || card === undefined) return
+  const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void; disconnect: () => void } }).ResizeObserver
+  if (Observer === undefined) return
+  try {
+    dockObserver?.disconnect()
+    const fresh = new Observer(() => { scheduleDock() })
+    fresh.observe(card)
+    dockObserver = fresh
+  } catch { dockObserver = undefined }
+}
+
+function updateDockChip(): void {
   const state = dockReact
-  if (layer === undefined || state === undefined) return
-  const setStyle = (node: any, key: string, value: string): void => {
-    const decl = node?.style
-    if (decl === undefined || decl === null) return
-    if (typeof decl.setProperty === 'function') decl.setProperty(key, value)
-    else decl[key] = value
-  }
-  for (const key of ['position', 'zIndex', 'display', 'flexDirection', 'gap', 'padding', 'borderRadius', 'background', 'border', 'color', 'boxShadow', 'font', 'width']) setStyle(layer, key, '')
-  setStyle(layer, 'position', 'fixed')
-  setStyle(layer, 'z-index', '2147483000')
-  setStyle(layer, 'flex-direction', 'column')
-  setStyle(layer, 'gap', '4px')
-  setStyle(layer, 'padding', '5px 8px')
-  setStyle(layer, 'border-radius', '12px')
-  setStyle(layer, 'background', 'var(--dsw-alias-bg-layer-1, rgba(30,30,32,0.92))')
-  setStyle(layer, 'border', '1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35))')
-  setStyle(layer, 'box-shadow', '0 8px 24px rgba(0,0,0,0.24)')
-  setStyle(layer, 'font', '12px system-ui, sans-serif')
-  setStyle(layer, 'width', 'max-content')
-  if (state.count === 0) { setStyle(layer, 'display', 'none'); return }
-  setStyle(layer, 'display', 'flex')
-  layer.textContent = ''
-  const row = create('div')
-  setStyle(row, 'display', 'flex')
-  setStyle(row, 'align-items', 'center')
-  setStyle(row, 'gap', '6px')
+  const el = ensureDock()
+  if (state === undefined || el === undefined) return
+  const doc = (globalThis as { document?: any }).document
+  if (state.count === 0) { el.style.display = 'none'; return }
+  const create = (tag: string): any => doc.createElement(tag)
+  el.textContent = ''
   const toggle = create('button')
   toggle.textContent = t('pending') + ' ×' + String(state.count)
-  setStyle(toggle, 'font-size', '12px')
-  setStyle(toggle, 'padding', '1px 6px')
-  setStyle(toggle, 'border-radius', '6px')
-  setStyle(toggle, 'border', '1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35))')
-  setStyle(toggle, 'background', 'transparent')
-  setStyle(toggle, 'color', 'inherit')
-  setStyle(toggle, 'cursor', 'pointer')
-  toggle.addEventListener?.('click', () => state.handlers.onToggle())
-  row.appendChild(toggle)
+  toggle.style.cssText = 'font:11px inherit;padding:1px 6px;border-radius:6px;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35));background:transparent;color:inherit;cursor:pointer'
+  toggle.addEventListener('click', () => state.handlers.onToggle())
+  el.appendChild(toggle)
   const send = create('button')
   send.textContent = t('send')
-  setStyle(send, 'font-size', '12px')
-  setStyle(send, 'padding', '1px 8px')
-  setStyle(send, 'border-radius', '6px')
-  setStyle(send, 'border', '1px solid var(--dsw-alias-brand-primary, #2563eb)')
-  setStyle(send, 'background', 'var(--dsw-alias-brand-primary, #2563eb)')
-  setStyle(send, 'color', '#fff')
-  setStyle(send, 'cursor', 'pointer')
-  send.addEventListener?.('click', () => state.handlers.onSend())
-  row.appendChild(send)
-  layer.appendChild(row)
+  send.style.cssText = 'font:11px inherit;padding:1px 8px;border-radius:6px;border:1px solid var(--dsw-alias-brand-primary,#2563eb);background:var(--dsw-alias-brand-primary,#2563eb);color:#fff;cursor:pointer'
+  send.addEventListener('click', () => state.handlers.onSend())
+  el.appendChild(send)
   if (state.open && state.items.length > 0) {
-    const list = create('div')
-    setStyle(list, 'display', 'flex')
-    setStyle(list, 'flex-direction', 'column')
-    setStyle(list, 'gap', '2px')
-    state.items.forEach((item, index) => {
-      const line = create('div')
-      setStyle(line, 'display', 'flex')
-      setStyle(line, 'align-items', 'center')
-      setStyle(line, 'gap', '6px')
-      const name = create('span')
-      name.textContent = item.nodeId
-      setStyle(name, 'color', 'var(--dsw-alias-label-dimmed, #9aa0a6)')
-      setStyle(name, 'font-size', '11px')
-      line.appendChild(name)
-      const note = create('span')
-      note.textContent = item.note === '' ? t('markedOnly') : item.note
-      line.appendChild(note)
-      const drop = create('button')
-      drop.textContent = t('remove')
-      setStyle(drop, 'font-size', '11px')
-      drop.addEventListener?.('click', () => state.handlers.onRemove(index))
-      line.appendChild(drop)
-      list.appendChild(line)
-    })
-    layer.appendChild(list)
+    for (const [index, item] of state.items.entries()) {
+      const line = create('span')
+      line.textContent = item.nodeId + ':' + (item.note === '' ? t('markedOnly') : item.note)
+      line.title = '点击删除'
+      line.style.cssText = 'cursor:pointer;opacity:.85'
+      line.addEventListener('click', () => state.handlers.onRemove(index))
+      el.appendChild(line)
+    }
   }
-  placeDock(layer)
-  void doc
+  el.style.display = 'flex'
+  observeDockAnchor()
+  const card = doc.querySelector('[data-composer-card]')
+  const rect = card?.getBoundingClientRect?.()
+  const width = Number(el.offsetWidth) || 100
+  const height = Number(el.offsetHeight) || 26
+  if (rect === undefined) { el.style.left = '16px'; el.style.top = '16px'; return }
+  const view = globalThis as { innerWidth?: number }
+  const left = Math.max(8, Math.min(rect.left, Number(view.innerWidth ?? 0) - width - 8))
+  el.style.left = left + 'px'
+  el.style.top = Math.max(8, rect.top - height - 8) + 'px'
 }
 
-/** Anchor to the composer card's own rectangle: above its top edge and clear of it. */
-function placeDock(layer: any): void {
-  const doc = (globalThis as { document?: DocumentLike }).document
-  const card = doc?.querySelector?.('[data-composer-card]') as { getBoundingClientRect?: () => { left: number; top: number; right: number; bottom: number; width: number; height: number } } | null | undefined
-  // Three anchors, tried in order. A missing anchor used to leave the layer unpositioned, which put it at the
-  // end of the document - visible to nobody. A fallback that is merely in the wrong place beats an invisible
-  // element, so the last resort still places it.
-  const surface = composerRect(doc)
-  const rect = card?.getBoundingClientRect?.() ?? (surface === undefined ? undefined : {
-    left: surface.left, top: surface.top, right: surface.left + surface.width,
-    bottom: surface.top + surface.height, width: surface.width, height: surface.height,
-  })
-  const width = Number(layer.offsetWidth ?? 0) || 120
-  const height = Number(layer.offsetHeight ?? 0) || 30
-  const viewport = globalThis as { innerWidth?: number; innerHeight?: number }
-  const maxLeft = Number(viewport.innerWidth ?? 0) - width - 8
-  const left = rect === undefined ? 16 : Math.max(8, Math.min(rect.left, maxLeft))
-  const top = rect === undefined ? 16 : Math.max(8, rect.top - height - 8)
-  if (typeof layer.style.setProperty === 'function') {
-    layer.style.setProperty('left', left + 'px')
-    layer.style.setProperty('top', top + 'px')
-  }
-}
-
-function getDockLayer(): any {
-  const doc = (globalThis as { document?: DocumentLike }).document
-  return doc?.querySelector?.('[data-dme-dock]') ?? undefined
-}
-
-/** Keep the docked count in step with the pending list. */
-/**
- * Keep the docked count in step with the pending list.
- *
- * Called from a render path, so it must never throw: an exception here unmounts the whole card, and the
- * conversation falls back to the host's plain tool row - which is exactly how the card "disappeared" once.
- */
+/** Keep the docked count in step with the pending list. Called from a render path, so it cannot throw. */
 export function updateDockLayer(items: Array<{ nodeId: string; note: string }>, open: boolean, handlers: DockHandlers): void {
   dockReact = { count: items.length, open, items, handlers }
-  try { refreshDock() } catch { /* the count is a convenience; the drawing is the point */ }
+  try { scheduleDock() } catch { /* a lost badge never costs the drawing */ }
 }
 
+function refreshDock(): void { scheduleDock() }
 function installEnterCapture(): void {
   if (pendingBlock === '') return
   const doc = (globalThis as { document?: DocumentLike }).document
