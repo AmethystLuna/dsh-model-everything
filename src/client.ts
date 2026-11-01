@@ -959,6 +959,7 @@ function dockSlotView(React: ReactLike): () => unknown {
     // insets are measured from the card's own box rather than guessed - and re-measured when either side
     // changes size, which is what a dragged divider does.
     const [pad, setPad] = (React.useState ?? ((initial: { left: number; right: number }) => [initial, () => {}]))({ left: 0, right: 0 }) as [{ left: number; right: number }, (next: { left: number; right: number }) => void]
+    const [diag, setDiag] = (React.useState ?? ((initial: string) => [initial, () => {}]))('') as [string, (next: string) => void]
     React.useEffect?.(() => {
       const doc = (globalThis as { document?: any }).document
       const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
@@ -972,7 +973,11 @@ function dockSlotView(React: ReactLike): () => unknown {
           if (slot === null || slot === undefined || card === null || card === undefined) return
           const s = slot.getBoundingClientRect()
           const c = card.getBoundingClientRect()
-          setPad({ left: Math.max(0, Math.round(c.left - s.left)), right: Math.max(0, Math.round(s.right - c.right)) })
+          const next = { left: Math.max(0, Math.round(c.left - s.left)), right: Math.max(0, Math.round(s.right - c.right)) }
+          setPad(next)
+          // The numbers are shown in the control itself: a screenshot then answers what a console command would,
+          // and this loop stops being guesswork.
+          setDiag(' L' + String(next.left) + ' R' + String(next.right) + ' s' + String(Math.round(s.left)) + ' c' + String(Math.round(c.left)) + ' w' + String(Math.round(c.width)))
         } catch { /* unmeasured insets are a cosmetic miss */ }
       }
       if (typeof timer === 'function') { timer(measure, 0); timer(measure, 120); timer(measure, 600) }
@@ -1001,7 +1006,7 @@ function dockSlotView(React: ReactLike): () => unknown {
         type: 'button',
         onClick: () => state.handlers.onToggle(),
         style: { font: 'inherit', padding: '1px 8px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: 'inherit', cursor: 'pointer' },
-      }, t('pending') + ' ×' + String(state.count)),
+      }, t('pending') + ' ×' + String(state.count) + diag),
       React.createElement('button', {
         type: 'button',
         onClick: () => state.handlers.onSend(),
