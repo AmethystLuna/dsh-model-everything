@@ -910,13 +910,10 @@ function updateDockChip(): void {
   }
   el.style.display = 'flex'
   observeDockAnchor()
-  const card = composerBox(doc)
-  const rect = card?.getBoundingClientRect?.()
-  if (rect !== undefined) {
-    // Instrumented while the alignment is being settled: the numbers ride in the control itself.
-    toggle.title = 'left ' + String(Math.round(rect.left)) + ' width ' + String(Math.round(rect.width))
-    toggle.textContent = toggle.textContent + ' L' + String(Math.round(rect.left)) + ' W' + String(Math.round(rect.width))
-  }
+  // The writing surface is the one element certainly inside the composer: align the control to the line the
+  // reader types on, in viewport coordinates. Nothing inferred, nothing constant.
+  const surface = (findComposer(doc) ?? doc.querySelector('textarea, [contenteditable="true"]')) as any
+  const rect = surface?.getBoundingClientRect?.()
   const width = Number(el.offsetWidth) || 100
   const height = Number(el.offsetHeight) || 26
   if (rect === undefined) { el.style.left = '16px'; el.style.top = '16px'; return }
@@ -924,6 +921,7 @@ function updateDockChip(): void {
   const left = Math.max(8, Math.min(rect.left, Number(view.innerWidth ?? 0) - width - 8))
   el.style.left = left + 'px'
   el.style.top = Math.max(8, rect.top - height - 8) + 'px'
+  observeDivider(doc)
 }
 
 /** Keep the docked count in step with the pending list. Called from a render path, so it cannot throw. */
@@ -1049,6 +1047,28 @@ function composerBox(doc: any): any {
   } catch {
     return undefined
   }
+}
+
+let dividerObserved: unknown
+
+/**
+ * Re-place after a divider drag.
+ *
+ * The host's column divider is `[class*="widthHandle"]`. Watching its size catches the drag itself; a
+ * pointerup catches the release, in case the layout settles after the last size change.
+ */
+function observeDivider(doc: any): void {
+  try {
+    const handle = doc?.querySelector?.('[class*="widthHandle"]')
+    if (handle === null || handle === undefined || dividerObserved === handle) return
+    dividerObserved = handle
+    const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void } }).ResizeObserver
+    if (Observer !== undefined) {
+      try { new Observer(() => { scheduleDock() }).observe(handle) } catch { /* no observer, no drag follow */ }
+    }
+    const scope = globalThis as { addEventListener?: (t: string, fn: () => void) => void }
+    scope.addEventListener?.('pointerup', () => { scheduleDock() })
+  } catch { /* a missing handle is a layout that never changes */ }
 }
 
 function refreshDock(): void { scheduleDock() }
