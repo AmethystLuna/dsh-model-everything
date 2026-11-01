@@ -1120,9 +1120,11 @@ function installEnterCapture(): void {
     // marker that only answers the button is a marker half the messages never get.
     const count = (block.match(/^Diagram note \[/gm) ?? []).length
     const label = '图注 ×' + String(count === 0 ? 1 : count)
-    attachSentChip(label)
-    // One chip, not two: the attach below the bubble was added next to the same anchor's sibling and both landed.
-    void attachBelowBubble
+    // The below-bubble insert is the one that lines up with the message text: it lands inside the element that
+    // already carries the text's padding. The sibling insert sat at the row's edge instead. One of them, and it
+    // is this one.
+    attachBelowBubble(label, draft)
+    void attachSentChip
     notifySent()
     foldOnce()
     pendingBlock = ''
