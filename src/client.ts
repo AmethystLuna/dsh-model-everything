@@ -258,10 +258,19 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
         'div',
         {
           style: {
-            ...(options.floating === false ? {} : { position: 'fixed', left: (docked === undefined ? 16 : docked.left) + 'px', top: (docked === undefined ? 16 : Math.max(8, docked.top - 40)) + 'px', zIndex: 30 }),
-            display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 6px', borderRadius: '8px',
-            background: TOKEN.surface, border: '1px solid ' + TOKEN.border, color: TOKEN.text,
-            boxShadow: '0 6px 18px rgba(0,0,0,0.25)', font: '12px system-ui, sans-serif', maxWidth: '420px',
+            ...(options.floating === false ? {} : {
+              position: 'fixed', zIndex: 30,
+              left: (docked === undefined ? 16 : docked.left) + 'px',
+              // Anchored to the composer's own top edge, in the gap above it: the count is in sight while the
+              // reader is typing, and never covers the box they are typing into.
+              top: (docked === undefined ? 16 : Math.max(8, docked.top - 46)) + 'px',
+              width: (docked === undefined ? 360 : Math.min(420, docked.width)) + 'px',
+            }),
+            display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 10px', borderRadius: '12px',
+            // The composer's own surface and hairline: the control reads as part of that box, not as a dialog.
+            background: 'var(--dsw-alias-bg-layer-1, ' + TOKEN.surface + ')',
+            border: '1px solid var(--dsw-alias-border-l2, ' + TOKEN.border + ')', color: TOKEN.text,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.22)', font: '12px system-ui, sans-serif',
           },
         },
         h(
@@ -707,10 +716,23 @@ function installEnterCapture(): void {
     // nobody asked for - the same rule the click path applies.
     const shell = draftShell()
     const draft = String(shell?.state?.getSnapshot?.()?.draft ?? '')
-    replaceBlock(draft.trim() === '' ? withoutEmptyQuestion(pendingBlock) : pendingBlock)
+    const block = draft.trim() === '' ? withoutEmptyQuestion(pendingBlock) : pendingBlock
+    replaceBlock(block)
+    // The count has to appear for this message too: pressing Enter is the path most readers take, and a
+    // marker that only answers the button is a marker half the messages never get.
+    const count = (block.match(/^Diagram note \[/gm) ?? []).length
+    attachSentChip('图注 ×' + String(count === 0 ? 1 : count))
+    notifySent()
     foldOnce()
     pendingBlock = ''
   }, true)
+}
+
+/** Tell the surfaces that a note left, so their own chrome can say so. */
+function notifySent(): void {
+  for (const listener of sentListeners.slice()) {
+    try { listener() } catch { /* one listener must not keep the others from hearing it */ }
+  }
 }
 
 function placeListBlock(list: Array<{ nodeId: string; note: string }>, caption: string): boolean {
