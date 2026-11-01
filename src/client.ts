@@ -980,10 +980,8 @@ function dockSlotView(React: ReactLike): () => unknown {
       const measure = (): void => {
         try {
           const slot = doc?.querySelector?.('[data-dme-dock-slot]')
-          // The card is the box the reader types in; hosts differ in what they mark. Try the attribute, then
-          // the scroll container, then the writing surface's own parent - the widest honest guess is still a
-          // measurement, not a constant.
-          const card = composerBox(doc)
+          // Same two rectangles the render uses, so a measurement taken here and a measurement taken there agree.
+          const card = (findComposer(doc) ?? doc?.querySelector?.('textarea, [contenteditable="true"]')) as any
           if (slot === null || slot === undefined || card === null || card === undefined) return
           const s = slot.getBoundingClientRect()
           const c = card.getBoundingClientRect()
@@ -994,7 +992,10 @@ function dockSlotView(React: ReactLike): () => unknown {
           setDiag(' L' + String(next.left) + ' R' + String(next.right) + ' s' + String(Math.round(s.left)) + ' c' + String(Math.round(c.left)) + ' w' + String(Math.round(c.width)))
         } catch { /* unmeasured insets are a cosmetic miss */ }
       }
-      if (typeof timer === 'function') { timer(measure, 0); timer(measure, 120); timer(measure, 600) }
+      // The composer can be laid out after this mounts: the first measurements come back 0 and the control sits
+      // at the column edge until some unrelated change forces a re-render (a pasted picture did). Retry until the
+      // number settles instead of hoping one measurement lands.
+      if (typeof timer === 'function') { for (const delay of [0, 100, 250, 500, 900, 1500, 2400]) timer(measure, delay) }
       const scope = globalThis as { addEventListener?: (t: string, fn: () => void) => void; removeEventListener?: (t: string, fn: () => void) => void }
       scope.addEventListener?.('resize', measure)
       const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void; disconnect: () => void } }).ResizeObserver
