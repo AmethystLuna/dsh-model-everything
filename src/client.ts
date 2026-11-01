@@ -777,14 +777,18 @@ function attachSentChip(label: string): void {
   let tries = 0
   const attempt = (): void => {
     tries += 1
-    const anchor = doc.querySelector?.('[data-annotation-chip]') as { parentNode?: { insertBefore?: (node: unknown, before: unknown) => unknown } | null; nextSibling?: unknown } | null | undefined
-    const parent = anchor?.parentNode
-    const made = (doc as unknown as { createElement?: (tag: string) => { textContent?: string; setAttribute?: (name: string, value: string) => void } }).createElement?.('span')
-    if (made !== undefined && parent !== undefined && parent !== null && typeof parent.insertBefore === 'function') {
+    // Their chip is the anchor; the BUBBLE is its parent, and the chip goes after the bubble - not inside it.
+    // Inside, it lasted until the next render of a message two other writers are rebuilding.
+    const anchor = doc.querySelector?.('[data-annotation-chip]') as { parentElement?: any } | null | undefined
+    const bubble = anchor?.parentElement
+    const row = bubble?.parentElement
+    const made = (doc as unknown as { createElement?: (tag: string) => any }).createElement?.('span')
+    if (made !== undefined && bubble !== undefined && bubble !== null && row !== undefined && row !== null) {
       made.textContent = label
       made.setAttribute?.('data-dme-own', '1')
+      made.style.cssText = 'display:inline-block;margin:4px 8px 0;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6)'
       try {
-        parent.insertBefore(made, anchor?.nextSibling ?? null)
+        row.insertBefore(made, bubble.nextSibling)
         return
       } catch {
         // A refused insert is a chip not shown, not a broken message.
