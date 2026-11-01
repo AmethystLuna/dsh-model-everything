@@ -910,8 +910,13 @@ function updateDockChip(): void {
   }
   el.style.display = 'flex'
   observeDockAnchor()
-  const card = doc.querySelector('[data-composer-card]')
+  const card = composerBox(doc)
   const rect = card?.getBoundingClientRect?.()
+  if (rect !== undefined) {
+    // Instrumented while the alignment is being settled: the numbers ride in the control itself.
+    toggle.title = 'left ' + String(Math.round(rect.left)) + ' width ' + String(Math.round(rect.width))
+    toggle.textContent = toggle.textContent + ' L' + String(Math.round(rect.left)) + ' W' + String(Math.round(rect.width))
+  }
   const width = Number(el.offsetWidth) || 100
   const height = Number(el.offsetHeight) || 26
   if (rect === undefined) { el.style.left = '16px'; el.style.top = '16px'; return }
@@ -1072,8 +1077,8 @@ function installEnterCapture(): void {
     const count = (block.match(/^Diagram note \[/gm) ?? []).length
     const label = '图注 ×' + String(count === 0 ? 1 : count)
     attachSentChip(label)
-    // Under the bubble, outside it: the same count, in a place no other writer owns.
-    attachBelowBubble(label, draft)
+    // One chip, not two: the attach below the bubble was added next to the same anchor's sibling and both landed.
+    void attachBelowBubble
     notifySent()
     foldOnce()
     pendingBlock = ''
