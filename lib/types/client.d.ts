@@ -81,6 +81,11 @@ export interface AnnotationState {
         left: number;
         top: number;
     };
+    /** The correction the dock applied after measuring where the chip actually landed. */
+    dockFix?: {
+        dx: number;
+        dy: number;
+    };
 }
 export interface AnnotationActions {
     onNote: (value: string) => void;
@@ -103,6 +108,10 @@ export interface AnnotationActions {
 export declare function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options?: {
     floating?: boolean;
     document?: DocumentLike;
+    dockFix?: {
+        dx: number;
+        dy: number;
+    };
 }): unknown;
 /** Remember what would leave with the next message, and start watching for that message. */
 export declare function setPendingBlock(text: string): void;

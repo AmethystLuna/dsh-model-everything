@@ -198,6 +198,8 @@ export interface AnnotationState {
   open?: boolean
   /** Where the editor sits, in the drawing's own coordinates: beside the node the reader picked. */
   anchor?: { left: number; top: number }
+  /** The correction the dock applied after measuring where the chip actually landed. */
+  dockFix?: { dx: number; dy: number }
 }
 
 export interface AnnotationActions {
@@ -219,7 +221,7 @@ export interface AnnotationActions {
  * fragments in it would be exactly the mess this feature is meant to avoid. Colours come from the host's tokens,
  * so light and dark themes need no separate code.
  */
-export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean; document?: DocumentLike } = {}): unknown {
+export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean; document?: DocumentLike; dockFix?: { dx: number; dy: number } } = {}): unknown {
   const button = (label: string, onClick: () => void, accent = false): unknown =>
     h('button', { type: 'button', onClick, style: { fontSize: '12px', padding: '2px 8px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: accent ? TOKEN.accent : TOKEN.text, cursor: 'pointer' } }, label)
   const editor = state.picked === null
@@ -261,6 +263,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
             ...(options.floating === false ? {} : {
               position: 'fixed', zIndex: 30,
               left: (docked === undefined ? 16 : docked.left) + 'px',
+              transform: 'translate(' + String(state.dockFix?.dx ?? 0) + 'px, ' + String(state.dockFix?.dy ?? 0) + 'px)',
               // Anchored to the composer's own top edge, in the gap above it: the count is in sight while the
               // reader is typing, and never covers the box they are typing into.
               top: (docked === undefined ? 16 : Math.max(8, docked.top - 46)) + 'px',
@@ -275,7 +278,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
         },
         h(
           'div',
-          { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+          { 'data-dme-dock': '1', style: { display: 'flex', alignItems: 'center', gap: '6px' } },
           h('button', { type: 'button', title: '展开，逐个删除', onClick: () => actions.onToggle(), style: { fontSize: '12px', padding: '1px 6px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, t('pending') + ' ×' + String(state.pending.length)),
           button(t('send'), actions.onSend, true),
         ),
@@ -385,6 +388,9 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [sent, setSent] = useState('')
   // The composer grows when a picture is pasted, and the docked control has to follow it.
   const [, setDockTick] = useState(0)
+  // `position: fixed` is relative to the nearest transformed ancestor, not to the viewport. The chip therefore
+  // measures where it actually landed and corrects itself once, instead of trusting the coordinates we computed.
+  const [dockFix, setDockFix] = useState({ dx: 0, dy: 0 })
   React.useEffect?.(() => {
     const doc = (globalThis as { document?: DocumentLike }).document
     const composer = findComposer(doc)
@@ -407,6 +413,16 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
       observer?.disconnect()
     }
   }, [])
+  React.useEffect?.(() => {
+    const doc = (globalThis as { document?: DocumentLike }).document
+    const chip = doc?.querySelector?.('[data-dme-dock]') as { getBoundingClientRect?: () => { left: number; top: number; height: number } } | null | undefined
+    const surface = composerRect(doc)
+    const landed = chip?.getBoundingClientRect?.()
+    if (surface === undefined || landed === undefined) return
+    const dx = Math.round(surface.left - landed.left)
+    const dy = Math.round((surface.top - landed.height - 8) - landed.top)
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) setDockFix((was) => ({ dx: was.dx + dx, dy: was.dy + dy }))
+  })
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
   // What would leave with the next message: the chip shows it, and the draft stays empty until Enter.
   setPendingBlock(pending.length === 0 ? '' : annotationBlock(pending.map((item) => ({ ...item, caption }))))
@@ -471,7 +487,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const panel = annotate
     ? annotationPanel(
         (type, options, ...children) => React.createElement(type, options, ...children),
-        { picked, note, pending, status, anchor, open },
+        { picked, note, pending, status, anchor, open, dockFix },
         {
           onNote: setNote,
           onAdd: () => {
