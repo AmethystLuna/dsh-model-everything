@@ -759,8 +759,14 @@ function attachBelowBubble(label: string, typed: string): void {
       const hit = hits[hits.length - 1]
       const host = hit === undefined ? undefined : hit.parentElement
       if (host !== undefined && host !== null) {
+        // Exactly one: a previous pass may have inserted a chip for the same message (a second Enter, a retry),
+        // and two counts under one bubble is worse than a late one.
+        try {
+          for (const old of Array.from(doc.querySelectorAll('[data-dme-chip]')) as Array<{ remove?: () => void }>) old.remove?.()
+        } catch { /* nothing to clear */ }
         const chip = doc.createElement('span')
         chip.setAttribute('data-dme-own', '1')
+        chip.setAttribute('data-dme-chip', '1')
         chip.textContent = label
         chip.style.cssText = 'display:inline-block;margin-top:4px;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6)'
         host.appendChild(chip)
