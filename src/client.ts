@@ -762,7 +762,10 @@ function attachBelowBubble(label: string, typed: string): void {
         // Exactly one: a previous pass may have inserted a chip for the same message (a second Enter, a retry),
         // and two counts under one bubble is worse than a late one.
         try {
-          for (const old of Array.from(doc.querySelectorAll('[data-dme-chip]')) as Array<{ remove?: () => void }>) old.remove?.()
+          const existing = Array.from(doc.querySelectorAll('[data-dme-chip]')) as Array<{ remove?: () => void; textContent?: string }>
+          // One per message: already present with this label means a retry found its own work.
+          if (existing.some((old) => String(old.textContent ?? '') === label)) return
+          for (const old of existing) old.remove?.()
         } catch { /* nothing to clear */ }
         const chip = doc.createElement('span')
         chip.setAttribute('data-dme-own', '1')
@@ -1143,7 +1146,8 @@ function installEnterCapture(): void {
     attachBelowBubble(label, draft)
     void attachSentChip
     notifySent()
-    foldOnce()
+    // foldOnce() is off: rewriting the message text made the bubble flicker back to the raw block on the next
+    // host render, and every re-fold landed beside the chip. The chip is the feature; the text stays as sent.
     pendingBlock = ''
   }, true)
 }
@@ -1281,7 +1285,8 @@ function submitDraft(): boolean {
   if (shell === undefined || typeof shell.submit !== 'function') return false
   try {
     shell.submit('queue')
-    foldOnce()
+    // foldOnce() is off: rewriting the message text made the bubble flicker back to the raw block on the next
+    // host render, and every re-fold landed beside the chip. The chip is the feature; the text stays as sent.
     return true
   } catch {
     return false
