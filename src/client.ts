@@ -890,6 +890,12 @@ function installEnterCapture(): void {
 
 /** Tell the surfaces that a note left, so their own chrome can say so. */
 function notifySent(): void {
+  // Clear the dock here as well as through React: the card can unmount while the message is being sent (the
+  // tool row collapses), and a listener that never runs leaves a count for a note that already left.
+  if (dockReact !== undefined) {
+    dockReact = { count: 0, open: false, items: [], handlers: dockReact.handlers }
+    try { scheduleDock() } catch { /* the count is a convenience */ }
+  }
   for (const listener of sentListeners.slice()) {
     try { listener() } catch { /* one listener must not keep the others from hearing it */ }
   }
