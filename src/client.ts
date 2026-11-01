@@ -733,6 +733,43 @@ function foldOnce(): void {
  * chip is outside that surgery: text nodes are what it removes. When there is no anchor it inserts nothing -
  * a missing chip is a smaller failure than a chip in the wrong place.
  */
+/**
+ * Put a count under the bubble that was just sent, outside it.
+ *
+ * Inside the bubble two other writers work: the host re-renders it, and the annotation plugin deletes the text
+ * before its own marker. An element inserted after the bubble is outside both - the row's children are
+ * reconciled by position, and a trailing extra child has nothing to disagree with.
+ *
+ * The bubble is found by the text the reader typed: after every rewrite, that string is still in the draft
+ * and in the message alike.
+ */
+function attachBelowBubble(label: string, typed: string): void {
+  const doc = (globalThis as { document?: any }).document
+  const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
+  const wanted = typed.trim()
+  if (doc === undefined || typeof timer !== 'function' || wanted === '') return
+  let tries = 0
+  const attempt = (): void => {
+    tries += 1
+    try {
+      const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
+      const hits = all.filter((node) => String(node.textContent ?? '').trim() === wanted && node.parentElement)
+      const hit = hits[hits.length - 1]
+      const host = hit === undefined ? undefined : hit.parentElement
+      if (host !== undefined && host !== null) {
+        const chip = doc.createElement('span')
+        chip.setAttribute('data-dme-own', '1')
+        chip.textContent = label
+        chip.style.cssText = 'display:inline-block;margin-top:4px;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6)'
+        host.appendChild(chip)
+        return
+      }
+    } catch { /* a chip not shown is not a broken message */ }
+    if (tries < 10) timer(attempt, 300)
+  }
+  timer(attempt, 400)
+}
+
 function attachSentChip(label: string): void {
   const doc = (globalThis as { document?: DocumentLike }).document
   const timer = (globalThis as { setTimeout?: (handler: () => void, delay: number) => unknown }).setTimeout
@@ -908,7 +945,10 @@ function installEnterCapture(): void {
     // The count has to appear for this message too: pressing Enter is the path most readers take, and a
     // marker that only answers the button is a marker half the messages never get.
     const count = (block.match(/^Diagram note \[/gm) ?? []).length
-    attachSentChip('图注 ×' + String(count === 0 ? 1 : count))
+    const label = '图注 ×' + String(count === 0 ? 1 : count)
+    attachSentChip(label)
+    // Under the bubble, outside it: the same count, in a place no other writer owns.
+    attachBelowBubble(label, draft)
     notifySent()
     foldOnce()
     pendingBlock = ''
