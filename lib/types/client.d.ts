@@ -116,6 +116,24 @@ export declare function annotationPanel(h: H, state: AnnotationState, actions: A
 /** Remember what would leave with the next message, and start watching for that message. */
 export declare function setPendingBlock(text: string): void;
 /**
+ * The dock, as a layer on `document.body`.
+ *
+ * A `position: fixed` node still positions against the nearest transformed ancestor, and the composer sits
+ * inside one - which is why every coordinate this plugin computed landed inside the box. The shipped
+ * annotation plugin sidesteps it the same way: its chip is a body-level layer, so fixed means the viewport.
+ * Size and place come from the composer card's own rectangle, measured after every layout change.
+ */
+interface DockHandlers {
+    onToggle: () => void;
+    onSend: () => void;
+    onRemove: (index: number) => void;
+}
+/** Keep the docked count in step with the pending list. */
+export declare function updateDockLayer(items: Array<{
+    nodeId: string;
+    note: string;
+}>, open: boolean, handlers: DockHandlers): void;
+/**
  * Tell this module when a message leaves, by watching the one signal the host gives: the draft empties.
  *
  * A note that was committed is in the draft, so after the send there is nothing left to keep - and a chip still
