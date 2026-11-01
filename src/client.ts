@@ -221,7 +221,7 @@ export interface AnnotationActions {
  * fragments in it would be exactly the mess this feature is meant to avoid. Colours come from the host's tokens,
  * so light and dark themes need no separate code.
  */
-export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean; document?: DocumentLike; dockFix?: { dx: number; dy: number } } = {}): unknown {
+export function annotationPanel(h: H, state: AnnotationState, actions: AnnotationActions, options: { floating?: boolean; document?: DocumentLike; dockFix?: { dx: number; dy: number }; dockChip?: boolean } = {}): unknown {
   const button = (label: string, onClick: () => void, accent = false): unknown =>
     h('button', { type: 'button', onClick, style: { fontSize: '12px', padding: '2px 8px', borderRadius: '6px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: accent ? TOKEN.accent : TOKEN.text, cursor: 'pointer' } }, label)
   const editor = state.picked === null
@@ -256,7 +256,7 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
   const docked = options.floating !== false && options.document !== undefined ? composerRect(options.document) : undefined
   // A docked count is a body-level layer now; rendering it here as well put a second, unpositioned copy
   // inside the card - which is what "the chip's coordinates ran off" was.
-  const chip = state.pending.length === 0 || options.floating !== true
+  const chip = state.pending.length === 0 || options.dockChip === false
     ? null
     : h(
         'div',
@@ -520,8 +520,8 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
           onToggle: () => setOpen(!open),
           onRemove: (index: number) => setPending(pending.filter((_, at) => at !== index)),
         },
-        // The docked count is the body-level layer; this panel keeps the editor and the status line only.
-        { document, floating: false },
+        // The count is the body-level layer; this panel keeps the editor, which still needs its anchor.
+        { document, dockChip: false },
       )
     : null
   return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel, { zoom: Number(zoom), full: Boolean(full), onZoom: (next: number) => setZoom(next), onFull: (next: boolean) => setFull(next) })
