@@ -866,14 +866,20 @@ function renderDockBody(doc: DocumentLike, create: (tag: string) => any): void {
 function placeDock(layer: any): void {
   const doc = (globalThis as { document?: DocumentLike }).document
   const card = doc?.querySelector?.('[data-composer-card]') as { getBoundingClientRect?: () => { left: number; top: number; right: number; bottom: number; width: number; height: number } } | null | undefined
-  const rect = card?.getBoundingClientRect?.()
-  if (rect === undefined) return
+  // Three anchors, tried in order. A missing anchor used to leave the layer unpositioned, which put it at the
+  // end of the document - visible to nobody. A fallback that is merely in the wrong place beats an invisible
+  // element, so the last resort still places it.
+  const surface = composerRect(doc)
+  const rect = card?.getBoundingClientRect?.() ?? (surface === undefined ? undefined : {
+    left: surface.left, top: surface.top, right: surface.left + surface.width,
+    bottom: surface.top + surface.height, width: surface.width, height: surface.height,
+  })
   const width = Number(layer.offsetWidth ?? 0) || 120
   const height = Number(layer.offsetHeight ?? 0) || 30
   const viewport = globalThis as { innerWidth?: number; innerHeight?: number }
   const maxLeft = Number(viewport.innerWidth ?? 0) - width - 8
-  const left = Math.max(8, Math.min(rect.left, maxLeft))
-  const top = Math.max(8, rect.top - height - 8)
+  const left = rect === undefined ? 16 : Math.max(8, Math.min(rect.left, maxLeft))
+  const top = rect === undefined ? 16 : Math.max(8, rect.top - height - 8)
   if (typeof layer.style.setProperty === 'function') {
     layer.style.setProperty('left', left + 'px')
     layer.style.setProperty('top', top + 'px')
