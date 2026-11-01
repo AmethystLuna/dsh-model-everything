@@ -1009,18 +1009,31 @@ function dockSlotView(React: ReactLike): () => unknown {
     }, [])
     const state = dockReact
     if (state === undefined || state.count === 0) return null
+    // Measured at render time, not only in an effect: the effect can run before the host has laid the slot out,
+    // and a zero measured at that moment is then the value the control keeps.
+    let livePad = pad
+    try {
+      const doc = (globalThis as { document?: any }).document
+      const slotEl = doc?.querySelector?.('[data-dme-dock-slot]')
+      const surfaceEl = (findComposer(doc) ?? doc?.querySelector?.('textarea, [contenteditable="true"]')) as any
+      const sr = slotEl?.getBoundingClientRect?.()
+      const cr = surfaceEl?.getBoundingClientRect?.()
+      if (sr !== undefined && sr !== null && cr !== undefined && cr !== null) {
+        livePad = { left: Math.max(0, Math.round(cr.left - sr.left)), right: Math.max(0, Math.round(sr.right - cr.right)) }
+      }
+    } catch { /* the effect's value stands */ }
     return React.createElement(
       'div',
       {
         'data-dme-own': '1',
         'data-dme-dock-slot': '1',
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', paddingTop: '2px', paddingBottom: '2px', paddingLeft: String(pad.left) + 'px', paddingRight: String(pad.right) + 'px', font: '11px system-ui, sans-serif', color: 'inherit' },
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', paddingTop: '2px', paddingBottom: '2px', paddingLeft: String(livePad.left) + 'px', paddingRight: String(livePad.right) + 'px', font: '11px system-ui, sans-serif', color: 'inherit' },
       },
       React.createElement('button', {
         type: 'button',
         onClick: () => state.handlers.onToggle(),
         style: { font: 'inherit', padding: '1px 8px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: 'inherit', cursor: 'pointer' },
-      }, t('pending') + ' ×' + String(state.count) + diag),
+      }, t('pending') + ' ×' + String(state.count) + ' L' + String(livePad.left) + diag),
       React.createElement('button', {
         type: 'button',
         onClick: () => state.handlers.onSend(),
