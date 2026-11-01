@@ -771,6 +771,17 @@ let dockLayer: { remove?: () => void } | undefined
 let dockReact: { count: number; open: boolean; items: Array<{ nodeId: string; note: string }>; handlers: DockHandlers } | undefined
 
 let dockEl: any
+let dockReceipt = ''
+let receiptTimer: unknown
+
+/** Show a receipt for a few seconds in the dock layer, and take it down again. */
+function publishDockReceipt(text: string): void {
+  dockReceipt = text
+  const scope = globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown; clearTimeout?: (id: unknown) => void }
+  if (scope.clearTimeout !== undefined) scope.clearTimeout(receiptTimer)
+  receiptTimer = scope.setTimeout?.(() => { dockReceipt = ''; try { scheduleDock() } catch { /* gone */ } }, 8000)
+}
+
 let dockObserver: { disconnect: () => void } | undefined
 let dockFrame: number | undefined
 
@@ -815,7 +826,23 @@ function updateDockChip(): void {
   const el = ensureDock()
   if (state === undefined || el === undefined) return
   const doc = (globalThis as { document?: any }).document
-  if (state.count === 0) { el.style.display = 'none'; return }
+  if (state.count === 0) {
+    if (dockReceipt === '') { el.style.display = 'none'; return }
+    // The receipt is text only: nothing to click, nothing to send.
+    el.textContent = ''
+    const note = doc.createElement('span')
+    note.textContent = dockReceipt
+    note.style.cssText = 'opacity:.75'
+    el.appendChild(note)
+    el.style.display = 'flex'
+    const cardRect = doc.querySelector('[data-composer-card]')?.getBoundingClientRect?.()
+    if (cardRect === undefined) { el.style.left = '16px'; el.style.top = '16px'; return }
+    const w = Number(el.offsetWidth) || 100
+    const h = Number(el.offsetHeight) || 24
+    el.style.left = Math.max(8, Math.min(cardRect.left, Number((globalThis as { innerWidth?: number }).innerWidth ?? 0) - w - 8)) + 'px'
+    el.style.top = Math.max(8, cardRect.top - h - 8) + 'px'
+    return
+  }
   const create = (tag: string): any => doc.createElement(tag)
   el.textContent = ''
   const toggle = create('button')
@@ -893,7 +920,12 @@ function notifySent(): void {
   // Clear the dock here as well as through React: the card can unmount while the message is being sent (the
   // tool row collapses), and a listener that never runs leaves a count for a note that already left.
   if (dockReact !== undefined) {
+    const before = dockReact.count
     dockReact = { count: 0, open: false, items: [], handlers: dockReact.handlers }
+    // A note that left keeps a short-lived receipt in this plugin's own layer. The bubble is not the place for
+    // it: the transcript is rebuilt by the host and by any other plugin folding the same message, and a chip
+    // planted there survives only until the next re-render.
+    if (before > 0) publishDockReceipt('图注 ×' + String(before) + ' 已发送')
     try { scheduleDock() } catch { /* the count is a convenience */ }
   }
   for (const listener of sentListeners.slice()) {
