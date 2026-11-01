@@ -820,6 +820,7 @@ let dockLayer: { remove?: () => void } | undefined
 let dockReact: { count: number; open: boolean; items: Array<{ nodeId: string; note: string }>; handlers: DockHandlers } | undefined
 
 let dockEl: any
+let dockRetries = 0
 let dockReceipt = ''
 let receiptTimer: unknown
 
@@ -939,6 +940,15 @@ function updateDockChip(): void {
   el.style.left = left + 'px'
   el.style.top = Math.max(8, rect.top - height - 8) + 'px'
   observeDivider(doc)
+  // Before the composer has a box the rectangle is degenerate and the control lands at the edge. Retry until the
+  // number stops looking like "not laid out yet" - bounded, so a host that never lays out does not spin.
+  const scope2 = globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }
+  if (left <= 8 && dockRetries < 12 && typeof scope2.setTimeout === 'function') {
+    dockRetries += 1
+    scope2.setTimeout(() => { try { updateDockChip() } catch { /* keeps the last placement */ } }, 250)
+  } else if (left > 8) {
+    dockRetries = 0
+  }
 }
 
 /** Keep the docked count in step with the pending list. Called from a render path, so it cannot throw. */
@@ -1653,12 +1663,10 @@ export default function factory(require: (name: string) => unknown): PluginShape
       // composer card" in the slot catalog. A slot is the supported way to sit there: the host owns the
       // position, the width and the surface, so this plugin stops computing coordinates in someone else's
       // layout. The body-level layer stays as the fallback for a host without this slot.
-      ctx.slots.inject('conversation.input.dock', () => ctx.slots.register(
-        // `label` is a function so it is evaluated when the host renders the dock, not here: apply runs on a page
-        // whose language is read from the document, and a host without one must still register.
-        { name: 'conversation.input.dock', id: 'dsh-model-everything-notes', order: 20, label: () => t('pending') },
-        dockSlotView(React),
-      ))
+      // The composer dock slot is not used: on this host its component renders before the composer has a box, and
+      // a hook-driven re-measure is not guaranteed - the count sat at the column edge until unrelated typing forced
+      // a re-render. The body layer measures itself on a retry schedule, which converges without hooks.
+      void dockSlotView
     },
   }
 }
