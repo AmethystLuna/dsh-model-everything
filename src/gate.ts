@@ -10,13 +10,15 @@
  *
  * Why it is a separate row. The plugin's doctrine is that a capability is discoverable
  * through its own tool description or skill text. Injection departs from that, so it is
- * opt-in and mounted as its own component: install it, disable it, or never enable it,
- * without touching the tools or the skills. `enabled` is a live switch, so the Web Plugins
- * page flips it inside a running host.
+ * mounted as its own component: the bundle's patch enables it, and the row can be turned off
+ * or removed without touching the tools or the skills. `enabled` is a live switch, so the Web
+ * Plugins page flips it inside a running host.
  *
- * Why it is off by default. It costs tokens in every session that turns it on, to fix a
- * problem text-only routing was measured not to have once the session engages. A deployment
- * that wants it says so; the default pays nothing.
+ * Why the bundle turns it on. Measured: a session that never decides to load a skill is never
+ * routed, and the catalog line is cut at 500 characters, so a domain the request names can be
+ * invisible at the moment of choosing. The cost is a fixed message in every session, which is
+ * why the switch is live and documented: turn it off where the bundle's default is wrong. The
+ * component's own `enabled` script default is off, so a bare `app.add(gate)` injects nothing.
  *
  * What it does not do. It routes; it checks nothing. It cannot make a skill load, and it
  * does not restate the doctrine - the skill bodies carry that, and duplicating them here
