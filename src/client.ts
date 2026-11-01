@@ -716,9 +716,13 @@ function foldOnce(): void {
   const doc = (globalThis as { document?: DocumentLike }).document
   const timer = (globalThis as { setTimeout?: (handler: () => void, delay: number) => unknown }).setTimeout
   if (doc === undefined || typeof timer !== 'function') return
-  timer(() => {
+  // Four passes, not one. The host re-renders the message after the first pass - a fold that landed a moment
+  // ago can be gone a moment later, which reads as "the chip showed for an instant and then went away". Four
+  // single scans are still cheaper than one observer over a streaming transcript.
+  const fold = (): void => {
     try { decorateTranscript(doc as unknown as TranscriptDocumentForClient, t('pending'), t('carried')) } catch { /* the message keeps its block */ }
-  }, 600)
+  }
+  for (const delay of [400, 1200, 2600, 5000]) timer(fold, delay)
 }
 
 /**
