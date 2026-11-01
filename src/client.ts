@@ -843,6 +843,8 @@ function ensureDock(): any {
   if (dockEl !== undefined) return dockEl
   const doc = (globalThis as { document?: any }).document
   if (doc?.body === undefined || typeof doc.createElement !== 'function') return undefined
+  // Exactly one layer: a reload, a remount or a stale reference must not leave two counts floating.
+  for (const old of Array.from(doc.querySelectorAll('[data-dme-dock]')) as Array<{ remove?: () => void }>) old.remove?.()
   const el = doc.createElement('div')
   el.setAttribute('data-dme-dock', '1')
   el.setAttribute('data-dme-own', '1')
@@ -943,6 +945,7 @@ function updateDockChip(): void {
   el.style.left = left + 'px'
   el.style.top = Math.max(8, rect.top - height - 8) + 'px'
   observeDivider(doc)
+  observeSurface(doc, surface)
   // Before the composer has a box the rectangle is degenerate and the control lands at the edge. Retry until the
   // number stops looking like "not laid out yet" - bounded, so a host that never lays out does not spin.
   const scope2 = globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }
@@ -1094,6 +1097,25 @@ function composerBox(doc: any): any {
 }
 
 let dividerObserved: unknown
+let surfaceObserved: unknown
+
+/**
+ * Re-place when the composer changes height.
+ *
+ * A pasted picture grows the box and the control has to move up with it. The surface alone is not enough:
+ * some hosts grow a wrapper and let the inner element keep its size, so the wrapper is watched too.
+ */
+function observeSurface(doc: any, surface: any): void {
+  try {
+    const targets = [surface, surface?.parentElement].filter((node) => node !== null && node !== undefined)
+    if (targets.length === 0 || surfaceObserved === surface) return
+    surfaceObserved = surface
+    const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void } }).ResizeObserver
+    if (Observer === undefined) return
+    const watcher = new Observer(() => { scheduleDock() })
+    for (const target of targets) { try { watcher.observe(target) } catch { /* one target is enough to try */ } }
+  } catch { /* no observer, no follow */ }
+}
 
 /**
  * Re-place after a divider drag.
