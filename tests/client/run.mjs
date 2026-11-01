@@ -148,8 +148,8 @@ test('the view renders the machine as an svg element', () => {
   plugin.apply({
     slots: {
       inject: (_slot, callback) => callback(),
-      register: (_options, view) => {
-        component = view
+      register: (options, view) => {
+        if (options.name === 'tool.call.toolview') component = view
       },
     },
   })
@@ -172,7 +172,7 @@ test('the view survives a call that has no result yet', () => {
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   for (const props of [{ phase: 'preparing' }, { phase: 'start', block: {} }, { phase: 'result', block: { args: { model: null } } }, {}]) {
     const element = component(props)
     if (element === null || typeof element !== 'object') throw new Error('no element for ' + JSON.stringify(props))
@@ -230,7 +230,7 @@ test('the drawing card draws the source the call carried', () => {
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   const element = component({
     phase: 'result',
     toolName: 'diagram_render',
@@ -247,7 +247,7 @@ test('the drawing card lists the lines the renderer refused', () => {
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   const element = component({
     phase: 'result',
     toolName: 'diagram_render',
@@ -261,7 +261,7 @@ test('the drawing card survives a call whose source has not arrived', () => {
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   for (const props of [{ phase: 'preparing', toolName: 'diagram_render' }, { phase: 'start', toolName: 'diagram_render', block: {} }, { toolName: 'diagram_render' }]) {
     const element = component(props)
     if (element === null || typeof element !== 'object') throw new Error('no element for ' + JSON.stringify(props))
@@ -272,7 +272,7 @@ test('the card draws from the result when the settled call no longer carries its
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   const element = component({
     phase: 'result',
     toolName: 'diagram_render',
@@ -294,7 +294,7 @@ test('the card finds the source in whatever shape the settled block carries', ()
     const { registrations } = loadBundle()
     const plugin = registrations[0].factory(() => stubReact)
     let component
-    plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+    plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
     const element = component({ phase: 'result', toolName: 'diagram_render', block })
     const html = JSON.stringify(element)
     if (!html.includes('<svg')) throw new Error('no drawing for block shape: ' + JSON.stringify(block).slice(0, 60))
@@ -410,7 +410,7 @@ test('the card calls the same hooks whether or not a call has settled', () => {
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => counting)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   counts.push(0)
   component({ phase: 'running', toolName: 'diagram_render', block: {} })
   counts.push(0)
@@ -431,7 +431,7 @@ test('the drawing card offers the annotation button when the host has hooks', ()
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stateful)
   let component
-  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (_options, view) => { component = view } } })
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
   const element = component({ phase: 'result', toolName: 'diagram_render', block: { args: { source: 'graph TD\n  a[One] --> b[Two]' } } })
   const html = JSON.stringify(element)
   if (!html.includes('<svg')) throw new Error('the card lost its drawing')

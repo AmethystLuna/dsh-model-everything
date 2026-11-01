@@ -922,7 +922,57 @@ function updateDockChip(): void {
 /** Keep the docked count in step with the pending list. Called from a render path, so it cannot throw. */
 export function updateDockLayer(items: Array<{ nodeId: string; note: string }>, open: boolean, handlers: DockHandlers): void {
   dockReact = { count: items.length, open, items, handlers }
+  bumpDock()
+  if (dockSlotMounted) return
   try { scheduleDock() } catch { /* a lost badge never costs the drawing */ }
+}
+
+/** Set by the slot component while it is mounted; the body layer stands down when it is. */
+let dockSlotMounted = false
+let dockVersion = 0
+const dockSubs = new Set<() => void>()
+
+function bumpDock(): void {
+  dockVersion += 1
+  for (const listener of Array.from(dockSubs)) {
+    try { listener() } catch { /* one listener must not stop the others */ }
+  }
+}
+
+/**
+ * The count, rendered into the host's dock slot.
+ *
+ * Same state as the body layer, so the card drives one source of truth and the host decides where it goes.
+ */
+function dockSlotView(React: ReactLike): () => unknown {
+  return function DockSlot(): unknown {
+    const [, setVersion] = (React.useState ?? ((initial: number) => [initial, () => {}] as [number, (next: number) => void]))(0) as [number, (next: number) => void]
+    React.useEffect?.(() => {
+      dockSlotMounted = true
+      const listener = (): void => setVersion(dockVersion)
+      dockSubs.add(listener)
+      return () => { dockSubs.delete(listener); dockSlotMounted = false }
+    }, [])
+    const state = dockReact
+    if (state === undefined || state.count === 0) return null
+    return React.createElement(
+      'div',
+      {
+        'data-dme-own': '1',
+        style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 4px', font: '11px system-ui, sans-serif', color: 'inherit' },
+      },
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => state.handlers.onToggle(),
+        style: { font: 'inherit', padding: '1px 8px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: 'inherit', cursor: 'pointer' },
+      }, t('pending') + ' ×' + String(state.count)),
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => state.handlers.onSend(),
+        style: { font: 'inherit', padding: '1px 8px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: 'inherit', cursor: 'pointer' },
+      }, t('send')),
+    )
+  }
 }
 
 function refreshDock(): void { scheduleDock() }
@@ -1470,6 +1520,16 @@ export default function factory(require: (name: string) => unknown): PluginShape
       // The whiteboard seat only exists on a host with the official right sidebar. Presence of the slot is
       // the capability check: if the callback never runs, this host has no sidebar and nothing is lost.
       ctx.slots.inject('sidebar.right.pane.tab', () => mountWhiteboard(React, ctx))
+      // The count belongs in the host's own dock above the composer card - "full-width entries above the
+      // composer card" in the slot catalog. A slot is the supported way to sit there: the host owns the
+      // position, the width and the surface, so this plugin stops computing coordinates in someone else's
+      // layout. The body-level layer stays as the fallback for a host without this slot.
+      ctx.slots.inject('conversation.input.dock', () => ctx.slots.register(
+        // `label` is a function so it is evaluated when the host renders the dock, not here: apply runs on a page
+        // whose language is read from the document, and a host without one must still register.
+        { name: 'conversation.input.dock', id: 'dsh-model-everything-notes', order: 20, label: () => t('pending') },
+        dockSlotView(React),
+      ))
     },
   }
 }
