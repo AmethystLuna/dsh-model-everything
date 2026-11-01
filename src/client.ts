@@ -753,7 +753,9 @@ function attachBelowBubble(label: string, typed: string): void {
     tries += 1
     try {
       const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
-      const hits = all.filter((node) => String(node.textContent ?? '').trim() === wanted && node.parentElement)
+      // Prefix, not equality: the bubble also carries the other plugin's chip text, so an exact match never
+      // found the element and the chip was never inserted.
+      const hits = all.filter((node) => String(node.textContent ?? '').trim().startsWith(wanted) && node.parentElement)
       const hit = hits[hits.length - 1]
       const host = hit === undefined ? undefined : hit.parentElement
       if (host !== undefined && host !== null) {
@@ -966,10 +968,7 @@ function dockSlotView(React: ReactLike): () => unknown {
           // The card is the box the reader types in; hosts differ in what they mark. Try the attribute, then
           // the scroll container, then the writing surface's own parent - the widest honest guess is still a
           // measurement, not a constant.
-          const card = doc?.querySelector?.('[data-composer-card]')
-            ?? doc?.querySelector?.('[data-input-scroll]')
-            ?? (findComposer(doc) as { parentElement?: unknown } | undefined)?.parentElement
-            ?? findComposer(doc)
+          const card = composerBox(doc)
           if (slot === null || slot === undefined || card === null || card === undefined) return
           const s = slot.getBoundingClientRect()
           const c = card.getBoundingClientRect()
@@ -1009,6 +1008,31 @@ function dockSlotView(React: ReactLike): () => unknown {
         style: { font: 'inherit', padding: '1px 8px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: 'inherit', cursor: 'pointer' },
       }, t('send')),
     )
+  }
+}
+
+/**
+ * The composer's card: the nearest ancestor of the writing surface that looks like a box.
+ *
+ * Hosts mark it differently - one ships `[data-composer-card]`, another marks nothing - but every one of them
+ * draws the input as a rounded card inside the column. Walking up for a border radius finds that box without
+ * depending on an attribute name.
+ */
+function composerBox(doc: any): any {
+  try {
+    const marked = doc?.querySelector?.('[data-composer-card]')
+    if (marked !== null && marked !== undefined) return marked
+    const surface = findComposer(doc) ?? doc?.querySelector?.('textarea, [contenteditable="true"]')
+    let node = surface
+    for (let depth = 0; depth < 8 && node !== null && node !== undefined; depth += 1) {
+      const radius = (globalThis as { getComputedStyle?: (el: unknown) => { borderRadius?: string; borderTopLeftRadius?: string } }).getComputedStyle?.(node)
+      const value = radius === undefined ? '' : String(radius.borderTopLeftRadius ?? radius.borderRadius ?? '')
+      if (value !== '' && value !== '0px') return node
+      node = node.parentElement
+    }
+    return surface
+  } catch {
+    return undefined
   }
 }
 
