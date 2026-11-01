@@ -953,13 +953,42 @@ function dockSlotView(React: ReactLike): () => unknown {
       dockSubs.add(listener)
       return () => { dockSubs.delete(listener); dockSlotMounted = false }
     }, [])
+    // The slot is full-width; the composer card is inset inside it. The count aligns with the card, so the
+    // insets are measured from the card's own box rather than guessed - and re-measured when either side
+    // changes size, which is what a dragged divider does.
+    const [pad, setPad] = (React.useState ?? ((initial: { left: number; right: number }) => [initial, () => {}]))({ left: 0, right: 0 }) as [{ left: number; right: number }, (next: { left: number; right: number }) => void]
+    React.useEffect?.(() => {
+      const doc = (globalThis as { document?: any }).document
+      const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
+      const measure = (): void => {
+        try {
+          const slot = doc?.querySelector?.('[data-dme-dock-slot]')
+          const card = doc?.querySelector?.('[data-composer-card]') ?? findComposer(doc)
+          if (slot === null || slot === undefined || card === null || card === undefined) return
+          const s = slot.getBoundingClientRect()
+          const c = card.getBoundingClientRect()
+          setPad({ left: Math.max(0, Math.round(c.left - s.left)), right: Math.max(0, Math.round(s.right - c.right)) })
+        } catch { /* unmeasured insets are a cosmetic miss */ }
+      }
+      if (typeof timer === 'function') timer(measure, 0)
+      const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void; disconnect: () => void } }).ResizeObserver
+      let watcher: { observe: (t: unknown) => void; disconnect: () => void } | undefined
+      if (Observer !== undefined) {
+        try {
+          watcher = new Observer(measure)
+          watcher.observe(doc?.body)
+        } catch { watcher = undefined }
+      }
+      return () => { watcher?.disconnect() }
+    }, [])
     const state = dockReact
     if (state === undefined || state.count === 0) return null
     return React.createElement(
       'div',
       {
         'data-dme-own': '1',
-        style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 4px', font: '11px system-ui, sans-serif', color: 'inherit' },
+        'data-dme-dock-slot': '1',
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', paddingTop: '2px', paddingBottom: '2px', paddingLeft: String(pad.left) + 'px', paddingRight: String(pad.right) + 'px', font: '11px system-ui, sans-serif', color: 'inherit' },
       },
       React.createElement('button', {
         type: 'button',
