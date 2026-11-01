@@ -22,7 +22,7 @@ import { decorateTranscript, startTranscriptDecoration, type TranscriptDocument 
 
 export interface ReactLike {
   createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown
-  useState?: <T>(initial: T) => [T, (next: T) => void]
+  useState?: <T>(initial: T) => [T, (next: T | ((previous: T) => T)) => void]
   useEffect?: (effect: () => void | (() => void), deps?: ReadonlyArray<unknown>) => void
 }
 
@@ -264,9 +264,9 @@ export function annotationPanel(h: H, state: AnnotationState, actions: Annotatio
               // Anchored to the composer's own top edge, in the gap above it: the count is in sight while the
               // reader is typing, and never covers the box they are typing into.
               top: (docked === undefined ? 16 : Math.max(8, docked.top - 46)) + 'px',
-              width: (docked === undefined ? 360 : Math.min(420, docked.width)) + 'px',
+              // Hugs its two buttons. A fixed width turned the control into a wide empty bar across the composer.
             }),
-            display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 10px', borderRadius: '12px',
+            display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 10px', borderRadius: '12px', width: 'max-content',
             // The composer's own surface and hairline: the control reads as part of that box, not as a dialog.
             background: 'var(--dsw-alias-bg-layer-1, ' + TOKEN.surface + ')',
             border: '1px solid var(--dsw-alias-border-l2, ' + TOKEN.border + ')', color: TOKEN.text,
@@ -383,6 +383,30 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [open, setOpen] = useState(false)
   // A note that left: this plugin's own chrome says so, where no other plugin works.
   const [sent, setSent] = useState('')
+  // The composer grows when a picture is pasted, and the docked control has to follow it.
+  const [, setDockTick] = useState(0)
+  React.useEffect?.(() => {
+    const doc = (globalThis as { document?: DocumentLike }).document
+    const composer = findComposer(doc)
+    const bump = (): void => setDockTick((n) => n + 1)
+    const scope = globalThis as {
+      addEventListener?: (type: string, handler: () => void) => void
+      removeEventListener?: (type: string, handler: () => void) => void
+      ResizeObserver?: new (callback: () => void) => { observe: (target: unknown) => void; disconnect: () => void }
+    }
+    scope.addEventListener?.('resize', bump)
+    let observer: { observe: (target: unknown) => void; disconnect: () => void } | undefined
+    if (composer !== undefined && composer !== null && scope.ResizeObserver !== undefined) {
+      try {
+        observer = new scope.ResizeObserver(bump)
+        observer.observe(composer)
+      } catch { observer = undefined }
+    }
+    return () => {
+      scope.removeEventListener?.('resize', bump)
+      observer?.disconnect()
+    }
+  }, [])
   const [anchor, setAnchor] = useState<{ left: number; top: number } | undefined>(undefined)
   // What would leave with the next message: the chip shows it, and the draft stays empty until Enter.
   setPendingBlock(pending.length === 0 ? '' : annotationBlock(pending.map((item) => ({ ...item, caption }))))

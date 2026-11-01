@@ -15,7 +15,7 @@ import { type Palette, type PaletteMode } from './render/palette.js';
 import { type DocumentLike } from './annotation.js';
 export interface ReactLike {
     createElement: (type: unknown, props?: Record<string, unknown> | null, ...children: unknown[]) => unknown;
-    useState?: <T>(initial: T) => [T, (next: T) => void];
+    useState?: <T>(initial: T) => [T, (next: T | ((previous: T) => T)) => void];
     useEffect?: (effect: () => void | (() => void), deps?: ReadonlyArray<unknown>) => void;
 }
 export interface SlotContext {

@@ -285,10 +285,14 @@ export interface Rect { left: number; top: number; width: number; height: number
 /** Where the reader's input box is, for a widget that has to sit right above it. */
 export function composerRect(doc: DocumentLike | undefined): Rect | undefined {
   const composer = findComposer(doc)
-  const measure = (composer as { getBoundingClientRect?: () => Rect } | undefined)?.getBoundingClientRect
-  if (composer === undefined || typeof measure !== 'function') return undefined
+  // The mark may sit on a wrapper that also holds the toolbar row; measuring it would put the count on top of
+  // that row. The writing surface is the line the reader types on, and the count belongs just above it.
+  const inner = (composer as ElementLike | undefined)?.querySelector?.('textarea, [contenteditable="true"]')
+  const surface = inner !== null && inner !== undefined && typeof inner === 'object' ? (inner as ElementLike) : composer
+  const measure = (surface as { getBoundingClientRect?: () => Rect } | undefined)?.getBoundingClientRect
+  if (surface === undefined || typeof measure !== 'function') return undefined
   try {
-    const rect = measure.call(composer)
+    const rect = measure.call(surface)
     return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
   } catch {
     return undefined
