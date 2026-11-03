@@ -850,7 +850,7 @@ function ensureDock(): any {
   const el = doc.createElement('div')
   el.setAttribute('data-dme-dock', '1')
   el.setAttribute('data-dme-own', '1')
-  el.style.cssText = 'position:fixed;z-index:1150;display:none;align-items:center;gap:6px;padding:4px 8px;border-radius:11px;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35));background:var(--dsw-alias-bg-layer-1, #2c2c2e);box-shadow:0 8px 24px rgba(0,0,0,0.24);font:11px var(--dsw-font-family, system-ui);color:var(--dsw-alias-label-primary, #eee)'
+  el.style.cssText = 'position:fixed;z-index:1140;display:none;align-items:center;gap:6px;padding:4px 8px;border-radius:11px;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35));background:var(--dsw-alias-bg-layer-1, #2c2c2e);box-shadow:0 8px 24px rgba(0,0,0,0.24);font:11px var(--dsw-font-family, system-ui);color:var(--dsw-alias-label-primary, #eee)'
   doc.body.appendChild(el)
   dockEl = el
   return el
@@ -949,8 +949,9 @@ function updateDockChip(): void {
   const anchor = cardRect ?? rect
   const seatTop = seatEl?.getBoundingClientRect?.()?.top
   const topEdge = Math.min(anchor.top, typeof seatTop === 'number' ? seatTop : anchor.top)
-  // Right-aligned to the card, the way the annotation plugin does it: 12px in from its right edge.
-  const left = Math.max(8, Math.min(anchor.right - width - 12, Number(view.innerWidth ?? 0) - width - 8))
+  // Left-aligned to the card, because the annotation plugin's own count sits on the right of the same strip and
+  // two right-aligned controls would cover each other. Same row, opposite ends.
+  const left = Math.max(8, Math.min(anchor.left, Number(view.innerWidth ?? 0) - width - 8))
   el.style.left = left + 'px'
   el.style.top = Math.max(8, topEdge - height - 6) + 'px'
   observeDivider(doc)
