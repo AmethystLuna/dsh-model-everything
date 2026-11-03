@@ -676,7 +676,10 @@ function replaceBlock(text: string): boolean {
   let rest = current
   if (placedText !== '' && rest.includes(placedText)) rest = rest.split(placedText).join('')
   rest = rest.replace(/^[\r\n]+/, '').replace(/\s+$/, '')
-  const next = text === '' ? rest : (rest === '' ? text : text + String.fromCharCode(10, 10) + rest)
+  // Appended, not prepended. The annotation plugin folds a message by deleting every text node BEFORE its own
+  // marker; a block placed in front of that marker is deleted with it, which is how our note vanished whenever
+  // both kinds were sent together. After it, the block survives their fold.
+  const next = text === '' ? rest : (rest === '' ? text : rest + String.fromCharCode(10, 10) + text)
   try {
     shell.setDraft(next)
     placedText = text
