@@ -1098,6 +1098,7 @@ function composerBox(doc: any): any {
 
 let dividerObserved: unknown
 let surfaceObserved: unknown
+let surfaceInputWatched = false
 
 /**
  * Re-place when the composer changes height.
@@ -1107,13 +1108,25 @@ let surfaceObserved: unknown
  */
 function observeSurface(doc: any, surface: any): void {
   try {
-    const targets = [surface, surface?.parentElement].filter((node) => node !== null && node !== undefined)
-    if (targets.length === 0 || surfaceObserved === surface) return
+    if (surface === undefined || surface === null || surfaceObserved === surface) return
     surfaceObserved = surface
+    // A pasted picture grows whichever ancestor the host chose, and the surface itself may keep its size while
+    // only moving down - which fires no resize at all. Watch a few levels up, and listen to the paste itself.
+    // Two levels only: the surface and the box around it. Watching further up fired on unrelated layout changes
+    // and moved the control to places the reader did not ask for.
+    const targets: any[] = [surface, surface?.parentElement].filter((node) => node !== null && node !== undefined)
     const Observer = (globalThis as { ResizeObserver?: new (cb: () => void) => { observe: (t: unknown) => void } }).ResizeObserver
-    if (Observer === undefined) return
-    const watcher = new Observer(() => { scheduleDock() })
-    for (const target of targets) { try { watcher.observe(target) } catch { /* one target is enough to try */ } }
+    if (Observer !== undefined) {
+      const watcher = new Observer(() => { scheduleDock() })
+      for (const target of targets) { try { watcher.observe(target) } catch { /* one target is enough to try */ } }
+    }
+    const scope = globalThis as { addEventListener?: (t: string, fn: () => void) => void; setTimeout?: (fn: () => void, ms: number) => unknown }
+    if (typeof scope.addEventListener === 'function' && !surfaceInputWatched) {
+      surfaceInputWatched = true
+      // `input` covers paste, typing and deletion; two delayed passes catch a layout that settles after it.
+      scope.addEventListener('input', () => { scheduleDock(); scope.setTimeout?.(() => { scheduleDock() }, 120); scope.setTimeout?.(() => { scheduleDock() }, 400) })
+      scope.addEventListener('paste', () => { scope.setTimeout?.(() => { scheduleDock() }, 60) })
+    }
   } catch { /* no observer, no follow */ }
 }
 
