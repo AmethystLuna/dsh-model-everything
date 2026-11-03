@@ -780,9 +780,15 @@ function insertChipAfter(doc: any, element: any, label: string): void {
     chip.setAttribute('data-dme-own', '1')
     chip.setAttribute('data-dme-chip', '1')
     chip.textContent = label
-    chip.style.cssText = 'display:inline-block;margin:4px 0 0;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6)'
-    const host = element.parentElement ?? element
-    host.appendChild(chip)
+    chip.style.cssText = 'position:fixed;z-index:1140;display:inline-block;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6);background:var(--dsw-alias-bg-layer-1, rgba(30,30,32,0.92))'
+    // A body-level layer, the same construction that works for the dock. Appended into the message it lasted until
+    // the next render - the message is React's, and this is not.
+    const box = element.getBoundingClientRect?.()
+    if (box !== undefined && box !== null) {
+      chip.style.setProperty('left', String(Math.round(box.left)) + 'px')
+      chip.style.setProperty('top', String(Math.round(box.bottom) + 4) + 'px')
+    }
+    doc.body.appendChild(chip)
   } catch { /* a chip not shown is not a broken message */ }
 }
 
