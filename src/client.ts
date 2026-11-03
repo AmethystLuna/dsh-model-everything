@@ -750,7 +750,10 @@ function attachBelowBubble(label: string, typed: string): void {
   const doc = (globalThis as { document?: any }).document
   const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
   const wanted = typed.trim()
-  if (doc === undefined || typeof timer !== 'function' || wanted === '') return
+  if (doc === undefined || typeof timer !== 'function') return
+  // Nothing typed is the common case for a note: there is no text to find the bubble by, so the message is found
+  // through the other plugin's chip instead.
+  if (wanted === '') { attachSentChip(label); return }
   let tries = 0
   const attempt = (): void => {
     tries += 1
