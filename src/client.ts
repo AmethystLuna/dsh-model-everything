@@ -934,17 +934,7 @@ function updateDockChip(): void {
   const cardEl = (doc.querySelector('[data-composer-card]') ?? null) as any
   const seatEl = (cardEl?.closest?.('[data-composer-seat]') ?? null) as any
   const cardRect = cardEl?.getBoundingClientRect?.() ?? null
-  // Every candidate left edge in one line, in the control itself: the reader's screenshot then says which one
-  // is the composer's box, instead of another round of guesses.
-  try {
-    const handleEl = doc.querySelector('[class*="widthHandle"], [class*="handle"]')
-    const colEl = doc.querySelector('[data-conversation-scroll]')
-    const read = (el: any): string => {
-      const r = el?.getBoundingClientRect?.()
-      return r === undefined || r === null ? '-' : String(Math.round(r.left))
-    }
-    toggle.textContent = toggle.textContent + ' s' + read(surface) + ' h' + read(handleEl) + ' c' + read(colEl)
-  } catch { /* the diagnostic is not the feature */ }
+  void surface
   const width = Number(el.offsetWidth) || 100
   const height = Number(el.offsetHeight) || 26
   if (rect === undefined && cardRect === null) { el.style.left = '16px'; el.style.top = '16px'; return }
@@ -1263,6 +1253,9 @@ function watchDraft(): void {
       const before = lastSeenDraft
       lastSeenDraft = draft
       if (before.trim() === '' || draft.trim() !== '') return
+      // Only a send clears the count. An empty box that Backspace or a deletion empties is not a send, and
+      // treating it as one deleted the reader's note without sending anything.
+      if (placedText === '') return
       placedText = ''
       for (const listener of sentListeners.slice()) {
         try { listener() } catch { /* one listener must not keep the others from hearing it */ }
