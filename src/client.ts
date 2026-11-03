@@ -789,6 +789,22 @@ function insertChipAfter(doc: any, element: any, label: string): void {
       chip.style.setProperty('top', String(Math.round(box.bottom) + 4) + 'px')
     }
     doc.body.appendChild(chip)
+    // Scrolling moves the message, not the layer: keep the chip on the block it belongs to.
+    const scope = globalThis as { addEventListener?: (t: string, fn: () => void) => void }
+    if (!chipScrollWatched && typeof scope.addEventListener === 'function') {
+      chipScrollWatched = true
+      scope.addEventListener('scroll', () => {
+        try {
+          const live = doc.querySelector('[data-dme-chip]')
+          const anchor = chipAnchor
+          const box2 = anchor?.getBoundingClientRect?.()
+          if (live === null || box2 === undefined || box2 === null) return
+          live.style.setProperty('left', String(Math.round(box2.left)) + 'px')
+          live.style.setProperty('top', String(Math.round(box2.bottom) + 4) + 'px')
+        } catch { /* a chip that stops following is still a chip */ }
+      })
+    }
+    chipAnchor = element
   } catch { /* a chip not shown is not a broken message */ }
 }
 
@@ -864,6 +880,8 @@ let dockEl: any
 let dockRetries = 0
 // What the last attempt to place the per-message count saw, for the diagnostic report.
 let chipAttempt = 'not attempted'
+let chipAnchor: any
+let chipScrollWatched = false
 let dockReceipt = ''
 let receiptTimer: unknown
 
