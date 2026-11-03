@@ -448,6 +448,9 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
       // nothing must never be the thing a click waits on. Measured: it hung, and the button looked dead.
       if (placeBlock(text)) {
         const label = '图注 ×' + String(list.length)
+        // The button path is a send too: without this the count under the message only ever appeared when the
+        // reader pressed Enter, and a click left the message unmarked.
+        attachBelowBubble(label, '')
         setSent('已发送 ' + label)
         attachSentChip(label)
         setStatus('已放入输入框并提交（' + String(list.length) + ' 条图注）')
