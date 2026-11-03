@@ -924,13 +924,13 @@ function updateDockChip(): void {
   }
   el.style.display = 'flex'
   observeDockAnchor()
-  // The writing surface is the one element certainly inside the composer: align the control to the line the
-  // reader types on, in viewport coordinates. Nothing inferred, nothing constant.
+  // Same seat as the annotation plugin, read from its source: the composer card, and the seat that holds it.
+  // Above the card, right-aligned to it, 6px clear - which is where that plugin's own count sits.
   const surface = (findComposer(doc) ?? doc.querySelector('textarea, [contenteditable="true"]')) as any
   const rect = surface?.getBoundingClientRect?.()
-  // Horizontal from the writing surface (the line the text starts on), vertical from the BOX around it: a pasted
-  // picture grows that box upward, and the surface itself barely moves - which is why the control moved 1px.
-  const boxRect = surface?.parentElement?.getBoundingClientRect?.()
+  const cardEl = (doc.querySelector('[data-composer-card]') ?? null) as any
+  const seatEl = (cardEl?.closest?.('[data-composer-seat]') ?? null) as any
+  const cardRect = cardEl?.getBoundingClientRect?.() ?? null
   // Every candidate left edge in one line, in the control itself: the reader's screenshot then says which one
   // is the composer's box, instead of another round of guesses.
   try {
@@ -944,12 +944,15 @@ function updateDockChip(): void {
   } catch { /* the diagnostic is not the feature */ }
   const width = Number(el.offsetWidth) || 100
   const height = Number(el.offsetHeight) || 26
-  if (rect === undefined) { el.style.left = '16px'; el.style.top = '16px'; return }
+  if (rect === undefined && cardRect === null) { el.style.left = '16px'; el.style.top = '16px'; return }
   const view = globalThis as { innerWidth?: number }
-  const left = Math.max(8, Math.min(rect.left, Number(view.innerWidth ?? 0) - width - 8))
+  const anchor = cardRect ?? rect
+  const seatTop = seatEl?.getBoundingClientRect?.()?.top
+  const topEdge = Math.min(anchor.top, typeof seatTop === 'number' ? seatTop : anchor.top)
+  // Right-aligned to the card, the way the annotation plugin does it: 12px in from its right edge.
+  const left = Math.max(8, Math.min(anchor.right - width - 12, Number(view.innerWidth ?? 0) - width - 8))
   el.style.left = left + 'px'
-  const topEdge = boxRect === undefined || boxRect === null || boxRect.height < rect.height ? rect.top : boxRect.top
-  el.style.top = Math.max(8, topEdge - height - 8) + 'px'
+  el.style.top = Math.max(8, topEdge - height - 6) + 'px'
   observeDivider(doc)
   observeSurface(doc, surface)
   // Before the composer has a box the rectangle is degenerate and the control lands at the edge. Retry until the
