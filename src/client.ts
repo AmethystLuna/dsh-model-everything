@@ -759,63 +759,12 @@ function foldOnce(): void {
  * The bubble is found by the text the reader typed: after every rewrite, that string is still in the draft
  * and in the message alike.
  */
-function attachBelowBubble(label: string, typed: string): void {
-  const doc = (globalThis as { document?: any }).document
-  const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
-  const wanted = typed.trim()
-  if (doc === undefined || typeof timer !== 'function') return
-  // Nothing typed is the common case for a note: there is no text to find the bubble by, so the message is found
-  // through the other plugin's chip instead.
-  if (wanted === '') {
-    // The note's own opening line is in the message whatever the reader typed and whichever plugin folded it.
-    const hit = findBlockElement(doc)
-    if (hit !== undefined) { insertChipAfter(doc, hit, label); return }
-    attachSentChip(label)
-    return
-  }
-  let tries = 0
-  const attempt = (): void => {
-    tries += 1
-    try {
-      const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
-      // Prefix, not equality: the bubble also carries the other plugin's chip text, so an exact match never
-      // found the element and the chip was never inserted.
-      const hits = all.filter((node) => String(node.textContent ?? '').trim().startsWith(wanted) && node.parentElement)
-      const hit = hits[hits.length - 1]
-      const host = hit === undefined ? undefined : hit.parentElement
-      if (host !== undefined && host !== null) {
-        // Exactly one: a previous pass may have inserted a chip for the same message (a second Enter, a retry),
-        // and two counts under one bubble is worse than a late one.
-        try {
-          const existing = Array.from(doc.querySelectorAll('[data-dme-chip]')) as Array<{ remove?: () => void; textContent?: string }>
-          // One per message: already present with this label means a retry found its own work.
-          if (existing.some((old) => String(old.textContent ?? '') === label)) return
-          for (const old of existing) old.remove?.()
-        } catch { /* nothing to clear */ }
-        const chip = doc.createElement('span')
-        chip.setAttribute('data-dme-own', '1')
-        chip.setAttribute('data-dme-chip', '1')
-        chip.textContent = label
-        chip.style.cssText = 'display:inline-block;margin-top:4px;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6)'
-        host.appendChild(chip)
-        return
-      }
-    } catch { /* a chip not shown is not a broken message */ }
-    if (tries < 10) timer(attempt, 300)
-  }
-  timer(attempt, 400)
-}
-
 /** The deepest element whose text is the note block, last in document order. */
 function findBlockElement(doc: any): any {
-  try {
-    const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
-    const hits = all.filter((node) => String(node.textContent ?? '').indexOf('Diagram annotations -') !== -1)
-    const deepest = hits.filter((node) => !hits.some((other) => other !== node && node.contains?.(other)))
-    return deepest[deepest.length - 1]
-  } catch {
-    return undefined
-  }
+  const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
+  const hits = all.filter((node) => String(node.textContent ?? '').indexOf('Diagram annotations -') !== -1)
+  const deepest = hits.filter((node) => !hits.some((other) => other !== node && node.contains?.(other)))
+  return deepest[deepest.length - 1]
 }
 
 /** Put the count inside the element that holds the message, after its text: that box already has the padding. */
@@ -832,6 +781,33 @@ function insertChipAfter(doc: any, element: any, label: string): void {
     const host = element.parentElement ?? element
     host.appendChild(chip)
   } catch { /* a chip not shown is not a broken message */ }
+}
+
+function attachBelowBubble(label: string, typed: string): void {
+  const doc = (globalThis as { document?: any }).document
+  const timer = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
+  if (doc === undefined || typeof timer !== 'function') return
+  const wanted = typed.trim()
+  let tries = 0
+  const attempt = (): void => {
+    tries += 1
+    try {
+      // Two ways to find the message that just left: by the text the reader typed, or - with nothing typed,
+      // which is the usual case for a note - by the note block's own opening line.
+      const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
+      let hit: any
+      if (wanted !== '') {
+        const hits = all.filter((node) => String(node.textContent ?? '').trim().startsWith(wanted) && node.parentElement)
+        hit = hits[hits.length - 1]
+      } else {
+        hit = findBlockElement(doc)
+      }
+      chipAttempt = hit === undefined ? 'not found, try ' + String(tries) : 'found'
+      if (hit !== undefined) { insertChipAfter(doc, hit, label); return }
+    } catch { /* a chip not shown is not a broken message */ }
+    if (tries < 20) timer(attempt, 500)
+  }
+  timer(attempt, 300)
 }
 
 function attachSentChip(label: string): void {
@@ -877,6 +853,8 @@ let dockReact: { count: number; open: boolean; items: Array<{ nodeId: string; no
 
 let dockEl: any
 let dockRetries = 0
+// What the last attempt to place the per-message count saw, for the diagnostic report.
+let chipAttempt = 'not attempted'
 let dockReceipt = ''
 let receiptTimer: unknown
 
@@ -1233,6 +1211,7 @@ function domReport(): string {
   const chips = doc.querySelectorAll('[data-dme-chip]')
   lines.push('chips ' + String(chips.length) + ' ' + Array.from(chips).map((chip) => rect(chip)).join(' | '))
   lines.push('pendingBlock ' + String(pendingBlock === '' ? 'empty' : pendingBlock.split(String.fromCharCode(10)).length + ' lines'))
+  lines.push('chipAttempt ' + chipAttempt)
   lines.push('dockedCount ' + String(dockReact?.count ?? 0) + ' placedText ' + String(placedText.length))
   lines.push('viewport ' + String((globalThis as { innerWidth?: number }).innerWidth) + 'x' + String((globalThis as { innerHeight?: number }).innerHeight))
   const report = lines.join(String.fromCharCode(10))
