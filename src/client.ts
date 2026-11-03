@@ -840,7 +840,9 @@ let dockFrame: number | undefined
 
 /** The layer, created once. `cssText` is the form the reference plugin uses and the browser applies. */
 function ensureDock(): any {
-  if (dockEl !== undefined) return dockEl
+  // A cached node that is no longer in the document is a stale handle: writing to it updates nothing and the
+  // layer that IS in the document keeps its old position. That is how one control became two.
+  if (dockEl !== undefined && dockEl.isConnected !== false) return dockEl
   const doc = (globalThis as { document?: any }).document
   if (doc?.body === undefined || typeof doc.createElement !== 'function') return undefined
   // Exactly one layer: a reload, a remount or a stale reference must not leave two counts floating.
