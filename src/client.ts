@@ -791,16 +791,12 @@ function insertChipAfter(doc: any, element: any, label: string): void {
     chip.style.cssText = 'position:fixed;z-index:1140;display:inline-block;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6);background:var(--dsw-alias-bg-layer-1, rgba(30,30,32,0.92))'
     // A body-level layer, the same construction that works for the dock. Appended into the message it lasted until
     // the next render - the message is React's, and this is not.
-    const box = element.getBoundingClientRect?.()
-    const view = globalThis as { innerHeight?: number }
-    const above = box === undefined || box === null || box.bottom < 0 || box.top > Number(view.innerHeight ?? 0)
-    if (above) chip.style.setProperty('display', 'none')
-    else if (box !== undefined && box !== null) {
-      chip.style.setProperty('display', 'inline-block')
-      chip.style.setProperty('left', String(Math.max(8, Math.round(box.left))) + 'px')
-      chip.style.setProperty('top', String(Math.max(8, Math.round(box.bottom) + 4)) + 'px')
-    }
     doc.body.appendChild(chip)
+    chipAnchor = element
+    placeChip(doc)
+    // The message may not be laid out yet when this runs: a hidden chip is placed again a few times, then left alone.
+    const timer2 = (globalThis as { setTimeout?: (fn: () => void, ms: number) => unknown }).setTimeout
+    if (typeof timer2 === 'function') { for (const delay of [300, 900, 2000, 3500]) timer2(() => { try { placeChip(doc) } catch { /* keeps the last placement */ } }, delay) }
     // Scrolling moves the message, not the layer: keep the chip on the block it belongs to.
     const scope = globalThis as { addEventListener?: (t: string, fn: () => void) => void }
     if (!chipScrollWatched && typeof scope.addEventListener === 'function') {
@@ -816,8 +812,22 @@ function insertChipAfter(doc: any, element: any, label: string): void {
         } catch { /* a chip that stops following is still a chip */ }
       })
     }
-    chipAnchor = element
   } catch { /* a chip not shown is not a broken message */ }
+}
+
+/** Put the count under the message it belongs to, or hide it while that message is outside the viewport. */
+function placeChip(doc: any): void {
+  const chip = doc?.querySelector?.('[data-dme-chip]')
+  const anchor = chipAnchor
+  if (chip === null || chip === undefined || anchor === undefined) return
+  const box = anchor.getBoundingClientRect?.()
+  if (box === undefined || box === null || box.width === 0) return
+  const view = globalThis as { innerHeight?: number }
+  const outside = box.bottom < 0 || box.top > Number(view.innerHeight ?? 0)
+  chip.style.setProperty('display', outside ? 'none' : 'inline-block')
+  if (outside) return
+  chip.style.setProperty('left', String(Math.max(8, Math.round(box.left))) + 'px')
+  chip.style.setProperty('top', String(Math.max(8, Math.round(box.bottom) + 4)) + 'px')
 }
 
 function attachBelowBubble(label: string, typed: string): void {
