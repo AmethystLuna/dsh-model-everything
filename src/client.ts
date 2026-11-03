@@ -753,7 +753,13 @@ function attachBelowBubble(label: string, typed: string): void {
   if (doc === undefined || typeof timer !== 'function') return
   // Nothing typed is the common case for a note: there is no text to find the bubble by, so the message is found
   // through the other plugin's chip instead.
-  if (wanted === '') { attachSentChip(label); return }
+  if (wanted === '') {
+    // The note's own opening line is in the message whatever the reader typed and whichever plugin folded it.
+    const hit = findBlockElement(doc)
+    if (hit !== undefined) { insertChipAfter(doc, hit, label); return }
+    attachSentChip(label)
+    return
+  }
   let tries = 0
   const attempt = (): void => {
     tries += 1
@@ -785,6 +791,34 @@ function attachBelowBubble(label: string, typed: string): void {
     if (tries < 10) timer(attempt, 300)
   }
   timer(attempt, 400)
+}
+
+/** The deepest element whose text is the note block, last in document order. */
+function findBlockElement(doc: any): any {
+  try {
+    const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
+    const hits = all.filter((node) => String(node.textContent ?? '').indexOf('Diagram annotations -') !== -1)
+    const deepest = hits.filter((node) => !hits.some((other) => other !== node && node.contains?.(other)))
+    return deepest[deepest.length - 1]
+  } catch {
+    return undefined
+  }
+}
+
+/** Put the count inside the element that holds the message, after its text: that box already has the padding. */
+function insertChipAfter(doc: any, element: any, label: string): void {
+  try {
+    const existing = Array.from(doc.querySelectorAll('[data-dme-chip]')) as Array<{ remove?: () => void; textContent?: string }>
+    if (existing.some((old) => String(old.textContent ?? '') === label)) return
+    for (const old of existing) old.remove?.()
+    const chip = doc.createElement('span')
+    chip.setAttribute('data-dme-own', '1')
+    chip.setAttribute('data-dme-chip', '1')
+    chip.textContent = label
+    chip.style.cssText = 'display:inline-block;margin:4px 0 0;padding:1px 8px;border-radius:9px;font:11px system-ui;border:1px solid var(--dsw-alias-border-l1, rgba(127,127,127,0.35));color:var(--dsw-alias-label-secondary, #9aa0a6)'
+    const host = element.parentElement ?? element
+    host.appendChild(chip)
+  } catch { /* a chip not shown is not a broken message */ }
 }
 
 function attachSentChip(label: string): void {
