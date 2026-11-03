@@ -766,8 +766,16 @@ function foldOnce(): void {
 function findBlockElement(doc: any): any {
   const all: any[] = Array.from(doc.querySelectorAll('div, p, span'))
   const hits = all.filter((node) => String(node.textContent ?? '').indexOf('Diagram annotations -') !== -1)
-  const deepest = hits.filter((node) => !hits.some((other) => other !== node && node.contains?.(other)))
-  return deepest[deepest.length - 1]
+  // The deepest match is not enough: a transcript container also "contains" the marker and is thousands of pixels
+  // tall, which put the count at y=24375. The smallest box that still holds the text is the message.
+  let best: any
+  let bestArea = Number.POSITIVE_INFINITY
+  for (const node of hits) {
+    const box = node.getBoundingClientRect?.()
+    const area = box === undefined || box === null ? Number.POSITIVE_INFINITY : box.width * box.height
+    if (area > 0 && area < bestArea) { bestArea = area; best = node }
+  }
+  return best
 }
 
 /** Put the count inside the element that holds the message, after its text: that box already has the padding. */
@@ -784,9 +792,13 @@ function insertChipAfter(doc: any, element: any, label: string): void {
     // A body-level layer, the same construction that works for the dock. Appended into the message it lasted until
     // the next render - the message is React's, and this is not.
     const box = element.getBoundingClientRect?.()
-    if (box !== undefined && box !== null) {
-      chip.style.setProperty('left', String(Math.round(box.left)) + 'px')
-      chip.style.setProperty('top', String(Math.round(box.bottom) + 4) + 'px')
+    const view = globalThis as { innerHeight?: number }
+    const above = box === undefined || box === null || box.bottom < 0 || box.top > Number(view.innerHeight ?? 0)
+    if (above) chip.style.setProperty('display', 'none')
+    else if (box !== undefined && box !== null) {
+      chip.style.setProperty('display', 'inline-block')
+      chip.style.setProperty('left', String(Math.max(8, Math.round(box.left))) + 'px')
+      chip.style.setProperty('top', String(Math.max(8, Math.round(box.bottom) + 4)) + 'px')
     }
     doc.body.appendChild(chip)
     // Scrolling moves the message, not the layer: keep the chip on the block it belongs to.
