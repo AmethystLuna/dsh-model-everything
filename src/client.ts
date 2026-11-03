@@ -926,6 +926,9 @@ function updateDockChip(): void {
   // reader types on, in viewport coordinates. Nothing inferred, nothing constant.
   const surface = (findComposer(doc) ?? doc.querySelector('textarea, [contenteditable="true"]')) as any
   const rect = surface?.getBoundingClientRect?.()
+  // Horizontal from the writing surface (the line the text starts on), vertical from the BOX around it: a pasted
+  // picture grows that box upward, and the surface itself barely moves - which is why the control moved 1px.
+  const boxRect = surface?.parentElement?.getBoundingClientRect?.()
   // Every candidate left edge in one line, in the control itself: the reader's screenshot then says which one
   // is the composer's box, instead of another round of guesses.
   try {
@@ -943,7 +946,8 @@ function updateDockChip(): void {
   const view = globalThis as { innerWidth?: number }
   const left = Math.max(8, Math.min(rect.left, Number(view.innerWidth ?? 0) - width - 8))
   el.style.left = left + 'px'
-  el.style.top = Math.max(8, rect.top - height - 8) + 'px'
+  const topEdge = boxRect === undefined || boxRect === null || boxRect.height < rect.height ? rect.top : boxRect.top
+  el.style.top = Math.max(8, topEdge - height - 8) + 'px'
   observeDivider(doc)
   observeSurface(doc, surface)
   // Before the composer has a box the rectangle is degenerate and the control lands at the edge. Retry until the
