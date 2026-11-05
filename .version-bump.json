@@ -1,5 +1,5 @@
 {
-  "version": "0.5.2",
+  "version": "0.6.0",
   "files": {
     "package.json": "version",
     "package-lock.json": "version",
@@ -13,8 +13,9 @@
       "RELEASE.md",
       "DSH-COMPATIBILITY.md",
       "scripts/bump-version.mjs",
-      ".github"
+      ".github",
+      "archive"
     ],
-    "note": "A directory name excludes its whole subtree. `.github` is here because the memory tree records the host dsh releases this plugin was measured against - `dsh 0.2.0-rc.2` is not this package's version, and rewriting it would falsify the measurement."
+    "note": "A directory name excludes its whole subtree. `.github` is here because the memory tree records the host dsh releases this plugin was measured against - `dsh 0.2.0-rc.2` is not this package's version, and rewriting it would falsify the measurement. `archive` is here for the same reason: it holds withdrawn plans that name a version they never shipped, and a number in a withdrawn plan is a historical record, not a release target."
   }
 }
