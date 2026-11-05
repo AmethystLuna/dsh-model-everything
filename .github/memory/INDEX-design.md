@@ -11,6 +11,7 @@ metadata:
 
 | 主题 | 一句话 | 什么时候读 |
 |---|---|---|
+| [roadmap](design/roadmap.md) | 0.6.0 之后的去向：控件收尾的具体项与验收，把对话里的 Mermaid / PlantUML 代码块渲染成卡片的目标与入口，以及为什么不能再走改写消息 DOM 那条路 | 决定下一个版本做什么、或准备动「对话里的代码块」之前 |
 | [store-entry](design/store-entry.md) | 商店条目注册草稿：名称、中英描述、分类，以及文案为什么这么排 | 注册创意工坊条目、改卡片文案或调整分类时 |
 | [gate-injection](design/gate-injection.md) | 会话开头路由注入：第二个 loader 行、默认开是怎么定的、它替代不了什么、代价与「文档即指引」原则的关系、从同类插件借的三种写法 | 动 `src/gate.ts`、改注入文本或开关、判断「要不要开这条消息」时 |
 | [client-rendering](design/client-rendering.md) | 客户端渲染通道已实测：槽位 `tool.call.toolview` 按工具名接管卡片、裸 JS 工厂与 props 契约、打包前提，以及为 100% 路径覆盖而定的模块划分 | 写渲染器、加客户端半、或怀疑「插件能不能画」之前 |
