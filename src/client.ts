@@ -818,10 +818,18 @@ function insertChipAfter(doc: any, element: any, label: string): void {
 /** Put the count under the message it belongs to, or hide it while that message is outside the viewport. */
 function placeChip(doc: any): void {
   const chip = doc?.querySelector?.('[data-dme-chip]')
+  if (chip === null || chip === undefined) return
+  // The cached anchor can be detached by a re-render: a detached node still answers getBoundingClientRect with
+  // zeros, so the count would stay hidden forever. Re-find the message by its text when the cached one is gone.
+  if (chipAnchor === undefined || chipAnchor.isConnected === false) chipAnchor = findBlockElement(doc)
   const anchor = chipAnchor
-  if (chip === null || chip === undefined || anchor === undefined) return
+  if (anchor === undefined) return
   const box = anchor.getBoundingClientRect?.()
-  if (box === undefined || box === null || box.width === 0) return
+  if (box === undefined || box === null) return
+  if (box.width === 0) {
+    // Laid out but not measurable yet: leave the count where it is rather than hiding it for good.
+    return
+  }
   const view = globalThis as { innerHeight?: number }
   const outside = box.bottom < 0 || box.top > Number(view.innerHeight ?? 0)
   chip.style.setProperty('display', outside ? 'none' : 'inline-block')
