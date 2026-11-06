@@ -111,9 +111,9 @@ export function renderGateText(skills: string[] = shippedSkills(), extraGuidance
   const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '` |')
   const extra = extraGuidance.trim()
   return `<EXTREMELY_IMPORTANT>
-Before answering anything about code, a design or a diagram: load the skill whose row matches and let its tool decide. Do not answer from memory.
+Before answering anything about code, a design or a diagram: load the matching skill and let its tool decide. Do not answer from memory.
 
-dsh-model-everything is active: it checks claims about designs and code - facts against the source, behaviour as a model, structure as a graph.
+dsh-model-everything checks claims about designs and code: facts against the source, behaviour as a model, structure as a graph.
 
 **Unsure which row applies?** Load \`model-everything\` first: it owns the doctrine, the schema and the routing to its siblings.
 
@@ -123,17 +123,19 @@ ${rows.join('\n')}
 
 **Tools** (dsh):
 
-- \`model_verify\` — one state machine: structural checks, adversarial probes, budgets, deadlines, regression.
-- \`model_compose_verify\` — two or more machines: deadlock, a rendezvous that never fires, and - with \`shared\` + \`accesses\` - an unordered write (C4) or a non-atomic update (C5).
-- \`model_datamodel_verify\` — a data model and its migration: keys, domains, coverage, copy consistency, rollback symmetry.
-- \`model_design_review\` — a design against its own declarations: layering, boundaries, substitutability, interface width. Graph shape is reported, not judged.
-- \`model_interleaving_scan\` — finds claims about threads, async and interrupts, names the family and routes each to what decides it. It proves nothing itself.
-- \`model_export\` — UPPAAL, TLA+, PRISM or SPIN input from a model. It exports; it does not check the target.
-- \`uml_render\`, \`uml_parse\`, \`uml_review\` — draw a model, read a diagram into one, audit one. Round-trip fidelity is measured.
-- \`uml_explain_labels\` — the accepted label and comment forms for one notation.
-- \`uml_structure_verify\` — dependency review of a structure drawing, one level or several. It audits the drawing, not the code.
-- \`diagram_render\`, \`diagram_review\`, \`diagram_diff\` — draw, size and compare a Mermaid or PlantUML source. Undrawable lines are refused by number.
-- \`report_diff\` — baseline against current: what a change added, removed or changed.
+- \`model_verify\` — a state machine: structural checks, adversarial probes, budgets, deadlines, regression.
+- \`model_compose_verify\` — several machines: deadlock, a handshake that never fires, an unordered write (C4), a non-atomic update (C5).
+- \`model_datamodel_verify\` — a data model and its migration: keys, domains, coverage, copy consistency, rollback.
+- \`model_design_review\` — a design against its own declarations: layering, boundaries, substitutability, interface width.
+- \`model_interleaving_scan\` — finds concurrency claims, names the family, routes each to what decides it. Proves nothing itself.
+- \`model_export\` — UPPAAL, TLA+, PRISM or SPIN input from a model. It does not check the target.
+- \`uml_render\`, \`uml_parse\`, \`uml_review\` — draw a model, read a diagram into one, audit one; round-trip measured.
+- \`uml_explain_labels\` — the label and comment forms a notation accepts.
+- \`uml_structure_verify\` — dependency review of a structure drawing. It audits the drawing, not the code.
+- \`diagram_render\`, \`diagram_review\`, \`diagram_diff\` — draw, size, compare a Mermaid or PlantUML source. Undrawable lines are refused by number.
+- \`model_automaton_verify\` — an automaton or two: what it accepts, trap states, language relation, with a witness word.
+- \`model_edit\` — one named change to a model file plus the finding delta. Refuses an edit that leaves the model invalid.
+- \`report_diff\` — baseline against current: findings added, removed or changed.
 
 **Read a report**: gate on \`verdict\`, never on \`ok\`. \`verdictReason\` says why and \`nextSteps\` says what to do. \`ran\` says whether it executed, \`checksRun\` how much it examined: a \`skip\` is not a \`pass\`, and a code ending \`_UNDECIDED\` means the search hit its limit and decided nothing. Keys starting with \`_\` are notes: ignored, and left out of the model hash.
 

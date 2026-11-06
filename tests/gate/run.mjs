@@ -7,6 +7,7 @@
 // The text is tested against the skills on disk, because its whole value is naming them: a
 // skill added without a line here is a routing hole no other suite can see.
 import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 const skillsRoot = new URL('../../skills/', import.meta.url)
 
@@ -154,6 +155,24 @@ await check('the default configuration injects, and points at the default text',
   if (defaults.gateContent !== gate.DEFAULT_GATE_TEXT) throw new Error('gateContent default is not the default text')
   const decision = await pass(mountWith(defaults))
   if (decision.messages.length !== 1) throw new Error('the default configuration injects ' + String(decision.messages.length) + ' message(s), and it should inject one')
+})
+
+await check('the tool inventory in the text is the tool surface, both directions', () => {
+  // A tool the text omits is a capability the model never learns it has; a name the text invents
+  // sends it to a tool that does not exist. Both are drift, and neither shows up as a failing
+  // tool - so the two lists are compared here, against the modules that declare them.
+  const root = fileURLToPath(new URL('../../', import.meta.url))
+  const declared = new Set()
+  for (const name of readdirSync(root + 'src')) {
+    if (!name.endsWith('-tool.ts') && name !== 'tool.ts') continue
+    const source = readFileSync(root + 'src/' + name, 'utf8')
+    for (const match of source.matchAll(/_NAME = '([a-z][a-z_]+)'/g)) declared.add(match[1])
+  }
+  const named = new Set([...gate.DEFAULT_GATE_TEXT.matchAll(/`((?:model|uml|diagram|report)_[a-z_]+)`/g)].map((match) => match[1]))
+  const missing = [...declared].filter((tool) => !named.has(tool))
+  if (missing.length > 0) throw new Error('these tools are registered but never named in the gate: ' + missing.join(', '))
+  const invented = [...named].filter((tool) => !declared.has(tool))
+  if (invented.length > 0) throw new Error('the gate names tools that do not exist: ' + invented.join(', '))
 })
 
 await check('a row for a skill that does not ship is never advertised', () => {
