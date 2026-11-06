@@ -1,6 +1,6 @@
 ---
 name: model-everything-diagram
-description: "Use when drawing a diagram from its source text, showing one to a reader, or checking its structure: Mermaid and PlantUML subsets, structure budgets, and containment diffs. Reach for it when an explanation is clearer shown than told - a layout, a flow, a change - and put the picture beside the explanation. Every line it cannot draw is refused by number. The drawing proves layout, not design. Doctrine: the model-everything skill.""
+description: "Use when drawing a diagram from its source text, showing one to a reader, or checking its structure: Mermaid and PlantUML subsets, structure budgets, and containment diffs. Reach for it when an explanation is clearer shown than told - a layout, a flow, a change - and put the picture beside the explanation. Every line it cannot draw is refused by number. The drawing proves layout, not design. Doctrine: the model-everything skill."
 ---
 
 # Model Everything — Drawing

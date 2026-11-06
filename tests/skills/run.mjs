@@ -58,6 +58,11 @@ function readFrontmatter(file) {
   const description = /^description:\s*"([\s\S]*?)"\s*$/m.exec(block[1])
   if (name === null) throw new Error('no name field')
   if (description === null) throw new Error('no quoted description field')
+  // The host parses this block with a real YAML parser and *ignores the whole skill* when it fails; a
+  // description that ends with two quotes reads fine to the looser regex above and kills the skill in dsh.
+  // Two of them shipped that way once, so the file is checked the way the host reads it.
+  const line = block[1].split(/\r?\n/).find((entry) => entry.startsWith('description:')) ?? ''
+  if ((line.match(/"/g) ?? []).length !== 2) throw new Error('the description must be one double-quoted scalar; this line has ' + String((line.match(/"/g) ?? []).length) + ' quotes')
   return { name: name[1], description: description[1] }
 }
 

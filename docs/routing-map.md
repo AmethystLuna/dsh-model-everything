@@ -22,7 +22,7 @@ mindmap
       closed schema: an unknown key is refused, not ignored
       the body it just loaded is where the field semantics live
     me - 7 corpus triggers
-      row: 366 of 500 chars
+      row: 365 of 500 chars
       tool: model_verify
       tool: model_edit
       tool: model_automaton_verify
@@ -47,7 +47,7 @@ mindmap
       near miss x1 → me-uml
       near miss x1 → me-interleaving
     me-diagram - 7 corpus triggers
-      row: 433 of 500 chars
+      row: 432 of 500 chars
       near miss x2 → me
       near miss x1 → me-structure
       near miss x1 → me-uml
@@ -90,10 +90,10 @@ mindmap
 
 | Skill | Row length | Owns these questions | Sends the near miss to |
 |---|---|---|---|
-| `model-everything` | 366/500 | "the README says the API accepts a batch of 100, check that"<br>"verify the claims in this design doc against the code"<br>"this spec says a job can never be both queued and running - is that enforced?" | me-interleaving x2, me-datamodel x2, me-structure x2, me-uml x2 |
+| `model-everything` | 365/500 | "the README says the API accepts a batch of 100, check that"<br>"verify the claims in this design doc against the code"<br>"this spec says a job can never be both queued and running - is that enforced?" | me-interleaving x2, me-datamodel x2, me-structure x2, me-uml x2 |
 | `model-everything-datamodel` | 483/500 | "review this migration: the orders table gains a required column"<br>"does the migration preserve every required field?"<br>"our schema says ids are unique and no row may be orphaned - check the model" | me-uml x2, me-interleaving x2, me x2, me-structure x2 |
 | `model-everything-design` | 478/500 | "does this design keep its layering, or does something reach across a boundary"<br>"tag each module with its responsibilities and check the split"<br>"this interface forces callers to depend on methods they never call" | me-structure x2, me-uml x1, me-interleaving x1 |
-| `model-everything-diagram` | 433/500 | "draw this mermaid flowchart for me"<br>"render this plantuml component diagram to svg"<br>"is this diagram too dense to read - how many boxes per package" | me x2, me-structure x1, me-uml x1 |
+| `model-everything-diagram` | 432/500 | "draw this mermaid flowchart for me"<br>"render this plantuml component diagram to svg"<br>"is this diagram too dense to read - how many boxes per package" | me x2, me-structure x1, me-uml x1 |
 | `model-everything-interleaving` | 389/500 | "this design claims the queue is thread-safe and lock-free"<br>"is this counter monotonic under concurrent writers?"<br>"the doc says the ISR-safe path touches no shared memory" | me x1, me-datamodel x1, me-uml x1, me-structure x1 |
 | `model-everything-report-reading` | 420/500 | "the verify tool gave me a report - what does this verdict mean?"<br>"why did the review come out pass_with_findings instead of pass?"<br>"which findings should I act on in this report?" | me x1, me-interleaving x1, me-datamodel x1, me-structure x1, me-uml x1 |
 | `model-everything-structure` | 476/500 | "here is our component diagram, check for dependency cycles"<br>"the deployment diagram has a service calling the database directly, which our layers forbid"<br>"audit the module structure: which packages depend on which?" | me-uml x2, me-interleaving x2, me x2, me-datamodel x1, me-design x1, me-report-reading x1 |

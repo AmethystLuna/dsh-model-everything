@@ -1,10 +1,10 @@
 {
-  "catalogChars": 3706,
+  "catalogChars": 3704,
   "catalogRows": [
     {
       "skill": "model-everything",
-      "chars": 366,
-      "body": 33024
+      "chars": 365,
+      "body": 33023
     },
     {
       "skill": "model-everything-datamodel",
@@ -18,8 +18,8 @@
     },
     {
       "skill": "model-everything-diagram",
-      "chars": 433,
-      "body": 8566
+      "chars": 432,
+      "body": 8565
     },
     {
       "skill": "model-everything-interleaving",
@@ -114,7 +114,7 @@
     }
   ],
   "perTurn": {
-    "chars": 37773,
+    "chars": 37771,
     "tokens": 9443
   },
   "routing": {
