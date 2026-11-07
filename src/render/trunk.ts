@@ -60,6 +60,11 @@ export interface TrunkEnd {
   entry: Side
   /** The arrow the notation stated. Ends merge only when they agree on it; two unset arrows agree. */
   arrow?: EdgeArrow
+  /**
+   * A dashed line. Ends merge only when they agree on the stroke as well as the head: one trunk is drawn with one
+   * stroke, so a dashed branch on a solid trunk is drawn solid - the one thing the notation said about it, erased.
+   */
+  dashed?: boolean
   /** The height of the run the channel stage gave the edge. An edge without one is not drawn by a run. */
   runY?: number
 }
@@ -140,9 +145,16 @@ function facesTrunk(point: TrunkPoint, side: Side, at: number): boolean {
   return (at - alongNormal(point, side)) * outward > 0.5
 }
 
-/** The group an edge end belongs to: its target, the side it enters by, and the arrow it means. */
+/**
+ * The group an edge end belongs to: its target, the side it enters by, the arrow it means, and its stroke.
+ *
+ * The stroke belongs in the key for the same reason the arrow does. A trunk is one line drawn once, so it has one
+ * `stroke-dasharray`: a dashed dependency that joined a solid association's trunk would be drawn solid along the run
+ * that carries it, and the dashes would resume half-way. Two statements, one appearance, is the confusion the arrow
+ * clause already refuses.
+ */
 function keyOf(end: TrunkEnd): string {
-  return end.to + '\u0000' + end.entry + '\u0000' + (end.arrow ?? '')
+  return end.to + '\u0000' + end.entry + '\u0000' + (end.arrow ?? '') + '\u0000' + (end.dashed === true ? 'dashed' : 'solid')
 }
 
 /** One end that has passed every per-edge rule, with the ports its group is built from. */

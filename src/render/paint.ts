@@ -1087,6 +1087,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       exit: entry.exit,
       entry: entry.entry,
       ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
+      ...(edge.dashed === true ? { dashed: true } : {}),
       ...(runY === undefined ? {} : { runY }),
     })
   })

@@ -55,6 +55,11 @@ export interface TrunkEnd {
     entry: Side;
     /** The arrow the notation stated. Ends merge only when they agree on it; two unset arrows agree. */
     arrow?: EdgeArrow;
+    /**
+     * A dashed line. Ends merge only when they agree on the stroke as well as the head: one trunk is drawn with one
+     * stroke, so a dashed branch on a solid trunk is drawn solid - the one thing the notation said about it, erased.
+     */
+    dashed?: boolean;
     /** The height of the run the channel stage gave the edge. An edge without one is not drawn by a run. */
     runY?: number;
 }

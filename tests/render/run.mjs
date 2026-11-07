@@ -3181,6 +3181,12 @@ test('the trunk planner refuses an end for each rule, and only that end', () => 
   const split = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { arrow: 'composition' })]))
   if (split.groups.length !== 1 || split.groups[0].members.includes(3)) throw new Error('a different arrow joined a trunk')
 
+  // The stroke is part of the key: a trunk is drawn once, with one dash pattern, so a dashed end on a solid trunk
+  // would be drawn solid along the shared run. Dashed ends still merge with dashed ones.
+  const stroke = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { dashed: true })]))
+  if (stroke.groups.length !== 1 || stroke.groups[0].members.includes(3)) throw new Error('a dashed end joined a solid trunk')
+  const allDashed = [trunkEndAt(0, 'a', { dashed: true }), trunkEndAt(1, 'b', { dashed: true }), trunkEndAt(2, 'c', { dashed: true })]
+  if (planTrunks(trunkInput(allDashed)).groups.length !== 1) throw new Error('three dashed ends did not merge with each other')
   const mixed = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { exit: 'right' })]))
   if (mixed.groups.length !== 1 || mixed.groups[0].members.includes(3)) throw new Error('an end on the other axis joined a trunk')
   const away = planTrunks(trunkInput([...four.slice(0, 3), trunkEndAt(3, 'd', { exit: 'top' })]))
