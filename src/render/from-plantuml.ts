@@ -17,7 +17,9 @@
  * - an edge end that names a declared block attaches to that block's rectangle, the way an external
  *   dependency on a package is drawn; a name that is not a declared block is an implicit element;
  * - `[*] --> X` for a start marker;
- * - `'` comments and `skinparam`/`!theme` directives.
+ * - `'` comments and `skinparam`/`!theme`/`hide`/`show`/`scale` directives;
+ * - `left to right direction` is accepted and has no effect: this renderer has one layout, top to bottom, so a
+ *   source that asks for landscape gets the same picture as one that does not.
  *
  * Refused, by line and by name: the element keywords this renderer has no symbol for (`actor`, `class`,
  * `cloud`, ...), the diagram kinds it does not draw (`sequence`), and an edge it cannot draw as written (a

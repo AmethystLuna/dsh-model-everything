@@ -57,7 +57,8 @@ longer a summary. When you present one, say what it shows — the layout, not wh
 node a short alias to name in edges, so a reader can check the grouping against the text that produced it. Mermaid
 stays supported - a flow someone else wrote still draws - but a new diagram this plugin authors is written in
 PlantUML. Both notations go through the same layout engine, so the choice changes the spelling of the source, not
-the drawing rules.
+the drawing rules - and **neither notation's direction keyword changes the layout**: Mermaid's `LR` and PlantUML's
+`left to right direction` are read and dropped, because there is one layout, top to bottom.
 
 A refusal is one line in `refused`, phrased `line N: …`. The drawing you get does not show the refused lines, and
 the tool says so rather than leaving you to notice.

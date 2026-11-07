@@ -8,7 +8,8 @@
  *
  * Supported:
  *
- * - `graph TD|TB|LR` and `flowchart TD|TB|LR`, with direction carried into the layout as a hint;
+ * - `graph TD|TB|LR` and `flowchart TD|TB|LR`; the direction token is read and dropped - this renderer has one
+ *   layout, top to bottom, so `LR` draws the same picture as `TD` (measured, not assumed);
  * - node declarations `A[text]`, `A(text)`, `A{text}`, `A((text))`, and a bare `A`;
  * - edges `-->`, `---`, `-.->`, `==>`, with a label as `-->|text|` or `-- text -->`;
  * - `stateDiagram` / `stateDiagram-v2`: `[*] --> A`, `A --> B: event`, `state "text" as id`;
