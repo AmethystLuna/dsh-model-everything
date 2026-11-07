@@ -3312,6 +3312,35 @@ test('a merged trunk enters the target at the centre of its side', () => {
   }
 })
 
+test('a run in the other stroke keeps a lane of clearance from a trunk it is not part of', () => {
+  // A dashed branch does not join a solid trunk: a trunk is one line drawn once, so it carries one stroke. The pair
+  // is then two lines saying different things, and the channel stage's own spacing is for the other case - two runs
+  // of one kind, which the eye is meant to read as one track. So the mixed pair stands a lane's width apart, and the
+  // assertion is about the drawn segments: no dashed horizontal within a lane of a solid horizontal it overlaps.
+  const source = ['graph TD', '  a --> t', '  b --> t', '  c --> t', '  d -.-> t'].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const horizontals = []
+  for (const shape of routesOf(canvas)) {
+    const points = routePointsOf(shape)
+    for (let i = 1; i < points.length; i += 1) {
+      const from = points[i - 1]
+      const to = points[i]
+      if (Math.abs(from.y - to.y) > 0.01) continue
+      horizontals.push({ y: from.y, lo: Math.min(from.x, to.x), hi: Math.max(from.x, to.x), dashed: shape.dashed === true })
+    }
+  }
+  const dashed = horizontals.filter((run) => run.dashed)
+  const solid = horizontals.filter((run) => !run.dashed)
+  if (dashed.length === 0 || solid.length === 0) throw new Error('the fixture did not draw both strokes')
+  for (const one of dashed) {
+    for (const other of solid) {
+      if (Math.min(one.hi, other.hi) - Math.max(one.lo, other.lo) <= 1) continue
+      if (Math.abs(one.y - other.y) < 14) throw new Error('a dashed run lies ' + String(Math.abs(one.y - other.y)) + ' from a solid one')
+    }
+  }
+  const ends = routesOf(canvas).map(endOf)
+  if (new Set(ends.map((end) => String(end.x))).size < 2) throw new Error('the dashed branch did not keep an entry of its own')
+})
 test('a diamond or an ellipse keeps its single port on the point that is the middle of its side', () => {
   // A diamond's side meets the symbol at its vertex, and an ellipse's at its cardinal point: both are already the
   // middle of the side, and a rule about slots must leave them there rather than spread along a run that is not

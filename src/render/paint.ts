@@ -1262,6 +1262,37 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   // target carries one relation's worth of ports however many arrows point at it.
   const sharedEntry = new Map<number, Point>()
   for (const group of trunks.groups) sharedEntry.set(group.id, pointOn(group.target, group.side, group.entryAlong))
+  /**
+   * A run drawn beside a trunk it is not part of, in the other stroke, keeps a lane's width from it.
+   *
+   * The channel stage spaces runs for the plane case: two lines of the same kind, which the eye reads as one
+   * straight track. At that spacing a dashed run sits a couple of pixels under a solid trunk, and the dashes read
+   * as a second line rather than as another kind of statement. The width is the lane spacing, because that is the
+   * gap the drawing already uses to say "these two lines are not one".
+   */
+  const TRUNK_RUN_CLEARANCE = 14
+  const runOf = new Map(placement.runs)
+  for (const group of trunks.groups) {
+    if (group.side !== 'top' && group.side !== 'bottom') continue
+    const members = new Set(group.members)
+    const lead = diagram.edges[group.members[0] as number] as DiagramEdge | undefined
+    const leadDashed = lead?.dashed === true
+    for (const [index, y] of [...runOf]) {
+      if (members.has(index)) continue
+      const edge = diagram.edges[index] as DiagramEdge | undefined
+      if (edge === undefined || (edge.dashed === true) === leadDashed) continue
+      if (Math.abs(y - group.at) >= TRUNK_RUN_CLEARANCE) continue
+      const source = boxes.get(edge.from)
+      const target = boxes.get(group.target)
+      const room = (candidate: number): boolean =>
+        (source === undefined || candidate >= source.y + source.height + 6) &&
+        (target === undefined || candidate <= target.y - 6)
+      const up = group.at - TRUNK_RUN_CLEARANCE
+      const down = group.at + TRUNK_RUN_CLEARANCE
+      if (room(up)) runOf.set(index, up)
+      else if (room(down)) runOf.set(index, down)
+    }
+  }
 
   /** The points a drawn edge passes through, whichever of the two shapes carries it. */
   const pointsOfRoute = (shape: LinkShape | PathShape): Point[] =>
@@ -1460,7 +1491,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // an empty strip only when the two rows it was measured between are the boxes actually drawn: a run reserved
     // between two boundaries is a strip outside them, while the painter's ports belong to boxes inside them. So the
     // proposal is checked, not trusted, and an edge whose legs would cross a box is the router's.
-    const runY = placement.runs.get(edgeIndex)
+    const runY = runOf.get(edgeIndex)
     if (runY !== undefined && anchors !== undefined && runFits(anchors, runY)) {
       const points = runRoute(anchors, runY)
       if (clearOfBoxes(points, source, target)) {
