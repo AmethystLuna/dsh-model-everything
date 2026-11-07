@@ -259,6 +259,34 @@ test('the drawing card lists the lines the renderer refused', () => {
 })
 
 test('the drawing card survives a call whose source has not arrived', () => {
+// The card can draw one of two ways: from the SVG the tool returned, or - when that payload is absent -
+// by re-parsing the source in the page. The second path is the only one that can paint a refusal strip,
+// and a strip the tool never reported reads as "this deployment is broken". Driven here over the block
+// shapes the host has handed over, with sources this repository ships.
+test('a settled card paints no refusal the tool did not report', () => {
+  const { registrations } = loadBundle()
+  const plugin = registrations[0].factory(() => stubReact)
+  let component
+  plugin.apply({ slots: { inject: (_slot, cb) => cb(), register: (options, view) => { if (options.name === 'tool.call.toolview') component = view } } })
+  const sources = [
+    'graph TD\n  a[Idea] --> b{Feasible?}\n  b -->|yes| c[Build]\n  b -->|no| d[Revise]\n  d --> a',
+    ['@startuml', 'package "P" {', '  component "a<br>b" as A', '}', 'A --> B', '@enduml'].join('\n'),
+  ]
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4" /></svg>'
+  for (const source of sources) {
+    for (const block of [
+      { args: { source } },
+      { args: { source }, result: { svg } },
+      { meta: { source }, result: { svg } },
+      { meta: { source } },
+    ]) {
+      const element = component({ phase: 'result', toolName: 'diagram_render', block })
+      const html = JSON.stringify(element)
+      if (!html.includes('<svg')) throw new Error('no drawing for block ' + JSON.stringify(block).slice(0, 40))
+      if (/line \\d+:/.test(html)) throw new Error('a refusal the tool never reported: ' + html.slice(0, 200))
+    }
+  }
+})
   const { registrations } = loadBundle()
   const plugin = registrations[0].factory(() => stubReact)
   let component

@@ -11,6 +11,7 @@ metadata:
 
 | 主题 | 一句话 | 什么时候读 |
 |---|---|---|
+| [plantuml-layout](design/plantuml-layout.md) | 选 PlantUML 的真实理由（布局可控）与今天的行为矩阵：支持、静默忽略、按行拒收各是哪些构造，以及把「可控」拆成 P1–P4 的顺序、验收与代价 | 决定卡片用哪种记号、给布局加约束、或评估「换 PlantUML 值不值」之前 |
 | [roadmap](design/roadmap.md) | 0.6.0 之后的去向：控件收尾的具体项与验收，把对话里的 Mermaid / PlantUML 代码块渲染成卡片的目标与入口，以及为什么不能再走改写消息 DOM 那条路 | 决定下一个版本做什么、或准备动「对话里的代码块」之前 |
 | [store-entry](design/store-entry.md) | 商店条目注册草稿：名称、中英描述、分类，以及文案为什么这么排 | 注册创意工坊条目、改卡片文案或调整分类时 |
 | [gate-injection](design/gate-injection.md) | 会话开头路由注入：第二个 loader 行、默认开是怎么定的、它替代不了什么、代价与「文档即指引」原则的关系、从同类插件借的三种写法 | 动 `src/gate.ts`、改注入文本或开关、判断「要不要开这条消息」时 |
