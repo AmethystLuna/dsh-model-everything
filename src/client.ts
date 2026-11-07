@@ -18,6 +18,7 @@ import { render } from './render/index.js'
 import { toSvg } from './render/svg.js'
 import { viewModel } from './render/viewmodel.js'
 import { annotationBlock, annotationMessage, composerRect, fillComposer, findComposer, pageCensus, prependBlock, pushBlock, pushNote, sessionFromLocation, submitComposer, withoutEmptyQuestion, type DocumentLike } from './annotation.js'
+import { dismissOnBackdrop, fullScreenFrame, leavesFullScreen } from './frame.js'
 import { decorateTranscript, startTranscriptDecoration, type TranscriptDocument as TranscriptDocumentForClient } from './transcript.js'
 
 export interface ReactLike {
@@ -375,7 +376,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   // conversation view down with it.
   const hasDrawing = markup !== null || (typeof source === 'string' && source.trim() !== '')
   const useState = React.useState
-  if (useState === undefined) return cardSurface(React, source, markup, scheme, overrides, null, null, null, null)
+  if (useState === undefined) return cardSurface(React, source, markup, scheme, overrides, null, null, null)
   const [annotate, setAnnotate] = useState(false)
   const [picked, setPicked] = useState<{ id: string } | null>(null)
   const [note, setNote] = useState('')
@@ -386,8 +387,6 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   const [open, setOpen] = useState(false)
   // A note that left: this plugin's own chrome says so, where no other plugin works.
   const [sent, setSent] = useState('')
-  // A self-report the reader can copy in one click, so a UI question is answered with facts instead of screenshots.
-  const [report, setReport] = useState('')
   // The composer grows when a picture is pasted, and the docked control has to follow it.
   const [, setDockTick] = useState(0)
   // `position: fixed` is relative to the nearest transformed ancestor, not to the viewport. The chip therefore
@@ -435,6 +434,15 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
   }, [])
   const [zoom, setZoom] = useState(1)
   const [full, setFull] = useState(false)
+  // Escape leaves full screen. Document-level because the overlay is not focusable and the reader may not have
+  // clicked into it yet.
+  React.useEffect?.(() => {
+    if (!full) return undefined
+    const doc = (globalThis as { document?: { addEventListener?: (type: string, fn: (event: { key?: string }) => void) => void; removeEventListener?: (type: string, fn: (event: { key?: string }) => void) => void } }).document
+    const onKey = (event: { key?: string }): void => { if (leavesFullScreen(event?.key)) setFull(false) }
+    doc?.addEventListener?.('keydown', onKey)
+    return () => { doc?.removeEventListener?.('keydown', onKey) }
+  }, [full])
   if (!hasDrawing) {
     const keys = props.block === null || typeof props.block !== 'object' ? 'none' : Object.keys(props.block as Record<string, unknown>).join(',')
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call · block: ' + (keys === '' ? 'empty' : keys))
@@ -494,13 +502,7 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
     { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
     React.createElement('button', { type: 'button', title: 'Point at a node and send a note about it', onClick: () => { setAnnotate(!annotate); setStatus(''); if (annotate) { setPicked(null); setNote('') } }, style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '5px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.text, cursor: 'pointer' } }, annotate ? t('noteOn') : t('note')),
     annotate && picked === null ? React.createElement('span', { style: { fontSize: '11px', opacity: 0.7 } }, '点一个节点') : null,
-    React.createElement('button', {
-      type: 'button',
-      onClick: () => {
-        try { setReport(domReport()) } catch (error) { setReport('report failed: ' + String((error as { message?: unknown })?.message ?? error)) }
-      },
-      style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '5px', border: '1px solid ' + TOKEN.border, background: 'transparent', color: TOKEN.dim, cursor: 'pointer' },
-    }, '诊断'),
+
     sent === '' ? null : React.createElement('span', {
       style: { fontSize: '11px', lineHeight: '16px', padding: '1px 6px', borderRadius: '9px', border: '1px solid ' + TOKEN.border, color: TOKEN.dim, whiteSpace: 'nowrap' },
     }, sent),
@@ -536,14 +538,11 @@ function drawingCard(React: ReactLike, props: ToolCallProps, overrides: Partial<
         { document, dockChip: false },
       )
     : null
-  const reportPanel = report === '' ? null : React.createElement('pre', {
-    style: { margin: '6px 0 0', padding: '8px', borderRadius: '8px', border: '1px solid ' + TOKEN.border, background: 'rgba(127,127,127,0.08)', font: '11px ui-monospace, monospace', whiteSpace: 'pre-wrap', userSelect: 'text', maxHeight: '220px', overflow: 'auto' },
-  }, report)
-  return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel, reportPanel, { zoom: Number(zoom), full: Boolean(full), onZoom: (next: number) => setZoom(next), onFull: (next: boolean) => setFull(next) })
+  return cardSurface(React, source, markup, scheme, overrides, onPick, toggle, panel, { zoom: Number(zoom), onDismiss: () => setFull(false), full: Boolean(full), onZoom: (next: number) => setZoom(next), onFull: (next: boolean) => setFull(next) })
 }
 
 /** The drawing itself, plus whatever the reader is doing to it. One surface, drawn once. */
-function cardSurface(React: ReactLike, source: unknown, returned: string | null, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown, report: unknown, view: { zoom: number; full: boolean; onZoom: (next: number) => void; onFull: (next: boolean) => void } = { zoom: 1, full: false, onZoom: () => {}, onFull: () => {} }): unknown {
+function cardSurface(React: ReactLike, source: unknown, returned: string | null, scheme: PaletteScheme, overrides: Partial<Palette>, onClick: ((event: never) => void) | null, toggle: unknown, panel: unknown, view: { zoom: number; full: boolean; onZoom: (next: number) => void; onFull: (next: boolean) => void; onDismiss?: () => void } = { zoom: 1, full: false, onZoom: () => {}, onFull: () => {} }): unknown {
   if (returned === null && (typeof source !== 'string' || source.trim() === '')) {
     return React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, 'no drawing in this call')
   }
@@ -595,13 +594,12 @@ function cardSurface(React: ReactLike, source: unknown, returned: string | null,
     { style: { position: 'relative', background: drawn.colours.background, padding: '6px', maxHeight: view.full ? 'none' : '260px', overflow: 'auto', flex: '1 1 auto', minHeight: '0' } },
     drawing,
     panel,
-    report,
   )
   const frame = view.full
-    ? { position: 'fixed' as const, inset: '16px', zIndex: 60, display: 'flex', flexDirection: 'column', ...chrome, boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }
+    ? { ...fullScreenFrame(), display: 'flex', flexDirection: 'column', ...chrome, boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }
     : { display: 'flex', flexDirection: 'column', ...chrome }
   const children = [header, body, refused].filter((child) => child !== null)
-  return React.createElement('div', { style: frame }, ...children)
+  return React.createElement('div', { style: frame, ...dismissOnBackdrop(view.full, view.onDismiss) }, ...children)
 }
 
 /**
@@ -857,7 +855,6 @@ function attachBelowBubble(label: string, typed: string): void {
       } else {
         hit = findBlockElement(doc)
       }
-      chipAttempt = hit === undefined ? 'not found, try ' + String(tries) : 'found'
       if (hit !== undefined) { insertChipAfter(doc, hit, label); return }
     } catch { /* a chip not shown is not a broken message */ }
     if (tries < 20) timer(attempt, 500)
@@ -908,8 +905,6 @@ let dockReact: { count: number; open: boolean; items: Array<{ nodeId: string; no
 
 let dockEl: any
 let dockRetries = 0
-// What the last attempt to place the per-message count saw, for the diagnostic report.
-let chipAttempt = 'not attempted'
 let chipAnchor: any
 let chipScrollWatched = false
 let dockReceipt = ''
@@ -1238,43 +1233,7 @@ function observeDivider(doc: any): void {
   } catch { /* a missing handle is a layout that never changes */ }
 }
 
-/**
- * One click, one paste: what the page actually contains.
- *
- * Every layout question so far cost a screenshot and a guess. The facts that decide those questions are cheap to
- * collect - which anchors exist, where they are, whether our nodes are still in the document - so they are
- * collected here and shown as selectable text.
- */
-function domReport(): string {
-  const doc = (globalThis as { document?: any }).document
-  if (doc === undefined) return 'no document'
-  const lines: string[] = []
-  const rect = (el: any): string => {
-    const r = el?.getBoundingClientRect?.()
-    return r === undefined || r === null ? 'absent' : [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(',')
-  }
-  const probe = (name: string, selector: string): void => {
-    const el = doc.querySelector(selector)
-    lines.push(name + ' ' + (el === null || el === undefined ? 'absent' : 'l,t,w,h=' + rect(el)))
-  }
-  probe('[data-composer-card]', '[data-composer-card]')
-  probe('[data-composer-seat]', '[data-composer-seat]')
-  probe('textarea/contenteditable', 'textarea, [contenteditable="true"]')
-  probe('[data-annotation-chip]', '[data-annotation-chip]')
-  probe('[data-conversation-scroll]', '[data-conversation-scroll]')
-  probe('widthHandle', '[class*="widthHandle"]')
-  const dock = doc.querySelector('[data-dme-dock]')
-  lines.push('dock ' + (dock === null ? 'absent' : 'l,t,w,h=' + rect(dock) + ' connected=' + String(dock.isConnected)))
-  const chips = doc.querySelectorAll('[data-dme-chip]')
-  lines.push('chips ' + String(chips.length) + ' ' + Array.from(chips).map((chip) => rect(chip)).join(' | '))
-  lines.push('pendingBlock ' + String(pendingBlock === '' ? 'empty' : pendingBlock.split(String.fromCharCode(10)).length + ' lines'))
-  lines.push('chipAttempt ' + chipAttempt)
-  lines.push('dockedCount ' + String(dockReact?.count ?? 0) + ' placedText ' + String(placedText.length))
-  lines.push('viewport ' + String((globalThis as { innerWidth?: number }).innerWidth) + 'x' + String((globalThis as { innerHeight?: number }).innerHeight))
-  const report = lines.join(String.fromCharCode(10))
-  try { (globalThis as { console?: { log?: (value: string) => void } }).console?.log?.(report) } catch { /* console may be gone */ }
-  return report
-}
+
 
 function refreshDock(): void { scheduleDock() }
 function installEnterCapture(): void {

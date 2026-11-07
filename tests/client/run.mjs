@@ -15,6 +15,7 @@ const repo = fileURLToPath(new URL('../../', import.meta.url)).replaceAll('\\', 
 // neither question needs a page.
 const { annotationMessage, composerRect, fillComposer, pageCensus, prependBlock, pushNote, sessionFromLocation, withoutEmptyQuestion } = await import('../../lib/annotation.js')
 const { annotationCountOf, decorateTranscript, itemsOf } = await import('../../lib/transcript.js')
+const { dismissOnBackdrop, fullScreenFrame, leavesFullScreen } = await import('../../lib/frame.js')
 
 const manifest = JSON.parse(readFileSync(repo + 'package.json', 'utf8'))
 
@@ -577,6 +578,33 @@ test('no composer means no write, and the caller is told', () => {
   const written = fillComposer({ querySelector: () => null }, 'text')
   if (written !== 'no-composer') throw new Error('reported ' + written)
   if (fillComposer(undefined, 'text') !== 'no-composer') throw new Error('an absent document was treated as a composer')
+})
+
+test('full screen leaves the window chrome reachable', () => {
+  // A full-bleed overlay covered minimize/maximize/close; the top edge has to start below that bar, or the
+  // only control that could leave full screen is the one the overlay is hiding.
+  const frame = fullScreenFrame()
+  if (frame.position !== 'fixed') throw new Error('the overlay is not fixed: ' + JSON.stringify(frame))
+  const top = Number(String(frame.top).replace('px', ''))
+  if (!Number.isFinite(top) || top < 48) throw new Error('the overlay starts too high: ' + String(frame.top))
+  if (frame.bottom === '0px' || frame.right === '0px') throw new Error('the overlay has no margin: ' + JSON.stringify(frame))
+})
+
+test('a click on the backdrop leaves full screen, a click inside does not', () => {
+  let dismissed = 0
+  const props = dismissOnBackdrop(true, () => { dismissed += 1 })
+  if (typeof props.onClick !== 'function') throw new Error('full screen has no dismiss handler')
+  const backdrop = {}
+  props.onClick({ target: backdrop, currentTarget: backdrop })
+  if (dismissed !== 1) throw new Error('the backdrop did not dismiss: ' + String(dismissed))
+  props.onClick({ target: {}, currentTarget: backdrop })
+  if (dismissed !== 1) throw new Error('a click inside the card dismissed it')
+  if (Object.keys(dismissOnBackdrop(false, () => {})).length !== 0) throw new Error('a windowed card got a dismiss handler')
+})
+
+test('Escape leaves full screen and nothing else does', () => {
+  if (!leavesFullScreen('Escape')) throw new Error('Escape does not leave full screen')
+  for (const key of ['Enter', 'Esc', 'Tab', undefined]) if (leavesFullScreen(key)) throw new Error('this key left full screen: ' + String(key))
 })
 
 if (failures > 0) {
