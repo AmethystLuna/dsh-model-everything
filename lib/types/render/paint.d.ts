@@ -28,7 +28,7 @@
  * placed after every edge is drawn, because what a label has to avoid is the whole picture.
  *
  * Every route is checked before it is drawn, and the assembled drawing is checked once more: a segment may touch no
- * box except the two the edge terminates at. A route is a proposal - a channel run, a lane, a trunk branch, a wrapped
+ * box except the two the edge terminates at. A route is a proposal - a channel run, a lane, a wrapped
  * column's sideways read - and any proposal that would cross a box is handed to the router instead. When even the
  * router cannot clear a box, the failure is reported on the canvas rather than hidden: a drawing that says which edge
  * could not be routed is worth more than one that quietly draws it through a box.
@@ -105,20 +105,6 @@ export interface PathShape {
     /** Why the label sits where it does. Undefined on an edge with no label. */
     labelPlacement?: LabelPlacement;
 }
-/**
- * A junction dot: the place one branch of a merged bundle meets the bundle's trunk.
- *
- * The dot is not decoration. Two lines that meet at a right angle read as a crossing unless one of them is marked as
- * joining the other, and a bundle whose branches are not marked reads as a set of broken lines rather than a merge.
- */
-export interface JunctionShape {
-    kind: 'junction';
-    x: number;
-    y: number;
-    colour: ColourRole;
-    /** The trunk the dot belongs to: one dot per branch, one trunk id per bundle. */
-    trunk: number;
-}
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
     kind: 'group';
@@ -145,7 +131,7 @@ export interface TitleShape {
     text: string;
     colour: ColourRole;
 }
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | JunctionShape | CaptionShape | TitleShape;
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape;
 /** One segment of a drawn route that could not be kept out of a box it does not terminate at. */
 export interface RoutingFailure {
     /** The edge's index in the diagram. */
@@ -229,7 +215,7 @@ export declare function placeLabel(label: string, points: Point[], boxes: Iterab
 /**
  * The boxes a polyline passes through other than the two it terminates at.
  *
- * This is the drawing's one clearance rule, and it is deliberately written once: a channel run, a lane, a trunk
+ * This is the drawing's one clearance rule, and it is deliberately written once: a channel run, a lane, a
  * branch, a wrapped column's sideways step and the router's fallback all have to obey the same test. A box is skipped
  * only when it is one of the edge's own two ends, so a port that sits inside its own symbol (a cylinder's cap apex)
  * is allowed and a segment that ends inside somebody else's box is not.
