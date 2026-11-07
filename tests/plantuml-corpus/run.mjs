@@ -91,9 +91,10 @@ const CASES = [
   },
   {
     name: "state alias with a long label",
-    why: "a long label widens the box, it does not wrap",
+    // `W --> [*]` is the exit, not a second box called `*`: one node, one self-loop labelled `end`.
+    why: "a long label widens the box; the exit marker is not a node",
     source: "@startuml\nstate \"Waiting for the upstream service to answer\" as W\n[*] --> W\nW --> [*]\n@enduml",
-    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
+    expect: { nodes: 1, edges: 1, groups: 0, refused: [] },
   },
   {
     name: "node and package share a name",

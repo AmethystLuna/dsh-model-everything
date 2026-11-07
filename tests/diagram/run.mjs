@@ -136,6 +136,21 @@ test('a dotted arrow is marked dashed and a state start marker sets the initial 
   if (state.kind !== 'machine') throw new Error('kind: ' + state.kind)
 })
 
+// `[*]` is a marker, not a name. Read as an endpoint it drew a box called `*` in PlantUML sources; the
+// Mermaid adapter had always folded it into the state it leaves, so the two notations disagreed about the
+// same source. Both now produce one node and a self-loop labelled `end`.
+test('an exit marker is not a node, in either notation', () => {
+  const plantuml = fromPlantUml('@startuml\n[*] --> W\nW --> [*]\n@enduml').diagram
+  const mermaid = fromMermaid('stateDiagram\n[*] --> W\nW --> [*]\n').diagram
+  for (const [name, diagram] of [['plantuml', plantuml], ['mermaid', mermaid]]) {
+    if (JSON.stringify(ids(diagram)) !== JSON.stringify(['W'])) throw new Error(name + ' nodes: ' + ids(diagram).join(','))
+    if (diagram.init !== 'W') throw new Error(name + ' init: ' + String(diagram.init))
+    if (diagram.edges.length !== 1 || diagram.edges[0].from !== 'W' || diagram.edges[0].to !== 'W') {
+      throw new Error(name + ' edge: ' + JSON.stringify(diagram.edges))
+    }
+  }
+})
+
 test('a sequence participant is refused by line', () => {
   const { refused } = fromPlantUml('@startuml\nactor User\nUser -> System : login\n@enduml')
   if (refused.length === 0) throw new Error('an actor was accepted')
