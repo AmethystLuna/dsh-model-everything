@@ -82,7 +82,10 @@ const CASES = [
   },
   {
     name: "composite state with inner transitions",
-    why: "must refuse: a state body is not a boundary here",
+    // The block line is refused; its body lines and every name another line mentions still draw. That is the
+    // decided degradation (the reader is told which line was dropped), not an oversight: dropping the members
+    // too would lose edges that parsed, and the counts below pin the choice.
+    why: "must refuse the state body, and keep the members that did parse",
     source: "@startuml\nstate Running {\n  [*] --> Busy\n  Busy --> Idle\n}\n[*] --> Running\n@enduml",
     expect: { nodes: 3, edges: 1, groups: 0, refused: ["`state` block is not a boundary"] },
   },
