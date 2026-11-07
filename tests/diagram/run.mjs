@@ -146,6 +146,31 @@ test('skinparam and themes are ignored without a refusal', () => {
   const { refused } = fromPlantUml('@startuml\nskinparam monochrome true\n!theme plain\nA --> B\n@enduml')
   if (refused.length !== 0) throw new Error('refused: ' + JSON.stringify(refused))
 })
+// A component called `Group` is an edge endpoint, not the sequence fragment `group`: the fragment keywords
+// are only a statement's dispatch when the line is not an edge. Three names, because the whole keyword table
+// is consulted the same way.
+test('an element named like a sequence keyword is still an element', () => {
+  for (const [name, source] of [
+    ['Group', '@startuml\nGroup o-- Member\n@enduml'],
+    ['Loop', '@startuml\nLoop --> B\n@enduml'],
+    ['Alt', '@startuml\ncomponent Alt\nAlt --> B\n@enduml'],
+  ]) {
+    const { diagram, refused } = fromPlantUml(source)
+    if (refused.length !== 0) throw new Error(name + ' refused: ' + refused.join('; '))
+    if (!diagram.nodes.some((node) => node.id === name)) throw new Error(name + ' is missing: ' + ids(diagram).join(','))
+    if (diagram.edges.length !== 1) throw new Error(name + ' edge count: ' + String(diagram.edges.length))
+  }
+  // And the statement itself is still refused: the fix reordered dispatch, it did not delete the table.
+  const fragment = fromPlantUml('@startuml\nalt x\nA --> B\n@enduml')
+  if (fragment.refused.length === 0) throw new Error('a bare alt statement was accepted')
+})
+
+// `<<service>>` is a stereotype, not part of the name. Kept, it drew a second box called `A <<service>>`.
+test('a stereotype does not become a second element', () => {
+  const { diagram, refused } = fromPlantUml('@startuml\ncomponent A <<service>>\nA --> B\n@enduml')
+  if (refused.length !== 0) throw new Error('refused: ' + JSON.stringify(refused))
+  if (JSON.stringify(ids(diagram)) !== JSON.stringify(['A', 'B'])) throw new Error('ids: ' + ids(diagram).join(','))
+})
 
 test('an empty plantuml file is an empty drawing', () => {
   if (fromPlantUml('@startuml\n@enduml').diagram.kind !== 'none') throw new Error('drew from an empty file')

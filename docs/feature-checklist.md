@@ -154,6 +154,7 @@ node tests/report-reading/run.mjs
 node tests/structure/run.mjs
 node tests/automaton/run.mjs
 node tests/diagram/run.mjs
+node tests/plantuml-corpus/run.mjs
 node tests/client/run.mjs
 node tests/render/run.mjs
 node tests/cycle-break/run.mjs
@@ -210,7 +211,8 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
-| `diagram` | 99 | a flowchart becomes boxes and labelled arrows |
+| `diagram` | 101 | a flowchart becomes boxes and labelled arrows |
+| `plantuml-corpus` | 0 | (read the file) |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 178 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |

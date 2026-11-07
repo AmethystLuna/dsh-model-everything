@@ -131,9 +131,16 @@ function ensure(builder: Builder, id: string, label?: string, shape?: NodeShape,
   if (shape !== undefined && existing.shape === undefined) existing.shape = shape
 }
 
-/** A component reference: `[text]`, `X`, or a quoted name. Returns the id, the label and any shape it stated. */
+/**
+ * A component reference: `[text]`, `X`, or a quoted name. Returns the id, the label and any shape it stated.
+ *
+ * A trailing stereotype (`<<service>>`) is not part of the name: kept, it becomes a second box called
+ * `A <<service>>` beside the real `A`, which draws a component the source never named.
+ */
 function reference(token: string): Reference {
-  const text = token.trim()
+  let text = token.trim()
+  while (/\s*<<[^<>]*>>\s*$/.test(text)) text = text.replace(/\s*<<[^<>]*>>\s*$/, '').trim()
+  if (text === '') text = token.trim()
   const bracket = BRACKET.exec(text)
   if (bracket !== null) {
     const label = bracket[1].trim()
@@ -236,6 +243,38 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     if (/^title\b/.test(line)) return
     if (IGNORED.test(line)) return
 
+    if (line === '[*] --> [*]') return
+
+    const startMarker = /^\[\*\]\s*-->\s*(.+)$/.exec(line)
+    if (startMarker !== null) {
+      const target = reference(startMarker[1])
+      ensure(builder, target.id, target.label, target.shape)
+      if (startId === undefined) startId = target.id
+      return
+    }
+    // An arrow is read before any keyword dispatch. A component may be called `Group`, `Loop` or `Alt`, and
+    // `Group o-- Member` is an edge, not the sequence fragment `group` - the keyword tables only apply to a
+    // line that is not an edge.
+    const arrow = readArrow(line)
+    if (arrow !== undefined) {
+      if (typeof arrow === 'string') {
+        refused.push(where + arrow)
+        return
+      }
+      ensure(builder, arrow.from.id, arrow.from.label, arrow.from.shape, true)
+      ensure(builder, arrow.to.id, arrow.to.label, arrow.to.shape, true)
+      builder.edges.push({
+        from: arrow.from.id,
+        to: arrow.to.id,
+        label: arrow.label,
+        ...(arrow.dashed ? { dashed: true } : {}),
+        arrow: arrow.arrow,
+      })
+      builder.edgeLines.push(index + 1)
+      builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
+      return
+    }
+
     const keyword = keywordOf(line)
     const notDrawn = NOT_DRAWN[keyword]
     if (notDrawn !== undefined) {
@@ -273,15 +312,6 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
 
-    if (line === '[*] --> [*]') return
-
-    const startMarker = /^\[\*\]\s*-->\s*(.+)$/.exec(line)
-    if (startMarker !== null) {
-      const target = reference(startMarker[1])
-      ensure(builder, target.id, target.label, target.shape)
-      if (startId === undefined) startId = target.id
-      return
-    }
 
     const declared = DECLARED.exec(line)
     if (declared !== null) {
@@ -307,25 +337,6 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
 
-    const arrow = readArrow(line)
-    if (arrow !== undefined) {
-      if (typeof arrow === 'string') {
-        refused.push(where + arrow)
-        return
-      }
-      ensure(builder, arrow.from.id, arrow.from.label, arrow.from.shape, true)
-      ensure(builder, arrow.to.id, arrow.to.label, arrow.to.shape, true)
-      builder.edges.push({
-        from: arrow.from.id,
-        to: arrow.to.id,
-        label: arrow.label,
-        ...(arrow.dashed ? { dashed: true } : {}),
-        arrow: arrow.arrow,
-      })
-      builder.edgeLines.push(index + 1)
-      builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
-      return
-    }
 
     const single = BRACKET.exec(line)
     if (single !== null) {

@@ -1,0 +1,157 @@
+// PlantUML constructs a component or state diagram actually contains, each with the difficulty it probes.
+//
+// The adapter is judged on two things at once: did it read the construct, and did it refuse the near miss
+// by line rather than draw half a diagram. Every case names the difficulty it exists for, so a failure
+// says which construct moved rather than only which assertion tripped.
+//
+// This is not PlantUML. A construct this renderer has no symbol for is refused by line, and the case
+// records that refusal as the expected answer - that is the contract, not a bug to fix later.
+import { render } from '../../lib/render/index.js'
+
+let failures = 0
+const test = (name, body) => {
+  try {
+    body()
+    console.log('PASS', name)
+  } catch (error) {
+    failures += 1
+    console.log('FAIL', name, '-', String(error.message).slice(0, 240))
+  }
+}
+
+const CASES = [
+  {
+    name: "nested packages, three levels",
+    why: "boundary depth: a group holds a group holds a group",
+    source: "@startuml\npackage \"A\" {\n  package \"B\" {\n    package \"C\" {\n      component X\n    }\n  }\n}\n@enduml",
+    expect: { nodes: 1, edges: 0, groups: 3, refused: [] },
+  },
+  {
+    name: "quoted package label with alias, edge into the block",
+    why: "the block itself is an edge end, not a box",
+    source: "@startuml\npackage \"Core services\" as Core {\n  component X\n}\ncomponent Y\nCore --> Y\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 1, refused: [] },
+  },
+  {
+    name: "edge into a nested package",
+    why: "must refuse: the edge would enter another boundary",
+    source: "@startuml\npackage A {\n  package B {\n    component X\n  }\n}\ncomponent Y\nB --> Y\n@enduml",
+    expect: { nodes: 2, edges: 0, groups: 2, refused: ["is a block inside"] },
+  },
+  {
+    name: "bracketed shorthand with spaces",
+    why: "the label is the id, spaces and all",
+    source: "@startuml\n[Payment gateway] --> [Order service]\n[Order service] --> Database\n@enduml",
+    expect: { nodes: 3, edges: 2, groups: 0, refused: [] },
+  },
+  {
+    name: "alias declared twice, label once",
+    why: "the first label wins, the id stays one node",
+    source: "@startuml\ncomponent \"First label\" as A\ncomponent \"Second label\" as A\nA --> B\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
+  },
+  {
+    name: "stereotype on a component",
+    why: "a stereotype is not part of the name",
+    source: "@startuml\ncomponent A <<service>>\nA --> B\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
+  },
+  {
+    name: "dependency with label, both directions",
+    why: "the mark end decides the edge direction",
+    source: "@startuml\nA ..> B : uses\nC <.. D : also uses\n@enduml",
+    expect: { nodes: 4, edges: 2, groups: 0, refused: [] },
+  },
+  {
+    name: "generalisation between components",
+    why: "the triangle sits at the general end",
+    source: "@startuml\nBase <|-- Derived\nDerived --> Client\n@enduml",
+    expect: { nodes: 3, edges: 2, groups: 0, refused: [] },
+  },
+  {
+    name: "composition and aggregation",
+    why: "the diamond sits at the whole, and the owner may be called Group",
+    source: "@startuml\nOrder *-- Line\nGroup o-- Member\n@enduml",
+    expect: { nodes: 4, edges: 2, groups: 0, refused: [] },
+  },
+  {
+    name: "marks at both ends",
+    why: "must refuse: a mark at each end is not one edge",
+    source: "@startuml\nA *--* B\n@enduml",
+    expect: { nodes: 0, edges: 0, groups: 0, refused: ["marked at both ends"] },
+  },
+  {
+    name: "composite state with inner transitions",
+    why: "must refuse: a state body is not a boundary here",
+    source: "@startuml\nstate Running {\n  [*] --> Busy\n  Busy --> Idle\n}\n[*] --> Running\n@enduml",
+    expect: { nodes: 3, edges: 1, groups: 0, refused: ["`state` block is not a boundary"] },
+  },
+  {
+    name: "state alias with a long label",
+    why: "a long label widens the box, it does not wrap",
+    source: "@startuml\nstate \"Waiting for the upstream service to answer\" as W\n[*] --> W\nW --> [*]\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
+  },
+  {
+    name: "node and package share a name",
+    why: "an explicit element keeps the name from becoming a boundary",
+    source: "@startuml\npackage P {\n  component X\n}\ncomponent P\nP --> X\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 1, refused: [] },
+  },
+  {
+    name: "line break in a label",
+    why: "br splits the line inside one box",
+    source: "@startuml\ncomponent \"reads<br>and writes\" as R\nR --> Store\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
+  },
+  {
+    name: "together block",
+    why: "parsed, and today it has no effect (P1)",
+    source: "@startuml\ntogether {\n  component A\n  component B\n}\nA --> C\nB --> C\n@enduml",
+    expect: { nodes: 3, edges: 2, groups: 0, refused: [] },
+  },
+  {
+    name: "hidden edge",
+    why: "refused today: the edge would only order, not draw (P2)",
+    source: "@startuml\nA -[hidden]-> B\nA --> C\nB --> C\n@enduml",
+    expect: { nodes: 3, edges: 2, groups: 0, refused: ["-[hidden]->"] },
+  },
+  {
+    name: "rightward edge hint",
+    why: "refused today: a per-edge direction has no layout to constrain (P4)",
+    source: "@startuml\nA -right-> B\n@enduml",
+    expect: { nodes: 0, edges: 0, groups: 0, refused: ["-right->"] },
+  },
+  {
+    name: "skinparam block",
+    why: "ignored, and the lines after it still parse",
+    source: "@startuml\nskinparam nodesep 10\nskinparam ranksep 20\nA --> B\n@enduml",
+    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
+  },
+]
+
+for (const c of CASES) {
+  test(c.name + ' - ' + c.why, () => {
+    const drawn = render({ source: c.source }, {}, { scheme: 'default' })
+    const counts = { nodes: drawn.diagram.nodes.length, edges: drawn.diagram.edges.length, groups: (drawn.diagram.groups ?? []).length }
+    for (const [key, want] of Object.entries(c.expect)) {
+      if (key === 'refused') continue
+      if (counts[key] !== want) throw new Error(key + ' ' + String(counts[key]) + ', expected ' + String(want))
+    }
+    if (drawn.refused.length !== c.expect.refused.length) {
+      throw new Error('refused ' + String(drawn.refused.length) + ' line(s): ' + drawn.refused.join(' | '))
+    }
+    for (const needle of c.expect.refused) {
+      if (!drawn.refused.some((line) => line.includes(needle))) throw new Error('no refusal mentions ' + needle + ': ' + drawn.refused.join(' | '))
+    }
+    // A refusal must never cost the lines that did parse: the drawing is what the reader sees.
+    if (!/<svg[^>]*viewBox="0 0 \d+ \d+"/.test(drawn.markup)) throw new Error('no drawing: ' + drawn.markup.slice(0, 80))
+    if (drawn.dropped !== 0) throw new Error('dropped ' + String(drawn.dropped) + ' shape(s)')
+  })
+}
+
+if (failures > 0) {
+  console.log('plantuml corpus failed: ' + String(failures))
+  process.exit(1)
+}
+console.log('all plantuml corpus cases passed')
