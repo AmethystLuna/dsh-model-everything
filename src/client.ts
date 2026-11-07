@@ -1749,7 +1749,7 @@ export function mountWhiteboard(React: ReactLike, ctx: SlotContext, options: Mou
           id: 'diagram-whiteboard',
           order: 120,
           title: () => 'Diagram',
-          description: () => 'Paste Mermaid or PlantUML and read the drawing',
+          description: () => 'Paste PlantUML or Mermaid and read the drawing',
         },
       ],
     })

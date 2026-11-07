@@ -29,7 +29,7 @@ export const diagramReviewTool = defineTool({
   parameters: {
     source: {
       type: 'string',
-      description: 'The diagram source text, in Mermaid or PlantUML syntax.',
+      description: 'The diagram source text, in PlantUML or Mermaid syntax.',
     },
     notation: {
       type: 'string',

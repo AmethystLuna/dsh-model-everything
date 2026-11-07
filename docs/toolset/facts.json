@@ -19,7 +19,7 @@
     {
       "skill": "model-everything-diagram",
       "chars": 432,
-      "body": 8565
+      "body": 9042
     },
     {
       "skill": "model-everything-interleaving",
@@ -42,7 +42,7 @@
       "body": 8203
     }
   ],
-  "toolChars": 34067,
+  "toolChars": 34105,
   "tools": [
     {
       "name": "model_automaton_verify",
@@ -102,7 +102,7 @@
     },
     {
       "name": "diagram_render",
-      "chars": 1614
+      "chars": 1652
     },
     {
       "name": "diagram_review",
@@ -114,8 +114,8 @@
     }
   ],
   "perTurn": {
-    "chars": 37771,
-    "tokens": 9443
+    "chars": 37809,
+    "tokens": 9452
   },
   "routing": {
     "rowsWithSibling": 8,

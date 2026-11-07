@@ -53,6 +53,12 @@ longer a summary. When you present one, say what it shows — the layout, not wh
 | Mermaid | `graph`/`flowchart` (TD/TB/LR), node shapes `[..]`, `(..)`, `{..}`, `((..))`, `[(..)]`, `[[..]]`, `<<..>>`; edges `-->`, `---`, `-.->`, `==>`, labels `-->\|text\|` and `-- text -->`; `stateDiagram`/`-v2` with `[*]` start and end markers and `state "text" as id`; `subgraph … end` including nesting | `sequenceDiagram`, `classDiagram`, `erDiagram`, `gantt`, `pie`, `journey`, `mindmap`, `timeline`, `quadrantChart`, `gitGraph`, `C4Context`, and the `click`/`style`/`classDef` directives |
 | PlantUML | `component`, `package`, `node`, `folder`, `cloud`, `database`, `state`, `artifact`, `rectangle` blocks and `[bracketed]` components; `-->`, `--->`, `..>`, either direction, `: label`; `[*] -->` start markers; `skinparam`/`!theme` ignored | `actor`, `participant`, `usecase`, `class`, `object`, `note`, `legend`, and the `alt`/`opt`/`loop`/`par` fragments |
 
+**Draw your own cards in PlantUML.** A `package`/`component` block states containment in the source, and `as` gives a
+node a short alias to name in edges, so a reader can check the grouping against the text that produced it. Mermaid
+stays supported - a flow someone else wrote still draws - but a new diagram this plugin authors is written in
+PlantUML. Both notations go through the same layout engine, so the choice changes the spelling of the source, not
+the drawing rules.
+
 A refusal is one line in `refused`, phrased `line N: …`. The drawing you get does not show the refused lines, and
 the tool says so rather than leaving you to notice.
 
