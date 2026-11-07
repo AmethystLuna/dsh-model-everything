@@ -27,7 +27,7 @@
  * into a boundary that is nested or empty).
  */
 
-import { emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
+import { emptyCaption, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -463,7 +463,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   builder.edges = keptEdges
 
   if (!seenAny || builder.nodes.size === 0) {
-    return { diagram: emptyDiagram(title, 'no nodes found'), refused }
+    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused }
   }
 
   const diagram: Diagram = {

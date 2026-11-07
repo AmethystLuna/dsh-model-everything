@@ -80,6 +80,17 @@ export function emptyDiagram(title: string, caption: string): Diagram {
   return { kind: 'none', title, nodes: [], edges: [], caption }
 }
 
+/**
+ * What an empty drawing says about itself.
+ *
+ * `no nodes found` is right for an empty source and wrong for one whose every line was refused: the reader
+ * then looks for a fault in an input that was written, not empty. The refused count is the difference, and
+ * it is already computed by the time this is asked.
+ */
+export function emptyCaption(refused: number): string {
+  return refused === 0 ? 'no nodes found' : 'nothing drawable: ' + String(refused) + ' line(s) refused'
+}
+
 /** The label to draw for a node: its own label when the notation gave one, else its id. */
 export function labelOf(node: DiagramNode): string {
   return node.label !== undefined && node.label !== '' ? node.label : node.id

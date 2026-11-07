@@ -176,6 +176,15 @@ test('an empty plantuml file is an empty drawing', () => {
   if (fromPlantUml('@startuml\n@enduml').diagram.kind !== 'none') throw new Error('drew from an empty file')
 })
 
+// An empty drawing has two causes and must not answer both with one sentence: a reader told "no nodes found"
+// about a source that had three refused lines looks for a fault in their own input.
+test('an empty drawing says whether the source was empty or refused', () => {
+  const empty = fromPlantUml('@startuml\n@enduml')
+  if (empty.diagram.caption !== 'no nodes found') throw new Error('empty source says: ' + empty.diagram.caption)
+  const refused = fromPlantUml('@startuml\nA *--* B\n@enduml')
+  if (refused.diagram.nodes.length !== 0) throw new Error('drew ' + String(refused.diagram.nodes.length) + ' node(s)')
+  if (!refused.diagram.caption.includes('refused')) throw new Error('refused source says: ' + refused.diagram.caption)
+})
 test('each element keyword draws the symbol it names', () => {
   const source = [
     '@startuml',

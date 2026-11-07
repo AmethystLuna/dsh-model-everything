@@ -69,5 +69,13 @@ export interface Diagram {
 }
 /** An empty drawing, for a source that produced no nodes. */
 export declare function emptyDiagram(title: string, caption: string): Diagram;
+/**
+ * What an empty drawing says about itself.
+ *
+ * `no nodes found` is right for an empty source and wrong for one whose every line was refused: the reader
+ * then looks for a fault in an input that was written, not empty. The refused count is the difference, and
+ * it is already computed by the time this is asked.
+ */
+export declare function emptyCaption(refused: number): string;
 /** The label to draw for a node: its own label when the notation gave one, else its id. */
 export declare function labelOf(node: DiagramNode): string;
