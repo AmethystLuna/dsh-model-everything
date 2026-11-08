@@ -3008,6 +3008,39 @@ test('a cylinder gives each relation leaving it a point of its own on the cap', 
   const distinct = new Set(starts.map((point) => String(point.x) + ',' + String(point.y)))
   if (distinct.size !== 3) throw new Error('the three relations leave from ' + String(distinct.size) + ' point(s)')
 })
+test('a route never doubles back on itself', () => {
+  // A lane carries one height per gap it crosses, and the last of them can sit past the port the edge enters; the route
+  // then runs to that height, comes back and enters, which reads as a hook. Three edges over two rows is enough to
+  // make the case: whatever the port ends up being, no leg may run back along the one before it.
+  const source = [
+    '@startuml',
+    'component "a" as a',
+    'component "b" as b',
+    'component "c" as c',
+    'a --> c',
+    'b --> c',
+    'a --> b',
+    '@enduml',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  for (const shape of routesOf(canvas)) {
+    const points = routePointsOf(shape)
+    for (let index = 2; index < points.length; index += 1) {
+      const before = points[index - 2]
+      const middle = points[index - 1]
+      const after = points[index]
+      const vertical = Math.abs(before.x - middle.x) < 0.5 && Math.abs(middle.x - after.x) < 0.5
+      const horizontal = Math.abs(before.y - middle.y) < 0.5 && Math.abs(middle.y - after.y) < 0.5
+      if (!vertical && !horizontal) continue
+      const axis = vertical ? 'y' : 'x'
+      const came = middle[axis] - before[axis]
+      const goes = after[axis] - middle[axis]
+      if (Math.abs(came) > 0.5 && Math.abs(goes) > 0.5 && Math.sign(came) !== Math.sign(goes)) {
+        throw new Error('a leg doubles back: ' + JSON.stringify([before, middle, after]))
+      }
+    }
+  }
+})
 test('a fan-in keeps a port of its own for every arrow and draws no junction', () => {
   // Merging was tried and withdrawn: PlantUML does not merge lines either, and one drawn line cannot carry two
   // statement kinds without saying something the source did not. So a fan-in is drawn as the arrows it is - one

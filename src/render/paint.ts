@@ -1235,6 +1235,36 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     return simplify(out)
   }
 
+  /**
+   * The same route with any leg that doubles back removed.
+   *
+   * A lane carries one height per gap it crosses, and the last of them can sit past the port the edge actually enters:
+   * the route then runs to that height, comes back, and enters - a hook a reader has to trace twice. The port is the
+   * fact; the waypoint that overshoots it is the proposal, and the proposal is what gives way.
+   */
+  const withoutReversals = (points: Point[]): Point[] => {
+    const out: Point[] = []
+    for (const point of points) {
+      const last = out[out.length - 1]
+      const before = out[out.length - 2]
+      if (last !== undefined && before !== undefined) {
+        const along = Math.abs(last.x - before.x) < 0.5 ? 'y' : Math.abs(last.y - before.y) < 0.5 ? 'x' : undefined
+        if (along !== undefined) {
+          const came = last[along] - before[along]
+          const goes = point[along] - last[along]
+          const sameAxis = along === 'y'
+            ? Math.abs(point.x - last.x) < 0.5
+            : Math.abs(point.y - last.y) < 0.5
+          if (sameAxis && Math.abs(goes) > 0.5 && Math.sign(goes) !== Math.sign(came) && Math.abs(came) > 0.5) {
+            out.pop()
+          }
+        }
+      }
+      out.push(point)
+    }
+    return simplify(out)
+  }
+
   const paintPath = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     const source = endBox(edge.from)
     const target = endBox(edge.to)
@@ -1412,7 +1442,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       }
       if (Math.abs(previous.x - anchors.entry.x) > 0.5 && Math.abs(previous.y - anchors.entry.y) > 0.5) points.push({ x: anchors.entry.x, y: previous.y })
       points.push(anchors.entry)
-      const simplified = simplify(points)
+      const simplified = withoutReversals(points)
       if (clearOfBoxes(simplified, source, target)) {
         paintPath(edgeIndex, edge, simplified, colour)
         continue
