@@ -39,6 +39,7 @@
 import { MARGIN, place, textOf, type Box } from './place.js'
 import { PORT_INSET } from './channels.js'
 import { snapJogs } from './jog.js'
+import { piecesFrom, sharedLength, sharedWith, totalFromRows, type Piece } from './separate.js'
 import { anchor, approachSides, crossesBox, normalOf, ROUTE_STUB, routeEdge, simplify, type Ports, type Side } from './route.js'
 import { cylinderApex, cylinderCaps, cylinderPointOn, hasDiscretePorts, hexagonCut, outlinePointFromCentre, sideOfPoint, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
@@ -1588,65 +1589,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
    */
   const SHARED_LINE_CLEARANCE = 14
   const SHARED_LINE_ROUNDS = 8
-  /** Every axis-aligned piece of a route: the axis it runs on, where, and the run between. */
-  const piecesFrom = (points: Point[]): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> => {
-    const out: Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> = []
-    for (let i = 1; i < points.length; i += 1) {
-      const one = points[i - 1] as Point
-      const two = points[i] as Point
-      if (Math.abs(one.y - two.y) < 0.5 && Math.abs(one.x - two.x) > 1) {
-        out.push({ axis: 'y', at: one.y, lo: Math.min(one.x, two.x), hi: Math.max(one.x, two.x), slot: i - 1 })
-      } else if (Math.abs(one.x - two.x) < 0.5 && Math.abs(one.y - two.y) > 1) {
-        out.push({ axis: 'x', at: one.x, lo: Math.min(one.y, two.y), hi: Math.max(one.y, two.y), slot: i - 1 })
-      }
-    }
-    return out
-  }
-  const piecesOf = (shape: LinkShape | PathShape): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> =>
-    shape.kind === 'path' ? piecesFrom(shape.points) : []
-  /**
-   * How much of the drawing reads as one line when it is two.
-   *
-   * Two pieces on one line are the plain case. Two pieces *nearly* on one line are the same defect seen from further
-   * away: at a couple of points apart they read as one thick line, and at a corner they read as a step that was drawn
-   * twice - which is what a dashed run beside a solid one looked like. Both are counted, by the length they overlap.
-   */
-  const NEAR_LINE = 5
-  // The pair contribution of one route against every other: the same arithmetic `sharedLength` does per pair, kept
-  // separately so a trial that moves one route does not have to walk the whole drawing again. Summing these rows and
-  // halving gives exactly `sharedLength` - each pair is counted once from each side.
-  const sharedWith = (all: Array<ReturnType<typeof piecesOf>>, index: number): number => {
-    let total = 0
-    const mine = all[index] as ReturnType<typeof piecesOf>
-    for (let other = 0; other < all.length; other += 1) {
-      if (other === index) continue
-      for (const piece of mine) {
-        for (const theirs of all[other] as ReturnType<typeof piecesOf>) {
-          if (piece.axis !== theirs.axis) continue
-          if (Math.abs(piece.at - theirs.at) >= NEAR_LINE) continue
-          total += Math.max(0, Math.min(piece.hi, theirs.hi) - Math.max(piece.lo, theirs.lo) - 1)
-        }
-      }
-    }
-    return total
-  }
-
-  const sharedLength = (all: Array<ReturnType<typeof piecesOf>>): number => {
-    let total = 0
-    for (let left = 0; left < all.length; left += 1) {
-      for (let right = left + 1; right < all.length; right += 1) {
-        for (const mine of all[left] as ReturnType<typeof piecesOf>) {
-          for (const theirs of all[right] as ReturnType<typeof piecesOf>) {
-            if (mine.axis !== theirs.axis) continue
-            const apart = Math.abs(mine.at - theirs.at)
-            if (apart >= NEAR_LINE) continue
-            total += Math.max(0, Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) - 1)
-          }
-        }
-      }
-    }
-    return total
-  }
+  const piecesOf = (shape: LinkShape | PathShape): Piece[] => (shape.kind === 'path' ? piecesFrom(shape.points) : [])
   // A leg that stepped aside can leave a corner behind it where its own two runs cross, so the cleanup runs again over
   // what the drawing finally carries - the last word on the shape of a route, after every stage that moved one.
   for (const { shape } of routes) {
@@ -1742,7 +1685,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       sharedRows[index] = sharedWith(drawnPieces, index)
       rebuilt += sharedRows[index] as number
     }
-    shared = rebuilt / 2
+    shared = totalFromRows(sharedRows)
   }
 
   // The separation pass steps a leg aside, and a step can leave a notch behind it: the cleanup runs once more over what
