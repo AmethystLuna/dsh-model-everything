@@ -567,6 +567,21 @@ test('an addition with no message does not print an empty one', () => {
   if (card.firstAdded.message !== '') throw new Error('a missing message became something: ' + card.firstAdded.message)
 })
 
+// A drawing past a window's width is complete and unusable at a glance. It is said, not cropped: a layout cut down to fit
+// would hide boxes the source asked for.
+test('a drawing wider than a window says its size', () => {
+  const value = {
+    ok: true, notation: 'plantuml', nodes: 61, edges: 60, groups: 0,
+    caption: 'plantuml, 61 boxes, 60 arrows', refused: [], ignored: [], dropped: 0,
+    labelCollisions: 0, width: 7090, height: 192, svg: '<svg></svg>',
+  }
+  const text = diagramRenderTool.output.render({}, value).map((part) => part.text ?? '').join('\n')
+  if (!text.includes('SIZE')) throw new Error('the size of a wide drawing was not reported')
+  if (!text.includes('7090x192')) throw new Error('the size was not carried: ' + text.slice(0, 200))
+  const normal = diagramRenderTool.output.render({}, { ...value, width: 240, nodes: 2, edges: 1 }).map((part) => part.text ?? '').join('\n')
+  if (normal.includes('SIZE')) throw new Error('a small drawing reported its size')
+})
+
 // A drawing can be complete and still carry a label its mask could not keep clear of another line. That is a fact about
 // the picture a reader is about to read, so it is said: an unmentioned ambiguity is one the reader has to find.
 test('a crowded drawing says a label could not be placed clear', () => {

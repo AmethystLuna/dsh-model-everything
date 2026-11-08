@@ -222,7 +222,7 @@ And the gates around it:
 | `channels` | 12 | two long edges crossing one gap get one lane each, in the order of their dummies |
 | `components` | 9 | a drawing splits into the pieces that share no edge |
 | `placement` | 11 | a boundary contains its own contents and only its own |
-| `presentation` | 56 | the card keeps the verdict, the counts and the first error |
+| `presentation` | 57 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
 | `tools` | 6 | a refused edit leaves the file byte-identical |
