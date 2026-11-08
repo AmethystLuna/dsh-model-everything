@@ -97,6 +97,20 @@ const MUTATIONS = [
     from: '  if (asked.size === 0 || groups.length === 0) return diagram',
     to: '  if (asked.size === 0 || groups.length === 0 || true) return diagram',
   },
+  {
+    id: 'M9',
+    what: 'a header is read and never drawn',
+    file: 'src/render/paint.ts',
+    from: '  if (diagram.header !== undefined) {',
+    to: '  if (false) {',
+  },
+  {
+    id: 'M10',
+    what: 'a legend block is read and never drawn',
+    file: 'src/render/paint.ts',
+    from: "  if (legend.length > 0) shapes.push({ kind: 'legend', x: MARGIN, y: legendTop, lines: legend, colour: 'text' })",
+    to: '',
+  },
 ]
 
 const argument = process.argv[2]

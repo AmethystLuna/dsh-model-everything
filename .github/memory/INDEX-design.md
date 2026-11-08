@@ -11,6 +11,7 @@ metadata:
 
 | 主题 | 一句话 | 什么时候读 |
 |---|---|---|
+| [render-layers](design/render-layers.md) | 渲染管线的分层约定：`paint` 只做画布与编排，六块策略各有独立模块与套件，以及一条新策略该放在哪一层 | 加一条绘图策略、改 `paint.ts`、或判断一段几何逻辑该不该单独成模块之前 |
 | [plantuml-layout](design/plantuml-layout.md) | 选 PlantUML 的真实理由（布局可控）、今天的行为矩阵（支持 / 进 ignored / 按行拒收）、P1–P4 的落地状态与各自的验收用例，以及转置布局必须用读者坐标系判断的两条坑 | 决定卡片用哪种记号、给布局加约束、或评估「换 PlantUML 值不值」之前 |
 | [roadmap](design/roadmap.md) | 0.6.0 之后的去向：控件收尾的具体项与验收，把对话里的 Mermaid / PlantUML 代码块渲染成卡片的目标与入口，以及为什么不能再走改写消息 DOM 那条路 | 决定下一个版本做什么、或准备动「对话里的代码块」之前 |
 | [store-entry](design/store-entry.md) | 商店条目注册草稿：名称、中英描述、分类，以及文案为什么这么排 | 注册创意工坊条目、改卡片文案或调整分类时 |
