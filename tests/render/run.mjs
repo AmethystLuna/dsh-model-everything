@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 // White-box suite for the renderer's pure half.
 //
@@ -3133,6 +3135,29 @@ test('a policy module is never handed the boxes', () => {
   }
   const painter = readFileSync(new URL('../../src/render/paint.ts', import.meta.url), 'utf8')
   if (!/\bBox\b/.test(painter)) throw new Error('the painter does not name Box, so nothing owns the boxes')
+})
+
+// A drawing has to be the same in another process: an order that depends on a hash map or a clock reads the same inside one
+// run and differs in the next, and this suite would never see it. The child renders the same sources and reports a hash;
+// nothing is written to disk.
+test('the same source draws the same bytes in another process', () => {
+  const sources = [
+    ['@startuml', 'component hub', ...Array.from({ length: 6 }, (_, i) => 'component t' + i), ...Array.from({ length: 6 }, (_, i) => 'hub --> t' + i), '@enduml'].join('\n'),
+    ['@startuml', 'left to right direction', 'package "app" as app {', '  component a', '  component b', '}', 'component c', 'a --> c', 'b --> c', '@enduml'].join('\n'),
+  ]
+  const here = sources.map((source) => createHash('sha256').update(render({ source }, {}, { scheme: 'default' }).markup).digest('hex'))
+  const moduleUrl = new URL('../../lib/render/index.js', import.meta.url).href
+  const script = [
+    'const { createHash } = await import("node:crypto")',
+    'const { render } = await import(' + JSON.stringify(moduleUrl) + ')',
+    'const sources = ' + JSON.stringify(sources),
+    'for (const source of sources) console.log(createHash("sha256").update(render({ source }, {}, { scheme: "default" }).markup).digest("hex"))',
+  ].join(';')
+  const output = execFileSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' })
+  const there = output.trim().split('\n').map((line) => line.trim()).filter((line) => line !== '')
+  if (JSON.stringify(there) !== JSON.stringify(here)) {
+    throw new Error('another process drew it differently: ' + JSON.stringify({ here, there }))
+  }
 })
 
 if (failures > 0) {
