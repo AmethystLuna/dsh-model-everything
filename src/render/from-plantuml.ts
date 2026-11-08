@@ -98,7 +98,7 @@ const PLAIN_ALIAS = /^([A-Za-z_][\w.-]*)\s+as\s+([A-Za-z_][\w-]*)$/
 const BRACKET = /^\[(.+?)\]$/
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
 /** The ignored lines that ask for an arrangement: accepted, dropped, and reported. */
-const LAYOUT_CONTROL = /^(left to right direction|top to bottom direction|skinparam|scale|hide|show|!pragma\s+layout)\b/
+const LAYOUT_CONTROL = /^(top to bottom direction|skinparam|scale|hide|show|!pragma\s+layout)\b/
 
 interface Builder {
   nodes: Map<string, DiagramNode>
@@ -273,6 +273,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
   const ignored: string[] = []
+  const heading: { value: 'down' | 'right' } = { value: 'down' }
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set() }
   let startId: string | undefined
   let seenAny = false
@@ -286,6 +287,10 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     if (/^@(start|end)uml\b/.test(line)) return
     seenAny = true
     if (/^title\b/.test(line)) return
+    if (/^left to right direction\b/.test(line)) {
+      heading.value = 'right'
+      return
+    }
     if (IGNORED.test(line)) {
       if (LAYOUT_CONTROL.test(line)) {
         ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
@@ -573,6 +578,6 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   // `together { A B }` is a row, not a boundary: the boxes are declared by their own lines and the block only joins
   // them, so it is attached to the drawing rather than drawn as a group.
   const sameRank = togetherGroups(lines)
-  const joined = sameRank.length === 0 ? diagram : { ...diagram, sameRank }
+  const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}) }
   return { diagram: joined, refused, ignored }
 }

@@ -298,10 +298,10 @@ export function place(diagram: Diagram, top: number): Placement {
     const node = nodeById.get(id)
     if (node !== undefined) {
       const text = textOf(node)
-      return { id, group: false, width: text.width, height: text.height }
+      return { id, group: false, ...extent(text.width, text.height) }
     }
     const size = measureGroup(id)
-    return { id, group: true, width: size.width, height: size.height }
+    return { id, group: true, ...extent(size.width, size.height) }
   }
 
   const entitiesIn = (scope: string | undefined): Entity[] => {
@@ -347,6 +347,13 @@ export function place(diagram: Diagram, top: number): Placement {
    *
    * A component has its own layers, its own ordering and its own coordinates. Nothing outside it can move it.
    */
+  // A drawing that runs left to right is laid out by turning the measurement on its side: the extent the rank advances
+  // by is the text width, and the extent the order advances by is its height. Everything downstream keeps working
+  // downwards, and the finished canvas is turned back.
+  const horizontal = diagram.direction === 'right'
+  const extent = (width: number, height: number): { width: number; height: number } =>
+    horizontal ? { width: height, height: width } : { width, height }
+
   const layoutPiece = (entities: Entity[], edges: LayoutEdge[], pinned: string | undefined, seed: Map<string, number>): Piece => {
     const byId = new Map(entities.map((entity) => [entity.id, entity] as const))
     const mine = new Set(entities.map((entity) => entity.id))

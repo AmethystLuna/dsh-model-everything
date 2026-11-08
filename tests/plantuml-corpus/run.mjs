@@ -191,6 +191,24 @@ for (const c of CASES) {
   })
 }
 
+// `left to right direction` turns the drawing: the same chain that stacks downwards runs along one row.
+test('left to right direction lays the chain out along a row', () => {
+  const chain = (heading) => {
+    const lines = ['@startuml', ...(heading === 'down' ? [] : ['left to right direction']), 'component A', 'component B', 'component C', 'A --> B', 'B --> C', '@enduml']
+    const r = render({ source: lines.join('\n') }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+    if (r.ignored.length !== 0) throw new Error('the direction was reported as ignored: ' + JSON.stringify(r.ignored))
+    const boxes = r.canvas.shapes.filter((shape) => shape.kind === 'box').sort((left, right) => left.x - right.x)
+    return { boxes, canvas: r.canvas }
+  }
+  const down = chain('down')
+  if (new Set(down.boxes.map((box) => box.y)).size !== 3) throw new Error('the downward chain did not take three rows')
+  const right = chain('right')
+  if (new Set(right.boxes.map((box) => box.y)).size !== 1) throw new Error('the turned chain is not on one row: ' + JSON.stringify(right.boxes.map((box) => box.y)))
+  if (right.boxes[0].x >= right.boxes[1].x) throw new Error('the turned chain runs backwards')
+  if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
+})
+
 // A direction on the edge is a constraint on the drawing: the same pair, written four ways, is four arrangements.
 test('a direction hint decides where the far box goes', () => {
   const where = (hint) => {
@@ -246,7 +264,7 @@ test('a hidden edge ranks two boxes the way it points and draws nothing', () => 
 // nearest miss is the same source without the line - same picture, and nothing to report.
 test('a layout control is reported as having no effect', () => {
   const withLine = render(
-    { source: ['@startuml', 'left to right direction', 'component A', 'component B', 'A --> B', '@enduml'].join('\n') },
+    { source: ['@startuml', 'top to bottom direction', 'component A', 'component B', 'A --> B', '@enduml'].join('\n') },
     {},
     { scheme: 'default' },
   )

@@ -1871,8 +1871,53 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const canvasWidth = Math.max(width, extent.width + MARGIN)
   const canvasHeight = Math.max(height, extent.height + MARGIN)
 
+  // A left-to-right drawing was laid out downwards with its measurements turned; the turning is undone here, in one
+  // pass over the finished canvas, so every stage above works in the space it already knew.
+  const turned = diagram.direction === 'right'
+  // The title band is reserved at the top of the page in either direction: the layout reserved it on the rank axis,
+  // which after the turn is the horizontal one, so the content is dropped by the band it no longer needs there.
+  const flip = (point: Point): Point => (turned ? { x: point.y, y: point.x + TITLE_HEIGHT } : point)
+  const drawnShapes = !turned
+    ? shapes
+    : shapes.map((shape): Shape => {
+        switch (shape.kind) {
+          case 'box':
+          case 'group':
+            return { ...shape, ...flip({ x: shape.x, y: shape.y }), width: shape.height, height: shape.width }
+          case 'link': {
+            const from = flip({ x: shape.x1, y: shape.y1 })
+            const to = flip({ x: shape.x2, y: shape.y2 })
+            const centre = flip({ x: shape.labelX, y: shape.labelY })
+            return { ...shape, x1: from.x, y1: from.y, x2: to.x, y2: to.y, labelX: centre.x, labelY: centre.y }
+          }
+          case 'path': {
+            const centre = flip({ x: shape.labelX, y: shape.labelY })
+            return { ...shape, points: shape.points.map(flip), labelX: centre.x, labelY: centre.y }
+          }
+          default:
+            return { ...shape, ...flip({ x: shape.x, y: shape.y }) }
+        }
+      })
+  // The title and the caption are anchored to the page, not to the drawing: turning the drawing does not turn them,
+  // and the space the caption reserved below the content is now a column of the page it does not need.
+  const laidOut = turned ? drawnShapes.filter((shape) => shape.kind !== 'caption' && shape.kind !== 'title') : drawnShapes
+  const content = turned ? drawnExtent(laidOut) : undefined
+  const turnedCaptionTop = content === undefined ? 0 : content.height + CAPTION_GAP
+  const placed = !turned
+    ? drawnShapes
+    : drawnShapes.map((shape): Shape => {
+        if (shape.kind === 'title') return { ...shape, x: MARGIN, y: MARGIN + 12 }
+        if (shape.kind === 'caption') return { ...shape, x: MARGIN, y: turnedCaptionTop }
+        return shape
+      })
   return {
-    canvas: { width: Math.round(canvasWidth), height: Math.round(canvasHeight), shapes, routingFailures, labelCollisions },
+    canvas: {
+      width: Math.round(turned ? Math.max(content === undefined ? 0 : content.width + MARGIN, canvasWidth) : canvasWidth),
+      height: Math.round(turned ? turnedCaptionTop + CAPTION_LINE + MARGIN / 2 : canvasHeight),
+      shapes: placed,
+      routingFailures,
+      labelCollisions,
+    },
     colours,
   }
 }

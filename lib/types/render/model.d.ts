@@ -87,6 +87,8 @@ export interface Diagram {
     groups?: DiagramGroup[];
     /** Boxes a source asked to share a row: `together { A B }`. */
     sameRank?: string[][];
+    /** The axis the drawing flows along: `right` comes from `left to right direction`. */
+    direction?: 'down' | 'right';
     /** One line under the drawing: what was decided, in words the drawing cannot carry. */
     caption: string;
 }

@@ -63,15 +63,17 @@ the drawing rules - and **neither notation's direction keyword changes the layou
 A refusal is one line in `refused`, phrased `line N: …`. The drawing you get does not show the refused lines, and
 the tool says so rather than leaving you to notice.
 
-A third answer sits between drawn and refused. A **layout control** - `left to right direction`, `skinparam`,
-`scale`, `hide`, `!pragma layout` - asks a layouter to arrange the drawing, and this renderer is the layouter: the
-line is understood, has no effect, and is reported in `ignored`. So a control that looks like it did nothing did
-nothing, and you are not left guessing whether it was dropped or obeyed.
+A third answer sits between drawn and refused. A **layout control** - `skinparam`, `scale`, `hide`, `!pragma layout` -
+asks a layouter to arrange the drawing, and this renderer is the layouter: the line is understood, has no effect, and
+is reported in `ignored`. So a control that looks like it did nothing did nothing, and you are not left guessing
+whether it was dropped or obeyed.
 
 A source that says more about the arrangement is obeyed. `A -[hidden]-> B` ranks the two boxes as any edge would and
 draws no line: it places a box without claiming a connection. `together { A B }` brings its members onto one row, the
 deepest row among them. A direction on the edge is a constraint too: `-down->` is what a layered drawing does anyway,
-`-up->` puts the far box on top, and `-right->` / `-left->` put the two on one row in that order.
+`-up->` puts the far box on top, and `-right->` / `-left->` put the two on one row in that order. `left to right
+direction` turns the whole drawing: the same pipeline runs with the measurement turned, and the finished page is turned
+back, so ranks advance along the page and a row's members stack down it.
 
 ## What the structure review reports
 
