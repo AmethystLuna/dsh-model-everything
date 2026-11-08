@@ -977,6 +977,20 @@ test('a together block names its boxes, and says when it names none', () => {
   if (JSON.stringify(bare.diagram.sameRank) !== JSON.stringify([['a', 'b']])) throw new Error('row: ' + JSON.stringify(bare.diagram.sameRank))
   const empty = render({ source: ['@startuml', 'together {', '}', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
   if (empty.ignored.length !== 1 || !empty.ignored[0].includes('names no boxes')) throw new Error('empty: ' + JSON.stringify(empty.ignored))
+  // A brace inside the block - a nested `together`, a boundary - is not the block's own end.
+  const nested = render(
+    { source: ['@startuml', 'together {', '  component a', '  together {', '    component b', '  }', '}', 'a --> b', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (JSON.stringify(nested.diagram.sameRank) !== JSON.stringify([['a', 'b']])) throw new Error('nested row: ' + JSON.stringify(nested.diagram.sameRank))
+  const boxed = render(
+    { source: ['@startuml', 'together {', '  package p {', '    component a', '  }', '  component b', '}', 'a --> b', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (JSON.stringify(boxed.diagram.sameRank) !== JSON.stringify([['a', 'b']])) throw new Error('boxed row: ' + JSON.stringify(boxed.diagram.sameRank))
+
   const lonely = render({ source: ['@startuml', 'together {', '  component a', '}', '@enduml'].join('\n') }, {}, { scheme: 'default' })
   if (lonely.ignored.length !== 1 || !lonely.ignored[0].includes('names one box')) throw new Error('one: ' + JSON.stringify(lonely.ignored))
 })
