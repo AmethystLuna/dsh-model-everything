@@ -110,6 +110,12 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
   drawing's page furniture where it was: the pinning that places it ran afterwards, and the suite stayed green for a
   reason that had nothing to do with the case. Ask which line makes the decision, and break that one; a mutation whose
   only effect is spacing is not testing a decision.
+- **widening a check is not the same as reaching more.** A document check was extended from five hand-written sources to a
+  hundred and fifty in the corpus, and stayed green — but a mutation that escaped `<` and not `&` also stayed green, because no
+  source in the corpus carried a character that needs escaping. The wider check was reaching exactly what the narrow one did.
+  After widening a check, break the thing it is supposed to see: if the widened version does not go red either, the widening
+  bought a number, not a case. The corpus gained nine positions with `&`, `<`, `>`, `"` after that, and the same mutation fails
+  at once.
 - **so run the pristine copy first.** The order that works: copy `lib/` and the suite, run it and require a green
   result with no `SKIP`, and only then apply the mutation. A red or skipping baseline means the mutation cannot be
   judged - report that, not "missed". The same `node_modules` junction that makes a tool-loading suite work belongs in
