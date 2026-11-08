@@ -310,7 +310,14 @@ test('the two notations describe the same drawing', () => {
     return JSON.stringify({
       nodes: d.nodes.map((n) => n.id + '=' + (n.label ?? '')).sort(),
       edges: d.edges.map((e) => e.from + '->' + e.to + (e.label ? ':' + e.label : '') + '/' + (e.arrow ?? '-') + (e.dashed ? '+dash' : '')).sort(),
-      groups: (d.groups ?? []).map((g) => g.label + '[' + [...g.members].sort().join(',') + ']').sort(),
+      // A boundary's id is the notation's own invention (PlantUML can alias it, Mermaid numbers it), so the model is
+      // compared by what the reader sees: the label, the parent's label, and who it holds.
+      groups: (d.groups ?? [])
+        .map((g) => {
+          const parent = g.parent === undefined ? 'root' : ((d.groups ?? []).find((other) => other.id === g.parent)?.label ?? g.parent)
+          return parent + '/' + g.label + '[' + [...g.members].sort().join(',') + ']'
+        })
+        .sort(),
     })
   }
   const pairs = [
@@ -333,6 +340,20 @@ test('the two notations describe the same drawing', () => {
     [
       ['@startuml', 'state "idle" as idle', 'state "busy" as busy', '[*] --> idle', 'idle --> busy : start', '@enduml'].join('\n'),
       ['stateDiagram-v2', '  state "idle" as idle', '  state "busy" as busy', '  [*] --> idle', '  idle --> busy: start'].join('\n'),
+    ],
+    [
+      // An edge that leaves its package, and one that stays inside it.
+      ['@startuml', 'package "app" as app {', '  component a', '}', 'component b', 'a --> b : out', '@enduml'].join('\n'),
+      ['flowchart TD', '  subgraph app', '    a', '  end', '  a -->|out| b'].join('\n'),
+    ],
+    [
+      ['@startuml', 'package "app" as app {', '  component a', '  component b', '  a --> b', '}', '@enduml'].join('\n'),
+      ['flowchart TD', '  subgraph app', '    a --> b', '  end'].join('\n'),
+    ],
+    [
+      // A nested boundary keeps the name it was written with as its id, in either notation.
+      ['@startuml', 'package "outer" as outer {', '  package "inner" as inner {', '    component a', '  }', '}', 'component b', 'a --> b', '@enduml'].join('\n'),
+      ['flowchart TD', '  subgraph outer', '    subgraph inner', '      a', '    end', '  end', '  a --> b'].join('\n'),
     ],
   ]
   for (const [plant, mermaid] of pairs) {

@@ -149,6 +149,9 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
     }
     if (/^subgraph\b/.test(lower)) {
       const label = line.replace(/^subgraph\b/i, '').trim().replace(/^["']|["']$/g, '')
+      // The id is positional on purpose: a label change must keep the id, or renaming a group would read as one group
+      // removed and another added in the structural diff. PlantUML can offer a stable alias (`as`), so the two
+      // notations agree about what the drawing *means* and differ only in the id they invent for a boundary.
       const id = 'subgraph-' + String(++endCount)
       builder.open.push({ id, label: label === '' ? id : label, members: [] })
       return
