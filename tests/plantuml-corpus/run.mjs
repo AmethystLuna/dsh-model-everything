@@ -209,6 +209,20 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A boundary, a control and a collections box are rectangles whose role is a small mark in the corner.
+test('a role box draws the mark that names its role', () => {
+  const source = ['@startuml', 'boundary "b" as b', 'control "c" as c', 'collections "col" as col', 'component core', 'b --> core', '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  const shapeOf = (id) => r.diagram.nodes.find((node) => node.id === id)?.shape
+  for (const [id, shape] of [['b', 'boundary'], ['c', 'control'], ['col', 'collections']]) {
+    if (shapeOf(id) !== shape) throw new Error(id + ' is not a ' + shape + ': ' + String(shapeOf(id)))
+  }
+  if (!r.markup.includes('<circle')) throw new Error('the control has no glyph')
+  const marks = (r.markup.match(/<line /g) ?? []).length + (r.markup.match(/<rect /g) ?? []).length
+  if (marks < 5) throw new Error('the role marks are missing: ' + String(marks))
+})
+
 // A queue, a stack and a storage are one rectangle whose edge says what it holds: an arc, two shelves, a curve.
 test('a queue, a stack and a storage draw their own edge', () => {
   const source = ['@startuml', 'queue "q" as q', 'stack "s" as s', 'storage "o" as o', 'component A', 'A --> q', 'A --> s', 'A --> o', '@enduml'].join('\n')

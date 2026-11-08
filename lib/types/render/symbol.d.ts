@@ -109,6 +109,18 @@ export declare function queueOutline(box: Box): {
  * pixels between the top edge and the first line of text.
  */
 export declare function stackShelves(box: Box): [number, number];
+/**
+ * The glyph a boundary, a control and a collections box carry in their corner.
+ *
+ * These three are the same rectangle as a component; what makes them different is a small mark, so the mark is what
+ * is drawn. It sits inside the box, which keeps the outline a plain rectangle: the layout, the ports and the routing
+ * already know how to handle one.
+ */
+export declare function roleGlyph(box: Box): {
+    x: number;
+    y: number;
+    size: number;
+};
 /** How much of the top edge a storage's curve takes. */
 export declare function storageCrown(box: Box): number;
 /** How much of the top-right corner a note folds away. */

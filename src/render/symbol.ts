@@ -211,6 +211,18 @@ export function stackShelves(box: Box): [number, number] {
   return [box.y + inset, box.y + inset * 2]
 }
 
+/**
+ * The glyph a boundary, a control and a collections box carry in their corner.
+ *
+ * These three are the same rectangle as a component; what makes them different is a small mark, so the mark is what
+ * is drawn. It sits inside the box, which keeps the outline a plain rectangle: the layout, the ports and the routing
+ * already know how to handle one.
+ */
+export function roleGlyph(box: Box): { x: number; y: number; size: number } {
+  const size = Math.min(5, box.height / 5)
+  return { x: box.x + 4 + size, y: box.y + box.height / 2, size }
+}
+
 /** How much of the top edge a storage's curve takes. */
 export function storageCrown(box: Box): number {
   return Math.min(8, box.height / 4)

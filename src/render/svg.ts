@@ -33,7 +33,7 @@ import { LABEL_HEIGHT, type Canvas, type Shape } from './paint.js'
 import { textWidth } from './text.js'
 import type { EdgeArrow } from './model.js'
 import type { Palette } from './palette.js'
-import { cylinderCaps, diamondPoints, foldPoints, frameTab, hexagonPoints, queueOutline, stackShelves, stadiumRadius, storageCrown, type Cubic } from './symbol.js'
+import { cylinderCaps, diamondPoints, foldPoints, frameTab, hexagonPoints, queueOutline, roleGlyph, stackShelves, stadiumRadius, storageCrown, type Cubic } from './symbol.js'
 
 /** One decimal place is enough at any zoom, and it keeps the markup readable. */
 const n = (value: number): string => {
@@ -147,6 +147,25 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
           ' Q' + n(x + w) + ' ' + n(y) + ' ' + n(x + w) + ' ' + n(y + crown) +
           ' L' + n(x + w) + ' ' + n(y + h) + ' Z'
         return '<path d="' + path + tail + boxText(shape, stroke)
+      }
+      // A boundary, a control and a collections box are rectangles that say what role they play; the role is the small
+      // mark in the corner, and it is drawn so the box is not read as a plain component.
+      case 'boundary':
+      case 'control':
+      case 'collections': {
+        const glyph = roleGlyph(shape)
+        const rect = '<rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '" rx="6' + tail
+        const mark =
+          shape.shape === 'boundary'
+            ? '<line x1="' + n(glyph.x) + '" y1="' + n(glyph.y - glyph.size) + '" x2="' + n(glyph.x) + '" y2="' + n(glyph.y + glyph.size) +
+              '" stroke="' + stroke + '" stroke-width="1" />' +
+              '<line x1="' + n(glyph.x - glyph.size) + '" y1="' + n(glyph.y - glyph.size) + '" x2="' + n(glyph.x - glyph.size) + '" y2="' + n(glyph.y + glyph.size) +
+              '" stroke="' + stroke + '" stroke-width="1" />'
+            : shape.shape === 'control'
+              ? '<circle cx="' + n(glyph.x) + '" cy="' + n(glyph.y) + '" r="' + n(glyph.size) + '" fill="none" stroke="' + stroke + '" stroke-width="1" />'
+              : '<rect x="' + n(glyph.x - glyph.size) + '" y="' + n(glyph.y - glyph.size) + '" width="' + n(glyph.size * 2) + '" height="' + n(glyph.size * 2) +
+                '" fill="none" stroke="' + stroke + '" stroke-width="1" />'
+        return rect + mark + boxText(shape, stroke)
       }
       // A subroutine carries its double side lines.
       case 'subroutine':

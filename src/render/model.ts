@@ -27,6 +27,9 @@ export type NodeShape =
   | 'queue'
   | 'stack'
   | 'storage'
+  | 'boundary'
+  | 'control'
+  | 'collections'
 
 export interface DiagramNode {
   id: string
