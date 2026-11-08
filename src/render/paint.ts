@@ -1773,6 +1773,58 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   // A route that still crosses a box after every stage has had its say is handed to the router once more, which is the
   // stage that knows how to go round one. The repair is only taken when it actually clears the boxes, so a drawing that
   // cannot be routed is reported below rather than silently moved onto another box.
+  // A jog shorter than a pen width is a kink a reader sees and cannot name: the port the node offered and the lane the
+  // channel stage chose disagree by a couple of pixels, and the route steps between them. The port is the node's own
+  // statement, so the lane adopts it: the leg before the jog moves onto the port's line and the jog disappears. A snap
+  // that would put the moved leg through a box is not taken.
+  const SNAP_JOG = 6
+  const snapped = (points: Point[], source: Box, target: Box): Point[] | undefined => {
+    let changed = false
+    const out = points.map((point) => ({ ...point }))
+    for (let round = 0; round < 4; round += 1) {
+      let moved = false
+      for (let i = 2; i < out.length - 1; i += 1) {
+        const before = out[i - 1]
+        const corner = out[i]
+        const after = out[i + 1]
+        const vertical = Math.abs(corner.x - before.x) < 0.01 && Math.abs(corner.y - before.y) > 0.01
+        const horizontal = Math.abs(corner.y - before.y) < 0.01 && Math.abs(corner.x - before.x) > 0.01
+        if (!vertical && !horizontal) continue
+        const jog = Math.hypot(corner.x - before.x, corner.y - before.y)
+        if (jog < 0.01 || jog >= SNAP_JOG) continue
+        // both neighbours must run across the jog, or this is a real corner and not a kink
+        const beforeAcross = vertical ? Math.abs(out[i - 2].y - before.y) < 0.01 : Math.abs(out[i - 2].x - before.x) < 0.01
+        const afterAcross = vertical ? Math.abs(after.y - corner.y) < 0.01 : Math.abs(after.x - corner.x) < 0.01
+        if (!beforeAcross || !afterAcross) continue
+        const from = { ...out[i - 2] }
+        const to = { ...out[i + 1] }
+        const candidate = { ...before }
+        if (vertical) candidate.x = corner.x
+        else candidate.y = corner.y
+        if (crossesBox(from.x, from.y, candidate.x, candidate.y, source)) continue
+        if (crossesBox(from.x, from.y, candidate.x, candidate.y, target)) continue
+        if (boxesCrossedBy([from, candidate, to], source, target, boxList).length > 0) continue
+        out[i - 1] = candidate
+        out.splice(i, 1)
+        moved = true
+        changed = true
+        break
+      }
+      if (!moved) break
+    }
+    return changed ? out : undefined
+  }
+  for (const { shape, edge } of routes) {
+    if (shape.kind !== 'path') continue
+    const diagramEdge = diagram.edges[edge] as DiagramEdge | undefined
+    if (diagramEdge === undefined) continue
+    const source = endBox(diagramEdge.from)
+    const target = endBox(diagramEdge.to)
+    if (source === undefined || target === undefined) continue
+    const cleaner = snapped(shape.points, source, target)
+    if (cleaner !== undefined) shape.points = cleaner
+  }
+
   for (const { shape, edge } of routes) {
     if (shape.kind !== 'path') continue
     const diagramEdge = diagram.edges[edge] as DiagramEdge | undefined

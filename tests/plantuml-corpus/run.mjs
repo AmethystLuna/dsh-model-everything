@@ -209,6 +209,40 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A route never steps sideways by a couple of pixels between two parallel legs: that reads as a kink, and the port the
+// node offered is the statement the lane must follow.
+test('no route carries a jog shorter than a pen width', () => {
+  const jogs = (shape) => {
+    const points = shape.points
+    let found = 0
+    for (let i = 2; i < points.length - 1; i += 1) {
+      const before = points[i - 1]
+      const corner = points[i]
+      const after = points[i + 1]
+      const vertical = Math.abs(corner.x - before.x) < 0.01 && Math.abs(corner.y - before.y) > 0.01
+      const horizontal = Math.abs(corner.y - before.y) < 0.01 && Math.abs(corner.x - before.x) > 0.01
+      if (!vertical && !horizontal) continue
+      const length = Math.hypot(corner.x - before.x, corner.y - before.y)
+      if (length < 0.01 || length >= 6) continue
+      const beforeAcross = vertical ? Math.abs(points[i - 2].y - before.y) < 0.01 : Math.abs(points[i - 2].x - before.x) < 0.01
+      const afterAcross = vertical ? Math.abs(after.y - corner.y) < 0.01 : Math.abs(after.x - corner.x) < 0.01
+      if (beforeAcross && afterAcross) found += 1
+    }
+    return found
+  }
+  const sources = [
+    ['@startuml', 'component A', 'component B', 'component C', 'A --> B', 'B --> C', 'A --> C', '@enduml'].join('\n'),
+    ['@startuml', 'left to right direction', 'component A', 'component B', 'component C', 'A --> B', 'B --> C', 'A --> C', '@enduml'].join('\n'),
+    ['@startuml', 'left to right direction', 'component A', 'component B', 'component C', 'component D', 'A --> B', 'B --> C', 'C --> D', 'A --> D', '@enduml'].join('\n'),
+  ]
+  for (const source of sources) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+    const total = r.canvas.shapes.filter((shape) => shape.kind === 'path').reduce((sum, shape) => sum + jogs(shape), 0)
+    if (total !== 0) throw new Error('a route carries ' + String(total) + ' jog(s)')
+  }
+})
+
 // A legend is page furniture. The metamorphic point is what it does *not* do: an arrow written inside it is text, not
 // an edge, and it takes no part in the layout.
 test('a legend block is text under the drawing, not lines in it', () => {
