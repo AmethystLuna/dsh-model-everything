@@ -135,6 +135,20 @@ const MUTATIONS = [
     from: 'const headerShift = diagram.header === undefined ? 0 : Math.max(1, diagram.header.length) * 16',
     to: 'const headerShift = diagram.header === undefined ? 0 : 16',
   },
+  {
+    id: 'M14',
+    what: 'the body of a block reaches the parser',
+    file: 'src/render/blocks.ts',
+    from: '    skip.add(index)',
+    to: '    void index',
+  },
+  {
+    id: 'M15',
+    what: 'a block that is never closed is not reported',
+    file: 'src/render/blocks.ts',
+    from: '  return state === undefined ? undefined : { state, openedAt }',
+    to: '  return undefined',
+  },
 ]
 
 const argument = process.argv[2]
