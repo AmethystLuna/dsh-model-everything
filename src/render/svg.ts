@@ -217,7 +217,14 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
     return '<text x="' + n(shape.x) + '" y="' + n(shape.y) + '" font-size="10" fill="' + colour + '">' + lines + '</text>'
   },
   title: (shape, colours) => {
-    return '<text x="' + n(shape.x) + '" y="' + n(shape.y) + '" font-size="12" fill="' + colours[shape.colour] + '">' + escape(shape.text) + '</text>'
+    // A one-line title is the text it always was: the multi-line form is additive, so no existing drawing changes shape.
+    const body =
+      shape.lines.length === 1
+        ? escape(shape.lines[0] as string)
+        : shape.lines
+            .map((line, index) => '<tspan x="' + n(shape.x) + '" dy="' + (index === 0 ? 0 : 15) + '">' + escape(line) + '</tspan>')
+            .join('')
+    return '<text x="' + n(shape.x) + '" y="' + n(shape.y) + '" font-size="12" fill="' + colours[shape.colour] + '">' + body + '</text>'
   },
   caption: (shape, colours) => {
     const colour = colours[shape.colour]

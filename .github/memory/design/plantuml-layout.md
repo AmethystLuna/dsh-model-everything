@@ -50,6 +50,7 @@ legend@176、来源图注@207、页脚@222、机器计数@237，画布 240×269�
 | `actor`/`participant`/`cloud`/`agent` | 序列图记号与云朵 | 按行拒收：没有对应轮廓 |
 | 序列图语句（`alt`/`opt`/`loop`/`par` …） | 时间轴片段 | 按行拒收 |
 | `skinparam backgroundColor #rrggbb` | 画布底色 | 支持：只改纸，不改排布；非十六进制颜色按行拒收 |
+| `title 文字` / `title` … `end title` | 图题 | 支持：单行或块；块内各行合成多行标题，行数决定标题带高度，块内文字**不进图** |
 | `scale N`（0.5–8） | 交付尺寸 | 支持：只把 `width`/`height` 乘 N，`viewBox` 保持布局尺寸，图内坐标不动 |
 | `scale 200 width` 之类按宽高定尺、或超出 0.5–8 | 缩放 | 按行拒收，并给出可写形式 `scale 2` |
 | 其它 `skinparam`（字号/字体/阴影…）、`!theme`、`hide`、`show`、`!pragma layout` | 样式与缩放 | 进 `ignored`，带行号；字号与配色写明“是固定的”，不再冒称“布局控制” |

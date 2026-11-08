@@ -140,7 +140,8 @@ export interface TitleShape {
     kind: 'title';
     x: number;
     y: number;
-    text: string;
+    /** One entry per line: a `\n` in the source's title is a second line. */
+    lines: string[];
     colour: ColourRole;
 }
 export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape | HeaderShape;

@@ -641,6 +641,29 @@ test('a turned drawing keeps its page furniture in page order', () => {
   }
 })
 
+// A `title` statement names the drawing. It used to be skipped in silence, which left the caller's default in place.
+test('a title statement names the drawing, on one line or in a block', () => {
+  const single = render({ source: ['@startuml', 'title Architecture overview', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (single.diagram.title !== 'Architecture overview') throw new Error('title: ' + single.diagram.title)
+  if (!single.markup.includes('Architecture overview')) throw new Error('the title was not drawn')
+  const block = render(
+    { source: ['@startuml', 'title', '  first line', '  second line', 'end title', 'component a', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (block.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(block.refused))
+  if (block.diagram.title !== 'first line\nsecond line') throw new Error('block title: ' + JSON.stringify(block.diagram.title))
+  const spans = (block.markup.match(/<tspan/g) ?? []).length
+  if (spans < 2) throw new Error('the block title is not drawn as lines: ' + String(spans))
+  // A title that names no text is not a title, and a one-line title is still the plain text it always was.
+  const plain = render({ source: ['@startuml', 'title One', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (/<title/.test(plain.markup)) throw new Error('unreachable')
+  if (plain.markup.includes('<tspan') && !plain.markup.includes('data-node-id')) throw new Error('a one-line title grew tspans')
+  // The lines of a block title stay out of the graph, exactly as the page-text blocks do.
+  const sneaky = render({ source: ['@startuml', 'title', '  component ghost', 'end title', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (sneaky.diagram.nodes.length !== 1) throw new Error('a title line became a node: ' + JSON.stringify(sneaky.diagram.nodes.map((node) => node.id)))
+})
+
 // `scale N` is a delivery size: the picture is the same one, drawn larger. The viewBox has to stay the layout's, or every
 // coordinate in the drawing would have to move and the two would drift apart.
 test('a scale directive changes the delivered size, not the drawing', () => {

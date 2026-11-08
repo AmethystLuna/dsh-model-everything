@@ -181,7 +181,8 @@ export interface TitleShape {
   kind: 'title'
   x: number
   y: number
-  text: string
+  /** One entry per line: a `\n` in the source's title is a second line. */
+  lines: string[]
   colour: ColourRole
 }
 
@@ -382,7 +383,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 // A header of more than one line takes the room of the lines it has: one line is a band of sixteen, and the title starts
 // below the last of them rather than on top of it.
 const headerShift = diagram.header === undefined ? 0 : Math.max(1, diagram.header.length) * 16
-const topOffset = MARGIN + TITLE_HEIGHT + headerShift
+// A title of more than one line takes the room of the lines it has, the same way a header does.
+const titleLines = diagram.title.split('\n')
+const titleShift = (titleLines.length - 1) * 16
+const topOffset = MARGIN + TITLE_HEIGHT + headerShift + titleShift
   const placement = place(diagram, topOffset)
   const { boxes, groupRects } = placement
 
@@ -1715,7 +1719,7 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   if (diagram.header !== undefined && diagram.header.length > 0) {
     shapes.push({ kind: 'header', x: MARGIN, y: MARGIN + 12, lines: diagram.header, colour: 'text' })
   }
-  shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12 + headerShift, text: diagram.title, colour: 'text' })
+  shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12 + headerShift, lines: titleLines, colour: 'text' })
 
   const contentRight = Math.max(
     MARGIN,

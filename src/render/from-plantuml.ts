@@ -289,6 +289,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[]; background?: string; scale?: number } = { value: 'down' }
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set(), groupLines: new Map() }
   let startId: string | undefined
+  let sourceTitle: string | undefined
   let seenAny = false
   let groupCount = 0
 
@@ -331,6 +332,14 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
 
   // A placed note's block form: its lines are the note's words, and the opener is rewritten into the one-line form the
   // parser already knows, so the note is created by the same path.
+  const titleWalk = collectBlocks(lines, inLegend, {
+    skipOpening: true,
+    open: (line, index) => (line === 'title' ? { index, text: [] as string[] } : undefined),
+    closes: (line) => /^end\s*title\b/.test(line),
+    text: (state, line) => { state.text.push(line) },
+    close: (state) => { sourceTitle = state.text.join('\n') },
+  })
+
   const noteWalk = collectBlocks(lines, inLegend, {
     open: (line, index) => {
       // A colon on the line means the note's text is on that line: the one-line form, which the parser reads. Only a line
@@ -347,12 +356,17 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   })
   // A block whose closing line is missing swallows the rest of the source. Saying nothing there is the worst answer of all:
   // the drawing comes out nearly empty and looks deliberate.
+
   for (const walk of [legendWalk, pageWalk]) {
     if (walk === undefined) continue
     refused.push('line ' + String(walk.openedAt + 1) + ': this block is never closed, so the lines after it were not read')
   }
   // A placed note that is never closed is one mistake, not two: the line names no text *and* the block has no end, and a
   // reader needs one sentence. The opener is skipped so the line parser does not add its own version of the same news.
+  // A block title that is never closed is still a title: its lines are kept, and the walk reports the missing end.
+  if (titleWalk !== undefined) {
+    sourceTitle = titleWalk.state.text.join('\n')
+  }
   if (noteWalk !== undefined) {
     inLegend.add(noteWalk.openedAt)
     refused.push(
@@ -369,7 +383,13 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     if (inLegend.has(index)) return
     if (/^@(start|end)uml\b/.test(line)) return
     seenAny = true
-    if (/^title\b/.test(line)) return
+    // `title X` names the drawing. It used to be skipped, which left the caller's default in place and nothing in the
+    // report to say the source's own title had been dropped.
+    const titleLine = /^title\s+(.+)$/.exec(line)
+    if (titleLine !== null) {
+      sourceTitle = (titleLine[1] as string).trim()
+      return
+    }
     // Page text in the source's own words. A block form (`header` … `end header`) is a body this renderer would have to
     // paginate; the one-line form is what a document writes for a footer or a caption.
     const pageText = /^(header|footer|caption)\s+(.+)$/.exec(line)
@@ -761,7 +781,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
 
   const diagram: Diagram = {
     kind: startId === undefined ? 'graph' : 'machine',
-    title,
+    title: sourceTitle ?? title,
     ...(startId === undefined ? {} : { init: startId }),
     nodes: [...builder.nodes.values()],
     edges: builder.edges,
