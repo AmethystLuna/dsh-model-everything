@@ -1302,7 +1302,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         const vertical = Math.abs(corner.x - last.x) < 0.5
         const toward = vertical ? Math.sign(last.y - corner.y) : Math.sign(last.x - corner.x)
         const at = vertical ? last.y - toward * STUB : last.x - toward * STUB
-        if (vertical && Math.abs(at - anchor.y) > 6) {
+        if (vertical && Math.abs(at - anchor.y) >= 2) {
           ;(folded[folded.length - 3] as { x: number; y: number }).x = anchor.x
           ;(folded[folded.length - 3] as { x: number; y: number }).y = at
           ;(folded[folded.length - 2] as { x: number; y: number }).y = at
@@ -1483,7 +1483,17 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (lane !== undefined && lane.points.length > 0 && anchors !== undefined) {
       const shift = laneShift.get(edgeIndex) ?? 0
       const ordered = lane.reversed ? [...lane.points].reverse() : lane.points
-      const waypoints = shift === 0 ? ordered : ordered.map((point) => ({ x: point.x + shift, y: point.y }))
+      // A lane whose x lands on a boundary is drawn along that boundary, and a solid line on a dashed box edge reads as
+      // the edge drawn twice. The lane steps outside it: four points is enough to tell them apart and small enough that
+      // the corridor still belongs to the gap it crosses.
+      const borderX = (x: number): number => {
+        for (const rect of placement.groupRects.values()) {
+          if (Math.abs(x - rect.x) < 1.5) return rect.x - 4
+          if (Math.abs(x - (rect.x + rect.width)) < 1.5) return rect.x + rect.width + 4
+        }
+        return x
+      }
+      const waypoints = ordered.map((point) => ({ x: borderX(point.x + shift), y: point.y }))
       const points: Point[] = [anchors.exit]
       let previous = anchors.exit
       for (const waypoint of waypoints) {
