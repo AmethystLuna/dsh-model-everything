@@ -3160,6 +3160,54 @@ test('the same source draws the same bytes in another process', () => {
   }
 })
 
+// Markup is a document, and a document has to parse. An unescaped `&` or a tag written once is invisible to every
+// geometric assertion in this suite and breaks the picture in the container instead.
+const wellFormed = (markup) => {
+  for (const match of markup.matchAll(/&/g)) {
+    const entity = /^&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/.exec(markup.slice(Number(match.index)))
+    if (entity === null) throw new Error('an unescaped & at ' + String(match.index))
+  }
+  const stack = []
+  for (const tag of markup.matchAll(/<(\/?)([a-z]+)([^>]*)>/g)) {
+    const closing = tag[1] === '/'
+    const selfClosing = tag[3].trimEnd().endsWith('/')
+    if (closing) {
+      const open = stack.pop()
+      if (open !== tag[2]) throw new Error('</' + tag[2] + '> closes <' + String(open) + '>')
+    } else if (!selfClosing) {
+      stack.push(tag[2])
+    }
+  }
+  if (stack.length !== 0) throw new Error('unclosed: ' + stack.join(','))
+}
+
+test('the document check rejects a document that does not parse', () => {
+  // A checker that cannot reject a known-bad document asserts nothing, so it is given two it must refuse.
+  for (const bad of ['<svg><text>a & b</text></svg>', '<svg><text>x</svg>']) {
+    let refused = false
+    try {
+      wellFormed(bad)
+    } catch {
+      refused = true
+    }
+    if (!refused) throw new Error('the check accepted ' + bad)
+  }
+})
+
+test('every drawing is a document that parses', () => {
+  const sources = [
+    ['@startuml', 'component a', 'component b', 'a --> b : retry & fallback', '@enduml'].join('\n'),
+    ['@startuml', 'title <draft> & "quotes"', 'component "网关" as gw', '@enduml'].join('\n'),
+    ['@startuml', 'note right of a : 5 < 6 & 7 > 2', 'component a', '@enduml'].join('\n'),
+    ['@startuml', 'legend', '  x & y <z>', 'end legend', 'component a', '@enduml'].join('\n'),
+    'flowchart LR\n  a[one] -->|5 & 6| b[two]',
+  ]
+  for (const source of sources) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    wellFormed(r.markup)
+  }
+})
+
 if (failures > 0) {
   console.log(NL + 'render tests failed: ' + String(failures))
   process.exit(1)

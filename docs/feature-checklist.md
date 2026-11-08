@@ -222,7 +222,7 @@ And the gates around it:
 | `diagram` | 103 | a flowchart becomes boxes and labelled arrows |
 | `plantuml-corpus` | 39 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
-| `render` | 175 | every verdict earns its own role |
+| `render` | 177 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
 | `layering` | 19 | a chain is one row per box |
 | `ordering` | 10 | two edges that end in opposite order cross, and two in the same order do not |
