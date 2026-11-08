@@ -1611,6 +1611,25 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
    * twice - which is what a dashed run beside a solid one looked like. Both are counted, by the length they overlap.
    */
   const NEAR_LINE = 5
+  // The pair contribution of one route against every other: the same arithmetic `sharedLength` does per pair, kept
+  // separately so a trial that moves one route does not have to walk the whole drawing again. Summing these rows and
+  // halving gives exactly `sharedLength` - each pair is counted once from each side.
+  const sharedWith = (all: Array<ReturnType<typeof piecesOf>>, index: number): number => {
+    let total = 0
+    const mine = all[index] as ReturnType<typeof piecesOf>
+    for (let other = 0; other < all.length; other += 1) {
+      if (other === index) continue
+      for (const piece of mine) {
+        for (const theirs of all[other] as ReturnType<typeof piecesOf>) {
+          if (piece.axis !== theirs.axis) continue
+          if (Math.abs(piece.at - theirs.at) >= NEAR_LINE) continue
+          total += Math.max(0, Math.min(piece.hi, theirs.hi) - Math.max(piece.lo, theirs.lo) - 1)
+        }
+      }
+    }
+    return total
+  }
+
   const sharedLength = (all: Array<ReturnType<typeof piecesOf>>): number => {
     let total = 0
     for (let left = 0; left < all.length; left += 1) {
@@ -1642,6 +1661,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     return from === undefined || to === undefined ? undefined : { from, to }
   }
   let shared = sharedLength(drawnPieces)
+  const sharedRows = drawnPieces.map((_, index) => sharedWith(drawnPieces, index))
   // Best improvement rather than first: a route has several legs and two ways to move each, and taking the first move
   // that helps can leave a drawing with a small overlap where another move would have left none.
   for (let round = 0; round < SHARED_LINE_ROUNDS && shared > 0; round += 1) {
@@ -1700,9 +1720,13 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
           const pieces = piecesFrom(moved)
           const trial = drawnPieces.slice()
           trial[at] = pieces
-          const total = sharedLength(trial)
+          // Only this route moved, so only its row changed: the rest of the drawing contributes what it contributed
+          // before. This is the same number `sharedLength(trial)` would return, without the walk over every pair.
+          const total = shared - (sharedRows[at] as number) + sharedWith(trial, at)
           if (total >= shared - 0.5) continue
-          if (best === undefined || total < best.total) best = { at, points: moved, pieces, total }
+          // A tie is decided by the rule, not by the rounding: two symmetric shifts can total the same number, and
+          // comparing them exactly makes the winner depend on the order the floats were added in.
+          if (best === undefined || total < best.total - 1e-9) best = { at, points: moved, pieces, total }
         }
       }
     }
@@ -1710,7 +1734,14 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const target = routes[best.at] as { shape: LinkShape | PathShape }
     if (target.shape.kind === 'path') target.shape.points = best.points
     drawnPieces[best.at] = best.pieces
-    shared = best.total
+    // A move changes this route's pairs *and* every other route's pair with it, so the rows are rebuilt from the
+    // drawing as it now stands. A rebuild per accepted move is cheap: the alternative is rows that silently drift.
+    let rebuilt = 0
+    for (let index = 0; index < drawnPieces.length; index += 1) {
+      sharedRows[index] = sharedWith(drawnPieces, index)
+      rebuilt += sharedRows[index] as number
+    }
+    shared = rebuilt / 2
   }
 
   // The separation pass steps a leg aside, and a step can leave a notch behind it: the cleanup runs once more over what
