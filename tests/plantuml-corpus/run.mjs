@@ -660,6 +660,11 @@ test('a title statement names the drawing, on one line or in a block', () => {
   if (/<title/.test(plain.markup)) throw new Error('unreachable')
   if (plain.markup.includes('<tspan') && !plain.markup.includes('data-node-id')) throw new Error('a one-line title grew tspans')
   // The lines of a block title stay out of the graph, exactly as the page-text blocks do.
+  // The label beside the drawing is an attribute, and an attribute cannot hold a line break: the lines are joined for it.
+  const label = /aria-label="([^"]*)"/.exec(block.markup)?.[1] ?? ''
+  if (label.includes('\n')) throw new Error('the label carries a line break: ' + JSON.stringify(label))
+  if (!label.startsWith('first line \u00b7 second line')) throw new Error('label: ' + JSON.stringify(label))
+
   const sneaky = render({ source: ['@startuml', 'title', '  component ghost', 'end title', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
   if (sneaky.diagram.nodes.length !== 1) throw new Error('a title line became a node: ' + JSON.stringify(sneaky.diagram.nodes.map((node) => node.id)))
 })

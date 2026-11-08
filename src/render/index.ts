@@ -62,7 +62,10 @@ export function render(input: RenderInput, overrides: Partial<Palette> = {}, opt
       : fromMermaid(input.source, input.title ?? 'mermaid')
   const diagram = input.folded === undefined ? parsed.diagram : collapse(parsed.diagram, input.folded)
   const { canvas, colours } = paintWith(diagram, overrides, options)
-  const written = toSvg(canvas, colours, diagram.title + ': ' + diagram.caption)
+  // A title can be several lines; an attribute cannot. The lines are joined for the label only - the drawing keeps them
+  // apart, and a reader hearing it should not hear a line break.
+  const spokenTitle = diagram.title.replace(/\n/g, ' \u00b7 ')
+  const written = toSvg(canvas, colours, spokenTitle + ': ' + diagram.caption)
   return {
     diagram,
     canvas,
