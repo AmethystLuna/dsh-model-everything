@@ -299,6 +299,28 @@ test('a turned drawing grows along the page and keeps its packages', () => {
   if (!(price.x > group.x + group.width)) throw new Error('the root box is not the next column: ' + String(price.x) + ' vs ' + String(group.x + group.width))
 })
 
+// A drawing large enough to matter must still finish quickly. The ceiling is forty times what the drawing costs today, so it
+// fails on the order of magnitude a cubic pass brings back, not on a loaded machine: the count and the routing are asserted
+// beside it, so a fast wrong picture does not pass either.
+test('a large drawing still finishes in a click', () => {
+  const shapes = {
+    chain: ['@startuml', ...Array.from({ length: 60 }, (_, i) => 'component n' + i), ...Array.from({ length: 59 }, (_, i) => 'n' + i + ' --> n' + (i + 1)), '@enduml'].join('\n'),
+    fan: ['@startuml', 'component hub', ...Array.from({ length: 60 }, (_, i) => 'component t' + i), ...Array.from({ length: 60 }, (_, i) => 'hub --> t' + i), '@enduml'].join('\n'),
+  }
+  for (const [name, source] of Object.entries(shapes)) {
+    const started = Date.now()
+    const r = render({ source }, {}, { scheme: 'default' })
+    const elapsed = Date.now() - started
+    if (r.refused.length !== 0) throw new Error(name + ' refused: ' + JSON.stringify(r.refused.slice(0, 2)))
+    if (name === 'chain' && (r.diagram.nodes.length !== 60 || r.diagram.edges.length !== 59)) {
+      throw new Error('the chain lost nodes: ' + String(r.diagram.nodes.length))
+    }
+    if (name === 'fan' && r.diagram.edges.length !== 60) throw new Error('the fan lost edges: ' + String(r.diagram.edges.length))
+    if (r.canvas.routingFailures.length !== 0) throw new Error(name + ' crossed a box')
+    if (elapsed > 8000) throw new Error(name + ' took ' + String(elapsed) + 'ms')
+  }
+})
+
 // The same source renders to the same bytes, in any order, in any process: a drawing a reader can point at is a drawing
 // that does not change under them, and every snapshot in these suites rests on it.
 test('the same source renders to the same bytes', () => {
