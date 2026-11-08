@@ -970,6 +970,26 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// An arrow's endpoints can carry a cardinality, a colour or a stereotype, and none of them is a name. One dash is an arrow.
+test('an endpoint keeps its name through a cardinality and a colour', () => {
+  const cases = {
+    cardinality: 'a "1" --> "*" b',
+    colour: 'a #red --> b',
+    stereotype: 'a <<entity>> --> b',
+  }
+  for (const [name, line] of Object.entries(cases)) {
+    const r = render({ source: ['@startuml', 'component a', 'component b', line, '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    const edge = r.diagram.edges[0]
+    if (edge === undefined) throw new Error(name + ' was not read: ' + JSON.stringify(r.refused))
+    if (edge.from !== 'a' || edge.to !== 'b') throw new Error(name + ': ' + JSON.stringify([edge.from, edge.to]))
+  }
+  // The shortest arrow the notation allows is still an arrow, and a mark at both ends is still refused.
+  const shortest = render({ source: ['@startuml', 'component a', 'component b', 'a -> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (shortest.refused.length !== 0 || shortest.diagram.edges.length !== 1) throw new Error('a one-dash arrow: ' + JSON.stringify(shortest.refused))
+  const both = render({ source: ['@startuml', 'component a', 'component b', 'a <--> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (both.refused.length !== 1 || !both.refused[0].includes('both ends')) throw new Error('a two-ended arrow: ' + JSON.stringify(both.refused))
+})
+
 // A declaration with a colour or a stereotype used to take the whole line as its name: the alias stopped matching, and the
 // element was created with an id nobody could point at. A description line is a body, and a body is refused by line.
 test('a colour or a stereotype does not become part of the name', () => {
