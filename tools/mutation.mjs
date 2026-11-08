@@ -157,6 +157,14 @@ const MUTATIONS = [
     from: "'\" fill=\"' + (canvas.background ?? colours.background) + '\" />'",
     to: "'\" fill=\"' + colours.background + '\" />'",
   },
+
+  {
+    id: 'M17',
+    what: 'the page furniture is turned with the drawing',
+    file: 'src/render/paint.ts',
+    from: "const pageKinds = new Set(['caption', 'title', 'header', 'legend'])",
+    to: 'const pageKinds = new Set<string>([])',
+  },
 ]
 
 const argument = process.argv[2]
