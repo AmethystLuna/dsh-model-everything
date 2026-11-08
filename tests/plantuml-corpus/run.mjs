@@ -299,6 +299,57 @@ test('a turned drawing grows along the page and keeps its packages', () => {
   if (!(price.x > group.x + group.width)) throw new Error('the root box is not the next column: ' + String(price.x) + ' vs ' + String(group.x + group.width))
 })
 
+// A drawing is a model, not a notation. The same graph written either way must produce the same model - the same nodes
+// with the same labels, the same edges with the same heads and dashes, the same containment - or "switch notation" would
+// silently switch the picture.
+test('the two notations describe the same drawing', () => {
+  const model = (source) => {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+    const d = r.diagram
+    return JSON.stringify({
+      nodes: d.nodes.map((n) => n.id + '=' + (n.label ?? '')).sort(),
+      edges: d.edges.map((e) => e.from + '->' + e.to + (e.label ? ':' + e.label : '') + '/' + (e.arrow ?? '-') + (e.dashed ? '+dash' : '')).sort(),
+      groups: (d.groups ?? []).map((g) => g.label + '[' + [...g.members].sort().join(',') + ']').sort(),
+    })
+  }
+  const pairs = [
+    [
+      ['@startuml', 'component a', 'component b', 'a --> b : calls', '@enduml'].join('\n'),
+      ['flowchart TD', '  a -->|calls| b'].join('\n'),
+    ],
+    [
+      ['@startuml', 'component a', 'component b', 'a ..> b : uses', '@enduml'].join('\n'),
+      ['flowchart TD', '  a -.->|uses| b'].join('\n'),
+    ],
+    [
+      ['@startuml', 'component a', 'component b', 'a -- b', '@enduml'].join('\n'),
+      ['flowchart TD', '  a --- b'].join('\n'),
+    ],
+    [
+      ['@startuml', 'package "app" as app {', '  component a', '  component b', '}', 'component c', 'a --> c', '@enduml'].join('\n'),
+      ['flowchart TD', '  subgraph app', '    a', '    b', '  end', '  a --> c'].join('\n'),
+    ],
+    [
+      ['@startuml', 'state "idle" as idle', 'state "busy" as busy', '[*] --> idle', 'idle --> busy : start', '@enduml'].join('\n'),
+      ['stateDiagram-v2', '  state "idle" as idle', '  state "busy" as busy', '  [*] --> idle', '  idle --> busy: start'].join('\n'),
+    ],
+  ]
+  for (const [plant, mermaid] of pairs) {
+    if (model(plant) !== model(mermaid)) {
+      throw new Error('the notations disagree about: ' + plant.slice(0, 40).replace(/\n/g, ' '))
+    }
+  }
+})
+
+test('a thick line is refused in either notation', () => {
+  const plant = render({ source: ['@startuml', 'component a', 'component b', 'a ==> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  const mermaid = render({ source: ['flowchart TD', '  a ==> b'].join('\n') }, {}, { scheme: 'default' })
+  if (plant.refused.length !== 1) throw new Error('plantuml thick: ' + JSON.stringify(plant.refused))
+  if (mermaid.refused.length !== 1) throw new Error('mermaid thick: ' + JSON.stringify(mermaid.refused))
+  if (!mermaid.refused[0].includes('thick line')) throw new Error('mermaid refused a thick line for another reason: ' + mermaid.refused[0])
+})
+
 // The two notations state the same direction with different words, and the engine honours both: a reader who asks for a
 // left-to-right picture gets one in either spelling.
 test('a mermaid direction token turns the drawing the way plantuml does', () => {

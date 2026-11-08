@@ -11,7 +11,7 @@
  * - `graph TD|TB|LR` and `flowchart TD|TB|LR`; `LR` and `RL` turn the drawing the way PlantUML's
  *   `left to right direction` does, and `TD`/`TB`/`BT` leave it top to bottom;
  * - node declarations `A[text]`, `A(text)`, `A{text}`, `A((text))`, and a bare `A`;
- * - edges `-->`, `---`, `-.->`, `==>`, with a label as `-->|text|` or `-- text -->`;
+ * - edges `-->`, `---`, `-.->`, with a label as `-->|text|` or `-- text -->`; a thick line (`==>`) is refused;
  * - `stateDiagram` / `stateDiagram-v2`: `[*] --> A`, `A --> B: event`, `state "text" as id`;
  * - `subgraph name ... end`, which becomes a group;
  * - `%%` comments and blank lines.

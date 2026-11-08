@@ -11,7 +11,7 @@
  * - `graph TD|TB|LR` and `flowchart TD|TB|LR`; `LR` and `RL` turn the drawing the way PlantUML's
  *   `left to right direction` does, and `TD`/`TB`/`BT` leave it top to bottom;
  * - node declarations `A[text]`, `A(text)`, `A{text}`, `A((text))`, and a bare `A`;
- * - edges `-->`, `---`, `-.->`, `==>`, with a label as `-->|text|` or `-- text -->`;
+ * - edges `-->`, `---`, `-.->`, with a label as `-->|text|` or `-- text -->`; a thick line (`==>`) is refused;
  * - `stateDiagram` / `stateDiagram-v2`: `[*] --> A`, `A --> B: event`, `state "text" as id`;
  * - `subgraph name ... end`, which becomes a group;
  * - `%%` comments and blank lines.
@@ -200,7 +200,8 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       }
       ensure(builder, from)
       ensure(builder, to)
-      push({ from, to, label })
+      // A transition is the same statement as PlantUML's `-->`: an association.
+      push({ from, to, label, arrow: 'association' })
       return
     }
 
@@ -228,11 +229,20 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       }
       ensure(builder, left.id, left.label, left.shape)
       ensure(builder, right.id, right.label, right.shape)
+      // The token states the line and the head, and the two notations have to mean the same thing by it: `-->` is an
+      // association, `---` a connection with no head, `-.->` a dashed dependency. `==>` is a thick line, which this
+      // renderer does not draw - drawing it dashed would state a line the source did not ask for.
+      if (edge[2] === '==>') {
+        refused.push(where + '`' + line + '` is a thick line: this renderer draws plain and dashed arrows, not heavy ones')
+        return
+      }
+      const kind = edge[2] === '-.->' ? 'dependency' : edge[2] === '---' ? 'none' : 'association'
       push({
         from: left.id,
         to: right.id,
         label: (edge[3] ?? '').trim(),
-        ...(edge[2] === '-.->' || edge[2] === '==>' ? { dashed: true } : {}),
+        arrow: kind,
+        ...(edge[2] === '-.->' ? { dashed: true } : {}),
       })
       return
     }

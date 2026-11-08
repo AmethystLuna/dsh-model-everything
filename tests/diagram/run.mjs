@@ -45,10 +45,14 @@ test('an edge label written as -- text --> is read too', () => {
   if (diagram.edges[0].label !== 'retry') throw new Error('label: ' + diagram.edges[0].label)
 })
 
-test('a dashed and a thick arrow are marked dashed', () => {
-  const { diagram } = fromMermaid('graph TD\n  a -.-> b\n  b ==> c\n  c --> d')
+test('a dashed mermaid edge is dashed and a thick one is refused', () => {
+  // `==>` is a thick line. Drawing it dashed would state a line the source did not write, so it is refused the way
+  // PlantUML's `==>` is - the two notations answer the same token the same way.
+  const { diagram, refused } = fromMermaid('graph TD\n  a -.-> b\n  b ==> c\n  c --> d')
   const dashed = diagram.edges.filter((edge) => edge.dashed).length
-  if (dashed !== 2) throw new Error('dashed: ' + String(dashed))
+  if (dashed !== 1) throw new Error('dashed: ' + String(dashed))
+  if (refused.length !== 1) throw new Error('refused: ' + JSON.stringify(refused))
+  if (!refused[0].includes('thick line')) throw new Error('the thick line was refused for another reason: ' + refused[0])
 })
 
 test('a state diagram carries a start marker as the initial state, not as a box', () => {

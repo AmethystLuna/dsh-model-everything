@@ -614,7 +614,9 @@ test('a dependency and a realisation are dashed, and an association is solid', (
 test('a mermaid edge states no arrow, and a mermaid drawing is unchanged', () => {
   const source = ['graph TD', '  a[Start] --> b{Check}', '  b -->|yes| c[Done]'].join(String.fromCharCode(10))
   const rendered = render({ source })
-  if (rendered.diagram.edges.some((edge) => edge.arrow !== undefined)) throw new Error('a Mermaid edge gained an arrow type')
+  // A Mermaid `-->` is the same statement as PlantUML's `-->`, so it carries the same kind: the two notations must not
+  // describe the same drawing differently. The golden below is unchanged by it - the plain head is what both draw.
+  if (rendered.diagram.edges.some((edge) => edge.arrow !== 'association')) throw new Error('a Mermaid edge lost its kind')
   // The golden holds the label on its line as well as the shapes: `yes` is centred on x=64, the line's own x, over
   // a mask from 54.1 to 73.9, so the line it names is interrupted by the word and nothing else is.
   const golden =
@@ -782,10 +784,11 @@ test('a composition in a multi-edge keeps its diamond and the association keeps 
 })
 
 test('two identical mermaid edges are two edges, drawn apart', () => {
-  // The property is a model-level one: Mermaid states no arrow, and its two `-->` lines are still two statements.
+  // The property is a model-level one: the two `-->` lines are two statements about one pair, whatever kind their
+  // heads are, and they are drawn apart.
   const { diagram } = render({ source: ['graph TD', '  a[A] --> b[B]', '  a --> b'].join(String.fromCharCode(10)) })
   if (diagram.edges.length !== 2) throw new Error('edges in the model: ' + String(diagram.edges.length))
-  if (diagram.edges.some((edge) => edge.arrow !== undefined)) throw new Error('a Mermaid edge gained an arrow type')
+  if (diagram.edges.some((edge) => edge.arrow !== 'association')) throw new Error('a Mermaid edge lost its kind')
   const { canvas } = paintWith(diagram)
   const routes = routesOf(canvas)
   if (routes.length !== 2) throw new Error('edges drawn: ' + String(routes.length))
