@@ -1592,7 +1592,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
    * away: at a couple of points apart they read as one thick line, and at a corner they read as a step that was drawn
    * twice - which is what a dashed run beside a solid one looked like. Both are counted, by the length they overlap.
    */
-  const NEAR_LINE = 4
+  const NEAR_LINE = 5
   const sharedLength = (all: Array<ReturnType<typeof piecesOf>>): number => {
     let total = 0
     for (let left = 0; left < all.length; left += 1) {
@@ -1710,8 +1710,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const tail = points[points.length - 1] as Point
     const corner = points[points.length - 2] as Point
     const head = points[points.length - 3] as Point
-    if (Math.abs(corner.x - tail.x) >= 0.5) continue
-    if (Math.abs(corner.y - tail.y) >= 16) continue
+    // The leg into the box is vertical for a top or bottom side and horizontal for a left or right one.
+    const down = Math.abs(corner.x - tail.x) < 0.5
+    const along = down ? Math.abs(corner.y - tail.y) : Math.abs(corner.x - tail.x)
+    if (along >= 16) continue
     const statement = diagram.edges[edge] as DiagramEdge | undefined
     if (statement === undefined) continue
     const from = endBox(statement.from)
@@ -1720,28 +1722,37 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // A whole stub if the line is free, then the next longest that is: the arrowhead needs a leg to sit in, and a
     // shorter one is better than a ledge.
     for (const span of [16, 12, 10, 8]) {
-      const target = tail.y - Math.sign(tail.y - corner.y) * span
-      if (Math.abs(target - head.y) < 2) continue
-      const line = [{ x: corner.x, y: target }, { x: head.x, y: target }]
+      const target = down
+        ? tail.y - Math.sign(tail.y - corner.y) * span
+        : tail.x - Math.sign(tail.x - corner.x) * span
+      if (down ? Math.abs(target - head.y) < 2 : Math.abs(target - head.x) < 2) continue
+      const line = down
+        ? [{ x: corner.x, y: target }, { x: head.x, y: target }]
+        : [{ x: target, y: corner.y }, { x: target, y: head.y }]
       if (boxesCrossedBy(line, from, to, boxList).length > 0) continue
-      const lo = Math.min(line[0].x, line[1].x)
-      const hi = Math.max(line[0].x, line[1].x)
+      const axis = down ? 'y' : 'x'
+      const lo = down ? Math.min(line[0].x, line[1].x) : Math.min(line[0].y, line[1].y)
+      const hi = down ? Math.max(line[0].x, line[1].x) : Math.max(line[0].y, line[1].y)
       let taken = false
       for (const other of routes) {
         if (other.shape === shape) continue
         for (const piece of piecesOf(other.shape)) {
-          if (piece.axis !== 'y') continue
-          if (Math.abs(piece.at - target) >= 4) continue
+          if (piece.axis !== axis) continue
+          if (Math.abs(piece.at - target) >= 5) continue
           if (Math.min(hi, piece.hi) - Math.max(lo, piece.lo) > 1) taken = true
         }
       }
       if (taken) continue
-      ;(shape.points[shape.points.length - 2] as { x: number; y: number }).y = target
-      ;(shape.points[shape.points.length - 3] as { x: number; y: number }).y = target
+      if (down) {
+        ;(shape.points[shape.points.length - 2] as { x: number; y: number }).y = target
+        ;(shape.points[shape.points.length - 3] as { x: number; y: number }).y = target
+      } else {
+        ;(shape.points[shape.points.length - 2] as { x: number; y: number }).x = target
+        ;(shape.points[shape.points.length - 3] as { x: number; y: number }).x = target
+      }
       break
     }
   }
-
 
   // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate
   // at. Each candidate route was checked before it was emitted, so this pass is the assertion that no stage slipped a
