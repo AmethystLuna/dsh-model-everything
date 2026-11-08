@@ -119,6 +119,7 @@ export const diagramRenderTool = defineTool({
       groups: rendered.diagram.groups?.length ?? 0,
       caption: rendered.diagram.caption,
       refused: rendered.refused,
+      ignored: rendered.ignored,
       dropped: rendered.dropped,
       ...(written === undefined ? {} : { path: written.path, bytes: written.bytes }),
       svg: rendered.markup,
