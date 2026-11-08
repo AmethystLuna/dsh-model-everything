@@ -277,10 +277,26 @@ function readArrow(line: string): ArrowParts | string | undefined {
  * it as a pre-pass keeps the declaration paths - quoted alias, bracketed alias, plain alias, bare name - untouched, and
  * a block whose members are declared elsewhere still contributes the ids it names.
  */
-function togetherGroups(lines: readonly string[]): string[][] {
+/**
+ * The boxes a `together { }` block names, read from the text before the lines are parsed, plus the lines that name a box
+ * without declaring it - `together { a b }` is legal PlantUML, and its members are as real as an arrow's endpoints.
+ */
+function togetherGroups(lines: readonly string[]): {
+  groups: string[][]
+  implicit: Map<number, string>
+  /** The lines of `together { }` blocks that name nothing: reported, not swallowed. */
+  empty: number[]
+  /** The lines of blocks that name one box: a row of one is not a row. */
+  oneMember: number[]
+} {
   const groups: string[][] = []
+  const implicit = new Map<number, string>()
   let open: string[] | undefined
+  let index = -1
+  const empty: number[] = []
+  const oneMember: number[] = []
   for (const raw of lines) {
+    index += 1
     const line = raw.replace(/'.*$/, '').trim()
     if (line === '') continue
     if (/^together\b/.test(line) && line.endsWith('{')) {
@@ -290,19 +306,28 @@ function togetherGroups(lines: readonly string[]): string[][] {
     if (open === undefined) continue
     if (line === '}') {
       if (open.length > 1) groups.push(open)
+      else if (open.length === 1) oneMember.push(index)
+      else empty.push(index)
       open = undefined
       continue
     }
 
     const declared = DECLARED.exec(line)
-    if (declared === null) continue
+    if (declared === null) {
+      // A bare name inside the block names a box; the arrow rules make such a name an element, and so does this.
+      if (/^[A-Za-z_][\w.-]*$/.test(line)) {
+        open.push(line)
+        implicit.set(index, line)
+      }
+      continue
+    }
     const rest = declared[2].trim()
     const quoted = QUOTED_ALIAS.exec(rest)
     const bracketed = BRACKET_ALIAS.exec(rest)
     const plain = PLAIN_ALIAS.exec(rest)
     open.push(quoted !== null ? quoted[2] : bracketed !== null ? bracketed[2] : plain !== null ? plain[2] : reference(rest).id)
   }
-  return groups
+  return { groups, implicit, empty, oneMember }
 }
 
 export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
@@ -310,6 +335,8 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const refused: string[] = []
   const ignored: string[] = []
   const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[]; background?: string; scale?: number } = { value: 'down' }
+  // Read before the lines are parsed: the block decides which bare names are boxes, and the loop needs that answer.
+  const together = togetherGroups(lines)
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set(), groupLines: new Map() }
   let startId: string | undefined
   let sourceTitle: string | undefined
@@ -408,6 +435,12 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     const line = raw.replace(/'.*$/, '').trim()
     if (line === '') return
     const where = 'line ' + String(index + 1) + ': '
+    // A bare name a `together` block lists is a box, the same as an arrow's endpoint.
+    const named = together.implicit.get(index)
+    if (named !== undefined) {
+      ensure(builder, named, undefined, undefined, true)
+      return
+    }
 
     if (inLegend.has(index)) return
     if (/^@(start|end)uml\b/.test(line)) return
@@ -729,6 +762,15 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     refused.push(where + '`' + line + '` is not something this renderer draws')
   })
 
+  // A `together` block that names nothing, or one box, is said rather than swallowed - before the empty-drawing exit, which
+  // would return without it.
+  for (const line of together.empty) {
+    ignored.push('line ' + String(line + 1) + ': this `together` block names no boxes, so it keeps nothing on one row')
+  }
+  for (const line of together.oneMember) {
+    ignored.push('line ' + String(line + 1) + ': this `together` block names one box, and a row of one is not a row')
+  }
+
   // A block's name can be written as an edge endpoint: `Web <|-- Mobile` points at the `package Web`
   // block. PlantUML allows it and so does UML; what it must not do is become a second box called `Web`.
   // An endpoint an arrow created is re-read as the boundary it names, and the edge attaches to that
@@ -885,7 +927,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
 
   // `together { A B }` is a row, not a boundary: the boxes are declared by their own lines and the block only joins
   // them, so it is attached to the drawing rather than drawn as a group.
-  const sameRank = togetherGroups(lines)
+  const sameRank = together.groups
   const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}), ...(legend.length === 0 ? {} : { legend }),
     ...(pageTextOf('header') === undefined ? {} : { header: pageTextOf('header') }),
     ...(pageTextOf('footer') === undefined ? {} : { footer: pageTextOf('footer') }),

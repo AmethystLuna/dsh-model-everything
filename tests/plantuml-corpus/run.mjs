@@ -970,6 +970,17 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// `together { a b }` names boxes without declaring them, and a block that keeps nothing on one row says so.
+test('a together block names its boxes, and says when it names none', () => {
+  const bare = render({ source: ['@startuml', 'together {', '  a', '  b', '}', 'a --> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (bare.refused.length !== 0) throw new Error('bare names refused: ' + JSON.stringify(bare.refused))
+  if (JSON.stringify(bare.diagram.sameRank) !== JSON.stringify([['a', 'b']])) throw new Error('row: ' + JSON.stringify(bare.diagram.sameRank))
+  const empty = render({ source: ['@startuml', 'together {', '}', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (empty.ignored.length !== 1 || !empty.ignored[0].includes('names no boxes')) throw new Error('empty: ' + JSON.stringify(empty.ignored))
+  const lonely = render({ source: ['@startuml', 'together {', '  component a', '}', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (lonely.ignored.length !== 1 || !lonely.ignored[0].includes('names one box')) throw new Error('one: ' + JSON.stringify(lonely.ignored))
+})
+
 // A boundary's stereotype or colour is a decoration on it, not part of its name: left in the label, the alias was lost and the
 // boundary could not be named by an edge or by its own members.
 test('a boundary keeps its name through a stereotype and a colour', () => {
