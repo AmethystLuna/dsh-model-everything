@@ -68,6 +68,10 @@ A third answer sits between drawn and refused. A **layout control** - `left to r
 layouter: the line is understood, has no effect, and is reported in `ignored`. So a control that looks like it did
 nothing did nothing, and you are not left guessing whether it was dropped or obeyed.
 
+One layout control is implemented rather than reported: `A -[hidden]-> B` ranks the two boxes as any edge would and
+draws no line. It is the way to place a box without claiming a connection, so it is honoured - and, being a statement
+about the drawing rather than about the subject, it is not counted as an edge in the caption.
+
 ## What the structure review reports
 
 | Code | Severity | What it means |

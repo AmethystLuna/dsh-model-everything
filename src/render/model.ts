@@ -43,6 +43,13 @@ export interface DiagramEdge {
    * states no arrow type, so it carries no field and is drawn exactly as before.
    */
   arrow?: EdgeArrow
+  /**
+   * An edge that ranks and is not drawn: `A -[hidden]-> B`.
+   *
+   * PlantUML uses one to say where boxes go without saying they connect, and a renderer that ranks from edges can
+   * honour that - the layout reads the edge like any other - and must then not draw the line.
+   */
+  invisible?: boolean
 }
 
 export interface DiagramGroup {

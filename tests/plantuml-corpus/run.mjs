@@ -116,9 +116,9 @@ const CASES = [
   },
   {
     name: "hidden edge",
-    why: "refused today: the edge would only order, not draw (P2)",
+    why: "it ranks and is not drawn: three nodes, three edges, no refusal",
     source: "@startuml\nA -[hidden]-> B\nA --> C\nB --> C\n@enduml",
-    expect: { nodes: 3, edges: 2, groups: 0, refused: ["-[hidden]->"] },
+    expect: { nodes: 3, edges: 3, groups: 0, refused: [] },
   },
   {
     name: "rightward edge hint",
@@ -190,6 +190,23 @@ for (const c of CASES) {
     }
   })
 }
+
+// A hidden edge is a layout instruction with no line: it ranks the two boxes and draws nothing. The metamorphic
+// check is the direction - writing it the other way puts the other box on top, so it is the edge doing the ordering.
+test('a hidden edge ranks two boxes the way it points and draws nothing', () => {
+  const rank = (source) => {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('the hidden edge was refused: ' + JSON.stringify(r.refused))
+    const boxes = r.canvas.shapes.filter((shape) => shape.kind === 'box')
+    const routes = r.canvas.shapes.filter((shape) => shape.kind === 'path' || shape.kind === 'link')
+    if (routes.length !== 0) throw new Error('a line was drawn for a hidden edge: ' + String(routes.length))
+    return boxes.sort((left, right) => left.y - right.y).map((box) => box.label)
+  }
+  const forward = rank(['@startuml', 'component A', 'component B', 'A -[hidden]-> B', '@enduml'].join('\n'))
+  const backward = rank(['@startuml', 'component A', 'component B', 'B -[hidden]-> A', '@enduml'].join('\n'))
+  if (JSON.stringify(forward) !== JSON.stringify(['A', 'B'])) throw new Error('A -[hidden]-> B drew: ' + JSON.stringify(forward))
+  if (JSON.stringify(backward) !== JSON.stringify(['B', 'A'])) throw new Error('B -[hidden]-> A drew: ' + JSON.stringify(backward))
+})
 
 // A layout control is not a refusal and not a drawing instruction: it is understood, dropped, and said so. The
 // nearest miss is the same source without the line - same picture, and nothing to report.
