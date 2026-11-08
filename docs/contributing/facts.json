@@ -150,6 +150,7 @@
   "suites": [
     "automaton",
     "baseline",
+    "blocks",
     "catalog",
     "channels",
     "client",

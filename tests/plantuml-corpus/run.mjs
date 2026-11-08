@@ -558,6 +558,20 @@ test('a state block is a solid boundary, and a package is still dashed', () => {
   if (!packaged.markup.includes('stroke-dasharray')) throw new Error('a package lost its dashes')
 })
 
+// A block whose closing line is missing swallows the source; the drawing has to say so rather than come out nearly empty.
+test('an unclosed block is refused by the line that opened it', () => {
+  const source = ['@startuml', 'header', '  internal', 'component a', '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 1) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if (!r.refused[0].startsWith('line 2:')) throw new Error('wrong line: ' + r.refused[0])
+  if (!r.refused[0].includes('never closed')) throw new Error('wrong reason: ' + r.refused[0])
+  // The three kinds of block are walked the same way, so all three report it.
+  for (const open of ['legend', 'note right of a']) {
+    const other = render({ source: ['@startuml', 'component a', open, '  text', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (!other.refused.some((entry) => entry.includes('never closed'))) throw new Error(open + ': ' + JSON.stringify(other.refused))
+  }
+})
+
 // The block form of the page text is text, not diagram lines: a footer whose line reads `component ghost` must not grow a
 // box, and a header of two lines must take the room of two.
 test('a page-text block is text, not diagram lines', () => {

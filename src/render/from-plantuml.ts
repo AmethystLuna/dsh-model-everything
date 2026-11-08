@@ -28,6 +28,7 @@
  */
 
 import { emptyCaption, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
+import { collectBlocks } from './blocks.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -291,78 +292,74 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   let seenAny = false
   let groupCount = 0
 
-  // A legend block is page furniture: the lines inside it are text, not diagram lines, so they are collected here and
-  // skipped by the loop below. Without this, an arrow written inside a legend would become an edge.
+  // Three kinds of block carry text that is not diagram source, and all three were collected by hand before the lines were
+  // parsed. They share the walking now; what differs is what a block means, which is each definition's business.
   const legend: string[] = []
   const inLegend = new Set<number>()
-  // The block form of a placed note - `note right of X`, its lines, `end note` - is collected before the lines are read and
-  // rewritten into the one-line form the parser already knows. Without this its body reached the parser and a line that read
-  // like source grew a box. The lines are joined into one paragraph: a box carries one paragraph, and the note wraps it.
-  {
-    let open: { index: number; side: string; target: string; text: string[] } | undefined
-    lines.forEach((rawLine, index) => {
-      const text = rawLine.trim()
-      if (open === undefined) {
-        const opener = /^note\s+(left|right|top|bottom)\s+of\s+(.+)$/.exec(text)
-        if (opener === null) return
-        // The opener is not skipped: it is rewritten into the one-line form once its body has been read.
-        open = { index, side: opener[1] as string, target: opener[2] as string, text: [] }
-        return
-      }
-      inLegend.add(index)
-      if (/^end\s*note\b/.test(text)) {
-        lines[open.index] = 'note ' + open.side + ' of ' + open.target + ' : ' + open.text.join(' ')
-        open = undefined
-        return
-      }
-      if (text !== '') open.text.push(text)
-    })
-  }
-
-  // The block form of the page text - `header`, then its lines, then `end header` - is collected the same way the legend
-  // is: the lines inside it are the source's words, and letting them reach the parser would turn a footer into boxes.
   const pageBlocks: { header: string[]; footer: string[]; sourceCaption: string[] } = { header: [], footer: [], sourceCaption: [] }
-  {
-    const keyOf = { header: 'header', footer: 'footer', caption: 'sourceCaption' } as const
-    let open: keyof typeof pageBlocks | undefined
-    lines.forEach((raw, index) => {
-      const text = raw.trim()
-      if (open === undefined) {
-        const opener = /^(header|footer|caption)\s*$/.exec(text)
-        if (opener === null) return
-        open = keyOf[opener[1] as 'header' | 'footer' | 'caption']
-        inLegend.add(index)
-        return
-      }
-      inLegend.add(index)
-      if (new RegExp('^end\\s*' + (open === 'sourceCaption' ? 'caption' : open) + '\\b').test(text)) {
-        open = undefined
-        return
-      }
-      if (text !== '') pageBlocks[open].push(text)
-    })
-  }
 
-  let legendOpen = false
-  lines.forEach((raw, index) => {
-    const text = raw.trim()
-    if (!legendOpen) {
-      if (!/^legend\b/.test(text)) return
-      legendOpen = true
-      inLegend.add(index)
-      const corner = /^legend\s+(left|right|top|bottom|center)/.exec(text)
+  const legendWalk = collectBlocks(lines, inLegend, {
+    skipOpening: true,
+    open: (line, index) => {
+      if (!/^legend\b/.test(line)) return undefined
+      const corner = /^legend\s+(left|right|top|bottom|center)/.exec(line)
       if (corner !== null && corner[1] !== 'bottom') {
-        ignored.push('line ' + String(index + 1) + ': `' + text + '` asks for a corner: this renderer puts the legend under the drawing')
+        ignored.push('line ' + String(index + 1) + ': `' + line + '` asks for a corner: this renderer puts the legend under the drawing')
       }
-      return
-    }
-    inLegend.add(index)
-    if (/^end\s*legend\b/.test(text)) {
-      legendOpen = false
-      return
-    }
-    if (text !== '') legend.push(text)
+      return { text: [] as string[] }
+    },
+    closes: (line) => /^end\s*legend\b/.test(line),
+    text: (state, line) => { state.text.push(line) },
+    close: (state) => { legend.push(...state.text) },
   })
+
+  // The page text's block form. A one-line statement is the same block with one line in it, and the line form is read by the
+  // parser, so this walk only handles the form that spans lines.
+  const pageWalk = collectBlocks(lines, inLegend, {
+    skipOpening: true,
+    open: (line) => {
+      const opener = /^(header|footer|caption)\s*$/.exec(line)
+      if (opener === null) return undefined
+      const keyOf = { header: 'header', footer: 'footer', caption: 'sourceCaption' } as const
+      const key = keyOf[opener[1] as 'header' | 'footer' | 'caption']
+      return { key }
+    },
+    closes: (line, state) => new RegExp('^end\\s*' + (state.key === 'sourceCaption' ? 'caption' : state.key) + '\\b').test(line),
+    text: (state, line) => { pageBlocks[state.key].push(line) },
+    close: () => {},
+  })
+
+  // A placed note's block form: its lines are the note's words, and the opener is rewritten into the one-line form the
+  // parser already knows, so the note is created by the same path.
+  const noteWalk = collectBlocks(lines, inLegend, {
+    open: (line, index) => {
+      // A colon on the line means the note's text is on that line: the one-line form, which the parser reads. Only a line
+      // with no text of its own opens a block.
+      const opener = /^note\s+(left|right|top|bottom)\s+of\s+([^:]+)$/.exec(line)
+      if (opener === null) return undefined
+      return { index, side: opener[1] as string, target: opener[2] as string, text: [] as string[] }
+    },
+    closes: (line) => /^end\s*note\b/.test(line),
+    text: (state, line) => { state.text.push(line) },
+    close: (state, lines, openedAt) => {
+      lines[openedAt] = 'note ' + state.side + ' of ' + state.target + ' : ' + state.text.join(' ')
+    },
+  })
+  // A block whose closing line is missing swallows the rest of the source. Saying nothing there is the worst answer of all:
+  // the drawing comes out nearly empty and looks deliberate.
+  for (const walk of [legendWalk, pageWalk]) {
+    if (walk === undefined) continue
+    refused.push('line ' + String(walk.openedAt + 1) + ': this block is never closed, so the lines after it were not read')
+  }
+  // A placed note that is never closed is one mistake, not two: the line names no text *and* the block has no end, and a
+  // reader needs one sentence. The opener is skipped so the line parser does not add its own version of the same news.
+  if (noteWalk !== undefined) {
+    inLegend.add(noteWalk.openedAt)
+    refused.push(
+      'line ' + String(noteWalk.openedAt + 1) + ': `' + lines[noteWalk.openedAt].trim() +
+        '` is never closed, and it names no text of its own',
+    )
+  }
 
   lines.forEach((raw, index) => {
     const line = raw.replace(/'.*$/, '').trim()
