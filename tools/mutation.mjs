@@ -224,6 +224,21 @@ const MUTATIONS = [
     from: "  const showMachine = diagram.sourceCaption === undefined || machineCaption.includes('refused')",
     to: '  const showMachine = true',
   },
+
+  {
+    id: 'M25',
+    what: 'a stereotype stays in the name it follows',
+    file: 'src/render/from-plantuml.ts',
+    from: "      const rest = declared[2].replace(/\\s+#\\S+\\s*$/, '').replace(/\\s*<<[^<>]*>>\\s*$/, '').trim()",
+    to: "      const rest = declared[2].replace(/\\s+#\\S+\\s*$/, '').trim()",
+  },
+  {
+    id: 'M26',
+    what: 'a description line becomes part of the element name',
+    file: 'src/render/from-plantuml.ts',
+    from: '    if (described !== null && SHAPES[described[1] as string] !== undefined) {',
+    to: '    if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
