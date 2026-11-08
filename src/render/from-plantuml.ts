@@ -295,6 +295,30 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   // skipped by the loop below. Without this, an arrow written inside a legend would become an edge.
   const legend: string[] = []
   const inLegend = new Set<number>()
+  // The block form of a placed note - `note right of X`, its lines, `end note` - is collected before the lines are read and
+  // rewritten into the one-line form the parser already knows. Without this its body reached the parser and a line that read
+  // like source grew a box. The lines are joined into one paragraph: a box carries one paragraph, and the note wraps it.
+  {
+    let open: { index: number; side: string; target: string; text: string[] } | undefined
+    lines.forEach((rawLine, index) => {
+      const text = rawLine.trim()
+      if (open === undefined) {
+        const opener = /^note\s+(left|right|top|bottom)\s+of\s+(.+)$/.exec(text)
+        if (opener === null) return
+        // The opener is not skipped: it is rewritten into the one-line form once its body has been read.
+        open = { index, side: opener[1] as string, target: opener[2] as string, text: [] }
+        return
+      }
+      inLegend.add(index)
+      if (/^end\s*note\b/.test(text)) {
+        lines[open.index] = 'note ' + open.side + ' of ' + open.target + ' : ' + open.text.join(' ')
+        open = undefined
+        return
+      }
+      if (text !== '') open.text.push(text)
+    })
+  }
+
   // The block form of the page text - `header`, then its lines, then `end header` - is collected the same way the legend
   // is: the lines inside it are the source's words, and letting them reach the parser would turn a footer into boxes.
   const pageBlocks: { header: string[]; footer: string[]; sourceCaption: string[] } = { header: [], footer: [], sourceCaption: [] }

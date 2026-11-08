@@ -688,6 +688,20 @@ test('a file, a card and a frame draw their own marks', () => {
   if (cloud.refused.length !== 1) throw new Error('a cloud was not refused: ' + JSON.stringify(cloud.refused))
 })
 
+// The block form of a placed note: its body is the note's words, not diagram lines. The lines are joined into one paragraph,
+// because a box carries one paragraph and the note wraps it.
+test('a note block carries its lines as text', () => {
+  const source = ['@startuml', 'component a', 'note right of a', '  first line', '  component ghost', 'end note', '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  const ids = r.diagram.nodes.map((node) => node.id).sort()
+  if (JSON.stringify(ids) !== JSON.stringify(['a', 'note-a'])) throw new Error('nodes: ' + JSON.stringify(ids))
+  const note = r.diagram.nodes.find((node) => node.id === 'note-a')
+  if (note?.label !== 'first line component ghost') throw new Error('the block text: ' + String(note?.label))
+  if (note.shape !== 'note') throw new Error('the block lost its fold')
+  if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
+})
+
 // A note beside a box names a side, and the side is honoured through the same placement machinery every other constraint
 // uses: a hidden edge with a direction hint. Four sides, one box, four arrangements.
 test('a note beside a box lands on the side the source named', () => {
