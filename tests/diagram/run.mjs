@@ -353,7 +353,8 @@ test('an edge between two boundaries is refused by line, not attached to a membe
 test('an element keyword this renderer does not draw is refused with its line and a reason', () => {
   // `class` used to be here and is now a named box; the keywords left are the symbols this renderer has no shape for.
   // `note` used to be here and is now a folded box; a note *placed* beside a box is still refused, but for another reason.
-  for (const [keyword, line] of [['actor', 'actor User'], ['legend', 'legend Right'], ['cloud', 'cloud Network']]) {
+  // `legend` joined the drawn set; the keywords left are the symbols this renderer has no outline for.
+  for (const [keyword, line] of [['actor', 'actor User'], ['agent', 'agent Helper'], ['cloud', 'cloud Network']]) {
     const { refused } = fromPlantUml(['@startuml', line, 'A --> B', '@enduml'].join(String.fromCharCode(10)))
     if (refused.length !== 1) throw new Error(keyword + ' refused: ' + JSON.stringify(refused))
     if (!refused[0].startsWith('line 2:')) throw new Error(keyword + ' has no line number: ' + refused[0])

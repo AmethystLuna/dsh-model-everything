@@ -209,6 +209,41 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A legend is page furniture. The metamorphic point is what it does *not* do: an arrow written inside it is text, not
+// an edge, and it takes no part in the layout.
+test('a legend block is text under the drawing, not lines in it', () => {
+  const withLegend = render(
+    {
+      source: [
+        '@startuml',
+        'component A',
+        'component B',
+        'A --> B',
+        'legend',
+        '  solid: a call',
+        '  dashed: an event',
+        '  A --> B',
+        'end legend',
+        '@enduml',
+      ].join('\n'),
+    },
+    {},
+    { scheme: 'default' },
+  )
+  if (withLegend.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(withLegend.refused))
+  if (withLegend.diagram.edges.length !== 1) {
+    throw new Error('the arrow inside the legend became an edge: ' + String(withLegend.diagram.edges.length))
+  }
+  if ((withLegend.diagram.legend ?? []).length !== 3) {
+    throw new Error('the legend lines were not kept: ' + JSON.stringify(withLegend.diagram.legend))
+  }
+  if (!withLegend.markup.includes('dashed: an event')) throw new Error('the legend is not drawn')
+  const withoutLegend = render({ source: ['@startuml', 'component A', 'component B', 'A --> B', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (withLegend.markup === withoutLegend.markup) throw new Error('the legend changed nothing')
+  const corner = render({ source: ['@startuml', 'component A', 'legend right', '  note', 'end legend', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (corner.ignored.length !== 1) throw new Error('a legend corner was not reported: ' + JSON.stringify(corner.ignored))
+})
+
 // A boundary, a control and a collections box are rectangles whose role is a small mark in the corner.
 test('a role box draws the mark that names its role', () => {
   const source = ['@startuml', 'boundary "b" as b', 'control "c" as c', 'collections "col" as col', 'component core', 'b --> core', '@enduml'].join('\n')

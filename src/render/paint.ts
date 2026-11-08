@@ -130,6 +130,15 @@ export interface GroupShape {
   colour: ColourRole
 }
 
+/** A `legend` block: page furniture, drawn under the drawing and never part of it. */
+export interface LegendShape {
+  kind: 'legend'
+  x: number
+  y: number
+  lines: string[]
+  colour: ColourRole
+}
+
 export interface CaptionShape {
   kind: 'caption'
   x: number
@@ -146,7 +155,7 @@ export interface TitleShape {
   colour: ColourRole
 }
 
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape
 
 /** Which side of each box an edge leaves by and arrives at, and, for a long edge, the lane x it meets there. */
 interface Facing {
@@ -1859,7 +1868,12 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     ...Array.from(boxes.values(), (box) => box.y + box.height),
     ...Array.from(groupRects.values(), (rect) => rect.y + rect.height),
   )
-  const captionTop = contentBottom + CAPTION_GAP
+  // A legend is page furniture: it sits under the drawing, above the caption, and takes no part in the layout - which is
+  // why the caption moves down for it rather than the drawing growing around it.
+  const legend = diagram.legend ?? []
+  const legendTop = contentBottom + CAPTION_GAP
+  if (legend.length > 0) shapes.push({ kind: 'legend', x: MARGIN, y: legendTop, lines: legend, colour: 'text' })
+  const captionTop = legendTop + (legend.length === 0 ? 0 : legend.length * CAPTION_LINE + CAPTION_GAP)
   // Anchored at the left margin, where the title is. The writer starts the text there: centred on a left-edge x,
   // half of a long caption fell outside the drawing and was clipped at the bottom edge of the picture.
   shapes.push({ kind: 'caption', x: MARGIN, y: captionTop, lines: captionLines, colour: captionRole(diagram.caption) })

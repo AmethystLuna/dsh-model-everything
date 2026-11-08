@@ -117,6 +117,14 @@ export interface GroupShape {
     label: string;
     colour: ColourRole;
 }
+/** A `legend` block: page furniture, drawn under the drawing and never part of it. */
+export interface LegendShape {
+    kind: 'legend';
+    x: number;
+    y: number;
+    lines: string[];
+    colour: ColourRole;
+}
 export interface CaptionShape {
     kind: 'caption';
     x: number;
@@ -131,7 +139,7 @@ export interface TitleShape {
     text: string;
     colour: ColourRole;
 }
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | TitleShape;
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape;
 /** One segment of a drawn route that could not be kept out of a box it does not terminate at. */
 export interface RoutingFailure {
     /** The edge's index in the diagram. */

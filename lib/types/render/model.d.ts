@@ -91,6 +91,8 @@ export interface Diagram {
     sameRank?: string[][];
     /** The axis the drawing flows along: `right` comes from `left to right direction`. */
     direction?: 'down' | 'right';
+    /** The lines a `legend` block wrote: page furniture, drawn under the drawing and never part of it. */
+    legend?: string[];
     /** One line under the drawing: what was decided, in words the drawing cannot carry. */
     caption: string;
 }

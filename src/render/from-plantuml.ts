@@ -91,7 +91,6 @@ const NOT_DRAWN: Record<string, string> = {
   participant: 'a participant is a lifeline, not one of the shapes this renderer draws',
   cloud: 'a cloud outline is not one of the shapes this renderer draws',
   agent: 'an agent is not one of the shapes this renderer draws',
-  legend: 'a legend is not one of the shapes this renderer draws',
 }
 
 /** A sequence fragment or lifeline event: lines that only make sense in a diagram this renderer refuses. */
@@ -287,11 +286,37 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   let seenAny = false
   let groupCount = 0
 
+  // A legend block is page furniture: the lines inside it are text, not diagram lines, so they are collected here and
+  // skipped by the loop below. Without this, an arrow written inside a legend would become an edge.
+  const legend: string[] = []
+  const inLegend = new Set<number>()
+  let legendOpen = false
+  lines.forEach((raw, index) => {
+    const text = raw.trim()
+    if (!legendOpen) {
+      if (!/^legend\b/.test(text)) return
+      legendOpen = true
+      inLegend.add(index)
+      const corner = /^legend\s+(left|right|top|bottom|center)/.exec(text)
+      if (corner !== null && corner[1] !== 'bottom') {
+        ignored.push('line ' + String(index + 1) + ': `' + text + '` asks for a corner: this renderer puts the legend under the drawing')
+      }
+      return
+    }
+    inLegend.add(index)
+    if (/^end\s*legend\b/.test(text)) {
+      legendOpen = false
+      return
+    }
+    if (text !== '') legend.push(text)
+  })
+
   lines.forEach((raw, index) => {
     const line = raw.replace(/'.*$/, '').trim()
     if (line === '') return
     const where = 'line ' + String(index + 1) + ': '
 
+    if (inLegend.has(index)) return
     if (/^@(start|end)uml\b/.test(line)) return
     seenAny = true
     if (/^title\b/.test(line)) return
@@ -594,6 +619,6 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   // `together { A B }` is a row, not a boundary: the boxes are declared by their own lines and the block only joins
   // them, so it is attached to the drawing rather than drawn as a group.
   const sameRank = togetherGroups(lines)
-  const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}) }
+  const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}), ...(legend.length === 0 ? {} : { legend }) }
   return { diagram: joined, refused, ignored }
 }

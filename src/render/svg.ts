@@ -220,6 +220,14 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
     // the canvas has already reserved for it instead of hanging off the left edge.
     return '<text x="' + n(shape.x) + '" y="' + n(shape.y + 11) + '" font-size="10" fill="' + colour + '">' + lines + '</text>'
   },
+  // A legend is a block of text under the drawing: same shape of output as a caption, one line box apart.
+  legend: (shape, colours) => {
+    const colour = colours[shape.colour]
+    const lines = shape.lines
+      .map((line, index) => '<tspan x="' + n(shape.x) + '" dy="' + (index === 0 ? 0 : 15) + '">' + escape(line) + '</tspan>')
+      .join('')
+    return '<text x="' + n(shape.x) + '" y="' + n(shape.y + 11) + '" font-size="10" fill="' + colour + '">' + lines + '</text>'
+  },
 }
 
 /** The dash pattern a route's source stated, or nothing for a solid line. */
