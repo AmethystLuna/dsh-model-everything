@@ -42,6 +42,7 @@ import { snapJogs } from './jog.js'
 import { piecesFrom, sharedLength, sharedWith, totalFromRows, type Piece } from './separate.js'
 import { applyLift, liftedSpan } from './lift.js'
 import { repairedRoute } from './repair.js'
+import { centreRun, packPorts, PORT_SEPARATION } from './ports.js'
 import { anchor, approachSides, crossesBox, normalOf, ROUTE_STUB, routeEdge, simplify, type Ports, type Side } from './route.js'
 import { cylinderApex, cylinderCaps, cylinderPointOn, hasDiscretePorts, hexagonCut, outlinePointFromCentre, sideOfPoint, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
@@ -205,7 +206,6 @@ const CAPTION_GAP = 16
 const CAPTION_CHAR_WIDTH = 6.2
 
 /** The closest two ports on one side may sit, so two edges never leave from the same pixel. */
-const PORT_SEPARATION = 14
 
 /**
  * The sides of a box, in the order a symbol's own points are drawn: a diamond's top, right, bottom and left vertices.
@@ -225,51 +225,6 @@ const isVerticalSide = (side: Side): boolean => side === 'top' || side === 'bott
  * port packer would allow is a gap a reader sees as one thick line. Exported so a test can name the pattern.
  */
 export const MULTI_EDGE_SPACING = 20
-
-/**
- * Spread the ports of one side along it: each stays as close to the point it asked for as the gap to its neighbours
- * allows, and the whole row is kept on the box.
- *
- * This is the same monotone fit coordinate assignment uses on x, applied to one side of one box: a forward pass that
- * keeps every port at least `PORT_SEPARATION` to the right of the one before it, then a backward pass that pulls the
- * row back onto the box without closing those gaps.
- */
-function packPorts(wanted: number[], low: number, high: number): number[] {
-  // A side only has so much room: when the row cannot hold its ports at the full separation, the separation shrinks
-  // to what the span allows rather than stacking the overflow on one coordinate. Two edges leaving from the same
-  // pixel read as one line that splits, which is worse than two lines drawn close together.
-  const span = high - low
-  const separation = wanted.length <= 1 ? PORT_SEPARATION : Math.min(PORT_SEPARATION, span / (wanted.length - 1))
-  const placed: number[] = []
-  let previous = low - separation
-  for (const value of wanted) {
-    previous = Math.min(high, Math.max(value, previous + separation))
-    placed.push(previous)
-  }
-  let next = high + separation
-  for (let index = placed.length - 1; index >= 0; index -= 1) {
-    next = Math.max(low, Math.min(placed[index], next - separation))
-    placed[index] = next
-  }
-  return placed
-}
-
-/**
- * Centre a row of ports on the side it sits on.
- *
- * The row keeps its order, its gaps and its separation, and is translated as a whole so its outer two ports sit
- * symmetrically about the middle of the span: two ports become the middle less and plus half their gap, and a longer
- * row is the same run of places the routing asked for, moved to where the side has room for it. A row that cannot
- * travel the whole way stops where its last port reaches the end of the span - the alternative is a port off the box.
- */
-function centreRun(placed: number[], low: number, high: number): number[] {
-  if (placed.length === 0) return placed
-  const first = placed[0] as number
-  const last = placed[placed.length - 1] as number
-  const middle = (low + high) / 2
-  const shift = Math.min(high - last, Math.max(low - first, middle - (first + last) / 2))
-  return shift === 0 ? placed : placed.map((value) => value + shift)
-}
 
 /** Which colour a box earns from its role. One mapping, used by every container. */
 export function roleOfNode(node: DiagramNode): ColourRole {
