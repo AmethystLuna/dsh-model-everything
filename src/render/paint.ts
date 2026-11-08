@@ -39,7 +39,7 @@
 import { MARGIN, place, textOf, type Box } from './place.js'
 import { PORT_INSET } from './channels.js'
 import { anchor, approachSides, crossesBox, normalOf, ROUTE_STUB, routeEdge, simplify, type Ports, type Side } from './route.js'
-import { cylinderApex, cylinderCaps, cylinderPointOn, hasDiscretePorts, hexagonCut, stadiumRadius } from './symbol.js'
+import { cylinderApex, cylinderCaps, cylinderPointOn, hasDiscretePorts, hexagonCut, outlinePointFromCentre, sideOfPoint, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
@@ -885,7 +885,16 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       const partner =
         claimed.get(endKey(index, end === 'exit' ? 'entry' : 'exit')) ??
         (end === 'exit' ? approached.entry : approached.exit)
-      const side = bestSide(id, end === 'exit' ? edge.to : edge.from, end, partner, index)
+      // The side a discrete port takes is the face the line to the other box leaves by - the point Graphviz clips an
+      // edge to - and the bend budget only decides when that line runs along a face, where the crossing is a corner
+      // between two sides.
+      const otherId = end === 'exit' ? edge.to : edge.from
+      const mine = endBox(id) as Box
+      const other = endBox(otherId) as Box
+      const outline = outlinePointFromCentre(mine, shapeOf(id), { x: other.x + other.width / 2, y: other.y + other.height / 2 })
+      const side = outline === undefined
+        ? bestSide(id, otherId, end, partner, index)
+        : sideOfPoint(mine, outline)
       if (side === undefined) continue
       claim(id, index, end, side)
     }
@@ -1175,6 +1184,19 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
 
   const portOf = (boxId: string, side: Side, edgeIndex: number): Point => {
     const coordinate = placedPort.get(slotKey(boxId, side, edgeIndex)) as number
+    // A symbol with no straight side takes the point the line to the other box crosses its outline at: an ellipse has
+    // an outline everywhere, and a port at one of its four cardinal points points at nothing. The packing still
+    // decides the order of the ports on a side; this only moves the point it drew onto the shape.
+    const edge = diagram.edges[edgeIndex]
+    const box = endBox(boxId)
+    if (edge !== undefined && box !== undefined && hasDiscretePorts(shapeOf(boxId))) {
+      const peerId = edge.from === boxId ? edge.to : edge.from
+      const peer = endBox(peerId)
+      if (peer !== undefined) {
+        const outline = outlinePointFromCentre(box, shapeOf(boxId), { x: peer.x + peer.width / 2, y: peer.y + peer.height / 2 })
+        if (outline !== undefined && sideOfPoint(box, outline) === side) return outline
+      }
+    }
     return pointOn(boxId, side, coordinate)
   }
   const anchorsFor = new Map<number, Ports>()
@@ -1268,7 +1290,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const paintPath = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     const source = endBox(edge.from)
     const target = endBox(edge.to)
-    const drawn = source === undefined || target === undefined ? points : orthogonal(points, source, target)
+    const drawn = source === undefined || target === undefined ? points : withoutReversals(orthogonal(points, source, target))
     const shape: PathShape = {
       kind: 'path',
       points: drawn,
@@ -1563,6 +1585,12 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     if (target.shape.kind === 'path') target.shape.points = best.points
     drawnPieces[best.at] = best.pieces
     shared = best.total
+  }
+
+  // A leg that stepped aside can leave a corner behind it where its own two runs cross, so the cleanup runs again over
+  // what the drawing finally carries - the last word on the shape of a route, after every stage that moved one.
+  for (const { shape } of routes) {
+    if (shape.kind === 'path') shape.points = withoutReversals(shape.points)
   }
 
   // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate

@@ -70,6 +70,19 @@ export declare function stadiumRadius(box: Box): number;
  */
 export declare function cylinderCaps(box: Box): CylinderCaps;
 /**
+ * Where the line from a box's middle toward another point crosses the symbol's outline.
+ *
+ * This is the anchor Graphviz clips an edge to: the end sits on the shape in the direction of the node it joins,
+ * not at the middle of one of four sides. A rectangle's outline is its box, so its sides already give that; this
+ * answers for the shapes whose outline is not four points - an ellipse, a rhombus - where the four cardinal points
+ * or vertices are an artefact of the port model rather than of the shape.
+ *
+ * Undefined for a shape whose outline this does not model: the caller then keeps the point on its side.
+ */
+export declare function outlinePointFromCentre(box: Box, shape: NodeShape | undefined, peer: Point): Point | undefined;
+/** The face of the box an outline point sits on: the one it is nearest. */
+export declare function sideOfPoint(box: Box, point: Point): 'top' | 'bottom' | 'left' | 'right';
+/**
  * A point on a cylinder's cap, at the fraction of the way across it an edge asked for.
  *
  * The apex is one point, and three relations leaving a cylinder all started there: three lines from one pixel, which
