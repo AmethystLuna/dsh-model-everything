@@ -44,6 +44,7 @@ import { applyLift, liftedSpan } from './lift.js'
 import { repairedRoute } from './repair.js'
 import { centreRun, packPorts, PORT_SEPARATION } from './ports.js'
 import { LABEL_HEIGHT, placeLabel, type LabelPlacement } from './labels.js'
+import { LABEL_PAD } from './labels.js'
 
 // The label arithmetic moved to its own module; the two names the writer and the suites already import from here stay
 // available from here, so the extraction did not move a public door.
@@ -1644,6 +1645,24 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
     }
   }
 
+  // What a label would cover, as three predicates: a border hides under text, text under text is unreadable, and a mask
+  // over another line hides that line. These live here because they are about the drawing, not about where a label goes.
+  const hitsBox = (spot: LabelSpot, box: Box): boolean =>
+    spot.x - spot.width / 2 < box.x + box.width + LABEL_PAD &&
+    spot.x + spot.width / 2 > box.x - LABEL_PAD &&
+    spot.y - spot.height / 2 < box.y + box.height + LABEL_PAD &&
+    spot.y + spot.height / 2 > box.y - LABEL_PAD
+  const hitsSpot = (spot: LabelSpot, other: LabelSpot): boolean =>
+    spot.x - spot.width / 2 < other.x + other.width / 2 + LABEL_PAD &&
+    spot.x + spot.width / 2 > other.x - other.width / 2 - LABEL_PAD &&
+    spot.y - spot.height / 2 < other.y + other.height / 2 + LABEL_PAD &&
+    spot.y + spot.height / 2 > other.y - other.height / 2 - LABEL_PAD
+  const hitsSegment = (spot: LabelSpot, segment: Segment): boolean =>
+    spot.x + spot.width / 2 > Math.min(segment.x1, segment.x2) - LABEL_PAD &&
+    spot.x - spot.width / 2 < Math.max(segment.x1, segment.x2) + LABEL_PAD &&
+    spot.y + spot.height / 2 > Math.min(segment.y1, segment.y2) - LABEL_PAD &&
+    spot.y - spot.height / 2 < Math.max(segment.y1, segment.y2) + LABEL_PAD
+
   // Labels last. A label has to clear every other edge, and until the last edge is drawn the painter does not know
   // where those are: this is why the whole pass exists rather than a decision made edge by edge.
   const routeSegments = routes.map(({ shape }) => segmentsOfRoute(shape))
@@ -1656,13 +1675,21 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
       return
     }
     if (shape.label === '') return
-    const placement = placeLabel(
-      shape.label,
-      pointsOfRoute(shape),
-      boxList,
-      placedLabels,
-      routeSegments.filter((_, other) => other !== at),
-    )
+    // What a candidate would cover is the painter's to say: it owns the boxes, the labels already placed and the other
+    // routes. The label module is handed the count per kind and nothing else.
+    const others = routeSegments.filter((_, other) => other !== at)
+    const placement = placeLabel(shape.label, pointsOfRoute(shape), (spot) => {
+      let boxHits = 0
+      for (const box of boxList) if (hitsBox(spot, box)) boxHits += 1
+      let labelHits = 0
+      for (const earlier of placedLabels) if (hitsSpot(spot, earlier)) labelHits += 1
+      let edgeHits = 0
+      for (const route of others) {
+        if (!route.some((segment) => hitsSegment(spot, segment))) continue
+        edgeHits += 1
+      }
+      return { boxes: boxHits, labels: labelHits, edges: edgeHits }
+    })
     shape.labelX = placement.x
     shape.labelY = placement.y
     shape.labelPlacement = {

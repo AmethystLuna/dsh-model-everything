@@ -6,9 +6,10 @@
  * whatever it happens to sit next to; text that interrupts its own line reads as part of it.
  *
  * The anchor then has to be earned, and earning it is arithmetic on rectangles. The painter supplies what a candidate would
- * cover (boxes, other labels, other routes); this module walks the runs and decides.
+ * cover - a count per kind, because a mask over a box is worse than one over a line - and this module walks the runs and
+ * decides. It is never handed the boxes: a module that can see where they are starts deciding where they go.
  */
-import type { Box, Point } from './place.js'
+import type { Point } from './place.js'
 import { textWidth } from './text.js'
 
 export interface LabelPlacement {
@@ -29,19 +30,17 @@ export interface LabelPlacement {
  */
 export const LABEL_HEIGHT = 12
 
-/** The room a label's mask keeps from anything it may not cover, so two rectangles never read as one. */
-const LABEL_PAD = 2
+/**
+ * The room a label's mask keeps from anything it may not cover, so two rectangles never read as one.
+ *
+ * Exported because the painter does the covering test: it holds the boxes and the other routes, and this module only asks how
+ * many of each a candidate would cover.
+ */
+export const LABEL_PAD = 2
 
 /** How far a label steps along its own run while it looks for a clear place to sit. */
 const LABEL_STEP = 3
 
-/** A straight piece of an edge, as the collision test needs it. */
-interface Segment {
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-}
 
 /** Where a label sits: the point it is centred on, and the rectangle its mask covers. */
 interface LabelSpot {
@@ -62,7 +61,7 @@ interface Run {
 }
 
 /** The runs of one edge, longest first. A label prefers the run with the most room. */
-function runsOf(points: Point[]): Run[] {
+function runsOf(points: readonly Point[]): Run[] {
   const runs: Run[] = []
   for (let index = 0; index + 1 < points.length; index += 1) {
     const from = points[index]
@@ -74,48 +73,30 @@ function runsOf(points: Point[]): Run[] {
   return runs.sort((left, right) => right.length - left.length || left.index - right.index)
 }
 
+/** What one candidate would cover, counted by the kind of thing it covers. */
+export interface Covered {
+  boxes: number
+  labels: number
+  edges: number
+}
+
 export function placeLabel(
   label: string,
-  points: Point[],
-  boxes: Iterable<Box>,
-  placed: LabelSpot[],
-  otherRoutes: Segment[][],
+  points: readonly Point[],
+  covered: (spot: LabelSpot) => Covered,
 ): LabelPlacement & LabelSpot {
   const width = textWidth(label)
   const height = LABEL_HEIGHT
   const spotAt = (x: number, y: number): LabelSpot => ({ x, y, width, height })
-  const hitsBox = (spot: LabelSpot, box: Box): boolean =>
-    spot.x - spot.width / 2 < box.x + box.width + LABEL_PAD &&
-    spot.x + spot.width / 2 > box.x - LABEL_PAD &&
-    spot.y - spot.height / 2 < box.y + box.height + LABEL_PAD &&
-    spot.y + spot.height / 2 > box.y - LABEL_PAD
-  const hitsSpot = (spot: LabelSpot, other: LabelSpot): boolean =>
-    spot.x - spot.width / 2 < other.x + other.width / 2 + LABEL_PAD &&
-    spot.x + spot.width / 2 > other.x - other.width / 2 - LABEL_PAD &&
-    spot.y - spot.height / 2 < other.y + other.height / 2 + LABEL_PAD &&
-    spot.y + spot.height / 2 > other.y - other.height / 2 - LABEL_PAD
-  // A label on top of a line is as unreadable as one on top of a box: the mask hides the stretch of line it
-  // covers, which on its own edge is the point of the mask and on any other edge is a line that goes missing.
-  const hitsSegment = (spot: LabelSpot, segment: Segment): boolean =>
-    spot.x + spot.width / 2 > Math.min(segment.x1, segment.x2) - LABEL_PAD &&
-    spot.x - spot.width / 2 < Math.max(segment.x1, segment.x2) + LABEL_PAD &&
-    spot.y + spot.height / 2 > Math.min(segment.y1, segment.y2) - LABEL_PAD &&
-    spot.y - spot.height / 2 < Math.max(segment.y1, segment.y2) + LABEL_PAD
-  /** Everything one candidate place overlaps, counted by the thing it covers rather than by the segment that draws it. */
   const collisionsAt = (spot: LabelSpot, run: number): LabelPlacement => {
-    let boxHits = 0
-    let labelHits = 0
-    let edgeHits = 0
-    for (const box of boxes) if (hitsBox(spot, box)) boxHits += 1
-    for (const earlier of placed) if (hitsSpot(spot, earlier)) labelHits += 1
-    for (const route of otherRoutes) {
-      for (const segment of route) {
-        if (!hitsSegment(spot, segment)) continue
-        edgeHits += 1
-        break
-      }
+    const counted = covered(spot)
+    return {
+      run,
+      collisions: counted.boxes + counted.labels + counted.edges,
+      boxes: counted.boxes,
+      labels: counted.labels,
+      edges: counted.edges,
     }
-    return { run, collisions: boxHits + labelHits + edgeHits, boxes: boxHits, labels: labelHits, edges: edgeHits }
   }
 
   const runs = runsOf(points)

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 // White-box suite for the renderer's pure half.
 //
 // Everything a drawing decides is decided here, in Node, with no browser: which nodes exist, what row each
@@ -1574,6 +1575,22 @@ test('a label is centred on its own line', () => {
   if (seen < 5) throw new Error('only ' + String(seen) + ' labels were measured')
 })
 
+/** The same coverage the painter reports, for the fixtures that assert the label rule on its own. */
+function cover({ wall, routes = [] } = {}) {
+  const PAD = 2
+  return (spot) => {
+    const boxes = wall === undefined ? 0 : (spot.x - spot.width / 2 < wall.x + wall.width + PAD &&
+      spot.x + spot.width / 2 > wall.x - PAD &&
+      spot.y - spot.height / 2 < wall.y + wall.height + PAD &&
+      spot.y + spot.height / 2 > wall.y - PAD ? 1 : 0)
+    const edges = routes.filter((route) => route.some((segment) =>
+      spot.x + spot.width / 2 > Math.min(segment.x1, segment.x2) - PAD &&
+      spot.x - spot.width / 2 < Math.max(segment.x1, segment.x2) + PAD &&
+      spot.y + spot.height / 2 > Math.min(segment.y1, segment.y2) - PAD &&
+      spot.y - spot.height / 2 < Math.max(segment.y1, segment.y2) + PAD)).length
+    return { boxes, labels: 0, edges }
+  }
+}
 test('a label whose midpoint sits across another line moves off the crossing', () => {
   // Clearing a box and clearing another label are two of the three collisions. The third is another edge's line: a
   // label lying across one hides it, and the mask makes that worse than text beside it. Asserted on the placement
@@ -1584,7 +1601,7 @@ test('a label whose midpoint sits across another line moves off the crossing', (
     { x: 240, y: 200 },
   ]
   const crossing = { x1: 140, y1: 120, x2: 140, y2: 280 }
-  const placed = placeLabel('retry', route, [], [], [[crossing]])
+  const placed = placeLabel('retry', route, cover({ routes: [[crossing]] }))
   const mask = { x: placed.x, y: placed.y, width: placed.width, height: placed.height }
   const overlaps = Math.abs(placed.x - 140) < placed.width / 2 + 1 && Math.abs(placed.y - 200) < placed.height / 2 + 1
   if (overlaps) throw new Error('the label stayed on the line it cannot cover: ' + JSON.stringify(mask))
@@ -2502,7 +2519,7 @@ test('a label whose longest run cannot be cleared moves to another run of its ow
     { x: 50, y: 400 },
     { x: 300, y: 400 },
   ]
-  const placement = placeLabel('event', points, [wall], [], [])
+  const placement = placeLabel('event', points, cover({ wall }));
   if (placement.run !== 1) throw new Error('the label took run ' + String(placement.run) + ', not the shorter run 1')
   if (placement.collisions !== 0) throw new Error('the shorter run was clear but the label reports ' + String(placement.collisions) + ' collisions')
   // The midpoint of the second run - a point of the edge - and never a point off it.
@@ -3104,6 +3121,18 @@ test('the bend budget wins: a port on a straight run keeps its place instead of 
   if (routePointsOf(route).length !== 2) throw new Error('the edge is not one straight run, so the case measures nothing: ' + JSON.stringify(routePointsOf(route)))
   if (Math.abs(startOf(route).x - entry.x) > 0.01) throw new Error('the two ports of the run do not share a line')
   if (Math.abs(entry.x - middle) <= 1) throw new Error('the port was centred, which costs the straight run two corners: ' + String(entry.x))
+})
+
+// The convention the render layers rest on: a policy module is never handed the boxes. One that can see where they are
+// starts deciding where they go, and the painter is the only place that may decide that.
+test('a policy module is never handed the boxes', () => {
+  const policy = ['jog', 'separate', 'lift', 'repair', 'ports', 'labels']
+  for (const name of policy) {
+    const source = readFileSync(new URL('../../src/render/' + name + '.ts', import.meta.url), 'utf8')
+    if (/import[^\n]*\bBox\b[^\n]*from '\.\/place\.js'/.test(source)) throw new Error(name + ' imports Box')
+  }
+  const painter = readFileSync(new URL('../../src/render/paint.ts', import.meta.url), 'utf8')
+  if (!/\bBox\b/.test(painter)) throw new Error('the painter does not name Box, so nothing owns the boxes')
 })
 
 if (failures > 0) {
