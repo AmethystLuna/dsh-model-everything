@@ -59,6 +59,12 @@ export const diagramRenderTool = defineTool({
         for (const line of ignored) lines.push('  ' + line)
         lines.push('NEXT  These lines are not errors: the drawing is complete without them. Delete them, or keep them so the source still renders elsewhere.')
       }
+      const unclear = Number(result.labelCollisions ?? 0)
+      if (unclear > 0) {
+        lines.push('')
+        lines.push('LABELS  ' + String(unclear) + ' label(s) could not be placed clear of another line')
+        lines.push('NEXT  The drawing is complete and every label is on its own edge. A crowded figure puts a label where its mask covers part of a neighbouring line: read the label from the source if the picture is ambiguous.')
+      }
       if (refused.length > 0) {
         lines.push('')
         lines.push('REFUSED  ' + String(refused.length) + ' line(s) - the drawing covers the rest')
@@ -121,6 +127,7 @@ export const diagramRenderTool = defineTool({
       refused: rendered.refused,
       ignored: rendered.ignored,
       dropped: rendered.dropped,
+      labelCollisions: rendered.canvas.labelCollisions,
       ...(written === undefined ? {} : { path: written.path, bytes: written.bytes }),
       svg: rendered.markup,
     }

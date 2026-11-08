@@ -10,6 +10,7 @@ import { MODEL_VERIFY_TOOL_NAME, modelVerifyTool } from '../../lib/tool.js'
 import { STRUCTURE_TOOL_NAME, umlStructureTool } from '../../lib/structure-tool.js'
 import { modelEditTool } from '../../lib/edit-tool.js'
 import { reportDiffTool } from '../../lib/report-diff-tool.js'
+import { diagramRenderTool } from '../../lib/diagram-render-tool.js'
 
 let failures = 0
 function test(name, body) {
@@ -564,6 +565,29 @@ test('an addition with no message does not print an empty one', () => {
   const card = presentation.reportCard({ verdict: 'pass_with_findings', summary: { added: 1, removed: 0, changed: 0, addedErrors: 0 }, added: [{ code: 'W1', severity: 'warning' }] }, 'report_diff')
   if (card.firstAdded === undefined) throw new Error('the addition was dropped')
   if (card.firstAdded.message !== '') throw new Error('a missing message became something: ' + card.firstAdded.message)
+})
+
+// A drawing can be complete and still carry a label its mask could not keep clear of another line. That is a fact about
+// the picture a reader is about to read, so it is said: an unmentioned ambiguity is one the reader has to find.
+test('a crowded drawing says a label could not be placed clear', () => {
+  const value = {
+    ok: true,
+    notation: 'plantuml',
+    nodes: 7,
+    edges: 6,
+    groups: 0,
+    caption: 'plantuml, 7 boxes, 6 arrows',
+    refused: [],
+    ignored: [],
+    dropped: 0,
+    labelCollisions: 1,
+    svg: '<svg></svg>',
+  }
+  const text = diagramRenderTool.output.render({}, value).map((part) => part.text ?? '').join('\n')
+  if (!text.includes('LABELS')) throw new Error('a label collision was not reported')
+  if (!text.includes('1 label(s)')) throw new Error('the count was not carried: ' + text.slice(0, 200))
+  const clean = diagramRenderTool.output.render({}, { ...value, labelCollisions: 0 }).map((part) => part.text ?? '').join('\n')
+  if (clean.includes('LABELS')) throw new Error('a clean drawing reported a label collision')
 })
 
 if (failures > 0) {
