@@ -32,6 +32,17 @@ Property-based or random input is welcome as exploration, but it does not replac
 equivalence classes: random input rarely lands on the near miss, and the near miss is where
 the defects are.
 
+## Measuring a construct's variants
+
+A syntax has one shape in the manual and several in the wild, and the renderer is usually built against the first. Listing the
+variants of one construct and rendering each is the cheapest way to find the rest: four forms of a note gave three defects, and
+six forms of a state declaration gave two more - a colour and a stereotype both stopped an alias matching, so the element took
+the whole line as its name.
+
+Write the matrix before deciding the construct is supported: the bare form, the quoted form, an alias, a colour, a stereotype,
+a body line, and whatever the notation allows after them. Each row is a source, and the answer is the element's id, its label,
+and what was refused or ignored.
+
 ## Rules for a finding-code case
 
 1. **One code per case.** The input produces that code and no other *error* code. A warning

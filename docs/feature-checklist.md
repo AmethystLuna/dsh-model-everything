@@ -220,7 +220,7 @@ And the gates around it:
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 104 | a flowchart becomes boxes and labelled arrows |
-| `plantuml-corpus` | 43 | left to right direction lays the chain out along a row |
+| `plantuml-corpus` | 44 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 177 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |

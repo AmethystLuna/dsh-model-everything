@@ -970,6 +970,24 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A declaration with a colour or a stereotype used to take the whole line as its name: the alias stopped matching, and the
+// element was created with an id nobody could point at. A description line is a body, and a body is refused by line.
+test('a colour or a stereotype does not become part of the name', () => {
+  const stereotype = render({ source: ['@startuml', 'component "网关" as gw <<service>>', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  const node = stereotype.diagram.nodes[0]
+  if (node?.id !== 'gw' || node?.label !== '网关') throw new Error('the stereotype became the name: ' + JSON.stringify([node?.id, node?.label]))
+  if (stereotype.ignored.length !== 1 || !stereotype.ignored[0].includes('stereotype this renderer does not draw')) {
+    throw new Error('the stereotype note: ' + JSON.stringify(stereotype.ignored))
+  }
+  const coloured = render({ source: ['@startuml', 'state S #lightblue', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (coloured.diagram.nodes[0]?.id !== 'S') throw new Error('the colour became the name: ' + String(coloured.diagram.nodes[0]?.id))
+  if (coloured.ignored.length !== 1) throw new Error('the colour note: ' + JSON.stringify(coloured.ignored))
+  const described = render({ source: ['@startuml', 'state S : entry / go', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (described.refused.length !== 1) throw new Error('a description line: ' + JSON.stringify(described.refused))
+  if (!described.refused[0].includes('adds a description line')) throw new Error('the reason: ' + described.refused[0])
+  if (described.diagram.nodes.length !== 0) throw new Error('a description line became an element')
+})
+
 // Three things a note's own syntax says that this renderer used to lose: an alias with a body, a fill colour, and a line break.
 test('a note keeps its words through an alias, a colour and a break', () => {
   const blocks = {
