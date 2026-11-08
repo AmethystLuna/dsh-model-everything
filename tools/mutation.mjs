@@ -216,6 +216,14 @@ const MUTATIONS = [
     from: "  value.replaceAll('&', '&amp;').replaceAll('<', '&lt;')",
     to: "  value.replaceAll('<', '&lt;')",
   },
+
+  {
+    id: 'M24',
+    what: 'the machine caption is drawn even when the source wrote its own',
+    file: 'src/render/paint.ts',
+    from: "  const showMachine = diagram.sourceCaption === undefined || machineCaption.includes('refused')",
+    to: '  const showMachine = true',
+  },
 ]
 
 const argument = process.argv[2]
