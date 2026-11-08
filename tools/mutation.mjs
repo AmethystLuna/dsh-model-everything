@@ -11,18 +11,20 @@
  *   node tools/mutation.mjs M3        run one, by its prefix
  *   node tools/mutation.mjs --list    list them
  */
-import { execFileSync } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' })
-// `npm` is `npm.cmd` on Windows, and `execFileSync` cannot start a `.cmd` without a shell: without this the build never
-// ran and every suite passed the unmutated `lib/`, which is the worst possible answer from a mutation check.
+const git = (...args) => execSync(['git', ...args].join(' '), { cwd: root, encoding: 'utf8' })
+// `npm` is `npm.cmd` on Windows, and a command runner cannot start a `.cmd` without a shell: without one the build never ran
+// and every suite passed the unmutated `lib/`, which is the worst possible answer from a mutation check. The command is
+// built as one string so the shell is used without the deprecation that passing an argument list to it brings.
 const run = (command, args) => {
+  const line = [command, ...args].join(' ')
   try {
-    return execFileSync(command, args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' })
+    return execSync(line, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (error) {
     return String(error.stdout ?? '') + String(error.stderr ?? '')
   }
