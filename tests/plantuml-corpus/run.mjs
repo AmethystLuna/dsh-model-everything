@@ -176,6 +176,18 @@ for (const c of CASES) {
       }
     }
     if (shared > 0) throw new Error('two edges share ' + String(shared) + ' points of line')
+    // And every leg is axis-aligned: a diagonal between two boxes reads as a different kind of relation than the
+    // orthogonal legs around it, and the layout has no reason to draw one.
+    for (const shape of drawn.canvas.shapes) {
+      const points = shape.kind === 'path' ? shape.points : shape.kind === 'link' ? [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }] : []
+      for (let index = 1; index < points.length; index += 1) {
+        const before = points[index - 1]
+        const after = points[index]
+        if (Math.abs(before.x - after.x) > 0.5 && Math.abs(before.y - after.y) > 0.5) {
+          throw new Error('a leg runs diagonally: ' + JSON.stringify([before, after]))
+        }
+      }
+    }
   })
 }
 

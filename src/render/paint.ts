@@ -1207,10 +1207,41 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   /** Paint one edge as a polyline. Its label is placed once every edge is drawn; see the pass after the loop. */
+  /**
+   * The same route, with every diagonal leg broken by an elbow.
+   *
+   * A stage that proposes a route may propose a straight line between two ports that line up on neither axis - the
+   * router's last resort, and a lane waypoint next to a stub. The drawing is orthogonal, so the leg gets one bend,
+   * placed where it crosses the fewest boxes: a diagonal through a diagram reads as a different kind of relation.
+   */
+  const orthogonal = (points: Point[], from: Box, to: Box): Point[] => {
+    const out: Point[] = [points[0] as Point]
+    for (let i = 1; i < points.length; i += 1) {
+      const before = out[out.length - 1] as Point
+      const after = points[i] as Point
+      if (Math.abs(before.x - after.x) < 0.5 || Math.abs(before.y - after.y) < 0.5) {
+        out.push(after)
+        continue
+      }
+      const elbows: Point[] = [{ x: after.x, y: before.y }, { x: before.x, y: after.y }]
+      let best: { elbow: Point; crossed: number } | undefined
+      for (const elbow of elbows) {
+        const crossed = boxesCrossedBy([before, elbow, after], from, to, boxList).length
+        if (best === undefined || crossed < best.crossed) best = { elbow, crossed }
+      }
+      if (best !== undefined) out.push(best.elbow)
+      out.push(after)
+    }
+    return simplify(out)
+  }
+
   const paintPath = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
+    const source = endBox(edge.from)
+    const target = endBox(edge.to)
+    const drawn = source === undefined || target === undefined ? points : orthogonal(points, source, target)
     const shape: PathShape = {
       kind: 'path',
-      points,
+      points: drawn,
       label: edge.label,
       labelX: 0,
       labelY: 0,
@@ -1223,6 +1254,17 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   /** Two points are a line and more of them are a polyline; both are an edge carrying a label. */
+  /** The face of a box a point sits on, by whichever face it is nearest. */
+  const faceOf = (box: Box, at: Point): Side => {
+    const distances: Array<[Side, number]> = [
+      ['top', Math.abs(at.y - box.y)],
+      ['bottom', Math.abs(at.y - (box.y + box.height))],
+      ['left', Math.abs(at.x - box.x)],
+      ['right', Math.abs(at.x - (box.x + box.width))],
+    ]
+    return distances.sort((left, right) => left[1] - right[1])[0][0] as Side
+  }
+
   const paintRoute = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     if (points.length > 2) {
       paintPath(edgeIndex, edge, points, colour)
@@ -1230,6 +1272,26 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     }
     const exit = points[0]
     const entry = points[points.length - 1]
+    // A two-point route is a straight line, and between two boxes that do not line up that is a diagonal. The
+    // drawing is orthogonal: the line leaves its box square to the face it starts on and enters the other the same
+    // way, so it bends once - and the bend goes where it crosses nothing.
+    if (Math.abs(exit.x - entry.x) > 0.5 && Math.abs(exit.y - entry.y) > 0.5) {
+      const source = endBox(edge.from)
+      const target = endBox(edge.to)
+      if (source !== undefined && target !== undefined) {
+        const level = (side: Side): boolean => side === 'top' || side === 'bottom'
+        const elbows: Point[] = level(faceOf(target, entry))
+          ? [{ x: entry.x, y: exit.y }, { x: exit.x, y: entry.y }]
+          : [{ x: exit.x, y: entry.y }, { x: entry.x, y: exit.y }]
+        const bent = elbows
+          .map((elbow) => simplify([exit, elbow, entry]))
+          .find((candidate) => clearOfBoxes(candidate, source, target))
+        if (bent !== undefined) {
+          paintPath(edgeIndex, edge, bent, colour)
+          return
+        }
+      }
+    }
     const shape: LinkShape = {
       kind: 'link',
       x1: exit.x,
