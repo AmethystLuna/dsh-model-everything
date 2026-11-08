@@ -1371,20 +1371,22 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   /**
-   * No two edges are drawn on one line.
+   * No two edges are drawn on one line, as far as stepping aside can arrange it.
    *
-   * The layout gives every edge its own corridor and the painter is the last stage that can see one stage's corridor
+   * The layout gives every edge its own corridor, and the painter is the last stage that can see one stage's corridor
    * become another's: an approach stub is a fixed distance from the box it enters, so two edges into two boxes that
-   * line up draw their long legs on one line, and a reader sees one line with two heads. Graphviz's answer is a
-   * virtual node per edge per gap; the same idea applied to what was drawn is a leg that steps aside by a lane's
-   * width - two corners, and the line is its own again. A step is only taken when it leaves no line shared at all:
-   * a jog that lands on another run trades one overlap for another, which is not a drawing that got better.
+   * share an x draw their long legs on one line, and a reader sees one line with two heads. Graphviz answers with a
+   * virtual node per edge per gap; applied after the fact, the answer is a leg that steps aside by a lane's width.
+   *
+   * Which leg steps is decided by the drawing, not by the edge: a move is taken only when the drawing's total shared
+   * length falls, so a jog that lands on another run is refused and no round can make the picture worse. The loop
+   * stops when no move improves it - a diagram with no room left keeps the overlaps it has, and the count of them
+   * stays observable instead of being hidden.
    */
   const SHARED_LINE_CLEARANCE = 14
+  const SHARED_LINE_ROUNDS = 8
   /** Every axis-aligned piece of a route: the axis it runs on, where, and the run between. */
-  const piecesOf = (shape: LinkShape | PathShape): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> => {
-    if (shape.kind !== 'path') return []
-    const points = shape.points
+  const piecesFrom = (points: Point[]): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> => {
     const out: Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> = []
     for (let i = 1; i < points.length; i += 1) {
       const one = points[i - 1] as Point
@@ -1397,14 +1399,23 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     }
     return out
   }
-  /** Do these two routes draw any piece on one line for more than a pixel? */
-  const shares = (one: ReturnType<typeof piecesOf>, other: ReturnType<typeof piecesOf>): boolean =>
-    one.some((mine) =>
-      other.some(
-        (theirs) =>
-          mine.axis === theirs.axis && Math.abs(mine.at - theirs.at) < 0.5 && Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) > 1,
-      ),
-    )
+  const piecesOf = (shape: LinkShape | PathShape): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> =>
+    shape.kind === 'path' ? piecesFrom(shape.points) : []
+  /** How much of the drawing is drawn twice: every pair of pieces on one line, summed. */
+  const sharedLength = (all: Array<ReturnType<typeof piecesOf>>): number => {
+    let total = 0
+    for (let left = 0; left < all.length; left += 1) {
+      for (let right = left + 1; right < all.length; right += 1) {
+        for (const mine of all[left] as ReturnType<typeof piecesOf>) {
+          for (const theirs of all[right] as ReturnType<typeof piecesOf>) {
+            if (mine.axis !== theirs.axis || Math.abs(mine.at - theirs.at) >= 0.5) continue
+            total += Math.max(0, Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) - 1)
+          }
+        }
+      }
+    }
+    return total
+  }
   const drawnPieces = routes.map(({ shape }) => piecesOf(shape))
   const boxesOfEdge = (edge: number): { from: Box; to: Box } | undefined => {
     const statement = diagram.edges[edge] as DiagramEdge | undefined
@@ -1413,38 +1424,49 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const to = endBox(statement.to)
     return from === undefined || to === undefined ? undefined : { from, to }
   }
-  routes.forEach(({ shape, edge }, at) => {
-    if (shape.kind !== 'path') return
-    const ends = boxesOfEdge(edge)
-    if (ends === undefined) return
-    const others = drawnPieces.filter((_, index) => index !== at)
-    if (!others.some((theirs) => shares(piecesOf(shape), theirs))) return
-    for (const piece of piecesOf(shape)) {
-      const points = shape.points
-      const before = points[piece.slot] as Point
-      const after = points[piece.slot + 1] as Point
-      const vertical = piece.axis === 'x'
-      // A vertical leg is entered and left along a horizontal, so its neighbours share its y; a horizontal leg's
-      // share its x. That is what a jog stands on, and a leg with no horizontal at an end cannot step aside.
-      const entersLevel = piece.slot > 0 && Math.abs(vertical ? (points[piece.slot - 1] as Point).y - before.y : (points[piece.slot - 1] as Point).x - before.x) < 0.5
-      const leavesLevel = piece.slot + 2 < points.length && Math.abs(vertical ? (points[piece.slot + 2] as Point).y - after.y : (points[piece.slot + 2] as Point).x - after.x) < 0.5
-      if (!entersLevel || !leavesLevel) continue
-      for (const shift of [SHARED_LINE_CLEARANCE, -SHARED_LINE_CLEARANCE]) {
-        const moved = [
-          ...points.slice(0, piece.slot + 1),
-          vertical ? { x: before.x + shift, y: before.y } : { x: before.x, y: before.y + shift },
-          vertical ? { x: after.x + shift, y: after.y } : { x: after.x, y: after.y + shift },
-          ...points.slice(piece.slot + 1),
-        ]
-        if (!clearOfBoxes(moved, ends.from, ends.to)) continue
-        const candidate: PathShape = { ...shape, points: moved }
-        if (others.some((theirs) => shares(piecesOf(candidate), theirs))) continue
-        shape.points = moved
-        drawnPieces[at] = piecesOf(shape)
-        return
+  let shared = sharedLength(drawnPieces)
+  // Best improvement rather than first: a route has several legs and two ways to move each, and taking the first move
+  // that helps can leave a drawing with a small overlap where another move would have left none.
+  for (let round = 0; round < SHARED_LINE_ROUNDS && shared > 0; round += 1) {
+    let best: { at: number; points: Point[]; pieces: ReturnType<typeof piecesFrom>; total: number } | undefined
+    for (let at = 0; at < routes.length; at += 1) {
+      const { shape, edge } = routes[at] as { shape: LinkShape | PathShape; edge: number }
+      if (shape.kind !== 'path') continue
+      const ends = boxesOfEdge(edge)
+      if (ends === undefined) continue
+      for (const piece of piecesOf(shape)) {
+        const points = shape.points
+        const before = points[piece.slot] as Point
+        const after = points[piece.slot + 1] as Point
+        const vertical = piece.axis === 'x'
+        // A vertical leg is entered and left along a horizontal, so its neighbours share its y; a horizontal leg's
+        // share its x. That is what a jog stands on, and a leg with no horizontal at an end cannot step aside.
+        const entersLevel = piece.slot > 0 && Math.abs(vertical ? (points[piece.slot - 1] as Point).y - before.y : (points[piece.slot - 1] as Point).x - before.x) < 0.5
+        const leavesLevel = piece.slot + 2 < points.length && Math.abs(vertical ? (points[piece.slot + 2] as Point).y - after.y : (points[piece.slot + 2] as Point).x - after.x) < 0.5
+        if (!entersLevel || !leavesLevel) continue
+        for (const shift of [SHARED_LINE_CLEARANCE, -SHARED_LINE_CLEARANCE]) {
+          const moved = [
+            ...points.slice(0, piece.slot + 1),
+            vertical ? { x: before.x + shift, y: before.y } : { x: before.x, y: before.y + shift },
+            vertical ? { x: after.x + shift, y: after.y } : { x: after.x, y: after.y + shift },
+            ...points.slice(piece.slot + 1),
+          ]
+          if (!clearOfBoxes(moved, ends.from, ends.to)) continue
+          const pieces = piecesFrom(moved)
+          const trial = drawnPieces.slice()
+          trial[at] = pieces
+          const total = sharedLength(trial)
+          if (total >= shared - 0.5) continue
+          if (best === undefined || total < best.total) best = { at, points: moved, pieces, total }
+        }
       }
     }
-  })
+    if (best === undefined) break
+    const target = routes[best.at] as { shape: LinkShape | PathShape }
+    if (target.shape.kind === 'path') target.shape.points = best.points
+    drawnPieces[best.at] = best.pieces
+    shared = best.total
+  }
 
   // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate
   // at. Each candidate route was checked before it was emitted, so this pass is the assertion that no stage slipped a

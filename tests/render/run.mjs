@@ -2959,6 +2959,49 @@ test('two edges whose targets line up do not draw their long legs on one line', 
     }
   }
 })
+test('a route that shares a line with another is moved until the drawing stops improving', () => {
+  // The rule is a loop, so it needs a case that says what the loop may not do: never make the drawing worse. Three
+  // edges leave one box and two of them share a run height, so a step aside has to be found for one of them without
+  // landing on the third.
+  const source = [
+    '@startuml',
+    'component "A" as a',
+    'component "B" as b',
+    'component "C" as c',
+    'component "D" as d',
+    'a --> b',
+    'a --> c',
+    'a --> d',
+    'b --> d',
+    'c --> d',
+    '@enduml',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const pieces = routesOf(canvas).map((shape) => {
+    if (shape.kind !== 'path') return []
+    const out = []
+    const points = shape.points
+    for (let i = 1; i < points.length; i += 1) {
+      const one = points[i - 1]
+      const two = points[i]
+      if (Math.abs(one.y - two.y) < 0.5 && Math.abs(one.x - two.x) > 4) out.push({ axis: 'y', at: one.y, lo: Math.min(one.x, two.x), hi: Math.max(one.x, two.x) })
+      if (Math.abs(one.x - two.x) < 0.5 && Math.abs(one.y - two.y) > 4) out.push({ axis: 'x', at: one.x, lo: Math.min(one.y, two.y), hi: Math.max(one.y, two.y) })
+    }
+    return out
+  })
+  let shared = 0
+  for (let left = 0; left < pieces.length; left += 1) {
+    for (let right = left + 1; right < pieces.length; right += 1) {
+      for (const mine of pieces[left]) {
+        for (const theirs of pieces[right]) {
+          if (mine.axis !== theirs.axis || Math.abs(mine.at - theirs.at) >= 0.5) continue
+          shared += Math.max(0, Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) - 1)
+        }
+      }
+    }
+  }
+  if (shared > 4) throw new Error('two routes share ' + String(shared) + ' points of line')
+})
 test('a fan-in keeps a port of its own for every arrow and draws no junction', () => {
   // Merging was tried and withdrawn: PlantUML does not merge lines either, and one drawn line cannot carry two
   // statement kinds without saying something the source did not. So a fan-in is drawn as the arrows it is - one
