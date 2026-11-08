@@ -164,6 +164,7 @@ interface At {
  * dependency and a realisation are told apart by the line, not by the head.
  */
 function edgeMarks(source: At, sourceNext: At, targetPrev: At, target: At, arrow: EdgeArrow | undefined, stroke: string, background: string): string {
+  if (arrow === 'none') return ''
   if (arrow === 'composition' || arrow === 'aggregation') {
     return diamond(source, sourceNext, stroke, arrow === 'composition' ? stroke : background)
   }

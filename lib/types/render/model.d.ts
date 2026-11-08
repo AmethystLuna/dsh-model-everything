@@ -26,7 +26,9 @@ export interface DiagramNode {
  * realisation, a filled diamond at the source for a composition, a hollow one for an aggregation, and a dashed
  * line for the two dependency-flavoured kinds.
  */
-export type EdgeArrow = 'association' | 'dependency' | 'generalization' | 'realization' | 'composition' | 'aggregation';
+export type EdgeArrow = 'association' | 'dependency' | 'generalization' | 'realization' | 'composition' | 'aggregation'
+/** A line with no head: `A -- B`, which states a connection and no direction. */
+ | 'none';
 export interface DiagramEdge {
     from: string;
     to: string;

@@ -57,6 +57,14 @@ const SHAPES: Record<string, NodeShape> = {
   // A use case is an ellipse. The `circle` symbol is written as an ellipse whose radii follow the box, so it
   // reads as the familiar use-case oval; `stadium` is the pill a terminal state is drawn as.
   usecase: 'circle',
+  // These five are boxes with compartments in PlantUML. The name is the part a component-level view needs, so the
+  // box is drawn and the compartments are refused line by line: the element is visible and the source is told what
+  // was not carried.
+  class: 'rect',
+  object: 'rect',
+  interface: 'rect',
+  enum: 'rect',
+  annotation: 'rect',
 }
 
 /** The keywords that open a boundary around what is written inside them. */
@@ -66,11 +74,6 @@ const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle',
 const NOT_DRAWN: Record<string, string> = {
   actor: 'an actor is a stick figure, not one of the shapes this renderer draws',
   participant: 'a participant is a lifeline, not one of the shapes this renderer draws',
-  class: 'a class box has compartments this renderer does not draw',
-  object: 'an object box has compartments this renderer does not draw',
-  interface: 'an interface is a circle or a boxed stereotype, neither of which this renderer draws',
-  enum: 'an enum box has compartments this renderer does not draw',
-  annotation: 'an annotation is not one of the shapes this renderer draws',
   cloud: 'a cloud outline is not one of the shapes this renderer draws',
   frame: 'a frame tab is not one of the shapes this renderer draws',
   card: 'a card is not one of the shapes this renderer draws',
@@ -203,14 +206,13 @@ function readArrow(line: string): ArrowParts | string | undefined {
     return 'an edge marked at both ends is not one this renderer draws'
   }
   if (leftMark === '*' || leftMark === 'o' || rightMark === '*' || rightMark === 'o') {
-    if (dotted) return 'a dotted composition or aggregation is not one this renderer draws'
     const atRight = rightMark === '*' || rightMark === 'o'
     const mark = atRight ? rightMark : leftMark
     return {
       from: atRight ? right : left,
       to: atRight ? left : right,
       label,
-      dashed: false,
+      dashed: dotted,
       arrow: mark === '*' ? 'composition' : 'aggregation',
     }
   }
@@ -232,7 +234,8 @@ function readArrow(line: string): ArrowParts | string | undefined {
       arrow: rightMark === '|>' ? (dotted ? 'realization' : 'generalization') : dotted ? 'dependency' : 'association',
     }
   }
-  return 'a line with no arrow end is not one this renderer draws; name the end it points at'
+  // No mark at either end: the source states a connection and no direction.
+  return { from: left, to: right, label, dashed: dotted, arrow: 'none' }
 }
 
 /**

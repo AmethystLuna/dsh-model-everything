@@ -351,7 +351,8 @@ test('an edge between two boundaries is refused by line, not attached to a membe
 })
 
 test('an element keyword this renderer does not draw is refused with its line and a reason', () => {
-  for (const [keyword, line] of [['actor', 'actor User'], ['class', 'class Order'], ['cloud', 'cloud Network']]) {
+  // `class` used to be here and is now a named box; the keywords left are the symbols this renderer has no shape for.
+  for (const [keyword, line] of [['actor', 'actor User'], ['note', 'note Remember this'], ['cloud', 'cloud Network']]) {
     const { refused } = fromPlantUml(['@startuml', line, 'A --> B', '@enduml'].join(String.fromCharCode(10)))
     if (refused.length !== 1) throw new Error(keyword + ' refused: ' + JSON.stringify(refused))
     if (!refused[0].startsWith('line 2:')) throw new Error(keyword + ' has no line number: ' + refused[0])
@@ -405,12 +406,14 @@ test('each arrow type is read in both directions, and points the way the source 
 })
 
 test('an edge it cannot draw as written is refused by line, not drawn as another arrow', () => {
-  const source = ['@startuml', 'A -- B', 'C *--> D', 'E *.. F', '@enduml'].join(String.fromCharCode(10))
+  // Two marks on one edge is the case the renderer cannot draw as written: it says so per line rather than choosing one
+  // of the two marks and drawing an arrow the source did not state.
+  const source = ['@startuml', 'A *-->* B', 'C <|--|> D', '@enduml'].join(String.fromCharCode(10))
   const { diagram, refused } = fromPlantUml(source)
-  if (refused.length !== 3) throw new Error('refused: ' + JSON.stringify(refused))
+  if (refused.length !== 2) throw new Error('refused: ' + JSON.stringify(refused))
   if (diagram.edges.length !== 0) throw new Error('a refused edge was drawn: ' + JSON.stringify(diagram.edges))
   const lines = refused.map((entry) => entry.slice(0, entry.indexOf(': ')))
-  if (JSON.stringify(lines) !== JSON.stringify(['line 2', 'line 3', 'line 4'])) throw new Error('lines: ' + lines.join(','))
+  if (JSON.stringify(lines) !== JSON.stringify(['line 2', 'line 3'])) throw new Error('lines: ' + lines.join(','))
   for (const entry of refused) {
     const reason = entry.slice(entry.indexOf(': ') + 2)
     if (reason.trim() === '') throw new Error('a refusal without a reason: ' + entry)

@@ -209,6 +209,50 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A class-like keyword is a named box here: the name is what a component-level view needs, and the compartments are
+// refused line by line when the source writes them.
+test('a class-like keyword draws a box, and its block form is still refused', () => {
+  for (const keyword of ['class', 'object', 'interface', 'enum', 'annotation']) {
+    const plain = render({ source: ['@startuml', keyword + ' Order', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (plain.refused.length !== 0) throw new Error(keyword + ' refused: ' + JSON.stringify(plain.refused))
+    if (plain.diagram.nodes.length !== 1) throw new Error(keyword + ' boxes: ' + String(plain.diagram.nodes.length))
+    const block = render({ source: ['@startuml', keyword + ' Order {', '  String id', '}', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (block.refused.length < 1) throw new Error(keyword + ' block was not refused')
+    if (!block.refused.some((entry) => entry.includes('is not a boundary'))) {
+      throw new Error(keyword + ' block refused for the wrong reason: ' + JSON.stringify(block.refused))
+    }
+  }
+})
+
+// A line with no head and a dotted composite are two statements the renderer can keep: the first connects two boxes
+// without claiming a direction, the second keeps the diamond and drops the solid line.
+test('a headless line connects and points nowhere', () => {
+  const draw = (edge) => {
+    const source = ['@startuml', 'component A', 'component B', 'A ' + edge + ' B', '@enduml'].join('\n')
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(edge + ' refused: ' + JSON.stringify(r.refused))
+    return { heads: (r.markup.match(/<polygon/g) ?? []).length, dashed: (r.markup.match(/stroke-dasharray/g) ?? []).length }
+  }
+  const headless = draw('--')
+  if (headless.heads !== 0) throw new Error('a headless line drew a head: ' + String(headless.heads))
+  const arrow = draw('-->')
+  if (arrow.heads !== 1) throw new Error('the nearest miss did not draw its head: ' + String(arrow.heads))
+})
+
+test('a dotted composite keeps the diamond and loses the solid line', () => {
+  const draw = (edge) => {
+    const source = ['@startuml', 'entity Whole', 'entity Part', 'Whole ' + edge + ' Part', '@enduml'].join('\n')
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(edge + ' refused: ' + JSON.stringify(r.refused))
+    return { diamond: (r.markup.match(/<polygon/g) ?? []).length, dashed: (r.markup.match(/stroke-dasharray/g) ?? []).length }
+  }
+  const dotted = draw('*..')
+  if (dotted.diamond !== 1) throw new Error('the dotted composite lost its diamond: ' + String(dotted.diamond))
+  if (dotted.dashed !== 1) throw new Error('the dotted composite drew a solid line')
+  const solid = draw('*--')
+  if (solid.dashed !== 0) throw new Error('the nearest miss drew a dashed line')
+})
+
 // A direction on the edge is a constraint on the drawing: the same pair, written four ways, is four arrangements.
 test('a direction hint decides where the far box goes', () => {
   const where = (hint) => {
