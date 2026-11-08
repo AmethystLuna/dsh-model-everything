@@ -299,6 +299,29 @@ test('a turned drawing grows along the page and keeps its packages', () => {
   if (!(price.x > group.x + group.width)) throw new Error('the root box is not the next column: ' + String(price.x) + ' vs ' + String(group.x + group.width))
 })
 
+// A leg runs along one axis or it does not: a route with a diagonal leg is a line that reaches its port by cutting a
+// corner, which reads as a mistake and hides which side it attached to. The neighbour case is the snap that removes a kink:
+// it must leave the route orthogonal, not trade a step for a slope.
+test('no route carries a diagonal leg', () => {
+  const sources = [
+    ['@startuml', 'left to right direction', 'component "接入" as a', 'component "应用" as b', 'component "数据" as c', 'a --> b', 'b --> c', 'a --> c : 直连', '@enduml'].join('\n'),
+    ['@startuml', 'component hub', ...Array.from({ length: 6 }, (_, i) => 'component t' + i), ...Array.from({ length: 6 }, (_, i) => 'hub --> t' + i), '@enduml'].join('\n'),
+    ['@startuml', 'component a', 'component b', 'component c', 'a --> b', 'b --> c', 'a --> c', '@enduml'].join('\n'),
+  ]
+  for (const source of sources) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused.slice(0, 2)))
+    for (const shape of r.canvas.shapes) {
+      const points = shape.kind === 'path' ? shape.points : shape.kind === 'link' ? [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }] : []
+      for (let index = 1; index < points.length; index += 1) {
+        const dx = Math.abs(points[index].x - points[index - 1].x)
+        const dy = Math.abs(points[index].y - points[index - 1].y)
+        if (dx > 0.01 && dy > 0.01) throw new Error('a diagonal leg: ' + dx.toFixed(2) + ' by ' + dy.toFixed(2))
+      }
+    }
+  }
+})
+
 // Two routes that run along the same line read as one line, and a reader loses one of the two statements. The property is
 // asserted over drawings with many long edges, where a routed lane can land on another edge's lane.
 test('no two routes draw the same line', () => {

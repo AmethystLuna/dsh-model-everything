@@ -164,6 +164,7 @@ node tests/coords/run.mjs
 node tests/channels/run.mjs
 node tests/components/run.mjs
 node tests/placement/run.mjs
+node tests/jog/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -212,7 +213,7 @@ And the gates around it:
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 103 | a flowchart becomes boxes and labelled arrows |
-| `plantuml-corpus` | 24 | left to right direction lays the chain out along a row |
+| `plantuml-corpus` | 25 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 173 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
@@ -222,6 +223,7 @@ And the gates around it:
 | `channels` | 12 | two long edges crossing one gap get one lane each, in the order of their dummies |
 | `components` | 9 | a drawing splits into the pieces that share no edge |
 | `placement` | 11 | a boundary contains its own contents and only its own |
+| `jog` | 5 | a two-pixel step between two parallel legs is removed |
 | `presentation` | 57 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
