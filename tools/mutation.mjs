@@ -173,6 +173,14 @@ const MUTATIONS = [
     from: "n(canvas.width * (canvas.scale ?? 1)) + '\" height=\"' + n(canvas.height * (canvas.scale ?? 1))",
     to: "n(canvas.width) + '\" height=\"' + n(canvas.height)",
   },
+
+  {
+    id: 'M19',
+    what: 'a title statement is read and dropped',
+    file: 'src/render/from-plantuml.ts',
+    from: '    title: sourceTitle ?? title,',
+    to: '    title,',
+  },
 ]
 
 const argument = process.argv[2]
