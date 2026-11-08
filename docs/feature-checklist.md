@@ -172,6 +172,7 @@ node tests/ports/run.mjs
 node tests/labels/run.mjs
 node tests/blocks/run.mjs
 node tests/skill-table/run.mjs
+node tests/names/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -238,6 +239,7 @@ And the gates around it:
 | `labels` | 4 | a label with nothing in the way sits on its longest run |
 | `blocks` | 6 | a block\ |
 | `skill-table` | 5 | the parser lists were read, so the checks below mean something |
+| `names` | 6 | a bare name is left alone |
 | `presentation` | 57 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

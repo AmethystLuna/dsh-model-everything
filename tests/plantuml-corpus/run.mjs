@@ -978,7 +978,7 @@ test('a boundary keeps its name through a stereotype and a colour', () => {
     if (r.refused.length !== 0) throw new Error(line + ' refused: ' + JSON.stringify(r.refused))
     const group = (r.diagram.groups ?? [])[0]
     if (group?.label !== expected) throw new Error(line + ' label: ' + String(group?.label))
-    if (r.ignored.length !== 1 || !r.ignored[0].includes('decoration this renderer does not draw')) {
+    if (r.ignored.length !== 1 || !/is a (stereotype|colour)/.test(r.ignored[0])) {
       throw new Error(line + ' ignored: ' + JSON.stringify(r.ignored))
     }
     // The label is how an edge names a boundary with no alias.

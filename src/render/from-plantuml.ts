@@ -29,6 +29,7 @@
 
 import { emptyCaption, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
+import { bareName, decorationReason } from './names.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -170,13 +171,9 @@ function ensure(builder: Builder, id: string, label?: string, shape?: NodeShape,
  * `A <<service>>` beside the real `A`, which draws a component the source never named.
  */
 function reference(token: string): Reference {
-  let text = token.trim()
-  // An endpoint can carry a stereotype, a cardinality or a colour. None of them is part of the name: leaving one in it
-  // produced an id like `a "1"` that no other line could point at.
-  while (/\s*<<[^<>]*>>\s*$/.test(text)) text = text.replace(/\s*<<[^<>]*>>\s*$/, '').trim()
-  while (/\s+("[^"]*"|'[^']*'|\([^()]*\))\s*$/.test(text)) text = text.replace(/\s+("[^"]*"|'[^']*'|\([^()]*\))\s*$/, '').trim()
-  while (/\s+#\S+\s*$/.test(text)) text = text.replace(/\s+#\S+\s*$/, '').trim()
-  while (/^("[^"]*"|'[^']*')\s+/.test(text)) text = text.replace(/^("[^"]*"|'[^']*')\s+/, '').trim()
+  // An endpoint carries decorations the name does not: `a "1" --> "*" b` names two boxes, not two labels.
+  const bare = bareName(token)
+  let text = bare.name === '' ? token.trim() : bare.name
   if (text === '') text = token.trim()
   const bracket = BRACKET.exec(text)
   if (bracket !== null) {
@@ -202,18 +199,10 @@ function boundaryOf(
   declaration: string,
   keyword: string,
   ordinal: number,
-): { id: string; label: string; decoration?: string } {
-  let rest = declaration.slice(keyword.length).trim()
-  let decoration: string | undefined
-  for (;;) {
-    const stereotype = /\s*<<[^<>]*>>\s*$/.exec(rest)
-    const colour = /\s+#\S+\s*$/.exec(rest)
-    const found = stereotype ?? colour
-    if (found === null) break
-    decoration = found[0].trim()
-    rest = rest.slice(0, found.index).trim()
-  }
-  const adornment = decoration === undefined ? {} : { decoration }
+): { id: string; label: string; decorations: string[] } {
+  const bare = bareName(declaration.slice(keyword.length))
+  const rest = bare.name
+  const adornment = { decorations: bare.stripped }
   const alias = QUOTED_ALIAS.exec(rest) ?? BRACKET_ALIAS.exec(rest) ?? PLAIN_ALIAS.exec(rest)
   if (alias !== null) return { id: alias[2], label: alias[1], ...adornment }
   const label = rest.replace(/^["']|["']$/g, '')
@@ -677,8 +666,8 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       }
       groupCount += 1
       const boundary = boundaryOf(declaration, opener, groupCount)
-      if (boundary.decoration !== undefined) {
-        ignored.push(where + '`' + boundary.decoration + '` is a decoration this renderer does not draw')
+      for (const decoration of boundary.decorations) {
+        ignored.push(where + '`' + decoration + '` ' + decorationReason(decoration))
       }
       builder.groupLines.set(boundary.id, index + 1)
       builder.open.push({
@@ -701,19 +690,13 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     const declared = DECLARED.exec(line)
     if (declared !== null) {
       const shape = SHAPES[declared[1]] as NodeShape
-      // A trailing `#colour` names a fill this renderer does not have. Dropping it without a word lost the element's
-      // text as well, because the alias no longer matched - so it is removed here and reported.
-      const colour = /\s+#\S+\s*$/.exec(declared[2])
-      if (colour !== null) {
-        ignored.push(where + '`' + colour[0].trim() + '` is a colour this renderer does not have: the palette is fixed')
+      // A colour or a stereotype after the name used to stop the alias matching, so the whole line became the name. Both are
+      // removed before the alias is read, and each one is reported as what it is.
+      const bare = bareName(declared[2])
+      for (const decoration of bare.stripped) {
+        ignored.push(where + '`' + decoration + '` ' + decorationReason(decoration))
       }
-      // A stereotype on a declaration breaks the alias the same way a colour does, and the element then took the whole
-      // line as its name. It is removed and reported: nothing here draws a stereotype.
-      const stereotype = /\s*<<[^<>]*>>\s*$/.exec(declared[2])
-      if (stereotype !== null) {
-        ignored.push(where + '`' + stereotype[0].trim() + '` is a stereotype this renderer does not draw')
-      }
-      const rest = declared[2].replace(/\s+#\S+\s*$/, '').replace(/\s*<<[^<>]*>>\s*$/, '').trim()
+      const rest = bare.name
       const quoted = QUOTED_ALIAS.exec(rest)
       // `\n` in a label is a line break, the same one a real newline is.
       const text = (value: string): string => value.replace(/\\n/g, '\n')
