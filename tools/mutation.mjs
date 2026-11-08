@@ -17,10 +17,12 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' })
+// `npm` is `npm.cmd` on Windows, and `execFileSync` cannot start a `.cmd` without a shell: without this the build never
+// ran and every suite passed the unmutated `lib/`, which is the worst possible answer from a mutation check.
 const run = (command, args) => {
   try {
-    return execFileSync(command, args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return execFileSync(command, args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' })
   } catch (error) {
     return String(error.stdout ?? '') + String(error.stderr ?? '')
   }
