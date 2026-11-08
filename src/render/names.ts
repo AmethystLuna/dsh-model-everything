@@ -17,6 +17,7 @@ export interface BareName {
 }
 
 const TRAILING = [
+  /,\s*$/,                        // a statement-end comma
   /\s*<<[^<>]*>>\s*$/,          // a stereotype
   /\s+(?:"[^"]*"|'[^']*'|\([^()]*\))\s*$/, // a cardinality after the name
   /\s+#\S+\s*$/,               // a colour
@@ -31,6 +32,7 @@ const LEADING = /^(?:"[^"]*"|'[^']*')\s+/
  * One wording per kind, in one place: the three call sites that strip decorations used to word this themselves, and they drifted.
  */
 export function decorationReason(token: string): string {
+  if (token === ',') return 'is a statement-end comma, which this renderer does not need'
   if (token.startsWith('<<')) return 'is a stereotype this renderer does not draw'
   if (token.startsWith('#')) return 'is a colour this renderer does not have: the palette is fixed'
   return 'is a cardinality, which this renderer does not draw'

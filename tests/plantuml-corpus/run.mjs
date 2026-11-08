@@ -970,6 +970,24 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A line's punctuation is not part of a name, a statement separator this renderer does not read is refused, and a source with
+// nothing in it says so. All three used to be silent or folded into a name.
+test('punctuation and empty sources are answered, not folded in', () => {
+  const comma = render({ source: ['@startuml', 'component a,', 'component b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (JSON.stringify(comma.diagram.nodes.map((node) => node.id)) !== JSON.stringify(['a', 'b'])) {
+    throw new Error('the comma: ' + JSON.stringify(comma.diagram.nodes.map((node) => node.id)))
+  }
+  if (comma.ignored.length !== 1 || !comma.ignored[0].includes('statement-end comma')) throw new Error('comma note: ' + JSON.stringify(comma.ignored))
+  const semi = render({ source: ['@startuml', 'component a; component b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (semi.refused.length !== 1 || !semi.refused[0].includes('one statement per line')) throw new Error('semicolon: ' + JSON.stringify(semi.refused))
+  if (semi.diagram.nodes.length !== 0) throw new Error('a semicolon line became an element')
+  for (const source of ['', '@startuml\n@enduml', 'flowchart']) {
+    const empty = render({ source }, {}, { scheme: 'default' })
+    if (empty.refused.length === 0) throw new Error('a source with nothing in it said nothing: ' + JSON.stringify(source))
+    if (!empty.refused[0].includes('no diagram')) throw new Error('the reason: ' + empty.refused[0])
+  }
+})
+
 // `together { a b }` names boxes without declaring them, and a block that keeps nothing on one row says so.
 test('a together block names its boxes, and says when it names none', () => {
   const bare = render({ source: ['@startuml', 'together {', '  a', '  b', '}', 'a --> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })

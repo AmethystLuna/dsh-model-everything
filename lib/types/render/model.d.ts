@@ -124,5 +124,12 @@ export declare function emptyDiagram(title: string, caption: string): Diagram;
  * it is already computed by the time this is asked.
  */
 export declare function emptyCaption(refused: number): string;
+/**
+ * The caption of a drawing that came out empty.
+ *
+ * A source with nothing in it is not a source whose lines were refused, even though both answer with a refusal now: the reader
+ * needs to know which of the two happened.
+ */
+export declare function emptyCaptionOf(refused: readonly string[]): string;
 /** The label to draw for a node: its own label when the notation gave one, else its id. */
 export declare function labelOf(node: DiagramNode): string;

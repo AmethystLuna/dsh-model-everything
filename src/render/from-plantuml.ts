@@ -27,7 +27,7 @@
  * into a boundary that is nested or empty).
  */
 
-import { emptyCaption, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
+import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
 import { bareName, decorationReason } from './names.js'
 
@@ -329,6 +329,7 @@ function togetherGroups(lines: readonly string[]): {
       depth += 1
       continue
     }
+
     const declared = DECLARED.exec(line)
     if (declared === null) {
       // A bare name inside the block names a box; the arrow rules make such a name an element, and so does this.
@@ -730,6 +731,12 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     }
 
 
+    // PlantUML allows several statements on one line separated by `;`. This renderer reads one per line, and folding them
+    // together would draw one element whose name is the rest of the line - so it is refused, naming the form to write.
+    if (/;[^;]*\S/.test(line) && !/^note\b/.test(line)) {
+      refused.push(where + '`;` separates two statements on one line; write one statement per line')
+      return
+    }
     // `state S : entry / go` adds a description line to the element. That is a body, and a body is a line this renderer
     // does not draw - refused by line rather than folded into the element's name.
     const described = /^([a-z]+)\s+\S+\s*:\s*\S/.exec(line)
@@ -917,8 +924,12 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     refused.push('line ' + String(line) + ': `' + group.label + '` is a boundary with nothing inside it, so there is no rectangle to draw')
   }
 
+  if (!seenAny && refused.length === 0) {
+    refused.push('the source has no diagram in it: no line named an element, a boundary or a relationship')
+  }
+
   if (!seenAny || builder.nodes.size === 0) {
-    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused, ignored }
+    return { diagram: emptyDiagram(title, emptyCaptionOf(refused)), refused, ignored }
   }
 
   const diagram: Diagram = {

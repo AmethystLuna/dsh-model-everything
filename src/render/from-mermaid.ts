@@ -20,7 +20,7 @@
  * `timeline`, `quadrantChart`, `gitGraph`, `C4Context`, and `click`/`style`/`classDef` directives.
  */
 
-import { emptyCaption, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode } from './model.js'
+import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode } from './model.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -260,11 +260,18 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   })
 
   if (mode === 'none') {
+    // A source with nothing in it is a statement too, and the same one the PlantUML reader makes: no diagram.
+    if (refused.length === 0) {
+      refused.push('the source has no diagram in it: no line named an element or a relationship')
+    }
     return { diagram: emptyDiagram(title, 'no mermaid diagram found'), refused, ignored }
   }
 
   if (builder.nodes.size === 0) {
-    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused, ignored }
+    if (refused.length === 0) {
+      refused.push('the source has no diagram in it: no line named an element or a relationship')
+    }
+    return { diagram: emptyDiagram(title, emptyCaptionOf(refused)), refused, ignored }
   }
 
   const diagram: Diagram = {
