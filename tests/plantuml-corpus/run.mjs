@@ -558,6 +558,30 @@ test('a state block is a solid boundary, and a package is still dashed', () => {
   if (!packaged.markup.includes('stroke-dasharray')) throw new Error('a package lost its dashes')
 })
 
+// A background colour is paper, not arrangement, so it is honoured; a font size is a type scale this renderer does not have,
+// and saying "layout control" about it was the wrong reason.
+test('a background colour is drawn, and styling skinparams say why they are not', () => {
+  const painted = render(
+    { source: ['@startuml', 'skinparam backgroundColor #eef4ff', 'component a', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (painted.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(painted.refused))
+  const root = /<rect x="0" y="0"[^>]*fill="([^"]+)"/.exec(painted.markup)
+  if (root?.[1] !== '#eef4ff') throw new Error('the canvas is ' + String(root?.[1]))
+  const plain = render({ source: ['@startuml', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (/<rect x="0" y="0"[^>]*fill="#eef4ff"/.test(plain.markup)) throw new Error('a drawing without a background took one')
+  const styled = render(
+    { source: ['@startuml', 'skinparam DefaultFontSize 20', 'component a', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (styled.ignored.length !== 1) throw new Error('ignored: ' + JSON.stringify(styled.ignored))
+  if (!styled.ignored[0].includes('type scale')) throw new Error('the reason: ' + styled.ignored[0])
+  const wrong = render({ source: ['@startuml', 'skinparam backgroundColor blue', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (wrong.refused.length !== 1 || !wrong.refused[0].includes('#rgb')) throw new Error('a named colour: ' + JSON.stringify(wrong.refused))
+})
+
 // A block whose closing line is missing swallows the source; the drawing has to say so rather than come out nearly empty.
 test('an unclosed block is refused by the line that opened it', () => {
   const source = ['@startuml', 'header', '  internal', 'component a', '@enduml'].join('\n')

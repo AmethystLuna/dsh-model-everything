@@ -161,6 +161,8 @@ export interface Canvas {
     width: number;
     height: number;
     shapes: Shape[];
+    /** A background the source asked for; the palette's own is used when the source said nothing. */
+    background?: string;
     /**
      * Every place a drawn segment still passes through a box it does not terminate at, after every route was checked.
      *

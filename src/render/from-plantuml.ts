@@ -286,7 +286,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
   const ignored: string[] = []
-  const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[] } = { value: 'down' }
+  const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[]; background?: string } = { value: 'down' }
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set(), groupLines: new Map() }
   let startId: string | undefined
   let seenAny = false
@@ -389,6 +389,25 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       heading.value = 'right'
       return
     }
+    // A background colour changes the paper, not the arrangement, so it is honoured. Every other skinparam is styling this
+    // renderer does not have: the type scale and the palette are fixed, and saying "layout control" about a font size was
+    // the wrong reason.
+    const skinBackground = /^skinparam\s+backgroundColor\s+(.+)$/i.exec(line)
+    if (skinBackground !== null) {
+      const value = (skinBackground[1] as string).trim().replace(/^["']|["']$/g, '')
+      if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)) {
+        refused.push(where + '`' + value + '` is not a colour this renderer draws: write `#rgb` or `#rrggbb`')
+        return
+      }
+      heading.background = value
+      return
+    }
+    if (/^skinparam\b/i.test(line)) {
+      const key = /^skinparam\s+(\S+)/i.exec(line)?.[1] ?? 'skinparam'
+      ignored.push(where + '`' + key + '` is styling this renderer does not have: the type scale and the palette are fixed')
+      return
+    }
+
     if (IGNORED.test(line)) {
       if (LAYOUT_CONTROL.test(line)) {
         ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
@@ -750,6 +769,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}), ...(legend.length === 0 ? {} : { legend }),
     ...(pageTextOf('header') === undefined ? {} : { header: pageTextOf('header') }),
     ...(pageTextOf('footer') === undefined ? {} : { footer: pageTextOf('footer') }),
-    ...(pageTextOf('sourceCaption') === undefined ? {} : { sourceCaption: pageTextOf('sourceCaption') }) }
+    ...(pageTextOf('sourceCaption') === undefined ? {} : { sourceCaption: pageTextOf('sourceCaption') }),
+    ...(heading.background === undefined ? {} : { background: heading.background }) }
   return { diagram: joined, refused, ignored }
 }

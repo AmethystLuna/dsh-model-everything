@@ -96,6 +96,8 @@ export interface Diagram {
     sameRank?: string[][];
     /** The axis the drawing flows along: `right` comes from `left to right direction`. */
     direction?: 'down' | 'right';
+    /** A background colour the source asked for (`skinparam backgroundColor`), as a hex string. */
+    background?: string;
     /** The lines a `legend` block wrote: page furniture, drawn under the drawing and never part of it. */
     legend?: string[];
     /** A `header` block: page text above the drawing, in the source's own words, one entry per line. */

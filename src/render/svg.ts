@@ -365,6 +365,6 @@ export function toSvg(canvas: Canvas, colours: Palette, label?: string): { marku
   // wallpaper, a themed panel - would otherwise change the contrast of a picture it knows nothing about.
   const background =
     '<rect x="0" y="0" width="' + n(canvas.width) + '" height="' + n(canvas.height) +
-    '" fill="' + colours.background + '" />'
+    '" fill="' + (canvas.background ?? colours.background) + '" />'
   return { markup: header + background + body.join('') + '</svg>', dropped }
 }

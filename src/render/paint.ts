@@ -212,6 +212,8 @@ export interface Canvas {
   width: number
   height: number
   shapes: Shape[]
+  /** A background the source asked for; the palette's own is used when the source said nothing. */
+  background?: string
   /**
    * Every place a drawn segment still passes through a box it does not terminate at, after every route was checked.
    *
@@ -1796,6 +1798,7 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
       height: Math.round(turned ? turnedCaptionTop + CAPTION_LINE + MARGIN / 2 : canvasHeight),
       shapes: placed,
       routingFailures,
+    ...(diagram.background === undefined ? {} : { background: diagram.background }),
       labelCollisions,
     },
     colours,

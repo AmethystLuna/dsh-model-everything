@@ -85,7 +85,7 @@ A label that could not be placed clear is reported too, as a `LABELS` block: the
 sits on its own edge, but its mask covers a stretch of a neighbouring line. That is a fact about the picture - read
 the label from the source when the drawing is ambiguous - and a crowded figure is where it happens.
 
-A third answer sits between drawn and refused. A **layout control** - `skinparam`, `scale`, `hide`, `!pragma layout` -
+A third answer sits between drawn and refused. A **layout control** - `scale`, `hide`, `!pragma layout`, and any `skinparam` except `backgroundColor`, which is paper rather than arrangement -
 asks a layouter to arrange the drawing, and this renderer is the layouter: the line is understood, has no effect, and
 is reported in `ignored`. So a control that looks like it did nothing did nothing, and you are not left guessing
 whether it was dropped or obeyed.
