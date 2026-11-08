@@ -33,6 +33,14 @@ export interface Parsed {
   diagram: Diagram
   /** Lines the parser refused to interpret, with the reason. Empty when the whole source was understood. */
   refused: string[]
+  /**
+   * Lines that were understood and have no effect, with the reason.
+   *
+   * A layout control - a direction, a spacing, a scale - asks the renderer to arrange the drawing differently. This
+   * renderer decides the arrangement itself, so the line is accepted and dropped. Saying so is the point: a reader who
+   * wrote `left to right direction` and saw the same picture had no way to tell a refusal from a no-op.
+   */
+  ignored: string[]
 }
 
 /** The element keywords this renderer draws, and the symbol each one becomes. */
@@ -89,6 +97,8 @@ const BRACKET_ALIAS = /^\[(.+?)\]\s+as\s+([A-Za-z_][\w-]*)$/
 const PLAIN_ALIAS = /^([A-Za-z_][\w.-]*)\s+as\s+([A-Za-z_][\w-]*)$/
 const BRACKET = /^\[(.+?)\]$/
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
+/** The ignored lines that ask for an arrangement: accepted, dropped, and reported. */
+const LAYOUT_CONTROL = /^(left to right direction|top to bottom direction|skinparam|scale|hide|show|!pragma\s+layout|together)\b/
 
 interface Builder {
   nodes: Map<string, DiagramNode>
@@ -228,6 +238,7 @@ function readArrow(line: string): ArrowParts | string | undefined {
 export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
+  const ignored: string[] = []
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set() }
   let startId: string | undefined
   let seenAny = false
@@ -241,7 +252,12 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     if (/^@(start|end)uml\b/.test(line)) return
     seenAny = true
     if (/^title\b/.test(line)) return
-    if (IGNORED.test(line)) return
+    if (IGNORED.test(line)) {
+      if (LAYOUT_CONTROL.test(line)) {
+        ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
+      }
+      return
+    }
 
     if (line === '[*] --> [*]') return
 
@@ -473,7 +489,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   builder.edges = keptEdges
 
   if (!seenAny || builder.nodes.size === 0) {
-    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused }
+    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused, ignored }
   }
 
   const diagram: Diagram = {
@@ -488,5 +504,5 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       String(builder.edges.length) + ' arrow' + (builder.edges.length === 1 ? '' : 's') +
       (refused.length === 0 ? '' : ', ' + String(refused.length) + ' line(s) refused'),
   }
-  return { diagram, refused }
+  return { diagram, refused, ignored }
 }

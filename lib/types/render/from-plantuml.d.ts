@@ -31,5 +31,13 @@ export interface Parsed {
     diagram: Diagram;
     /** Lines the parser refused to interpret, with the reason. Empty when the whole source was understood. */
     refused: string[];
+    /**
+     * Lines that were understood and have no effect, with the reason.
+     *
+     * A layout control - a direction, a spacing, a scale - asks the renderer to arrange the drawing differently. This
+     * renderer decides the arrangement itself, so the line is accepted and dropped. Saying so is the point: a reader who
+     * wrote `left to right direction` and saw the same picture had no way to tell a refusal from a no-op.
+     */
+    ignored: string[];
 }
 export declare function fromPlantUml(source: string, title?: string): Parsed;

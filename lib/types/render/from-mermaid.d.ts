@@ -24,5 +24,7 @@ export interface Parsed {
     diagram: Diagram;
     /** Lines the parser refused to interpret, with the reason. Empty when the whole source was understood. */
     refused: string[];
+    /** Lines understood and dropped, with the reason. Mermaid's own layout hints are read and have no effect here. */
+    ignored: string[];
 }
 export declare function fromMermaid(source: string, title?: string): Parsed;

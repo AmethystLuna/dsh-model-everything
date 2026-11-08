@@ -191,6 +191,27 @@ for (const c of CASES) {
   })
 }
 
+// A layout control is not a refusal and not a drawing instruction: it is understood, dropped, and said so. The
+// nearest miss is the same source without the line - same picture, and nothing to report.
+test('a layout control is reported as having no effect', () => {
+  const withLine = render(
+    { source: ['@startuml', 'left to right direction', 'component A', 'component B', 'A --> B', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (withLine.refused.length !== 0) throw new Error('the control was refused: ' + JSON.stringify(withLine.refused))
+  if (withLine.ignored.length !== 1) throw new Error('ignored notes: ' + JSON.stringify(withLine.ignored))
+  if (!withLine.ignored[0].includes('layout control')) throw new Error('the note does not say why: ' + withLine.ignored[0])
+  if (!withLine.ignored[0].startsWith('line 2:')) throw new Error('the note does not name its line: ' + withLine.ignored[0])
+  const without = render(
+    { source: ['@startuml', 'component A', 'component B', 'A --> B', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (without.ignored.length !== 0) throw new Error('a plain source reported a control: ' + JSON.stringify(without.ignored))
+  if (without.markup !== withLine.markup) throw new Error('the control changed the drawing it says it does not change')
+})
+
 if (failures > 0) {
   console.log('plantuml corpus failed: ' + String(failures))
   process.exit(1)

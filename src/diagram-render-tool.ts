@@ -52,6 +52,13 @@ export const diagramRenderTool = defineTool({
           (result.path === undefined ? '' : '  written=' + String(result.path)),
       )
       lines.push('CAPTION  ' + String(result.caption))
+      const ignored = Array.isArray(result.ignored) ? (result.ignored as string[]) : []
+      if (ignored.length > 0) {
+        lines.push('')
+        lines.push('IGNORED  ' + String(ignored.length) + ' line(s) understood and dropped - they ask for an arrangement')
+        for (const line of ignored) lines.push('  ' + line)
+        lines.push('NEXT  These lines are not errors: the drawing is complete without them. Delete them, or keep them so the source still renders elsewhere.')
+      }
       if (refused.length > 0) {
         lines.push('')
         lines.push('REFUSED  ' + String(refused.length) + ' line(s) - the drawing covers the rest')

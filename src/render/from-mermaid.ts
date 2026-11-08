@@ -26,6 +26,8 @@ export interface Parsed {
   diagram: Diagram
   /** Lines the parser refused to interpret, with the reason. Empty when the whole source was understood. */
   refused: string[]
+  /** Lines understood and dropped, with the reason. Mermaid's own layout hints are read and have no effect here. */
+  ignored: string[]
 }
 
 const CURVED_EDGE = /^(.+?)\s*(-->|---|-\.->|==>)\s*(?:\|([^|]*)\|\s*)?(.+)$/
@@ -107,6 +109,7 @@ function nodeFrom(token: string): { id: string; label?: string; shape?: DiagramN
 export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
+  const ignored: string[] = []
   const builder: Builder = { nodes: new Map(), edges: [], groups: [], open: [] }
   let mode: 'none' | 'graph' | 'state' = 'none'
   let startId: string | undefined
@@ -239,11 +242,11 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   })
 
   if (mode === 'none') {
-    return { diagram: emptyDiagram(title, 'no mermaid diagram found'), refused }
+    return { diagram: emptyDiagram(title, 'no mermaid diagram found'), refused, ignored }
   }
 
   if (builder.nodes.size === 0) {
-    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused }
+    return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused, ignored }
   }
 
   const diagram: Diagram = {
@@ -258,5 +261,5 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       String(builder.edges.length) + ' arrow' + (builder.edges.length === 1 ? '' : 's') +
       (refused.length === 0 ? '' : ', ' + String(refused.length) + ' line(s) refused'),
   }
-  return { diagram, refused }
+  return { diagram, refused, ignored }
 }

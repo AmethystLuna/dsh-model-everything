@@ -30,6 +30,8 @@ export interface Rendered {
     notation: Notation;
     /** Lines the parser refused, with their reason. Empty when the whole source was understood. */
     refused: string[];
+    /** Lines that were understood and have no effect, with the reason: a layout control this renderer decides itself. */
+    ignored: string[];
     /** Shapes the SVG writer had no case for. Must be zero; reported rather than hidden. */
     dropped: number;
 }

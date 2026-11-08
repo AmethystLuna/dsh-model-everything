@@ -63,6 +63,11 @@ the drawing rules - and **neither notation's direction keyword changes the layou
 A refusal is one line in `refused`, phrased `line N: …`. The drawing you get does not show the refused lines, and
 the tool says so rather than leaving you to notice.
 
+A third answer sits between drawn and refused. A **layout control** - `left to right direction`, `skinparam`,
+`scale`, `hide`, `!pragma layout`, `together` - asks a layouter to arrange the drawing, and this renderer is the
+layouter: the line is understood, has no effect, and is reported in `ignored`. So a control that looks like it did
+nothing did nothing, and you are not left guessing whether it was dropped or obeyed.
+
 ## What the structure review reports
 
 | Code | Severity | What it means |
