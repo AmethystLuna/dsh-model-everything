@@ -10,6 +10,7 @@
  *   node tools/mutation.mjs           run every mutation
  *   node tools/mutation.mjs M3        run one, by its prefix
  *   node tools/mutation.mjs --list    list them
+ *   node tools/mutation.mjs --audit   which suites the run list leaves out
  */
 import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -202,6 +203,19 @@ const MUTATIONS = [
 ]
 
 const argument = process.argv[2]
+// A mutation is only caught if the suite that would catch it runs. The suite list below is a fast subset of
+// `test:engine`, so this mode prints what it leaves out - the places where a mutation could go unnoticed.
+if (argument === '--audit') {
+  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+  const engine = String(pkg.scripts['test:engine'] ?? '')
+  const all = [...engine.matchAll(/node (tests\/[^\s&]+)/g)].map((match) => match[1])
+  const missing = all.filter((suite) => !SUITES.includes(suite))
+  console.log('on the mutation run list:', SUITES.length)
+  console.log('not on it:', missing.length)
+  for (const suite of missing) console.log('  ' + suite)
+  process.exit(0)
+}
+
 if (argument === '--list') {
   for (const mutation of MUTATIONS) console.log(mutation.id, mutation.what)
   process.exit(0)
