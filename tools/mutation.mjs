@@ -165,6 +165,14 @@ const MUTATIONS = [
     from: '        const top = furnitureAt.get(index)',
     to: '        const top = undefined as number | undefined',
   },
+
+  {
+    id: 'M18',
+    what: 'the delivered size ignores the scale the source asked for',
+    file: 'src/render/svg.ts',
+    from: "n(canvas.width * (canvas.scale ?? 1)) + '\" height=\"' + n(canvas.height * (canvas.scale ?? 1))",
+    to: "n(canvas.width) + '\" height=\"' + n(canvas.height)",
+  },
 ]
 
 const argument = process.argv[2]
