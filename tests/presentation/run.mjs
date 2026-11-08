@@ -605,6 +605,20 @@ test('a crowded drawing says a label could not be placed clear', () => {
   if (clean.includes('LABELS')) throw new Error('a clean drawing reported a label collision')
 })
 
+// The two branches of a scan card that no other case reaches: a scan that reports only some of its counts, and one with imports
+// it resolved dynamically. A card is built by `reportCard` before it is written, so the case goes through that - writing the
+// fields in by hand would exercise a path no tool takes.
+test('a scan card states a partial scan and its computed imports', async () => {
+  const { reportCard } = await import('../../lib/presentation.js')
+  const { structureCardBlocks } = await import('../../lib/presentation.js')
+  const partial = structuredClone(reportCard({ summary: { nodes: 3, edges: 2, cycles: 0 }, scan: { files: 12 } }, 'structure'))
+  const partialText = structureCardBlocks(partial)[0].text
+  if (!partialText.includes('12 file(s)') && !partialText.includes('12')) throw new Error('the file count is missing: ' + partialText)
+  if (partialText.includes('undefined')) throw new Error('a missing count reached the card: ' + partialText)
+  const computed = structuredClone(reportCard({ summary: { nodes: 3, edges: 2, cycles: 0 }, scan: { files: 12, unresolved: 2, packages: 3, dynamic: 4 } }, 'structure'))
+  const computedText = structureCardBlocks(computed)[0].text
+  if (!computedText.includes('4 computed')) throw new Error('the computed count is missing: ' + computedText)
+})
 if (failures > 0) {
   console.log('presentation tests failed:', failures)
   process.exit(1)
