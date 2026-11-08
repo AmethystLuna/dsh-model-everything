@@ -136,6 +136,15 @@ const PRINCIPLES = [
     enforced: 'the practice behind tests/engine, tests/design-engine, tests/skills',
   },
   {
+    id: 'mutation-breaks-the-guard',
+    title: 'A mutation that only changes spacing is not a mutation',
+    source: 'tests/AGENTS.md',
+    quote: 'a mutation has to break the guard that decides',
+    because:
+      'Emptying the set of shapes a turned drawing excludes from its turn left the page furniture exactly where the suite wanted it, because the pass that places it ran afterwards: the suite stayed green and the mutation tested nothing. Break the line that decides, not a number beside it.',
+    enforced: 'tools/mutation.mjs (M17), tests/plantuml-corpus',
+  },
+  {
     id: 'two-shapes',
     title: 'A method proposal and a behaviour report need different things',
     source: 'CONTRIBUTING.md',

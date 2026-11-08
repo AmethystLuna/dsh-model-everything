@@ -558,6 +558,49 @@ test('a state block is a solid boundary, and a package is still dashed', () => {
   if (!packaged.markup.includes('stroke-dasharray')) throw new Error('a package lost its dashes')
 })
 
+// The hardest drawing in the acceptance gallery, pinned in the repository rather than in a scratch folder: a turned drawing
+// with two packages, a `together` row inside one of them, a hidden edge, and three edges that cross a package border.
+test('a turned drawing with nested packages keeps its edges out of its boxes', () => {
+  const source = [
+    '@startuml',
+    'left to right direction',
+    'package "ingress" as edge {',
+    '  component "gateway" as gw',
+    '}',
+    'package "app" as app {',
+    '  together {',
+    '    component "orders" as order',
+    '    component "stock" as sku',
+    '  }',
+    '}',
+    'component "pricing" as price',
+    'component "database" as db',
+    'gw --> order',
+    'gw --> sku',
+    'order --> price : charge',
+    'sku -[hidden]-> price',
+    'price --> db : store',
+    '@enduml',
+  ].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if ((r.diagram.groups ?? []).length !== 2) throw new Error('groups: ' + String((r.diagram.groups ?? []).length))
+  if (r.diagram.nodes.length !== 5) throw new Error('nodes: ' + String(r.diagram.nodes.length))
+  const drawn = r.canvas.shapes.filter((shape) => shape.kind === 'path' || shape.kind === 'link')
+  // The hidden edge is a placement, not a line: five edges, four of them drawn.
+  if (drawn.length !== 4) throw new Error('drawn edges: ' + String(drawn.length))
+  if (r.canvas.routingFailures.length !== 0) throw new Error('a route failed: ' + JSON.stringify(r.canvas.routingFailures))
+  if (r.canvas.labelCollisions !== 0) throw new Error('labels collide: ' + String(r.canvas.labelCollisions))
+  for (const shape of drawn) {
+    if (shape.kind !== 'path') continue
+    for (let index = 0; index + 1 < shape.points.length; index += 1) {
+      const a = shape.points[index]
+      const b = shape.points[index + 1]
+      if (Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01) throw new Error('a diagonal leg: ' + JSON.stringify([a, b]))
+    }
+  }
+})
+
 // Page furniture lives in page space, so the turn must not carry it into the drawing: a header went inside the drawing and the
 // legend went off the right edge, and both captions landed on one line.
 test('a turned drawing keeps its page furniture in page order', () => {

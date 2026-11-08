@@ -106,6 +106,10 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
 - **a SKIP also reads as a pass.** Some suites import a tool module dynamically and print `SKIP` when
   `@deepseek-ai/dsh-tools` does not resolve. A scratch copy without a `node_modules` junction hit exactly that, and two
   mutations came back "not caught" for a case that never ran.
+- **a mutation has to break the guard that decides.** Emptying a set that only moves the legend down left the
+  drawing's page furniture where it was: the pinning that places it ran afterwards, and the suite stayed green for a
+  reason that had nothing to do with the case. Ask which line makes the decision, and break that one; a mutation whose
+  only effect is spacing is not testing a decision.
 - **so run the pristine copy first.** The order that works: copy `lib/` and the suite, run it and require a green
   result with no `SKIP`, and only then apply the mutation. A red or skipping baseline means the mutation cannot be
   judged - report that, not "missed". The same `node_modules` junction that makes a tool-loading suite work belongs in

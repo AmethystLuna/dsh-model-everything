@@ -31,6 +31,7 @@ they cannot read.
 | **No brittle counts, in shipped text or in a test name** | [AGENTS.md](../AGENTS.md) | tests/skills, tests/catalog |
 | **A case that cannot fail is not a case** | [CONTRIBUTING.md](../CONTRIBUTING.md) | tests/negatives, tests/contracts |
 | **A new check is mutation-tested before it is trusted** | [tests/AGENTS.md](../tests/AGENTS.md) | the practice behind tests/engine, tests/design-engine, tests/skills |
+| **A mutation that only changes spacing is not a mutation** | [tests/AGENTS.md](../tests/AGENTS.md) | tools/mutation.mjs (M17), tests/plantuml-corpus |
 | **A method proposal and a behaviour report need different things** | [CONTRIBUTING.md](../CONTRIBUTING.md) | .github/ISSUE_TEMPLATE, tests/contributing |
 | **A refusal says what would have been accepted** | [AGENTS.md](../AGENTS.md) | tests/uml, tests/tool-boundary |
 | **Every capability states its non-goal beside its scope claim** | [AGENTS.md](../AGENTS.md) | tests/catalog, tests/skills |
@@ -192,6 +193,16 @@ Kept honest by `tests/negatives, tests/contracts`.
 A test that never goes red is decoration. And a mutated file with a syntax error passes silently, because the suite cannot tell a broken engine from a quiet one.
 
 Kept honest by `the practice behind tests/engine, tests/design-engine, tests/skills`.
+
+### A mutation that only changes spacing is not a mutation
+
+> a mutation has to break the guard that decides
+>
+> — [`tests/AGENTS.md`](../tests/AGENTS.md)
+
+Emptying the set of shapes a turned drawing excludes from its turn left the page furniture exactly where the suite wanted it, because the pass that places it ran afterwards: the suite stayed green and the mutation tested nothing. Break the line that decides, not a number beside it.
+
+Kept honest by `tools/mutation.mjs (M17), tests/plantuml-corpus`.
 
 ### A method proposal and a behaviour report need different things
 
