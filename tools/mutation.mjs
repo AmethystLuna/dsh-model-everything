@@ -149,6 +149,14 @@ const MUTATIONS = [
     from: '  return state === undefined ? undefined : { state, openedAt }',
     to: '  return undefined',
   },
+
+  {
+    id: 'M16',
+    what: 'the canvas ignores the background the source asked for',
+    file: 'src/render/svg.ts',
+    from: "'\" fill=\"' + (canvas.background ?? colours.background) + '\" />'",
+    to: "'\" fill=\"' + colours.background + '\" />'",
+  },
 ]
 
 const argument = process.argv[2]
