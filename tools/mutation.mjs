@@ -239,6 +239,21 @@ const MUTATIONS = [
     from: '    if (described !== null && SHAPES[described[1] as string] !== undefined) {',
     to: '    if (false) {',
   },
+
+  {
+    id: 'M27',
+    what: 'a cardinality written before a name stays in it',
+    file: 'src/render/names.ts',
+    from: '    if (leading === null) break',
+    to: '    if (leading !== null) break',
+  },
+  {
+    id: 'M28',
+    what: 'a quoted name followed by `as` is read as a cardinality',
+    file: 'src/render/names.ts',
+    from: '    if (/^as\\s/i.test(after)) break',
+    to: '    if (false) break',
+  },
 ]
 
 const argument = process.argv[2]
