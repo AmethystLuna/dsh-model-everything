@@ -96,6 +96,11 @@ export interface Diagram {
     sameRank?: string[][];
     /** The axis the drawing flows along: `right` comes from `left to right direction`. */
     direction?: 'down' | 'right';
+    /**
+     * How much larger the drawing is delivered (`scale N`). The layout is unchanged: the same picture, drawn at N times the
+     * size, which is what the notation means.
+     */
+    scale?: number;
     /** A background colour the source asked for (`skinparam backgroundColor`), as a hex string. */
     background?: string;
     /** The lines a `legend` block wrote: page furniture, drawn under the drawing and never part of it. */

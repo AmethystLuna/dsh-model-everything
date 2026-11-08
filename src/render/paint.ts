@@ -214,6 +214,8 @@ export interface Canvas {
   shapes: Shape[]
   /** A background the source asked for; the palette's own is used when the source said nothing. */
   background?: string
+  /** The delivery size the source asked for (`scale N`); absent means what the layout produced. */
+  scale?: number
   /**
    * Every place a drawn segment still passes through a box it does not terminate at, after every route was checked.
    *
@@ -1823,6 +1825,7 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
       shapes: placed,
       routingFailures,
     ...(diagram.background === undefined ? {} : { background: diagram.background }),
+    ...(diagram.scale === undefined ? {} : { scale: diagram.scale }),
       labelCollisions,
     },
     colours,

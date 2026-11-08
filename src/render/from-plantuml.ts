@@ -109,7 +109,7 @@ const PLAIN_ALIAS = /^([A-Za-z_][\w.-]*)\s+as\s+([A-Za-z_][\w-]*)$/
 const BRACKET = /^\[(.+?)\]$/
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
 /** The ignored lines that ask for an arrangement: accepted, dropped, and reported. */
-const LAYOUT_CONTROL = /^(top to bottom direction|skinparam|scale|hide|show|!pragma\s+layout)\b/
+const LAYOUT_CONTROL = /^(top to bottom direction|skinparam|hide|show|!pragma\s+layout)\b/
 
 interface Builder {
   nodes: Map<string, DiagramNode>
@@ -286,7 +286,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
   const ignored: string[] = []
-  const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[]; background?: string } = { value: 'down' }
+  const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[]; background?: string; scale?: number } = { value: 'down' }
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set(), groupLines: new Map() }
   let startId: string | undefined
   let seenAny = false
@@ -389,6 +389,23 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       heading.value = 'right'
       return
     }
+    // `scale N` asks for the same picture at N times the size: it is a delivery size, not a layout, so it is honoured by
+    // multiplying what the writer puts in `width`/`height` and leaving the `viewBox` alone.
+    const scale = /^scale\s+([0-9]+(?:\.[0-9]+)?)\s*$/.exec(line)
+    if (scale !== null) {
+      const factor = Number(scale[1])
+      if (!(factor >= 0.5 && factor <= 8)) {
+        refused.push(where + '`' + line + '` is outside the range this renderer scales: 0.5 to 8')
+        return
+      }
+      heading.scale = factor
+      return
+    }
+    if (/^scale\b/.test(line)) {
+      refused.push(where + '`' + line + '` sizes a drawing by width and height; `scale 2` is the form this renderer takes')
+      return
+    }
+
     // A background colour changes the paper, not the arrangement, so it is honoured. Every other skinparam is styling this
     // renderer does not have: the type scale and the palette are fixed, and saying "layout control" about a font size was
     // the wrong reason.
@@ -770,6 +787,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     ...(pageTextOf('header') === undefined ? {} : { header: pageTextOf('header') }),
     ...(pageTextOf('footer') === undefined ? {} : { footer: pageTextOf('footer') }),
     ...(pageTextOf('sourceCaption') === undefined ? {} : { sourceCaption: pageTextOf('sourceCaption') }),
-    ...(heading.background === undefined ? {} : { background: heading.background }) }
+    ...(heading.background === undefined ? {} : { background: heading.background }),
+    ...(heading.scale === undefined ? {} : { scale: heading.scale }) }
   return { diagram: joined, refused, ignored }
 }

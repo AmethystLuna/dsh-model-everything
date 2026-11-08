@@ -641,6 +641,29 @@ test('a turned drawing keeps its page furniture in page order', () => {
   }
 })
 
+// `scale N` is a delivery size: the picture is the same one, drawn larger. The viewBox has to stay the layout's, or every
+// coordinate in the drawing would have to move and the two would drift apart.
+test('a scale directive changes the delivered size, not the drawing', () => {
+  const base = ['@startuml', 'component a', 'component b', 'a --> b', '@enduml'].join('\n')
+  const scaled = ['@startuml', 'scale 2', 'component a', 'component b', 'a --> b', '@enduml'].join('\n')
+  const plain = render({ source: base }, {}, { scheme: 'default' })
+  const twice = render({ source: scaled }, {}, { scheme: 'default' })
+  const head = (r) => /viewBox="0 0 ([0-9.]+) ([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"/.exec(r.markup)
+  const a = head(plain)
+  const b = head(twice)
+  if (a === null || b === null) throw new Error('no size in the markup')
+  if (b[1] !== a[1] || b[2] !== a[2]) throw new Error('the viewBox moved: ' + JSON.stringify([a.slice(1, 3), b.slice(1, 3)]))
+  if (Number(b[3]) !== Number(a[3]) * 2 || Number(b[4]) !== Number(a[4]) * 2) throw new Error('the delivered size: ' + JSON.stringify([a.slice(3), b.slice(3)]))
+  // Nothing inside the drawing moved: the first box sits at the same coordinates in both.
+  const box = (r) => r.canvas.shapes.find((shape) => shape.kind === 'box')
+  if (box(plain).x !== box(twice).x || box(plain).y !== box(twice).y) throw new Error('the drawing was laid out again')
+  // Two forms the notation allows and this renderer does not: out of range, and sizing by width and height.
+  const tooBig = render({ source: ['@startuml', 'scale 20', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (!tooBig.refused[0]?.includes('0.5 to 8')) throw new Error('out of range: ' + JSON.stringify(tooBig.refused))
+  const bySize = render({ source: ['@startuml', 'scale 200 width', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (!bySize.refused[0]?.includes('`scale 2` is the form')) throw new Error('by size: ' + JSON.stringify(bySize.refused))
+})
+
 // A background colour is paper, not arrangement, so it is honoured; a font size is a type scale this renderer does not have,
 // and saying "layout control" about it was the wrong reason.
 test('a background colour is drawn, and styling skinparams say why they are not', () => {

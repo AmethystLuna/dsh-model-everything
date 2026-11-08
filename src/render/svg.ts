@@ -358,7 +358,8 @@ export function toSvg(canvas: Canvas, colours: Palette, label?: string): { marku
   }
   const header =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + n(canvas.width) + ' ' + n(canvas.height) +
-    '" width="' + n(canvas.width) + '" height="' + n(canvas.height) + '" role="img"' +
+    // `scale N` multiplies only what is delivered: the viewBox is the layout's, so nothing in the drawing moves.
+    '" width="' + n(canvas.width * (canvas.scale ?? 1)) + '" height="' + n(canvas.height * (canvas.scale ?? 1)) + '" role="img"' +
     (label === undefined ? '' : ' aria-label="' + escape(label) + '"') +
     ' font-family="system-ui, -apple-system, Segoe UI, sans-serif">'
   // The surface is part of the drawing, not the container's business: a page that paints its own layers - a
