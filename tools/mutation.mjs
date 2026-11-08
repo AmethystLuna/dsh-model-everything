@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const touched = new Set()
 const git = (...args) => execSync(['git', ...args].join(' '), { cwd: root, encoding: 'utf8' })
 // `npm` is `npm.cmd` on Windows, and a command runner cannot start a `.cmd` without a shell: without one the build never ran
 // and every suite passed the unmutated `lib/`, which is the worst possible answer from a mutation check. The command is
@@ -181,6 +182,21 @@ const MUTATIONS = [
     from: '    title: sourceTitle ?? title,',
     to: '    title,',
   },
+
+  {
+    id: 'M20',
+    what: 'the notation table refuses an element it says it draws',
+    file: 'skills/model-everything-diagram/SKILL.md',
+    from: 'and the lifeline events |',
+    to: 'the lifeline events and `component` |',
+  },
+  {
+    id: 'M21',
+    what: 'the notation table names one keyword twice in a cell',
+    file: 'skills/model-everything-diagram/SKILL.md',
+    from: '`title` (one line, or a block ending `end title`)',
+    to: '`title` `title` (one line, or a block ending `end title`)',
+  },
 ]
 
 const argument = process.argv[2]
@@ -221,11 +237,12 @@ try {
       if (failures > 0) red.push(suite.split('/')[1] + ' (' + String(failures) + ')')
     }
     results.push({ mutation, caught: red.length > 0, why: red.join(', ') })
+    touched.add(mutation.file)
     writeFileSync(path, original)
     run('npm', ['run', 'build'])
   }
 } finally {
-  run('git', ['checkout', '--', 'src', 'lib'])
+  run('git', ['checkout', '--', ...(touched.size === 0 ? ['src', 'lib'] : [...touched, 'src', 'lib'])])
 }
 
 let missed = 0
