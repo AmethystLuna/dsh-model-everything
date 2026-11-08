@@ -1,5 +1,5 @@
 /**
- * The diagram a renderer draws, in the notation it came from being nobody's business.
+ * Thx diagram a renderer draws, in the notation it came from being nobody's business.
  *
  * Every source - a verification report, a Mermaid file, a PlantUML component diagram, a dependency scan -
  * is reduced to this one shape before anything is laid out. A renderer that understood notations would have
@@ -10,7 +10,7 @@
 /** What a node is, as far as colour is concerned. */
 export type NodeRole = 'normal' | 'error' | 'warning' | 'muted';
 /** The symbol a node is drawn as. UML and Mermaid both distinguish these; the notation decides which one applies. */
-export type NodeShape = 'rect' | 'diamond' | 'cylinder' | 'stadium' | 'circle' | 'subroutine' | 'hexagon';
+export type NodeShape = 'rect' | 'diamond' | 'cylinder' | 'stadium' | 'circle' | 'subroutine' | 'hexagon' | 'note';
 export interface DiagramNode {
     id: string;
     /** The text drawn inside the box. Defaults to the id when a notation labelled it. */

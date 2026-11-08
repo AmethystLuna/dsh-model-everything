@@ -189,6 +189,39 @@ export function cylinderPointOn(box: Box, side: 'top' | 'bottom', along: number)
   return cubicPoint(side === 'top' ? caps.top : caps.bottom, t)
 }
 
+/** How much of the top-right corner a note folds away. */
+export function noteFold(width: number, height: number): number {
+  return Math.min(12, width / 4, height / 3)
+}
+
+/**
+ * A note: the rectangle with one corner folded, and the crease that shows it.
+ *
+ * The fold is the whole difference between a note and a component, so it is drawn: a plain rectangle would say
+ * `this is an element` where the source said `this is a remark about one`.
+ */
+export function notePoints(box: Box): { outline: Point[]; fold: [Point, Point, Point] } {
+  const cut = noteFold(box.width, box.height)
+  const right = box.x + box.width
+  const bottom = box.y + box.height
+  // The pentagon is the note: the top-right corner is cut away on the diagonal. The crease is the flap the cut left
+  // behind, drawn as its two legs so the corner reads as folded rather than chamfered.
+  return {
+    outline: [
+      { x: box.x, y: box.y },
+      { x: right - cut, y: box.y },
+      { x: right, y: box.y + cut },
+      { x: right, y: bottom },
+      { x: box.x, y: bottom },
+    ],
+    fold: [
+      { x: right - cut, y: box.y },
+      { x: right - cut, y: box.y + cut },
+      { x: right, y: box.y + cut },
+    ],
+  }
+}
+
 /** The apex of a cylinder's top or bottom cap: the point its middle is drawn at. */
 export function cylinderApex(box: Box, side: 'top' | 'bottom'): Point {
   const caps = cylinderCaps(box)

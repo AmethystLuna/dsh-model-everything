@@ -57,6 +57,8 @@ const SHAPES: Record<string, NodeShape> = {
   // A use case is an ellipse. The `circle` symbol is written as an ellipse whose radii follow the box, so it
   // reads as the familiar use-case oval; `stadium` is the pill a terminal state is drawn as.
   usecase: 'circle',
+  // A note is a rectangle with a folded corner: the fold is what makes it a remark rather than an element.
+  note: 'note',
   // These five are boxes with compartments in PlantUML. The name is the part a component-level view needs, so the
   // box is drawn and the compartments are refused line by line: the element is visible and the source is told what
   // was not carried.
@@ -85,7 +87,6 @@ const NOT_DRAWN: Record<string, string> = {
   queue: 'a queue is not one of the shapes this renderer draws',
   stack: 'a stack is not one of the shapes this renderer draws',
   storage: 'a storage symbol is not one of the shapes this renderer draws',
-  note: 'a note is not one of the shapes this renderer draws',
   legend: 'a legend is not one of the shapes this renderer draws',
 }
 
@@ -339,6 +340,14 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       builder.edges.push({ from: from.id, to: to.id, label: (invisible[3] ?? '').trim(), invisible: true })
       builder.edgeLines.push(index + 1)
       builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
+      return
+    }
+
+    // `note left of X` is a placement, not an element: it says where to put a remark relative to a box, and this
+    // renderer decides placement itself. The standalone forms (`note "text" as N`) are elements and are drawn.
+    const placed = /^note\s+(left|right|top|bottom)\b|^note\s+over\b/.exec(line)
+    if (placed !== null) {
+      refused.push(where + '`' + line.split(/\s+/).slice(0, 3).join(' ') + '`: a note placed next to a box is a position this renderer decides, not a shape it draws')
       return
     }
 

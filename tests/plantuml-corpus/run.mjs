@@ -209,6 +209,28 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A note is an element with a folded corner; a note placed beside a box is a position, which this renderer decides.
+test('a note draws with its fold, and a placed note is refused', () => {
+  const note = render(
+    { source: ['@startuml', 'component A', 'note "remember the retry" as n', 'A --> n', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (note.refused.length !== 0) throw new Error('the note was refused: ' + JSON.stringify(note.refused))
+  const shape = note.diagram.nodes.find((node) => node.id === 'n')
+  if (shape?.shape !== 'note') throw new Error('the note is not a note: ' + JSON.stringify(shape))
+  if (!note.markup.includes('<path d="M')) throw new Error('the note has no crease')
+  const placed = render(
+    { source: ['@startuml', 'component A', 'note left of A : hi', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (placed.refused.length !== 1) throw new Error('a placed note was not refused: ' + JSON.stringify(placed.refused))
+  if (!placed.refused[0].includes('a position this renderer decides')) {
+    throw new Error('the placed note was refused for the wrong reason: ' + placed.refused[0])
+  }
+})
+
 // A direction hint is written in the reader's coordinates: the same `-right->` puts the far box on the right in either
 // direction, and `-down->` puts it below in either. The turned drawing reads the hints turned.
 test('a direction hint means the same thing in a turned drawing', () => {

@@ -91,5 +91,17 @@ export declare function sideOfPoint(box: Box, point: Point): 'top' | 'bottom' | 
  * the side the symbol is drawn by.
  */
 export declare function cylinderPointOn(box: Box, side: 'top' | 'bottom', along: number): Point;
+/** How much of the top-right corner a note folds away. */
+export declare function noteFold(width: number, height: number): number;
+/**
+ * A note: the rectangle with one corner folded, and the crease that shows it.
+ *
+ * The fold is the whole difference between a note and a component, so it is drawn: a plain rectangle would say
+ * `this is an element` where the source said `this is a remark about one`.
+ */
+export declare function notePoints(box: Box): {
+    outline: Point[];
+    fold: [Point, Point, Point];
+};
 /** The apex of a cylinder's top or bottom cap: the point its middle is drawn at. */
 export declare function cylinderApex(box: Box, side: 'top' | 'bottom'): Point;

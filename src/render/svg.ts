@@ -33,7 +33,7 @@ import { LABEL_HEIGHT, type Canvas, type Shape } from './paint.js'
 import { textWidth } from './text.js'
 import type { EdgeArrow } from './model.js'
 import type { Palette } from './palette.js'
-import { cylinderCaps, diamondPoints, hexagonPoints, stadiumRadius, type Cubic } from './symbol.js'
+import { cylinderCaps, diamondPoints, hexagonPoints, notePoints, stadiumRadius, type Cubic } from './symbol.js'
 
 /** One decimal place is enough at any zoom, and it keeps the markup readable. */
 const n = (value: number): string => {
@@ -90,6 +90,16 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
         return '<rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '" rx="' + n(stadiumRadius(shape)) + tail + boxText(shape, stroke)
       case 'circle':
         return '<ellipse cx="' + n(x + w / 2) + '" cy="' + n(y + h / 2) + '" rx="' + n(w / 2) + '" ry="' + n(h / 2) + tail + boxText(shape, stroke)
+      // A note: the folded corner is the symbol, and the flap the fold left behind is drawn as its two legs.
+      case 'note': {
+        const note = notePoints(shape)
+        const crease = note.fold.map((point) => at(point)).join(' L')
+        return (
+          '<polygon points="' + points(note.outline) + tail +
+          '<path d="M' + crease + '" fill="none" stroke="' + stroke + '" stroke-width="1" />' +
+          boxText(shape, stroke)
+        )
+      }
       // A subroutine carries its double side lines.
       case 'subroutine':
         return (
