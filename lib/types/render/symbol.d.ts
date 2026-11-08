@@ -99,9 +99,24 @@ export declare function noteFold(width: number, height: number): number;
  * The fold is the whole difference between a note and a component, so it is drawn: a plain rectangle would say
  * `this is an element` where the source said `this is a remark about one`.
  */
-export declare function notePoints(box: Box): {
+/**
+ * A folded box: the rectangle with one corner cut away, and the flap the cut left behind.
+ *
+ * The fold is the whole difference between a remark and an element, so it is drawn: a plain rectangle would say
+ * `this is an element` where the source said something else. `side` is the corner that folds - top-right for a note
+ * and a file, top-left for a card.
+ */
+export declare function foldPoints(box: Box, side: 'right' | 'left'): {
     outline: Point[];
     fold: [Point, Point, Point];
+};
+/**
+ * A frame: a rectangle whose name sits in a tab across the top-left corner.
+ *
+ * The tab is the symbol. The name is drawn in it, so the inside stays free for what the frame holds.
+ */
+export declare function frameTab(box: Box, label: number): {
+    tab: Box;
 };
 /** The apex of a cylinder's top or bottom cap: the point its middle is drawn at. */
 export declare function cylinderApex(box: Box, side: 'top' | 'bottom'): Point;

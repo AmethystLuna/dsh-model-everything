@@ -12,7 +12,18 @@
 export type NodeRole = 'normal' | 'error' | 'warning' | 'muted'
 
 /** The symbol a node is drawn as. UML and Mermaid both distinguish these; the notation decides which one applies. */
-export type NodeShape = 'rect' | 'diamond' | 'cylinder' | 'stadium' | 'circle' | 'subroutine' | 'hexagon' | 'note'
+export type NodeShape =
+  | 'rect'
+  | 'diamond'
+  | 'cylinder'
+  | 'stadium'
+  | 'circle'
+  | 'subroutine'
+  | 'hexagon'
+  | 'note'
+  | 'file'
+  | 'card'
+  | 'frame'
 
 export interface DiagramNode {
   id: string

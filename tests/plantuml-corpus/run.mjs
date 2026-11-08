@@ -209,6 +209,21 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A file, a card and a frame each carry a mark that says what they are: the mark is drawn, and a keyword the renderer
+// has no mark for stays refused.
+test('a file, a card and a frame draw their own marks', () => {
+  const source = ['@startuml', 'file "config" as config', 'card "payment" as card', 'frame "timeout" as policy', 'component A', 'A --> config', '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  const shapeOf = (id) => r.diagram.nodes.find((node) => node.id === id)?.shape
+  for (const [id, shape] of [['config', 'file'], ['card', 'card'], ['policy', 'frame']]) {
+    if (shapeOf(id) !== shape) throw new Error(id + ' is not a ' + shape + ': ' + String(shapeOf(id)))
+  }
+  if ((r.markup.match(/<polygon/g) ?? []).length < 2) throw new Error('the folded marks are missing')
+  const cloud = render({ source: ['@startuml', 'cloud Network', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (cloud.refused.length !== 1) throw new Error('a cloud was not refused: ' + JSON.stringify(cloud.refused))
+})
+
 // A note is an element with a folded corner; a note placed beside a box is a position, which this renderer decides.
 test('a note draws with its fold, and a placed note is refused', () => {
   const note = render(

@@ -200,12 +200,33 @@ export function noteFold(width: number, height: number): number {
  * The fold is the whole difference between a note and a component, so it is drawn: a plain rectangle would say
  * `this is an element` where the source said `this is a remark about one`.
  */
-export function notePoints(box: Box): { outline: Point[]; fold: [Point, Point, Point] } {
+/**
+ * A folded box: the rectangle with one corner cut away, and the flap the cut left behind.
+ *
+ * The fold is the whole difference between a remark and an element, so it is drawn: a plain rectangle would say
+ * `this is an element` where the source said something else. `side` is the corner that folds - top-right for a note
+ * and a file, top-left for a card.
+ */
+export function foldPoints(box: Box, side: 'right' | 'left'): { outline: Point[]; fold: [Point, Point, Point] } {
   const cut = noteFold(box.width, box.height)
   const right = box.x + box.width
   const bottom = box.y + box.height
-  // The pentagon is the note: the top-right corner is cut away on the diagonal. The crease is the flap the cut left
-  // behind, drawn as its two legs so the corner reads as folded rather than chamfered.
+  if (side === 'left') {
+    return {
+      outline: [
+        { x: box.x + cut, y: box.y },
+        { x: right, y: box.y },
+        { x: right, y: bottom },
+        { x: box.x, y: bottom },
+        { x: box.x, y: box.y + cut },
+      ],
+      fold: [
+        { x: box.x + cut, y: box.y },
+        { x: box.x + cut, y: box.y + cut },
+        { x: box.x, y: box.y + cut },
+      ],
+    }
+  }
   return {
     outline: [
       { x: box.x, y: box.y },
@@ -221,6 +242,17 @@ export function notePoints(box: Box): { outline: Point[]; fold: [Point, Point, P
     ],
   }
 }
+
+/**
+ * A frame: a rectangle whose name sits in a tab across the top-left corner.
+ *
+ * The tab is the symbol. The name is drawn in it, so the inside stays free for what the frame holds.
+ */
+export function frameTab(box: Box, label: number): { tab: Box } {
+  const width = Math.min(box.width, Math.max(24, label + 16))
+  return { tab: { x: box.x, y: box.y, width, height: 18 } }
+}
+
 
 /** The apex of a cylinder's top or bottom cap: the point its middle is drawn at. */
 export function cylinderApex(box: Box, side: 'top' | 'bottom'): Point {
