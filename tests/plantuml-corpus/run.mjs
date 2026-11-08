@@ -519,6 +519,21 @@ test('a mermaid direction token turns the drawing the way plantuml does', () => 
   if (new Set(downBoxes.map((box) => box.y)).size !== 3) throw new Error('the TD chain lost its rows')
 })
 
+// A boundary with nothing drawable inside it has no rectangle, and silence would leave a reader with a drawing that lost a
+// line. It is refused by its own line, once - an edge refused against the same boundary already said it.
+test('an empty boundary is refused by its line, and only once', () => {
+  const alone = render({ source: ['@startuml', 'state "empty" as E {', '}', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (alone.refused.length !== 1) throw new Error('alone: ' + JSON.stringify(alone.refused))
+  if (!alone.refused[0].startsWith('line 2:')) throw new Error('no line number: ' + alone.refused[0])
+  if (!alone.refused[0].includes('nothing inside it')) throw new Error('wrong reason: ' + alone.refused[0])
+  const withEdge = render(
+    { source: ['@startuml', 'component a \' outside', 'state "empty" as E {', '}', 'a --> E', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (withEdge.refused.length !== 1) throw new Error('two lines for one defect: ' + JSON.stringify(withEdge.refused))
+})
+
 // A composite state is a boundary, and the notation says so with a solid outline: a package is dashed because it groups
 // unrelated things, while a composite state is one state whose inside happens to be states.
 test('a state block is a solid boundary, and a package is still dashed', () => {

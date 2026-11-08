@@ -119,6 +119,8 @@ interface Builder {
   edgeScopes: Array<string | undefined>
   groups: DiagramGroup[]
   open: DiagramGroup[]
+  /** The line each boundary was opened on, by id: a boundary with nothing inside it names its own line. */
+  groupLines: Map<string, number>
   /** Node ids an edge wrote first. A name that turns out to be a block is removed again, not drawn as a box. */
   implicit: Set<string>
 }
@@ -284,7 +286,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const refused: string[] = []
   const ignored: string[] = []
   const heading: { value: 'down' | 'right'; header?: string; footer?: string; sourceCaption?: string } = { value: 'down' }
-  const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set() }
+  const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set(), groupLines: new Map() }
   let startId: string | undefined
   let seenAny = false
   let groupCount = 0
@@ -466,6 +468,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       }
       groupCount += 1
       const boundary = boundaryOf(declaration, opener, groupCount)
+      builder.groupLines.set(boundary.id, index + 1)
       builder.open.push({
         id: boundary.id,
         label: boundary.label,
@@ -588,6 +591,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   }
 
   const keptEdges: DiagramEdge[] = []
+  const explainedEmpty = new Set<string>()
   builder.edges.forEach((edge, index) => {
     const where = 'line ' + String(builder.edgeLines[index]) + ': '
     const fromBoundary = boundaryAt.get(edge.from)
@@ -613,6 +617,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
         return
       }
       if (!hasContents(boundary)) {
+        explainedEmpty.add(boundary)
         refused.push(where + '`' + group.label + '` is a block with nothing drawn inside it, so there is no rectangle to attach the edge to')
         return
       }
@@ -624,6 +629,18 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     })
   })
   builder.edges = keptEdges
+
+  // A boundary with nothing drawable inside it has no rectangle to draw, and saying nothing would leave a reader with a
+  // drawing that silently lost a line. It is refused by the line it was opened on, the same way a line it cannot draw is.
+  for (const group of builder.groups) {
+    // One defect, one line: an edge already refused against this boundary said the same thing.
+    if (explainedEmpty.has(group.id)) continue
+    const hasChild = builder.groups.some((child) => child.parent === group.id)
+    if (group.members.length > 0 || hasChild) continue
+    const line = builder.groupLines.get(group.id)
+    if (line === undefined) continue
+    refused.push('line ' + String(line) + ': `' + group.label + '` is a boundary with nothing inside it, so there is no rectangle to draw')
+  }
 
   if (!seenAny || builder.nodes.size === 0) {
     return { diagram: emptyDiagram(title, emptyCaption(refused.length)), refused, ignored }
