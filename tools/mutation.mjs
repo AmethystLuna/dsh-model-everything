@@ -160,10 +160,10 @@ const MUTATIONS = [
 
   {
     id: 'M17',
-    what: 'the page furniture is turned with the drawing',
+    what: 'the legend and the captions keep the coordinates the turn gave them',
     file: 'src/render/paint.ts',
-    from: "const pageKinds = new Set(['caption', 'title', 'header', 'legend'])",
-    to: 'const pageKinds = new Set<string>([])',
+    from: '        const top = furnitureAt.get(index)',
+    to: '        const top = undefined as number | undefined',
   },
 ]
 
