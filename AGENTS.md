@@ -56,7 +56,12 @@ npm run test:full        # end-to-end combined suite
 npm run bump -- <x.y.z>  # sync versions across declared manifests
 npm run bump -- --check  # all declared manifests agree
 npm run bump -- --audit  # no stale version references
+node tools/mutation.mjs  # opt-in: inject a defect, list which suite catches it
 ```
+
+`node tools/mutation.mjs` rewrites `src/` to plant a defect, runs the drawing suites, and restores the files with git: it
+needs a clean tree, and it fails when a planted defect goes unnoticed. Run it after a change to the layout or the routing -
+a suite that passes a broken drawing asserts nothing a reader would notice.
 
 Before committing: `npm run build` then `git diff --exit-code -- lib`. A change to
 `src/` that is not reflected in `lib/` fails CI.

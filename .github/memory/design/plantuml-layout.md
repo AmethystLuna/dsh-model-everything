@@ -133,24 +133,27 @@ metadata:
 
 矛盾约束的成规兑现了：`together` 造成的排序环由 `coords.ts` 的 `placing` 集合丢弃一条，而不是无限递归。
 
-## 缺陷注入：哪道闸门真的会红（第 20 轮实测）
+## 缺陷注入：哪道闸门真的会红（第 20–21 轮实测）
 
-把五种典型缺陷注入 `src/`（每次改完 `npm run build`、跑四个套件、再用 `git checkout -- src lib` 还原），看谁报错：
+`node tools/mutation.mjs` 会往 `src/` 里种一个缺陷、跑绘图相关的套件、再用 git 还原，**没被任何套件抓到就退出码 1**。
+它要求工作区干净，不进入 `npm run check`（它会改写工作区）。当前八个注入点与抓到它们的闸门：
 
-| 注入的缺陷 | 修复前 | 现在 |
-|---|---|---|
-| 关掉 separation pass（`SHARED_LINE_ROUNDS = 0`） | **没抓到** | `no two routes draw the same line` |
-| 端口打包改回固定 14px（忽略边能容纳的跨度） | 抓到 | 抓到 |
-| 关掉短台阶合并（`SNAP_JOG = 0`） | 抓到 | 抓到 |
-| Mermaid `==>` 又映射成虚线 | 抓到 | 抓到 |
-| 分离段只更新被移动那一行的 row（第 18 轮的真 bug） | **没抓到** | `a six-way fan-out keeps its routing` |
+| 注入 | 闸门 |
+|---|---|
+| M1 关掉 separation pass | `no two routes draw the same line`（plantuml-corpus，2 条） |
+| M2 端口打包改回固定间距 | `two edges never leave one side from the same point`（plantuml-corpus） |
+| M3 关掉短台阶合并 | `no route carries a jog shorter than a pen width`（plantuml-corpus） |
+| M4 Mermaid 粗线又画成虚线 | 记号等价性 + `a dashed mermaid edge…`（plantuml-corpus、diagram） |
+| M5 分离段只更新被移动那一行 | 扇出路由快照（plantuml-corpus，2 条） |
+| M6 交叉数恒为 0 | `tests/ordering`（3 条） |
+| M7 走廊贴着盒子边取 | `tests/render`（2 条） |
+| M8 折叠边界不生效 | `tests/diagram`（11 条） |
 
-两条结论：**没有断言的 pass 等于装饰**——分离段与它的分解在注入缺陷时全绿；补上「两条路线不共线」这条**性质**闸门（不看实现）
-与一张扇出路由快照后，两类缺陷都会红。补的闸门还顺带证明分离段**今天确实会触发**：给的一份分层源关掉它就会出现共线。
+补这两道闸门之前，M1 与 M5 是**全绿**的：没有断言的 pass 等于装饰，而一个真修过的 bug 没有快照就等于没修。
 
-另一个环境事实：`npm run build` 之后 `git status` 会报 145 个 `lib/` 文件「已修改」，而 `git hash-object` 与
-`HEAD:lib/...` **哈希相同**、`git diff --exit-code -- lib` 退出码为 0。这是 `core.autocrlf=true` 下 Windows 检出的
-stat 缓存噪音，不是内容变化——发布规则看的是 `git diff`，它是对的。
+工具本身踩过一个坑，值得记：`execFileSync('npm', …)` 在 Windows 上启动不了 `npm.cmd`，构建静默没跑，于是八个注入点
+全部“通过”——变异检查对着旧 `lib/` 跑，给出最糟的答案。改成把命令拼成一个字符串交给 shell 才正确，并顺手避开了
+`shell: true` + 参数数组的弃用告警。
 
 ## 测试与风险
 
