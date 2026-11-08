@@ -277,6 +277,26 @@ test('no route carries a jog shorter than a pen width', () => {
   }
 })
 
+// The two notations state the same direction with different words, and the engine honours both: a reader who asks for a
+// left-to-right picture gets one in either spelling.
+test('a mermaid direction token turns the drawing the way plantuml does', () => {
+  const rows = (notation) => {
+    const source = notation === 'mermaid' ? 'flowchart LR\n  a --> b\n  b --> c' : '@startuml\nleft to right direction\ncomponent a\ncomponent b\ncomponent c\na --> b\nb --> c\n@enduml'
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(notation + ' refused: ' + JSON.stringify(r.refused))
+    const boxes = r.canvas.shapes.filter((shape) => shape.kind === 'box')
+    return { rows: new Set(boxes.map((box) => box.y)).size, wide: r.canvas.width > r.canvas.height }
+  }
+  for (const notation of ['mermaid', 'plantuml']) {
+    const turned = rows(notation)
+    if (turned.rows !== 1) throw new Error(notation + ' did not turn the chain: ' + String(turned.rows) + ' rows')
+    if (!turned.wide) throw new Error(notation + ' kept the portrait canvas')
+  }
+  const down = render({ source: 'flowchart TD\n  a --> b\n  b --> c' }, {}, { scheme: 'default' })
+  const downBoxes = down.canvas.shapes.filter((shape) => shape.kind === 'box')
+  if (new Set(downBoxes.map((box) => box.y)).size !== 3) throw new Error('the TD chain lost its rows')
+})
+
 // A legend is page furniture. The metamorphic point is what it does *not* do: an arrow written inside it is text, not
 // an edge, and it takes no part in the layout.
 test('a legend block is text under the drawing, not lines in it', () => {

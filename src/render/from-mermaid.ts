@@ -8,8 +8,8 @@
  *
  * Supported:
  *
- * - `graph TD|TB|LR` and `flowchart TD|TB|LR`; the direction token is read and dropped - this renderer has one
- *   layout, top to bottom, so `LR` draws the same picture as `TD` (measured, not assumed);
+ * - `graph TD|TB|LR` and `flowchart TD|TB|LR`; `LR` and `RL` turn the drawing the way PlantUML's
+ *   `left to right direction` does, and `TD`/`TB`/`BT` leave it top to bottom;
  * - node declarations `A[text]`, `A(text)`, `A{text}`, `A((text))`, and a bare `A`;
  * - edges `-->`, `---`, `-.->`, `==>`, with a label as `-->|text|` or `-- text -->`;
  * - `stateDiagram` / `stateDiagram-v2`: `[*] --> A`, `A --> B: event`, `state "text" as id`;
@@ -112,6 +112,7 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   const ignored: string[] = []
   const builder: Builder = { nodes: new Map(), edges: [], groups: [], open: [] }
   let mode: 'none' | 'graph' | 'state' = 'none'
+  const direction: { value: 'down' | 'right' } = { value: 'down' }
   let startId: string | undefined
   let endCount = 0
 
@@ -136,6 +137,10 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
     }
     if (/^(graph|flowchart)\b/.test(lower)) {
       mode = 'graph'
+      // The direction token is the same statement PlantUML's `left to right direction` makes, and the engine below
+      // knows how to honour it: `LR` turns the drawing, `TD`/`TB` leave it as it is.
+      const heading = /\b(LR|RL|TD|TB|BT)\b/.exec(line)
+      if (heading !== null && (heading[1] === 'LR' || heading[1] === 'RL')) direction.value = 'right'
       return
     }
     if (/^statediagram(-v2)?\b/.test(lower)) {
@@ -256,6 +261,7 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
     nodes: [...builder.nodes.values()],
     edges: builder.edges,
     ...(builder.groups.length === 0 ? {} : { groups: builder.groups }),
+    ...(direction.value === 'right' ? { direction: direction.value } : {}),
     caption:
       mode + ', ' + String(builder.nodes.size) + ' box' + (builder.nodes.size === 1 ? '' : 'es') + ', ' +
       String(builder.edges.length) + ' arrow' + (builder.edges.length === 1 ? '' : 's') +

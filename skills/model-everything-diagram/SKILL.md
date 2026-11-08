@@ -57,11 +57,25 @@ longer a summary. When you present one, say what it shows — the layout, not wh
 node a short alias to name in edges, so a reader can check the grouping against the text that produced it. Mermaid
 stays supported - a flow someone else wrote still draws - but a new diagram this plugin authors is written in
 PlantUML. Both notations go through the same layout engine, so the choice changes the spelling of the source, not
-the drawing rules - and **neither notation's direction keyword changes the layout**: Mermaid's `LR` and PlantUML's
-`left to right direction` are read and dropped, because there is one layout, top to bottom.
+the drawing rules - and **the direction keyword is the one place the two notations agree by doing**: Mermaid's `LR`
+and PlantUML's `left to right direction` both turn the drawing, so a reader who writes either gets the picture they
+asked for.
 
 A refusal is one line in `refused`, phrased `line N: …`. The drawing you get does not show the refused lines, and
 the tool says so rather than leaving you to notice.
+
+**Why a keyword is refused.** Each name left in the table above is a symbol this engine has no outline for, not a
+line it skipped: `actor` and `participant` are the stick figure and the lifeline of a sequence diagram, and a
+sequence diagram is a different picture with a time axis; `agent` is that same stick figure under another name; a
+`cloud` outline is a rounded blob whose only meaning is 'somewhere else', which the caption can say in words; a
+`note` placed beside a box (`note left of`, `note right:`) is a position, and positions are decided here; an edge
+marked at both ends states two directions in one line. Drawing any of them as a plain rectangle would put a symbol
+in the picture that the text did not ask for. The drawing you get does not show the refused lines, and
+the tool says so rather than leaving you to notice.
+
+A label that could not be placed clear is reported too, as a `LABELS` block: the drawing is complete and every label
+sits on its own edge, but its mask covers a stretch of a neighbouring line. That is a fact about the picture - read
+the label from the source when the drawing is ambiguous - and a crowded figure is where it happens.
 
 A third answer sits between drawn and refused. A **layout control** - `skinparam`, `scale`, `hide`, `!pragma layout` -
 asks a layouter to arrange the drawing, and this renderer is the layouter: the line is understood, has no effect, and
