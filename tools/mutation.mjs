@@ -208,6 +208,14 @@ const MUTATIONS = [
     from: '      if (HIDE_DIRECTIVE.test(line)) {',
     to: '      if (false) {',
   },
+
+  {
+    id: 'M23',
+    what: 'text is escaped for angle brackets but not for ampersands',
+    file: 'src/render/svg.ts',
+    from: "  value.replaceAll('&', '&amp;').replaceAll('<', '&lt;')",
+    to: "  value.replaceAll('<', '&lt;')",
+  },
 ]
 
 const argument = process.argv[2]
