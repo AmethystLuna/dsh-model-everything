@@ -285,7 +285,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
   const ignored: string[] = []
-  const heading: { value: 'down' | 'right'; header?: string; footer?: string; sourceCaption?: string } = { value: 'down' }
+  const heading: { value: 'down' | 'right'; header?: string[]; footer?: string[]; sourceCaption?: string[] } = { value: 'down' }
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set(), groupLines: new Map() }
   let startId: string | undefined
   let seenAny = false
@@ -295,6 +295,30 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   // skipped by the loop below. Without this, an arrow written inside a legend would become an edge.
   const legend: string[] = []
   const inLegend = new Set<number>()
+  // The block form of the page text - `header`, then its lines, then `end header` - is collected the same way the legend
+  // is: the lines inside it are the source's words, and letting them reach the parser would turn a footer into boxes.
+  const pageBlocks: { header: string[]; footer: string[]; sourceCaption: string[] } = { header: [], footer: [], sourceCaption: [] }
+  {
+    const keyOf = { header: 'header', footer: 'footer', caption: 'sourceCaption' } as const
+    let open: keyof typeof pageBlocks | undefined
+    lines.forEach((raw, index) => {
+      const text = raw.trim()
+      if (open === undefined) {
+        const opener = /^(header|footer|caption)\s*$/.exec(text)
+        if (opener === null) return
+        open = keyOf[opener[1] as 'header' | 'footer' | 'caption']
+        inLegend.add(index)
+        return
+      }
+      inLegend.add(index)
+      if (new RegExp('^end\\s*' + (open === 'sourceCaption' ? 'caption' : open) + '\\b').test(text)) {
+        open = undefined
+        return
+      }
+      if (text !== '') pageBlocks[open].push(text)
+    })
+  }
+
   let legendOpen = false
   lines.forEach((raw, index) => {
     const text = raw.trim()
@@ -334,9 +358,9 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
         refused.push(where + '`' + (pageText[1] as string) + '` names no text')
         return
       }
-      if (pageText[1] === 'header') heading.header = value
-      else if (pageText[1] === 'footer') heading.footer = value
-      else heading.sourceCaption = value
+      if (pageText[1] === 'header') heading.header = [value]
+      else if (pageText[1] === 'footer') heading.footer = [value]
+      else heading.sourceCaption = [value]
       return
     }
 
@@ -690,12 +714,21 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       String(builder.edges.length) + ' arrow' + (builder.edges.length === 1 ? '' : 's') +
       (refused.length === 0 ? '' : ', ' + String(refused.length) + ' line(s) refused'),
   }
+  // A page-text block and a one-line statement say the same thing; the line form is the block with one line in it, and a
+  // source that writes both gets both, in the order it wrote them.
+  const pageTextOf = (key: 'header' | 'footer' | 'sourceCaption'): string[] | undefined => {
+    const fromBlock = pageBlocks[key]
+    const line = heading[key]
+    const lines = [...(line === undefined ? [] : line), ...fromBlock]
+    return lines.length === 0 ? undefined : lines
+  }
+
   // `together { A B }` is a row, not a boundary: the boxes are declared by their own lines and the block only joins
   // them, so it is attached to the drawing rather than drawn as a group.
   const sameRank = togetherGroups(lines)
   const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}), ...(legend.length === 0 ? {} : { legend }),
-    ...(heading.header === undefined ? {} : { header: heading.header }),
-    ...(heading.footer === undefined ? {} : { footer: heading.footer }),
-    ...(heading.sourceCaption === undefined ? {} : { sourceCaption: heading.sourceCaption }) }
+    ...(pageTextOf('header') === undefined ? {} : { header: pageTextOf('header') }),
+    ...(pageTextOf('footer') === undefined ? {} : { footer: pageTextOf('footer') }),
+    ...(pageTextOf('sourceCaption') === undefined ? {} : { sourceCaption: pageTextOf('sourceCaption') }) }
   return { diagram: joined, refused, ignored }
 }

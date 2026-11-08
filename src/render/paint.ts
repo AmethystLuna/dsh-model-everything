@@ -173,7 +173,7 @@ export interface HeaderShape {
   kind: 'header'
   x: number
   y: number
-  text: string
+  lines: string[]
   colour: ColourRole
 }
 
@@ -375,7 +375,9 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const groups = diagram.groups ?? []
   // A header is page text above the drawing, so it takes the band the title would have had and pushes everything down by
 // one line. A drawing without one keeps the geometry it always had.
-const headerShift = diagram.header === undefined ? 0 : 16
+// A header of more than one line takes the room of the lines it has: one line is a band of sixteen, and the title starts
+// below the last of them rather than on top of it.
+const headerShift = diagram.header === undefined ? 0 : Math.max(1, diagram.header.length) * 16
 const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   const placement = place(diagram, topOffset)
   const { boxes, groupRects } = placement
@@ -1706,8 +1708,8 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   })
   const labelCollisions = routes.reduce((total, { shape }) => total + ((shape.labelPlacement?.collisions ?? 0) > 0 ? 1 : 0), 0)
 
-  if (diagram.header !== undefined) {
-    shapes.push({ kind: 'header', x: MARGIN, y: MARGIN + 12, text: diagram.header, colour: 'text' })
+  if (diagram.header !== undefined && diagram.header.length > 0) {
+    shapes.push({ kind: 'header', x: MARGIN, y: MARGIN + 12, lines: diagram.header, colour: 'text' })
   }
   shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12 + headerShift, text: diagram.title, colour: 'text' })
 
@@ -1734,8 +1736,8 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   // The source's own words come first and this renderer's note last: a reader reads the diagram's caption before the
   // machine's count of boxes.
   const extra: string[] = []
-  if (diagram.sourceCaption !== undefined) extra.push(diagram.sourceCaption)
-  if (diagram.footer !== undefined) extra.push(diagram.footer)
+  if (diagram.sourceCaption !== undefined) extra.push(...diagram.sourceCaption)
+  if (diagram.footer !== undefined) extra.push(...diagram.footer)
   if (extra.length > 0) shapes.push({ kind: 'caption', x: MARGIN, y: captionTop, lines: extra, colour: 'text' })
   // Anchored at the left margin, where the title is. The writer starts the text there: centred on a left-edge x,
   // half of a long caption fell outside the drawing and was clipped at the bottom edge of the picture.

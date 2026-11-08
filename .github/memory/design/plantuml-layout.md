@@ -34,6 +34,7 @@ metadata:
 | `component "文字" as X`、`package "文字" as P { }` | 别名 | 支持，别名是边引用的 id |
 | `[*] --> A` | 起点 | 支持 |
 | `title` | 标题 | 支持 |
+| `header`/`caption`/`footer`，单行或 `… end header` 块形式 | 页面文本 | 支持，行数决定占用的带高；块内文字**不进图** |
 | `legend` … `end legend` | 图例块 | 支持，画在图下、图注之上，**不参与布局**；`legend right` 等角位进 `ignored` |
 | `left to right direction`（PlantUML）与 `flowchart LR`（Mermaid） | 全局方向 | **支持**：测量转置后跑同一条管线，末尾把画布转回来 |
 | `top to bottom direction` | 全局方向 | 接受但无效果（本来就是自上而下），进 `ignored` |

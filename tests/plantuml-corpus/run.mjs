@@ -558,6 +558,34 @@ test('a state block is a solid boundary, and a package is still dashed', () => {
   if (!packaged.markup.includes('stroke-dasharray')) throw new Error('a package lost its dashes')
 })
 
+// The block form of the page text is text, not diagram lines: a footer whose line reads `component ghost` must not grow a
+// box, and a header of two lines must take the room of two.
+test('a page-text block is text, not diagram lines', () => {
+  const source = [
+    '@startuml',
+    'header',
+    '  internal',
+    '  component ghost',
+    'end header',
+    'component a',
+    'footer',
+    '  revised',
+    '  a --> b',
+    'end footer',
+    '@enduml',
+  ].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if (r.diagram.nodes.length !== 1) throw new Error('a page-text line became a node: ' + JSON.stringify(r.diagram.nodes.map((node) => node.id)))
+  if (r.diagram.edges.length !== 0) throw new Error('a page-text line became an edge: ' + String(r.diagram.edges.length))
+  if (JSON.stringify(r.diagram.header) !== JSON.stringify(['internal', 'component ghost'])) throw new Error('header lines: ' + JSON.stringify(r.diagram.header))
+  if (JSON.stringify(r.diagram.footer) !== JSON.stringify(['revised', 'a --> b'])) throw new Error('footer lines: ' + JSON.stringify(r.diagram.footer))
+  const headerShape = r.canvas.shapes.find((shape) => shape.kind === 'header')
+  const title = r.canvas.shapes.find((shape) => shape.kind === 'title')
+  if (headerShape === undefined || title === undefined) throw new Error('the header or the title is missing')
+  if (!(title.y > headerShape.y + 15)) throw new Error('the title sits on the second header line')
+})
+
 // Page text in the source's own words: a header above the drawing pushes it down, a caption and a footer sit under it.
 test('page text in the source is drawn, and it moves the drawing only when it must', () => {
   const bare = render({ source: ['@startuml', 'component a', 'component b', 'a --> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })

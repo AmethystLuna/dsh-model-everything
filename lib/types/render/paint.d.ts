@@ -133,7 +133,7 @@ export interface HeaderShape {
     kind: 'header';
     x: number;
     y: number;
-    text: string;
+    lines: string[];
     colour: ColourRole;
 }
 export interface TitleShape {
