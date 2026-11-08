@@ -1,6 +1,6 @@
 ---
 name: plantuml-layout
-description: 选 PlantUML 作卡片语言的真正理由（布局可控）：今天哪些构造支持、哪些被静默忽略、哪些按行拒收，以及把「可控」拆成 P1–P4 的顺序、每步的验收与代价
+description: 选 PlantUML 作卡片语言的真正理由（布局可控）、今天的行为矩阵（支持 / 进 ignored / 按行拒收）、P1–P4 的落地状态与各自的验收用例，以及转置布局必须用读者坐标系判断的两条坑
 metadata:
   type: design
 ---
