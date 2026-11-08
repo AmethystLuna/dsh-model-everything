@@ -292,6 +292,7 @@ function togetherGroups(lines: readonly string[]): {
   const groups: string[][] = []
   const implicit = new Map<number, string>()
   let open: string[] | undefined
+  let depth = 0
   let index = -1
   const empty: number[] = []
   const oneMember: number[] = []
@@ -300,11 +301,23 @@ function togetherGroups(lines: readonly string[]): {
     const line = raw.replace(/'.*$/, '').trim()
     if (line === '') continue
     if (/^together\b/.test(line) && line.endsWith('{')) {
-      open = []
+      // A nested block joins the row its parent is collecting: a row of a row is still one row.
+      if (open === undefined) {
+        open = []
+        depth = 0
+      } else {
+        depth += 1
+      }
       continue
     }
     if (open === undefined) continue
     if (line === '}') {
+      // A brace that closes something inside the block - a boundary, a nested `together` - is not the block's own end.
+      if (open !== undefined && depth > 0) {
+        depth -= 1
+        continue
+      }
+      if (open === undefined) continue
       if (open.length > 1) groups.push(open)
       else if (open.length === 1) oneMember.push(index)
       else empty.push(index)
@@ -312,6 +325,10 @@ function togetherGroups(lines: readonly string[]): {
       continue
     }
 
+    if (line.endsWith('{')) {
+      depth += 1
+      continue
+    }
     const declared = DECLARED.exec(line)
     if (declared === null) {
       // A bare name inside the block names a box; the arrow rules make such a name an element, and so does this.

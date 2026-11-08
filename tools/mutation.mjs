@@ -254,6 +254,21 @@ const MUTATIONS = [
     from: '    if (/^as\\s/i.test(after)) break',
     to: '    if (false) break',
   },
+
+  {
+    id: 'M29',
+    what: 'a bare name inside a together block is not a box',
+    file: 'src/render/from-plantuml.ts',
+    from: "      if (/^[A-Za-z_][\\w.-]*$/.test(line)) {",
+    to: '      if (false) {',
+  },
+  {
+    id: 'M30',
+    what: 'a brace inside a together block ends the block',
+    file: 'src/render/from-plantuml.ts',
+    from: '      if (open !== undefined && depth > 0) {',
+    to: '      if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
