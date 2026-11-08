@@ -64,3 +64,31 @@ if (status.interaction !== 'follow-approval') throw new Error('inspect status in
 if ('enabled' in status) throw new Error('the status still reports an enabled switch that does not switch anything')
 
 console.log('PASS apply smoke: tool and inspect registrations, and no self-reporting switch')
+
+// The drawing tool, called the way the runtime calls it: source in, SVG and a report out. The suites under tests/ call
+// the renderer directly, which leaves the wiring - execute, the result the card keeps, and the text the model reads -
+// unasserted. These sources are the constructs the renderer grew this month, one line each.
+const drawing = (await import('../lib/diagram-render-tool.js')).diagramRenderTool
+const drawn = [
+  ['@startuml', 'component a', 'component b', 'a --> b : calls', '@enduml'].join('\n'),
+  ['@startuml', 'together {', '  component a', '  component b', '}', 'component c', 'c --> a', 'a -[hidden]-> b', '@enduml'].join('\n'),
+  ['@startuml', 'left to right direction', 'package "p" as p {', '  component x', '}', 'note "read this" as n', 'x --> n', 'note -right-> p', '@enduml'].join('\n'),
+  'flowchart LR\n  a[one] --> b[two]\n  b --> c[three]',
+]
+for (const source of drawn) {
+  const value = await drawing.execute({ source }, {})
+  const report = drawing.output.render({ source }, value).map((part) => part.text ?? '').join('\n')
+  if (value.svg.startsWith('<svg') === false) throw new Error('no svg for: ' + source.slice(0, 30))
+  if (value.svg.includes('data-node-id') === false) throw new Error('the svg carries no node for: ' + source.slice(0, 30))
+  if (report.includes('NEXT') === false) throw new Error('the report says nothing next for: ' + source.slice(0, 30))
+  if (value.labelCollisions !== 0) throw new Error('a label collision on a small drawing: ' + source.slice(0, 30))
+}
+// A line the renderer will not draw is still a drawing: the refused line is reported and the rest arrives.
+const partial = await drawing.execute({ source: ['@startuml', 'component a', 'actor Someone', 'component b', 'a --> b', '@enduml'].join('\n') }, {})
+const partialReport = drawing.output.render({}, partial).map((part) => part.text ?? '').join('\n')
+if (partial.refused.length !== 1) throw new Error('the refused line was not counted: ' + String(partial.refused.length))
+if (partial.svg.includes('data-node-id') === false) throw new Error('a refusal threw the whole drawing away')
+if (partialReport.includes('REFUSED') === false) throw new Error('the report does not name the refused line')
+if (partial.ok !== false) throw new Error('a drawing with a refused line reported ok')
+
+console.log('PASS apply smoke: the drawing tool answers source in, svg and report out')
