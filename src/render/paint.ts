@@ -1370,6 +1370,82 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     paintRoute(edgeIndex, edge, routeEdge(source, target, boxList, anchors).points, colour)
   }
 
+  /**
+   * No two edges are drawn on one line.
+   *
+   * The layout gives every edge its own corridor and the painter is the last stage that can see one stage's corridor
+   * become another's: an approach stub is a fixed distance from the box it enters, so two edges into two boxes that
+   * line up draw their long legs on one line, and a reader sees one line with two heads. Graphviz's answer is a
+   * virtual node per edge per gap; the same idea applied to what was drawn is a leg that steps aside by a lane's
+   * width - two corners, and the line is its own again. A step is only taken when it leaves no line shared at all:
+   * a jog that lands on another run trades one overlap for another, which is not a drawing that got better.
+   */
+  const SHARED_LINE_CLEARANCE = 14
+  /** Every axis-aligned piece of a route: the axis it runs on, where, and the run between. */
+  const piecesOf = (shape: LinkShape | PathShape): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> => {
+    if (shape.kind !== 'path') return []
+    const points = shape.points
+    const out: Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> = []
+    for (let i = 1; i < points.length; i += 1) {
+      const one = points[i - 1] as Point
+      const two = points[i] as Point
+      if (Math.abs(one.y - two.y) < 0.5 && Math.abs(one.x - two.x) > 1) {
+        out.push({ axis: 'y', at: one.y, lo: Math.min(one.x, two.x), hi: Math.max(one.x, two.x), slot: i - 1 })
+      } else if (Math.abs(one.x - two.x) < 0.5 && Math.abs(one.y - two.y) > 1) {
+        out.push({ axis: 'x', at: one.x, lo: Math.min(one.y, two.y), hi: Math.max(one.y, two.y), slot: i - 1 })
+      }
+    }
+    return out
+  }
+  /** Do these two routes draw any piece on one line for more than a pixel? */
+  const shares = (one: ReturnType<typeof piecesOf>, other: ReturnType<typeof piecesOf>): boolean =>
+    one.some((mine) =>
+      other.some(
+        (theirs) =>
+          mine.axis === theirs.axis && Math.abs(mine.at - theirs.at) < 0.5 && Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) > 1,
+      ),
+    )
+  const drawnPieces = routes.map(({ shape }) => piecesOf(shape))
+  const boxesOfEdge = (edge: number): { from: Box; to: Box } | undefined => {
+    const statement = diagram.edges[edge] as DiagramEdge | undefined
+    if (statement === undefined) return undefined
+    const from = endBox(statement.from)
+    const to = endBox(statement.to)
+    return from === undefined || to === undefined ? undefined : { from, to }
+  }
+  routes.forEach(({ shape, edge }, at) => {
+    if (shape.kind !== 'path') return
+    const ends = boxesOfEdge(edge)
+    if (ends === undefined) return
+    const others = drawnPieces.filter((_, index) => index !== at)
+    if (!others.some((theirs) => shares(piecesOf(shape), theirs))) return
+    for (const piece of piecesOf(shape)) {
+      const points = shape.points
+      const before = points[piece.slot] as Point
+      const after = points[piece.slot + 1] as Point
+      const vertical = piece.axis === 'x'
+      // A vertical leg is entered and left along a horizontal, so its neighbours share its y; a horizontal leg's
+      // share its x. That is what a jog stands on, and a leg with no horizontal at an end cannot step aside.
+      const entersLevel = piece.slot > 0 && Math.abs(vertical ? (points[piece.slot - 1] as Point).y - before.y : (points[piece.slot - 1] as Point).x - before.x) < 0.5
+      const leavesLevel = piece.slot + 2 < points.length && Math.abs(vertical ? (points[piece.slot + 2] as Point).y - after.y : (points[piece.slot + 2] as Point).x - after.x) < 0.5
+      if (!entersLevel || !leavesLevel) continue
+      for (const shift of [SHARED_LINE_CLEARANCE, -SHARED_LINE_CLEARANCE]) {
+        const moved = [
+          ...points.slice(0, piece.slot + 1),
+          vertical ? { x: before.x + shift, y: before.y } : { x: before.x, y: before.y + shift },
+          vertical ? { x: after.x + shift, y: after.y } : { x: after.x, y: after.y + shift },
+          ...points.slice(piece.slot + 1),
+        ]
+        if (!clearOfBoxes(moved, ends.from, ends.to)) continue
+        const candidate: PathShape = { ...shape, points: moved }
+        if (others.some((theirs) => shares(piecesOf(candidate), theirs))) continue
+        shape.points = moved
+        drawnPieces[at] = piecesOf(shape)
+        return
+      }
+    }
+  })
+
   // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate
   // at. Each candidate route was checked before it was emitted, so this pass is the assertion that no stage slipped a
   // segment through a box - and the place a router that found no way round is reported rather than hidden.

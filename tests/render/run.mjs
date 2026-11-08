@@ -2918,6 +2918,47 @@ const endsOn = (canvas, target) => {
   return new Set(points.map((point) => String(point.x) + ',' + String(point.y)))
 }
 
+test('two edges whose targets line up do not draw their long legs on one line', () => {
+  // Two transitions wrap round the same side and enter boxes that share an x, so the approach stub puts both long
+  // legs on one line. The painter steps the later one aside by a lane: a reader must not see one line with two heads.
+  const source = [
+    '@startuml',
+    'state "待支付" as pending',
+    'state "已支付" as paid',
+    'state "已关闭" as closed',
+    'state "已签收" as delivered',
+    'state "已发货" as shipped',
+    '[*] --> pending',
+    'pending --> paid',
+    'paid --> shipped',
+    'shipped --> delivered',
+    'pending --> closed',
+    '@enduml',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const pieces = routesOf(canvas).map((shape) => {
+    if (shape.kind !== 'path') return []
+    const out = []
+    const points = shape.points
+    for (let i = 1; i < points.length; i += 1) {
+      const one = points[i - 1]
+      const two = points[i]
+      if (Math.abs(one.x - two.x) < 0.5 && Math.abs(one.y - two.y) > 4) out.push({ at: one.x, lo: Math.min(one.y, two.y), hi: Math.max(one.y, two.y) })
+    }
+    return out
+  })
+  for (let left = 0; left < pieces.length; left += 1) {
+    for (let right = left + 1; right < pieces.length; right += 1) {
+      for (const mine of pieces[left]) {
+        for (const theirs of pieces[right]) {
+          if (Math.abs(mine.at - theirs.at) > 0.5) continue
+          const overlap = Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo)
+          if (overlap > 1) throw new Error('two routes share a vertical at ' + String(mine.at) + ' for ' + String(overlap))
+        }
+      }
+    }
+  }
+})
 test('a fan-in keeps a port of its own for every arrow and draws no junction', () => {
   // Merging was tried and withdrawn: PlantUML does not merge lines either, and one drawn line cannot carry two
   // statement kinds without saying something the source did not. So a fan-in is drawn as the arrows it is - one
