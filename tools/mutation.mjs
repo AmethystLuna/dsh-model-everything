@@ -111,6 +111,16 @@ const MUTATIONS = [
     from: "  if (legend.length > 0) shapes.push({ kind: 'legend', x: MARGIN, y: legendTop, lines: legend, colour: 'text' })",
     to: '',
   },
+  {
+    id: 'M11',
+    what: 'the edge that places a note beside a box is drawn',
+    file: 'src/render/from-plantuml.ts',
+    from: [
+      "        hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,",
+      '        invisible: true,',
+    ].join('\n'),
+    to: "        hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,",
+  },
 ]
 
 const argument = process.argv[2]
