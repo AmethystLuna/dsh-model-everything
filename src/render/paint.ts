@@ -1264,7 +1264,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
    * the route then runs to that height, comes back, and enters - a hook a reader has to trace twice. The port is the
    * fact; the waypoint that overshoots it is the proposal, and the proposal is what gives way.
    */
-  const withoutReversals = (points: Point[]): Point[] => {
+  const withoutReversals = (points: Point[], free?: (segment: Segment) => boolean, lift = true): Point[] => {
     const out: Point[] = []
     for (const point of points) {
       const last = out[out.length - 1]
@@ -1288,28 +1288,25 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     // the step they are, two points above the box they enter. The notch is folded into the leg it belongs to, which
     // turns the pair into the one corner the route actually is.
     const folded = simplify(out)
-    const STUB = 6
-    // A short leg at either end is a notch: the approach is two points longer than the box allows. It is not folded
-    // away - the last leg has to meet the box square to its side, and turning it into the approach would lay the line
-    // along the box and point the arrow sideways - so the run before it is lifted to a whole stub away.
-    const ends = folded.length >= 3
-    if (ends) {
-      const last = folded[folded.length - 1] as Point
-      const anchor = folded[folded.length - 3] as Point
+    // A short leg at the end is a notch: the approach runs a couple of points above the box, and the arrowhead does
+    // not fit in the leg it leaves. It is not folded away - the last leg has to meet the box square to its side, and
+    // folding it would lay the line along the box and point the arrow sideways - so the run before it is lifted. A
+    // whole stub is the answer when the line that makes is free, and the shortest legal one when it is not.
+    if (lift && folded.length >= 3) {
+      const tail = folded[folded.length - 1] as Point
       const corner = folded[folded.length - 2] as Point
-      const short = Math.abs(corner.x - last.x) + Math.abs(corner.y - last.y) < 6
-      if (short) {
-        const vertical = Math.abs(corner.x - last.x) < 0.5
-        const toward = vertical ? Math.sign(last.y - corner.y) : Math.sign(last.x - corner.x)
-        const at = vertical ? last.y - toward * STUB : last.x - toward * STUB
-        if (vertical && Math.abs(at - anchor.y) >= 2) {
-          ;(folded[folded.length - 3] as { x: number; y: number }).x = anchor.x
+      const head = folded[folded.length - 3] as Point
+      const vertical = Math.abs(corner.x - tail.x) < 0.5
+      if (vertical && Math.abs(corner.y - tail.y) < 16) {
+        const toward = Math.sign(tail.y - corner.y)
+        for (const span of [16, 6]) {
+          const at = tail.y - toward * span
+          const segment: Segment = { x1: corner.x, y1: at, x2: head.x, y2: at }
+          if (Math.abs(at - head.y) < 2) continue
+          if (free !== undefined && !free(segment)) continue
           ;(folded[folded.length - 3] as { x: number; y: number }).y = at
           ;(folded[folded.length - 2] as { x: number; y: number }).y = at
-        } else if (!vertical && Math.abs(at - anchor.x) > 6) {
-          ;(folded[folded.length - 3] as { x: number; y: number }).y = anchor.y
-          ;(folded[folded.length - 3] as { x: number; y: number }).x = at
-          ;(folded[folded.length - 2] as { x: number; y: number }).x = at
+          break
         }
       }
     }
@@ -1319,7 +1316,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const paintPath = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
     const source = endBox(edge.from)
     const target = endBox(edge.to)
-    const drawn = source === undefined || target === undefined ? points : withoutReversals(orthogonal(points, source, target))
+    const routed = source === undefined || target === undefined ? points : orthogonal(points, source, target)
+    const drawn = source === undefined || target === undefined
+      ? routed
+      : withoutReversals(routed, (segment) => segmentFree(segment, source, target))
     const shape: PathShape = {
       kind: 'path',
       points: drawn,
@@ -1331,6 +1331,7 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       ...(edge.arrow === undefined ? {} : { arrow: edge.arrow }),
     }
     shapes.push(shape)
+    drawnRoutes.push(drawn)
     routes.push({ shape, edge: edgeIndex, fixed: false })
   }
 
@@ -1344,6 +1345,31 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       ['right', Math.abs(at.x - (box.x + box.width))],
     ]
     return distances.sort((left, right) => left[1] - right[1])[0][0] as Side
+  }
+
+  /** The routes drawn so far, so a lift can be told whether the line it makes is already taken. */
+  const drawnRoutes: Point[][] = []
+  /** Is this segment free: no other drawn line within four points of it, and no box across it. */
+  const segmentFree = (segment: Segment, from: Box, to: Box): boolean => {
+    const vertical = Math.abs(segment.x1 - segment.x2) < 0.5
+    const at = vertical ? segment.x1 : segment.y1
+    const lo = vertical ? Math.min(segment.y1, segment.y2) : Math.min(segment.x1, segment.x2)
+    const hi = vertical ? Math.max(segment.y1, segment.y2) : Math.max(segment.x1, segment.x2)
+    for (const other of drawnRoutes) {
+      for (let slot = 1; slot < other.length; slot += 1) {
+        const start = other[slot - 1] as Point
+        const end = other[slot] as Point
+        const otherVertical = Math.abs(start.x - end.x) < 0.5
+        if (otherVertical !== vertical) continue
+        const otherAt = otherVertical ? start.x : start.y
+        if (Math.abs(otherAt - at) >= 4) continue
+        const otherLo = otherVertical ? Math.min(start.y, end.y) : Math.min(start.x, end.x)
+        const otherHi = otherVertical ? Math.max(start.y, end.y) : Math.max(start.x, end.x)
+        if (Math.min(hi, otherHi) - Math.max(lo, otherLo) > 1) return false
+      }
+    }
+    const crossed = boxesCrossedBy([{ x: segment.x1, y: segment.y1 }, { x: segment.x2, y: segment.y2 }], from, to, boxList)
+    return crossed.length === 0
   }
 
   const paintRoute = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
@@ -1583,6 +1609,12 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     }
     return total
   }
+  // A leg that stepped aside can leave a corner behind it where its own two runs cross, so the cleanup runs again over
+  // what the drawing finally carries - the last word on the shape of a route, after every stage that moved one.
+  for (const { shape } of routes) {
+    if (shape.kind === 'path') shape.points = withoutReversals(shape.points)
+  }
+
   const drawnPieces = routes.map(({ shape }) => piecesOf(shape))
   const boxesOfEdge = (edge: number): { from: Box; to: Box } | undefined => {
     const statement = diagram.edges[edge] as DiagramEdge | undefined
@@ -1663,11 +1695,53 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     shared = best.total
   }
 
-  // A leg that stepped aside can leave a corner behind it where its own two runs cross, so the cleanup runs again over
-  // what the drawing finally carries - the last word on the shape of a route, after every stage that moved one.
+  // The separation pass steps a leg aside, and a step can leave a notch behind it: the cleanup runs once more over what
+  // the drawing finally carries, which is the last word on the shape of a route. It does not lift an approach here - the
+  // lines are already placed, and a lift would put one on another - only removes what the step left behind.
   for (const { shape } of routes) {
-    if (shape.kind === 'path') shape.points = withoutReversals(shape.points)
+    if (shape.kind === 'path') shape.points = withoutReversals(shape.points, undefined, false)
   }
+
+  // A stub that ends a route is lifted to a whole one here, when every route is on the page: the line it needs has to
+  // be free of all of them, which the painter could not know while it was still drawing them.
+  for (const { shape, edge } of routes) {
+    if (shape.kind !== 'path' || shape.points.length < 3) continue
+    const points = shape.points
+    const tail = points[points.length - 1] as Point
+    const corner = points[points.length - 2] as Point
+    const head = points[points.length - 3] as Point
+    if (Math.abs(corner.x - tail.x) >= 0.5) continue
+    if (Math.abs(corner.y - tail.y) >= 16) continue
+    const statement = diagram.edges[edge] as DiagramEdge | undefined
+    if (statement === undefined) continue
+    const from = endBox(statement.from)
+    const to = endBox(statement.to)
+    if (from === undefined || to === undefined) continue
+    // A whole stub if the line is free, then the next longest that is: the arrowhead needs a leg to sit in, and a
+    // shorter one is better than a ledge.
+    for (const span of [16, 12, 10, 8]) {
+      const target = tail.y - Math.sign(tail.y - corner.y) * span
+      if (Math.abs(target - head.y) < 2) continue
+      const line = [{ x: corner.x, y: target }, { x: head.x, y: target }]
+      if (boxesCrossedBy(line, from, to, boxList).length > 0) continue
+      const lo = Math.min(line[0].x, line[1].x)
+      const hi = Math.max(line[0].x, line[1].x)
+      let taken = false
+      for (const other of routes) {
+        if (other.shape === shape) continue
+        for (const piece of piecesOf(other.shape)) {
+          if (piece.axis !== 'y') continue
+          if (Math.abs(piece.at - target) >= 4) continue
+          if (Math.min(hi, piece.hi) - Math.max(lo, piece.lo) > 1) taken = true
+        }
+      }
+      if (taken) continue
+      ;(shape.points[shape.points.length - 2] as { x: number; y: number }).y = target
+      ;(shape.points[shape.points.length - 3] as { x: number; y: number }).y = target
+      break
+    }
+  }
+
 
   // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate
   // at. Each candidate route was checked before it was emitted, so this pass is the assertion that no stage slipped a
