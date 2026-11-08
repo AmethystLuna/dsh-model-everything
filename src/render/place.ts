@@ -319,7 +319,16 @@ export function place(diagram: Diagram, top: number): Placement {
     return found.sort((left, right) => firstIndexOf(left.id) - firstIndexOf(right.id))
   }
 
-  const statementUp = (edge: DiagramEdge): boolean => edge.hint === 'up'
+  // A direction hint is written in the reader's coordinates, and a turned drawing reads them turned: `-right->` still
+  // puts the far box on the right, which under the turn is the rank axis. Right becomes down, down becomes right, and
+  // the two vertical hints trade places the same way.
+  const hintOf = (edge: DiagramEdge): 'up' | 'down' | 'left' | 'right' | undefined => {
+    const hint = edge.hint
+    if (hint === undefined || !horizontal) return hint
+    return hint === 'right' ? 'down' : hint === 'down' ? 'right' : hint === 'up' ? 'left' : 'up'
+  }
+
+  const statementUp = (edge: DiagramEdge): boolean => hintOf(edge) === 'up'
 
   const edgesIn = (scope: string | undefined): LayoutEdge[] => {
     const found: LayoutEdge[] = []
@@ -364,10 +373,11 @@ export function place(diagram: Diagram, top: number): Placement {
     for (const edge of edges) {
       const statement = diagram.edges[edge.index] as DiagramEdge | undefined
       if (statement === undefined) continue
-      if (statement.hint === 'right') {
+      const hint = hintOf(statement)
+      if (hint === 'right') {
         hintedRows.push([statement.from, statement.to])
         hintedOrder.push([statement.from, statement.to])
-      } else if (statement.hint === 'left') {
+      } else if (hint === 'left') {
         hintedRows.push([statement.to, statement.from])
         hintedOrder.push([statement.to, statement.from])
       }

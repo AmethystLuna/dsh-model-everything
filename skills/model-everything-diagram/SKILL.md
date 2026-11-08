@@ -73,7 +73,8 @@ draws no line: it places a box without claiming a connection. `together { A B }`
 deepest row among them. A direction on the edge is a constraint too: `-down->` is what a layered drawing does anyway,
 `-up->` puts the far box on top, and `-right->` / `-left->` put the two on one row in that order. `left to right
 direction` turns the whole drawing: the same pipeline runs with the measurement turned, and the finished page is turned
-back, so ranks advance along the page and a row's members stack down it.
+back, so ranks advance along the page and a row's members stack down it. A hint means the same thing in either
+direction - `-right->` puts the far box on the right whether the drawing runs down or right.
 
 ## What the structure review reports
 

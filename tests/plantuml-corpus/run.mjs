@@ -209,6 +209,28 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A direction hint is written in the reader's coordinates: the same `-right->` puts the far box on the right in either
+// direction, and `-down->` puts it below in either. The turned drawing reads the hints turned.
+test('a direction hint means the same thing in a turned drawing', () => {
+  const place = (heading, hint) => {
+    const lines = ['@startuml', ...(heading === 'right' ? ['left to right direction'] : []), 'component A', 'component B', 'A -' + hint + '-> B', '@enduml']
+    const r = render({ source: lines.join('\n') }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(hint + ' refused: ' + JSON.stringify(r.refused))
+    const box = (label) => r.canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === label)
+    return { a: box('A'), b: box('B') }
+  }
+  for (const heading of ['down', 'right']) {
+    const right = place(heading, 'right')
+    if (!(right.b.x > right.a.x && Math.abs(right.a.y - right.b.y) < 1)) {
+      throw new Error(heading + ' -right-> did not put B on the right: ' + JSON.stringify(right.b))
+    }
+    const down = place(heading, 'down')
+    if (!(down.b.y > down.a.y && Math.abs(down.a.x - down.b.x) < 1)) {
+      throw new Error(heading + ' -down-> did not put B below: ' + JSON.stringify(down.b))
+    }
+  }
+})
+
 // A class-like keyword is a named box here: the name is what a component-level view needs, and the compartments are
 // refused line by line when the source writes them.
 test('a class-like keyword draws a box, and its block form is still refused', () => {
