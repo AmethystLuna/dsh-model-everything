@@ -33,4 +33,12 @@ export interface Layering {
  * hole in the middle of the page is not.
  */
 export declare function mergeRanks(layering: Layering, groups: readonly (readonly string[])[]): Layering;
+/**
+ * Put the named pairs in order along their row.
+ *
+ * A `-right->` says the far box is to the right of the near one, and the row order is decided by barycentres that do not
+ * know that. The pair is a statement about the drawing, so it is kept: the two swap places when they came out the other
+ * way round. Swapping one pair can disturb another, so the walk repeats until a pass changes nothing.
+ */
+export declare function orderRowPairs(layers: readonly (readonly string[])[], pairs: readonly (readonly [string, string])[]): void;
 export declare function layer(graph: LayoutGraph, edges: LayoutEdge[]): Layering;

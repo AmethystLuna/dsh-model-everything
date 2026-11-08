@@ -122,9 +122,9 @@ const CASES = [
   },
   {
     name: "rightward edge hint",
-    why: "refused today: a per-edge direction has no layout to constrain (P4)",
+    why: "honoured: the two boxes share a row, A on the left",
     source: "@startuml\nA -right-> B\n@enduml",
-    expect: { nodes: 0, edges: 0, groups: 0, refused: ["-right->"] },
+    expect: { nodes: 2, edges: 1, groups: 0, refused: [] },
   },
   {
     name: "skinparam block",
@@ -190,6 +190,25 @@ for (const c of CASES) {
     }
   })
 }
+
+// A direction on the edge is a constraint on the drawing: the same pair, written four ways, is four arrangements.
+test('a direction hint decides where the far box goes', () => {
+  const where = (hint) => {
+    const source = ['@startuml', 'component A', 'component B', 'A -' + hint + '-> B', '@enduml'].join('\n')
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(hint + ' refused: ' + JSON.stringify(r.refused))
+    const box = (label) => r.canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === label)
+    return { a: box('A'), b: box('B') }
+  }
+  const down = where('down')
+  if (!(down.a.y < down.b.y && Math.abs(down.a.x - down.b.x) < 1)) throw new Error('down did not stack them')
+  const up = where('up')
+  if (!(up.b.y < up.a.y && Math.abs(up.a.x - up.b.x) < 1)) throw new Error('up did not put B on top')
+  const right = where('right')
+  if (!(right.a.x < right.b.x && Math.abs(right.a.y - right.b.y) < 1)) throw new Error('right did not put them side by side')
+  const left = where('left')
+  if (!(left.b.x < left.a.x && Math.abs(left.a.y - left.b.y) < 1)) throw new Error('left did not put B on the left')
+})
 
 // `together { }` puts its members on one row. The metamorphic check is the chain it collapses: two boxes joined by an
 // edge are on two rows, and the same pair inside together is on one.

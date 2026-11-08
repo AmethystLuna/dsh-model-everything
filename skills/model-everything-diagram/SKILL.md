@@ -68,10 +68,10 @@ A third answer sits between drawn and refused. A **layout control** - `left to r
 line is understood, has no effect, and is reported in `ignored`. So a control that looks like it did nothing did
 nothing, and you are not left guessing whether it was dropped or obeyed.
 
-Two layout controls are implemented rather than reported, because both are statements about the drawing that this
-renderer can keep. `A -[hidden]-> B` ranks the two boxes as any edge would and draws no line: it places a box without
-claiming a connection. `together { A B }` brings its members onto one row, the deepest row among them, so a group a
-source wanted side by side is side by side.
+A source that says more about the arrangement is obeyed. `A -[hidden]-> B` ranks the two boxes as any edge would and
+draws no line: it places a box without claiming a connection. `together { A B }` brings its members onto one row, the
+deepest row among them. A direction on the edge is a constraint too: `-down->` is what a layered drawing does anyway,
+`-up->` puts the far box on top, and `-right->` / `-left->` put the two on one row in that order.
 
 ## What the structure review reports
 

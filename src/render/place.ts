@@ -20,7 +20,7 @@ import { assignChannels } from './channels.js'
 import { assignCoordinates } from './coords.js'
 import { breakCycles } from './cycle-break.js'
 import { addDummies } from './dummy.js'
-import { layer, mergeRanks } from './layer.js'
+import { layer, mergeRanks, orderRowPairs } from './layer.js'
 import { seedOrder, type LayoutEdge, type LayoutGraph } from './layout.js'
 import { order } from './order.js'
 import { measure, MIN_NODE_WIDTH, type Measured as TextBox } from './text.js'
@@ -319,6 +319,8 @@ export function place(diagram: Diagram, top: number): Placement {
     return found.sort((left, right) => firstIndexOf(left.id) - firstIndexOf(right.id))
   }
 
+  const statementUp = (edge: DiagramEdge): boolean => edge.hint === 'up'
+
   const edgesIn = (scope: string | undefined): LayoutEdge[] => {
     const found: LayoutEdge[] = []
     diagram.edges.forEach((edge, index) => {
@@ -326,7 +328,9 @@ export function place(diagram: Diagram, top: number): Placement {
       const from = entityAt(scope, edge.from)
       const to = entityAt(scope, edge.to)
       if (from === undefined || to === undefined || from === to) return
-      found.push({ index, from, to })
+      // An `up` hint is a back edge by design: the ranking reads it the other way round, and the painter walks the
+      // lane backwards (cycle breaking already marks a lane reversed when its ends disagree with the statement).
+      found.push(statementUp(edge) ? { index, from: to, to: from } : { index, from, to })
     })
     return found
   }
@@ -346,7 +350,23 @@ export function place(diagram: Diagram, top: number): Placement {
   const layoutPiece = (entities: Entity[], edges: LayoutEdge[], pinned: string | undefined, seed: Map<string, number>): Piece => {
     const byId = new Map(entities.map((entity) => [entity.id, entity] as const))
     const mine = new Set(entities.map((entity) => entity.id))
-    const sameRank = (diagram.sameRank ?? [])
+    // `-right->` and `-left->` say the two boxes share a row, and which way round: a statement about the drawing,
+    // like together, so it enters the ranking as one.
+    const hintedRows: string[][] = []
+    const hintedOrder: Array<[string, string]> = []
+    for (const edge of edges) {
+      const statement = diagram.edges[edge.index] as DiagramEdge | undefined
+      if (statement === undefined) continue
+      if (statement.hint === 'right') {
+        hintedRows.push([statement.from, statement.to])
+        hintedOrder.push([statement.from, statement.to])
+      } else if (statement.hint === 'left') {
+        hintedRows.push([statement.to, statement.from])
+        hintedOrder.push([statement.to, statement.from])
+      }
+    }
+    const groups = [...(diagram.sameRank ?? []), ...hintedRows]
+    const sameRank = groups
       .map((group) => group.filter((id) => mine.has(id)))
       .filter((group) => group.length > 1)
     const graph: LayoutGraph = {
@@ -360,6 +380,7 @@ export function place(diagram: Diagram, top: number): Placement {
     const layered = graph.sameRank === undefined ? ranking : mergeRanks(ranking, graph.sameRank)
     const augmented = addDummies(layered, broken.edges)
     const ordered = order(augmented.layers, augmented.chains, seed)
+    orderRowPairs(ordered.layers, hintedOrder)
     const gap = edges.some((edge) => (diagram.edges[edge.index] as DiagramEdge).label !== '') ? LABELLED_LAYER_GAP : LAYER_GAP
     const coordinates = assignCoordinates(
       {

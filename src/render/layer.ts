@@ -65,6 +65,32 @@ export function mergeRanks(layering: Layering, groups: readonly (readonly string
 }
 
 /**
+ * Put the named pairs in order along their row.
+ *
+ * A `-right->` says the far box is to the right of the near one, and the row order is decided by barycentres that do not
+ * know that. The pair is a statement about the drawing, so it is kept: the two swap places when they came out the other
+ * way round. Swapping one pair can disturb another, so the walk repeats until a pass changes nothing.
+ */
+export function orderRowPairs(layers: readonly (readonly string[])[], pairs: readonly (readonly [string, string])[]): void {
+  if (pairs.length === 0) return
+  for (let round = 0; round < 4; round += 1) {
+    let moved = false
+    for (const [first, second] of pairs) {
+      for (const row of layers) {
+        const at = row.indexOf(first)
+        const to = row.indexOf(second)
+        if (at < 0 || to < 0 || at < to) continue
+        const as = row as string[]
+        as[at] = second
+        as[to] = first
+        moved = true
+      }
+    }
+    if (!moved) return
+  }
+}
+
+/**
  * The longest-path ranking: the highest layer each node can possibly take.
  *
  * Every source starts on layer zero and every other node one below its latest predecessor, which is the shortest

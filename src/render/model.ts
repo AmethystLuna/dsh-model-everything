@@ -50,6 +50,13 @@ export interface DiagramEdge {
    * honour that - the layout reads the edge like any other - and must then not draw the line.
    */
   invisible?: boolean
+  /**
+   * The direction the source asked for: `A -down-> B` and its three siblings.
+   *
+   * `down` is what a layered drawing does anyway; `up` puts B above A; `right` and `left` put the two on one row, in
+   * that order. PlantUML states it on the edge, so it is carried on the edge.
+   */
+  hint?: 'up' | 'down' | 'left' | 'right'
 }
 
 /**
