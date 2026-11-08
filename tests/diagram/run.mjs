@@ -10,6 +10,7 @@ import { diffStructure } from '../../lib/render/diff.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
 import { detectNotation, render as draw } from '../../lib/render/index.js'
 import { wellFormed } from '../svg-document.mjs'
+import { ACCEPTANCE } from './acceptance-sources.mjs'
 
 // Each drawing is also checked as a document, for the same reason the corpus does it: geometry assertions read the markup as
 // a string and cannot see a tag that never closes.
@@ -1265,6 +1266,22 @@ test('the annotate command refuses a host that cannot take a follow-up, and keep
   registerAnnotateCommand({ get: () => ({ register: () => { throw new Error('nope') } }) })
   registerAnnotateCommand({ get: () => undefined })
   registerAnnotateCommand({})
+})
+
+// The gallery the reader is shown, checked by name: every source has to come out with nothing refused, no route through a box,
+// and no label left unclear. A number nobody asserts is a number nobody reads.
+test('the acceptance corpus comes out clean', () => {
+  const dirty = []
+  for (const [name, source] of ACCEPTANCE) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    const problems = []
+    if (r.refused.length > 0) problems.push(String(r.refused.length) + ' refused')
+    if (r.canvas.routingFailures.length > 0) problems.push(String(r.canvas.routingFailures.length) + ' route(s) through a box')
+    if (r.canvas.labelCollisions > 0) problems.push(String(r.canvas.labelCollisions) + ' unclear label(s)')
+    if (r.canvas.width <= 0 || r.canvas.height <= 0) problems.push('an empty canvas')
+    if (problems.length > 0) dirty.push(name + ': ' + problems.join(', '))
+  }
+  if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
 if (failures > 0) {

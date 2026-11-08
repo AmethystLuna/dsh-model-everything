@@ -447,9 +447,16 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       heading.background = value
       return
     }
+    // `linetype ortho` asks for exactly what this renderer draws: every edge leaves and enters on a side, and turns between.
+    // Saying "styling this renderer does not have" about it would be the wrong reason twice over.
+    if (/^skinparam\s+linetype\s+ortho\b/i.test(line)) {
+      ignored.push(where + '`' + line + '` asks for orthogonal lines, which is what every edge here is already')
+      return
+    }
+
     if (/^skinparam\b/i.test(line)) {
       const key = /^skinparam\s+(\S+)/i.exec(line)?.[1] ?? 'skinparam'
-      ignored.push(where + '`' + key + '` is styling this renderer does not have: the type scale and the palette are fixed')
+      ignored.push(where + '`' + key + '` is styling this renderer does not have: the type scale, the palette and the line style are fixed')
       return
     }
 

@@ -763,6 +763,17 @@ test('a directive that has no effect says which kind it is', () => {
   if (scaled.ignored.length !== 0) throw new Error('an honoured scale was also ignored: ' + JSON.stringify(scaled.ignored))
 })
 
+// A skinparam that asks for what the renderer already does is not styling it lacks, and one that asks for a different line
+// style is not about the palette. Both answers name the thing asked for.
+test('a skinparam that is already satisfied says so', () => {
+  const ortho = render({ source: ['@startuml', 'skinparam linetype ortho', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (!ortho.ignored[0]?.includes('orthogonal lines, which is what every edge here is already')) {
+    throw new Error('ortho: ' + JSON.stringify(ortho.ignored))
+  }
+  const polyline = render({ source: ['@startuml', 'skinparam linetype polyline', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (!polyline.ignored[0]?.includes('line style are fixed')) throw new Error('polyline: ' + JSON.stringify(polyline.ignored))
+})
+
 // A `hide` directive names something this renderer never draws. Saying "layout control" about it was the wrong reason: it
 // arranges nothing, and a reader was told to look in the wrong place.
 test('a hide directive says there is nothing to hide, not that it is a layout control', () => {
