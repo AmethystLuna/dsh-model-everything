@@ -277,6 +277,28 @@ test('no route carries a jog shorter than a pen width', () => {
   }
 })
 
+// A turned drawing is asked to grow along the page, so it never wraps into a second run of ranks - and a box declared
+// outside a package is never placed inside it, however tightly the columns fit.
+test('a turned drawing grows along the page and keeps its packages', () => {
+  const chain = ['@startuml', 'left to right direction', ...Array.from({ length: 10 }, (_, i) => 'component n' + i), ...Array.from({ length: 9 }, (_, i) => 'n' + i + ' --> n' + (i + 1)), '@enduml'].join('\n')
+  const wide = render({ source: chain }, {}, { scheme: 'default' })
+  if (wide.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(wide.refused))
+  const rows = new Set(wide.canvas.shapes.filter((shape) => shape.kind === 'box').map((box) => box.y))
+  if (rows.size !== 1) throw new Error('the turned chain wrapped into ' + String(rows.size) + ' rows')
+  if (wide.canvas.width <= wide.canvas.height) throw new Error('the turned chain is not wide: ' + wide.canvas.width + 'x' + wide.canvas.height)
+  const mixed = ['@startuml', 'left to right direction', 'package "应用" as app {', '  together {', '    component "订单" as order', '    component "库存" as stock', '  }', '}', 'component "计价" as price', 'component "库" as db', 'order --> price : 计算', 'stock -[hidden]-> price', 'price --> db', '@enduml'].join('\n')
+  const r = render({ source: mixed }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('mixed refused: ' + JSON.stringify(r.refused))
+  if (r.canvas.routingFailures.length !== 0) throw new Error('mixed crossed a box: ' + JSON.stringify(r.canvas.routingFailures))
+  const group = r.canvas.shapes.find((shape) => shape.kind === 'group')
+  if (group === undefined) throw new Error('the package is gone')
+  const price = r.canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === '计价')
+  if (price === undefined) throw new Error('the root box is gone')
+  const inside = price.x + price.width > group.x && price.x < group.x + group.width && price.y + price.height > group.y && price.y < group.y + group.height
+  if (inside) throw new Error('a box declared outside the package was drawn inside it')
+  if (!(price.x > group.x + group.width)) throw new Error('the root box is not the next column: ' + String(price.x) + ' vs ' + String(group.x + group.width))
+})
+
 // The two notations state the same direction with different words, and the engine honours both: a reader who asks for a
 // left-to-right picture gets one in either spelling.
 test('a mermaid direction token turns the drawing the way plantuml does', () => {

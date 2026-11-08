@@ -411,7 +411,11 @@ export function place(diagram: Diagram, top: number): Placement {
       },
       { gap: NODE_GAP, layerGap: gap },
     )
-    const bands = planBands(coordinates.layerWidth, coordinates.layerHeight, gap)
+    // Wrapping packs a tall strip into a squarer page by starting a second run of ranks beside the first. A turned
+    // drawing asked to grow along the page's x, so wrapping it would contradict the request: it keeps one run.
+    const bands = horizontal
+      ? { bands: [{ first: 0, last: Math.max(0, coordinates.layerHeight.length - 1), offsetX: 0 }] }
+      : planBands(coordinates.layerWidth, coordinates.layerHeight, gap)
     const bandOfLayer = new Array<number>(coordinates.layerHeight.length).fill(0)
     bands.bands.forEach((band, index) => {
       for (let depth = band.first; depth <= band.last; depth += 1) bandOfLayer[depth] = index
@@ -427,7 +431,10 @@ export function place(diagram: Diagram, top: number): Placement {
 
     const items = new Map<string, { box: Box; group: boolean }>()
     ordered.layers.forEach((row, depth) => {
-      const shift = bands.bands[bandOfLayer[depth]].offsetX
+      // A band is a second run of ranks set beside the first. In a turned drawing the rank axis is the page's x, so the
+      // bands are set beside each other along the page's y instead: the same rule, read on the axis the drawing flows on.
+      const shift = horizontal ? 0 : bands.bands[bandOfLayer[depth]].offsetX
+      const bandShift = horizontal ? bands.bands[bandOfLayer[depth]].offsetX : 0
       const top = layerTop[depth]
       const rowHeight = coordinates.layerHeight[depth]
       for (const id of row) {
@@ -437,7 +444,7 @@ export function place(diagram: Diagram, top: number): Placement {
         items.set(id, {
           box: {
             x: centre + shift - entity.width / 2,
-            y: top + (rowHeight - entity.height) / 2,
+            y: top + (rowHeight - entity.height) / 2 + bandShift,
             width: entity.width,
             height: entity.height,
           },
