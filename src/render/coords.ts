@@ -143,11 +143,19 @@ function compactBlocks(rows: string[][], root: Map<string, string>, widthOf: (id
     }
   }
   const placed = new Map<string, number>()
+  // A block's space comes from the blocks left of it, so the walk follows those. Two rows can disagree about which of
+  // two boxes comes first - a rank shared by boxes that other edges pull the other way, which `together` can produce -
+  // and then the constraints close a loop. One of the two is dropped rather than recursing forever: the ordering is a
+  // proposal, and a drawing with a slightly loose row is better than one that does not render.
+  const placing = new Set<string>()
   const place = (block: string): number => {
     const known = placed.get(block)
     if (known !== undefined) return known
+    if (placing.has(block)) return 0
+    placing.add(block)
     let value = 0
     for (const step of clears.get(block) ?? []) value = Math.max(value, place(step.block) + step.space)
+    placing.delete(block)
     placed.set(block, value)
     return value
   }
