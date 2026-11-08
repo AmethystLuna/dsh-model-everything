@@ -1284,7 +1284,36 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
       }
       out.push(point)
     }
-    return simplify(out)
+    // A leg a few points long is a notch, not a leg: the run before it, the notch and the stub after it are drawn as
+    // the step they are, two points above the box they enter. The notch is folded into the leg it belongs to, which
+    // turns the pair into the one corner the route actually is.
+    const folded = simplify(out)
+    const STUB = 6
+    // A short leg at either end is a notch: the approach is two points longer than the box allows. It is not folded
+    // away - the last leg has to meet the box square to its side, and turning it into the approach would lay the line
+    // along the box and point the arrow sideways - so the run before it is lifted to a whole stub away.
+    const ends = folded.length >= 3
+    if (ends) {
+      const last = folded[folded.length - 1] as Point
+      const anchor = folded[folded.length - 3] as Point
+      const corner = folded[folded.length - 2] as Point
+      const short = Math.abs(corner.x - last.x) + Math.abs(corner.y - last.y) < 6
+      if (short) {
+        const vertical = Math.abs(corner.x - last.x) < 0.5
+        const toward = vertical ? Math.sign(last.y - corner.y) : Math.sign(last.x - corner.x)
+        const at = vertical ? last.y - toward * STUB : last.x - toward * STUB
+        if (vertical && Math.abs(at - anchor.y) > 6) {
+          ;(folded[folded.length - 3] as { x: number; y: number }).x = anchor.x
+          ;(folded[folded.length - 3] as { x: number; y: number }).y = at
+          ;(folded[folded.length - 2] as { x: number; y: number }).y = at
+        } else if (!vertical && Math.abs(at - anchor.x) > 6) {
+          ;(folded[folded.length - 3] as { x: number; y: number }).y = anchor.y
+          ;(folded[folded.length - 3] as { x: number; y: number }).x = at
+          ;(folded[folded.length - 2] as { x: number; y: number }).x = at
+        }
+      }
+    }
+    return simplify(folded)
   }
 
   const paintPath = (edgeIndex: number, edge: DiagramEdge, points: Point[], colour: ColourRole): void => {
@@ -1520,14 +1549,23 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
   const piecesOf = (shape: LinkShape | PathShape): Array<{ axis: 'x' | 'y'; at: number; lo: number; hi: number; slot: number }> =>
     shape.kind === 'path' ? piecesFrom(shape.points) : []
-  /** How much of the drawing is drawn twice: every pair of pieces on one line, summed. */
+  /**
+   * How much of the drawing reads as one line when it is two.
+   *
+   * Two pieces on one line are the plain case. Two pieces *nearly* on one line are the same defect seen from further
+   * away: at a couple of points apart they read as one thick line, and at a corner they read as a step that was drawn
+   * twice - which is what a dashed run beside a solid one looked like. Both are counted, by the length they overlap.
+   */
+  const NEAR_LINE = 4
   const sharedLength = (all: Array<ReturnType<typeof piecesOf>>): number => {
     let total = 0
     for (let left = 0; left < all.length; left += 1) {
       for (let right = left + 1; right < all.length; right += 1) {
         for (const mine of all[left] as ReturnType<typeof piecesOf>) {
           for (const theirs of all[right] as ReturnType<typeof piecesOf>) {
-            if (mine.axis !== theirs.axis || Math.abs(mine.at - theirs.at) >= 0.5) continue
+            if (mine.axis !== theirs.axis) continue
+            const apart = Math.abs(mine.at - theirs.at)
+            if (apart >= NEAR_LINE) continue
             total += Math.max(0, Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) - 1)
           }
         }
@@ -1590,6 +1628,15 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
                 ...points.slice(piece.slot + 2),
               ]
           if (!clearOfBoxes(moved, ends.from, ends.to)) continue
+          // A leg a few points long is not a leg: it reads as a notch at the corner it joins, and it is what a move
+          // makes when it lands the route almost where it already was. A route that gains one is not an improvement.
+          const notch = moved.some((point, index) => {
+            if (index === 0) return false
+            const previous = moved[index - 1] as Point
+            const gap = Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y)
+            return gap > 0.5 && gap < 6
+          })
+          if (notch) continue
           const pieces = piecesFrom(moved)
           const trial = drawnPieces.slice()
           trial[at] = pieces
