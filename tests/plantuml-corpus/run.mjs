@@ -970,6 +970,27 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// Three things a note's own syntax says that this renderer used to lose: an alias with a body, a fill colour, and a line break.
+test('a note keeps its words through an alias, a colour and a break', () => {
+  const blocks = {
+    'note as N': ['note as N', '  the body', 'end note'],
+  }
+  for (const [name, lines] of Object.entries(blocks)) {
+    const r = render({ source: ['@startuml', 'component a', ...lines, '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(name + ' refused: ' + JSON.stringify(r.refused))
+    const note = r.diagram.nodes.find((node) => node.shape === 'note')
+    if (note?.label !== 'the body') throw new Error(name + ' label: ' + String(note?.label))
+  }
+  const coloured = render({ source: ['@startuml', 'note "x" as N #lightblue', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  const colouredNote = coloured.diagram.nodes.find((node) => node.shape === 'note')
+  if (colouredNote?.label !== 'x') throw new Error('a colour took the text: ' + String(colouredNote?.label))
+  if (coloured.ignored.length !== 1 || !coloured.ignored[0].includes('palette is fixed')) throw new Error('the colour: ' + JSON.stringify(coloured.ignored))
+  const broken = render({ source: ['@startuml', 'note "first\\nsecond" as N', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  const brokenNote = broken.diagram.nodes.find((node) => node.shape === 'note')
+  if (brokenNote?.label !== 'first\nsecond') throw new Error('the break: ' + JSON.stringify(brokenNote?.label))
+  if (brokenNote.height <= 27) throw new Error('a two-line note is one line tall')
+})
+
 // A note beside a box names a side, and the side is honoured through the same placement machinery every other constraint
 // uses: a hidden edge with a direction hint. Four sides, one box, four arrangements.
 test('a note beside a box lands on the side the source named', () => {
