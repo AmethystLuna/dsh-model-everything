@@ -277,7 +277,15 @@ export function assignChannels(input: ChannelInput, options: ChannelOptions): Ch
   // A gap always has a row below it, so its strip is bounded: one stack per gap, inside that strip.
   const midOf = (gap: number): number => (layerY[gap] + layerHeight[gap] + layerY[gap + 1]) / 2
   const heightOf = new Map<number, Map<number, number>>()
-  for (const [gap, list] of stacks) {
+  // A run is stacked inside its own gap, but two runs can still land within a couple of points of each other - in one
+  // gap when the ladder is short, or in two gaps that offer the same height - and then two unrelated edges are drawn
+  // on one line. Each run therefore keeps a run's height clear of every run already placed.
+  const RUN_SEPARATION = 8
+  const placed: number[] = []
+  const clearOf = (candidate: number, taken: number[]): boolean =>
+    placed.every((other) => Math.abs(other - candidate) >= RUN_SEPARATION) &&
+    taken.every((other) => Math.abs(other - candidate) >= RUN_SEPARATION)
+  for (const [gap, list] of [...stacks].sort((left, right) => left[0] - right[0])) {
     const top = layerY[gap] + layerHeight[gap]
     const bottom = layerY[gap + 1]
     const pad = Math.min(8, Math.max(1, (bottom - top) / 3))
@@ -285,8 +293,19 @@ export function assignChannels(input: ChannelInput, options: ChannelOptions): Ch
     const hi = Math.max(lo, bottom - pad)
     // Left to right, so a run that stays near its box sits near the row it left.
     const sorted = [...list].sort((left, right) => left.left - right.left || left.edge - right.edge)
+    const inGap: number[] = []
     sorted.forEach((item, index) => {
-      const y = sorted.length === 1 ? (lo + hi) / 2 : lo + ((hi - lo) * (index + 1)) / (sorted.length + 1)
+      const wanted = sorted.length === 1 ? (lo + hi) / 2 : lo + ((hi - lo) * (index + 1)) / (sorted.length + 1)
+      let y = wanted
+      for (let step = 0; step < 24; step += 1) {
+        const offset = Math.ceil(step / 2) * 2 * (step % 2 === 1 ? 1 : -1)
+        const candidate = Math.min(hi, Math.max(lo, wanted + offset))
+        if (!clearOf(candidate, inGap)) continue
+        y = candidate
+        break
+      }
+      placed.push(y)
+      inGap.push(y)
       const heights = heightOf.get(item.edge) ?? new Map<number, number>()
       heights.set(item.gap, y)
       heightOf.set(item.edge, heights)

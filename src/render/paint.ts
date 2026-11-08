@@ -1562,14 +1562,33 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         // share its x. That is what a jog stands on, and a leg with no horizontal at an end cannot step aside.
         const entersLevel = piece.slot > 0 && Math.abs(vertical ? (points[piece.slot - 1] as Point).y - before.y : (points[piece.slot - 1] as Point).x - before.x) < 0.5
         const leavesLevel = piece.slot + 2 < points.length && Math.abs(vertical ? (points[piece.slot + 2] as Point).y - after.y : (points[piece.slot + 2] as Point).x - after.x) < 0.5
-        if (!entersLevel || !leavesLevel) continue
+        // The last leg before a box is the one that enters it, and the first is the one that leaves: those have a
+        // horizontal at one end only, and moving them moves the port along its side - which is what the packing would
+        // have done had it known the leg was taken.
+        const atEntry = entersLevel && piece.slot + 2 === points.length
+        const atExit = leavesLevel && piece.slot === 0
+        if (!entersLevel && !leavesLevel) continue
+        // A port on a curve or a rhombus slides along its outline, not along the box it was measured in: a terminal leg
+        // of such an edge is not moved here, because the point it would move to is not on the shape.
+        const endsOn = (index: number, side: 'from' | 'to'): boolean => {
+          const statement = diagram.edges[index] as DiagramEdge | undefined
+          return statement !== undefined && hasDiscretePorts(shapeOf(side === 'from' ? statement.from : statement.to))
+        }
+        const discreteEnd = (atEntry && endsOn(routes[at] === undefined ? -1 : (routes[at] as { edge: number }).edge, 'to')) ||
+          (atExit && endsOn((routes[at] as { edge: number }).edge, 'from'))
+        const shiftable = (entersLevel && leavesLevel) || ((atEntry || atExit) && !discreteEnd)
+        if (!shiftable) continue
         for (const shift of [SHARED_LINE_CLEARANCE, -SHARED_LINE_CLEARANCE]) {
-          const moved = [
-            ...points.slice(0, piece.slot + 1),
-            vertical ? { x: before.x + shift, y: before.y } : { x: before.x, y: before.y + shift },
-            vertical ? { x: after.x + shift, y: after.y } : { x: after.x, y: after.y + shift },
-            ...points.slice(piece.slot + 1),
-          ]
+          const lead = vertical ? { x: before.x + shift, y: before.y } : { x: before.x, y: before.y + shift }
+          const tail = vertical ? { x: after.x + shift, y: after.y } : { x: after.x, y: after.y + shift }
+          const moved = entersLevel && leavesLevel
+            ? [...points.slice(0, piece.slot + 1), lead, tail, ...points.slice(piece.slot + 1)]
+            : [
+                ...points.slice(0, piece.slot),
+                lead,
+                tail,
+                ...points.slice(piece.slot + 2),
+              ]
           if (!clearOfBoxes(moved, ends.from, ends.to)) continue
           const pieces = piecesFrom(moved)
           const trial = drawnPieces.slice()
