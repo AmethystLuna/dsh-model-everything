@@ -114,6 +114,7 @@ metadata:
   进布局前做一次 90° 映射（right↔down、up↔left）。
 
 同一条管线的其他约束仍然成立：端口间距按边实际能容纳的跨度收缩（永不重合）、短于 6px 的横向台阶并掉、
+注释的长文本与其它盒子一样**走同一套换行**（32 字实测折成两行、盒子长到 222×42，没有溢出）——不需要为注释单开一条文本规则。
 标签找不到干净位置时如实报 `LABELS`。
 
 ## 引擎能被约束的地方（已实现）
@@ -152,6 +153,7 @@ metadata:
 | M8 折叠边界不生效 | `tests/diagram`（11 条） |
 | M9 读了 `header` 却不画 | 页面文本用例（plantuml-corpus） |
 | M10 读了 `legend` 块却不画 | `a legend block is text under the drawing…`（plantuml-corpus） |
+| M11 定位注释的隐形边被画出来 | `a note beside a box lands on the side the source named`（plantuml-corpus） |
 
 补这两道闸门之前，M1 与 M5 是**全绿**的：没有断言的 pass 等于装饰，而一个真修过的 bug 没有快照就等于没修。
 
