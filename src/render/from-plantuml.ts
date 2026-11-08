@@ -192,13 +192,32 @@ function keywordOf(line: string): string {
   return line.split(/[\s{]/)[0].toLowerCase()
 }
 
-/** The id and label an opening boundary line states. An alias is the id, because edges will name it. */
-function boundaryOf(declaration: string, keyword: string, ordinal: number): { id: string; label: string } {
-  const rest = declaration.slice(keyword.length).trim()
+/**
+ * The id and label an opening boundary line states. An alias is the id, because edges will name it.
+ *
+ * A stereotype or a colour written after the name is a decoration on the boundary, not part of what it is called: left in,
+ * both ended up in the label and the alias was lost, so the boundary could not be named by an edge or by its own members.
+ */
+function boundaryOf(
+  declaration: string,
+  keyword: string,
+  ordinal: number,
+): { id: string; label: string; decoration?: string } {
+  let rest = declaration.slice(keyword.length).trim()
+  let decoration: string | undefined
+  for (;;) {
+    const stereotype = /\s*<<[^<>]*>>\s*$/.exec(rest)
+    const colour = /\s+#\S+\s*$/.exec(rest)
+    const found = stereotype ?? colour
+    if (found === null) break
+    decoration = found[0].trim()
+    rest = rest.slice(0, found.index).trim()
+  }
+  const adornment = decoration === undefined ? {} : { decoration }
   const alias = QUOTED_ALIAS.exec(rest) ?? BRACKET_ALIAS.exec(rest) ?? PLAIN_ALIAS.exec(rest)
-  if (alias !== null) return { id: alias[2], label: alias[1] }
+  if (alias !== null) return { id: alias[2], label: alias[1], ...adornment }
   const label = rest.replace(/^["']|["']$/g, '')
-  return { id: 'group-' + String(ordinal), label: label === '' ? keyword : label }
+  return { id: 'group-' + String(ordinal), label: label === '' ? keyword : label, ...adornment }
 }
 
 interface ArrowParts {
@@ -658,6 +677,9 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       }
       groupCount += 1
       const boundary = boundaryOf(declaration, opener, groupCount)
+      if (boundary.decoration !== undefined) {
+        ignored.push(where + '`' + boundary.decoration + '` is a decoration this renderer does not draw')
+      }
       builder.groupLines.set(boundary.id, index + 1)
       builder.open.push({
         id: boundary.id,

@@ -970,6 +970,23 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A boundary's stereotype or colour is a decoration on it, not part of its name: left in the label, the alias was lost and the
+// boundary could not be named by an edge or by its own members.
+test('a boundary keeps its name through a stereotype and a colour', () => {
+  for (const [line, expected] of [['package p <<layer>> {', 'p'], ['package p #lightblue {', 'p']]) {
+    const r = render({ source: ['@startuml', line, '  component a', '}', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(line + ' refused: ' + JSON.stringify(r.refused))
+    const group = (r.diagram.groups ?? [])[0]
+    if (group?.label !== expected) throw new Error(line + ' label: ' + String(group?.label))
+    if (r.ignored.length !== 1 || !r.ignored[0].includes('decoration this renderer does not draw')) {
+      throw new Error(line + ' ignored: ' + JSON.stringify(r.ignored))
+    }
+    // The label is how an edge names a boundary with no alias.
+    const wired = render({ source: ['@startuml', line, '  component a', '}', 'component outside', 'outside --> p', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (wired.diagram.edges.length !== 1) throw new Error(line + ' could not be named by an edge: ' + JSON.stringify(wired.refused))
+  }
+})
+
 // An arrow's endpoints can carry a cardinality, a colour or a stereotype, and none of them is a name. One dash is an arrow.
 test('an endpoint keeps its name through a cardinality and a colour', () => {
   const cases = {
