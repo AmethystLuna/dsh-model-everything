@@ -40,6 +40,7 @@ import { MARGIN, place, textOf, type Box } from './place.js'
 import { PORT_INSET } from './channels.js'
 import { snapJogs } from './jog.js'
 import { piecesFrom, sharedLength, sharedWith, totalFromRows, type Piece } from './separate.js'
+import { applyLift, liftedSpan } from './lift.js'
 import { anchor, approachSides, crossesBox, normalOf, ROUTE_STUB, routeEdge, simplify, type Ports, type Side } from './route.js'
 import { cylinderApex, cylinderCaps, cylinderPointOn, hasDiscretePorts, hexagonCut, outlinePointFromCentre, sideOfPoint, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
@@ -1696,57 +1697,35 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   }
 
   // A stub that ends a route is lifted to a whole one here, when every route is on the page: the line it needs has to
-  // be free of all of them, which the painter could not know while it was still drawing them.
-  for (const { shape, edge } of routes) {
-    if (shape.kind !== 'path' || shape.points.length < 3) continue
-    const points = shape.points
-    const tail = points[points.length - 1] as Point
-    const corner = points[points.length - 2] as Point
-    const head = points[points.length - 3] as Point
-    // The leg into the box is vertical for a top or bottom side and horizontal for a left or right one.
-    const down = Math.abs(corner.x - tail.x) < 0.5
-    const along = down ? Math.abs(corner.y - tail.y) : Math.abs(corner.x - tail.x)
-    if (along >= 16) continue
-    const statement = diagram.edges[edge] as DiagramEdge | undefined
-    if (statement === undefined) continue
-    const from = endBox(statement.from)
-    const to = endBox(statement.to)
-    if (from === undefined || to === undefined) continue
-    // A whole stub if the line is free, then the next longest that is: the arrowhead needs a leg to sit in, and a
-    // shorter one is better than a ledge.
-    for (const span of [16, 12, 10, 8]) {
-      const target = down
-        ? tail.y - Math.sign(tail.y - corner.y) * span
-        : tail.x - Math.sign(tail.x - corner.x) * span
-      if (down ? Math.abs(target - head.y) < 2 : Math.abs(target - head.x) < 2) continue
-      const line = down
-        ? [{ x: corner.x, y: target }, { x: head.x, y: target }]
-        : [{ x: target, y: corner.y }, { x: target, y: head.y }]
-      if (boxesCrossedBy(line, from, to, boxList).length > 0) continue
-      const axis = down ? 'y' : 'x'
-      const lo = down ? Math.min(line[0].x, line[1].x) : Math.min(line[0].y, line[1].y)
-      const hi = down ? Math.max(line[0].x, line[1].x) : Math.max(line[0].y, line[1].y)
-      let taken = false
+  // be free of all of them, which the painter could not know while it was still drawing them. The arithmetic is in
+  // `lift.ts`; what stays here is what only the painter knows - the boxes a line must clear and the routes it must not
+  // lie on.
+  for (const { shape } of routes) {
+    if (shape.kind !== 'path') continue
+    const free = (line: readonly Point[]): boolean => {
+      const statement = diagram.edges[routes.find((route) => route.shape === shape)?.edge ?? -1] as DiagramEdge | undefined
+      const from = statement === undefined ? undefined : endBox(statement.from)
+      const to = statement === undefined ? undefined : endBox(statement.to)
+      if (from === undefined || to === undefined) return false
+      if (boxesCrossedBy([...line], from, to, boxList).length > 0) return false
+      // A horizontal line is a `y` piece (it sits at one y); a vertical one is an `x` piece.
+      const axis = Math.abs(line[0].y - line[1].y) < 0.5 ? 'y' : 'x'
+      const lo = axis === 'y' ? Math.min(line[0].x, line[1].x) : Math.min(line[0].y, line[1].y)
+      const hi = axis === 'y' ? Math.max(line[0].x, line[1].x) : Math.max(line[0].y, line[1].y)
+      const at = axis === 'y' ? line[0].y : line[0].x
       for (const other of routes) {
         if (other.shape === shape) continue
         for (const piece of piecesOf(other.shape)) {
           if (piece.axis !== axis) continue
-          if (Math.abs(piece.at - target) >= 5) continue
-          if (Math.min(hi, piece.hi) - Math.max(lo, piece.lo) > 1) taken = true
+          if (Math.abs(piece.at - at) >= 5) continue
+          if (Math.min(hi, piece.hi) - Math.max(lo, piece.lo) > 1) return false
         }
       }
-      if (taken) continue
-      if (down) {
-        ;(shape.points[shape.points.length - 2] as { x: number; y: number }).y = target
-        ;(shape.points[shape.points.length - 3] as { x: number; y: number }).y = target
-      } else {
-        ;(shape.points[shape.points.length - 2] as { x: number; y: number }).x = target
-        ;(shape.points[shape.points.length - 3] as { x: number; y: number }).x = target
-      }
-      break
+      return true
     }
+    const span = liftedSpan(shape.points, free)
+    if (span !== undefined) applyLift(shape.points, span)
   }
-
   // The assembled drawing, checked once: every segment of every drawn edge against every box it does not terminate
   // at. Each candidate route was checked before it was emitted, so this pass is the assertion that no stage slipped a
   // segment through a box - and the place a router that found no way round is reported rather than hidden.

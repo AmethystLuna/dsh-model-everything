@@ -166,6 +166,7 @@ node tests/components/run.mjs
 node tests/placement/run.mjs
 node tests/jog/run.mjs
 node tests/separate/run.mjs
+node tests/lift/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -226,6 +227,7 @@ And the gates around it:
 | `placement` | 11 | a boundary contains its own contents and only its own |
 | `jog` | 5 | a two-pixel step between two parallel legs is removed |
 | `separate` | 7 | a piece is the axis it runs on, where, and how far |
+| `lift` | 7 | the last leg is read, and a route too short has none |
 | `presentation` | 57 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
