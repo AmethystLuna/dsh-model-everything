@@ -35,6 +35,9 @@ metadata:
 | `[*] --> A` | 起点 | 支持 |
 | `title` | 标题 | 支持 |
 | `header`/`caption`/`footer`，单行或 `… end header` 块形式 | 页面文本 | 支持，行数决定占用的带高；块内文字**不进图** |
+
+页面家具全叠在一起时（表头 + 标题 + 图 + 图例 + 来源图注 + 页脚 + 渲染器计数）实测是**一条 15px 节奏**：header@32、title@48、
+legend@176、来源图注@207、页脚@222、机器计数@237，画布 240×269，无挤压——所以“叠放间距”没有再单独加规则。
 | `legend` … `end legend` | 图例块 | 支持，画在图下、图注之上，**不参与布局**；`legend right` 等角位进 `ignored` |
 | `left to right direction`（PlantUML）与 `flowchart LR`（Mermaid） | 全局方向 | **支持**：测量转置后跑同一条管线，末尾把画布转回来 |
 | `top to bottom direction` | 全局方向 | 接受但无效果（本来就是自上而下），进 `ignored` |
