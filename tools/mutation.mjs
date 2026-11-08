@@ -200,6 +200,14 @@ const MUTATIONS = [
     from: '`title` (one line, or a block ending `end title`)',
     to: '`title` `title` (one line, or a block ending `end title`)',
   },
+
+  {
+    id: 'M22',
+    what: 'a hide directive is reported as a layout control again',
+    file: 'src/render/from-plantuml.ts',
+    from: '      if (HIDE_DIRECTIVE.test(line)) {',
+    to: '      if (false) {',
+  },
 ]
 
 const argument = process.argv[2]

@@ -453,6 +453,31 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
 
+    // An include brings content this renderer never reads. Dropping it quietly would hand back a drawing that is missing
+    // whatever the file held, and look complete.
+    if (/^!include\b/.test(line)) {
+      refused.push(where + '`' + line + '` names a file this renderer does not read, so the drawing would be missing what it holds')
+      return
+    }
+    // `!pragma layout` asks for a particular layout engine, which is this renderer's own decision: it keeps the layout-control
+    // reason, and only the pragmas that are not about arrangement get the preprocessor one.
+    if (LAYOUT_CONTROL.test(line)) {
+      ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
+      return
+    }
+    if (/^!(define|theme|pragma|procedure|function|unquoted)\b/.test(line)) {
+      ignored.push(where + '`' + line + '` is a preprocessor directive: nothing is expanded here, the source is drawn as written')
+      return
+    }
+    if (/^allowmixing\b/.test(line)) {
+      ignored.push(where + '`' + line + '` permits mixing diagram families; only one family is drawn here, so it has no effect')
+      return
+    }
+    if (/^together\s*$/.test(line)) {
+      ignored.push(where + '`' + line + '` names no boxes: a `together { }` block keeps its own members on one row')
+      return
+    }
+
     if (IGNORED.test(line)) {
       if (HIDE_DIRECTIVE.test(line)) {
         ignored.push(where + '`' + line + '` hides something this renderer does not draw: an element here has no compartments or stereotypes')

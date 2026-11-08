@@ -692,6 +692,30 @@ test('a scale directive changes the delivered size, not the drawing', () => {
   if (!bySize.refused[0]?.includes('`scale 2` is the form')) throw new Error('by size: ' + JSON.stringify(bySize.refused))
 })
 
+// Every directive the renderer does not act on says *why*, and an include is refused rather than dropped: a drawing that is
+// missing everything a file held looks complete, which is the one thing a report must not do.
+test('a directive that has no effect says which kind it is', () => {
+  const reasons = {
+    '!define FOO 1': 'preprocessor directive',
+    '!theme plain': 'preprocessor directive',
+    'allowmixing': 'mixing diagram families',
+    'together': 'names no boxes',
+    '!pragma layout smetana': 'is a layout control',
+  }
+  for (const [line, reason] of Object.entries(reasons)) {
+    const r = render({ source: ['@startuml', line, 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(line + ' was refused: ' + JSON.stringify(r.refused))
+    if (r.ignored.length !== 1) throw new Error(line + ': ignored ' + JSON.stringify(r.ignored))
+    if (!r.ignored[0].includes(reason)) throw new Error(line + ': ' + r.ignored[0])
+  }
+  const included = render({ source: ['@startuml', '!include common.puml', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (included.refused.length !== 1) throw new Error('an include was not refused: ' + JSON.stringify(included.refused))
+  if (!included.refused[0].includes('would be missing')) throw new Error('the include reason: ' + included.refused[0])
+  // A directive that is honoured must not also be reported as ignored.
+  const scaled = render({ source: ['@startuml', 'scale 2', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (scaled.ignored.length !== 0) throw new Error('an honoured scale was also ignored: ' + JSON.stringify(scaled.ignored))
+})
+
 // A `hide` directive names something this renderer never draws. Saying "layout control" about it was the wrong reason: it
 // arranges nothing, and a reader was told to look in the wrong place.
 test('a hide directive says there is nothing to hide, not that it is a layout control', () => {
