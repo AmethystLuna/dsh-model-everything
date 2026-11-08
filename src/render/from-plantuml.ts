@@ -109,7 +109,15 @@ const PLAIN_ALIAS = /^([A-Za-z_][\w.-]*)\s+as\s+([A-Za-z_][\w-]*)$/
 const BRACKET = /^\[(.+?)\]$/
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
 /** The ignored lines that ask for an arrangement: accepted, dropped, and reported. */
-const LAYOUT_CONTROL = /^(top to bottom direction|skinparam|hide|show|!pragma\s+layout)\b/
+const LAYOUT_CONTROL = /^(top to bottom direction|!pragma\s+layout)\b/
+
+/**
+ * Directives that hide something this renderer never draws.
+ *
+ * `hide empty members`, `hide stereotype`, `hide circle`: a class box here has no compartments and a component has no stereotype,
+ * so there is nothing to hide. Saying "layout control" about them was the wrong reason - they change no arrangement.
+ */
+const HIDE_DIRECTIVE = /^(hide|show)\b/
 
 interface Builder {
   nodes: Map<string, DiagramNode>
@@ -446,6 +454,10 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     }
 
     if (IGNORED.test(line)) {
+      if (HIDE_DIRECTIVE.test(line)) {
+        ignored.push(where + '`' + line + '` hides something this renderer does not draw: an element here has no compartments or stereotypes')
+        return
+      }
       if (LAYOUT_CONTROL.test(line)) {
         ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
       }

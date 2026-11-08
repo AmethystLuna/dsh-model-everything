@@ -692,6 +692,20 @@ test('a scale directive changes the delivered size, not the drawing', () => {
   if (!bySize.refused[0]?.includes('`scale 2` is the form')) throw new Error('by size: ' + JSON.stringify(bySize.refused))
 })
 
+// A `hide` directive names something this renderer never draws. Saying "layout control" about it was the wrong reason: it
+// arranges nothing, and a reader was told to look in the wrong place.
+test('a hide directive says there is nothing to hide, not that it is a layout control', () => {
+  for (const line of ['hide empty members', 'hide stereotype', 'hide circle']) {
+    const r = render({ source: ['@startuml', line, 'class Order', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(line + ' was refused: ' + JSON.stringify(r.refused))
+    if (r.ignored.length !== 1) throw new Error(line + ': ignored ' + JSON.stringify(r.ignored))
+    if (!r.ignored[0].includes('no compartments')) throw new Error(line + ': ' + r.ignored[0])
+  }
+  // A real layout control keeps its own reason.
+  const layout = render({ source: ['@startuml', 'top to bottom direction', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (!layout.ignored[0]?.includes('is a layout control')) throw new Error('layout: ' + JSON.stringify(layout.ignored))
+})
+
 // A background colour is paper, not arrangement, so it is honoured; a font size is a type scale this renderer does not have,
 // and saying "layout control" about it was the wrong reason.
 test('a background colour is drawn, and styling skinparams say why they are not', () => {
