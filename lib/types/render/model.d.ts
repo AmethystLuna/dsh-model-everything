@@ -46,6 +46,13 @@ export interface DiagramEdge {
      */
     invisible?: boolean;
 }
+/**
+ * Boxes a source asked to keep on one row: `together { A B }`.
+ *
+ * PlantUML's together is a statement about the drawing, not about the subject, so it is carried beside the groups
+ * rather than as one: a group is a boundary drawn around its members, and this is a row they share.
+ */
+export type SameRank = string[];
 export interface DiagramGroup {
     id: string;
     label: string;
@@ -71,6 +78,8 @@ export interface Diagram {
     nodes: DiagramNode[];
     edges: DiagramEdge[];
     groups?: DiagramGroup[];
+    /** Boxes a source asked to share a row: `together { A B }`. */
+    sameRank?: string[][];
     /** One line under the drawing: what was decided, in words the drawing cannot carry. */
     caption: string;
 }

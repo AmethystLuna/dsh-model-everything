@@ -20,7 +20,7 @@ import { assignChannels } from './channels.js'
 import { assignCoordinates } from './coords.js'
 import { breakCycles } from './cycle-break.js'
 import { addDummies } from './dummy.js'
-import { layer } from './layer.js'
+import { layer, mergeRanks } from './layer.js'
 import { seedOrder, type LayoutEdge, type LayoutGraph } from './layout.js'
 import { order } from './order.js'
 import { measure, MIN_NODE_WIDTH, type Measured as TextBox } from './text.js'
@@ -345,13 +345,19 @@ export function place(diagram: Diagram, top: number): Placement {
    */
   const layoutPiece = (entities: Entity[], edges: LayoutEdge[], pinned: string | undefined, seed: Map<string, number>): Piece => {
     const byId = new Map(entities.map((entity) => [entity.id, entity] as const))
+    const mine = new Set(entities.map((entity) => entity.id))
+    const sameRank = (diagram.sameRank ?? [])
+      .map((group) => group.filter((id) => mine.has(id)))
+      .filter((group) => group.length > 1)
     const graph: LayoutGraph = {
       nodes: entities.map((entity) => ({ id: entity.id, width: entity.width, height: entity.height })),
       edges,
       ...(pinned === undefined ? {} : { init: pinned }),
+      ...(sameRank.length === 0 ? {} : { sameRank }),
     }
     const broken = breakCycles(graph)
-    const layered = layer(graph, broken.edges)
+    const ranking = layer(graph, broken.edges)
+    const layered = graph.sameRank === undefined ? ranking : mergeRanks(ranking, graph.sameRank)
     const augmented = addDummies(layered, broken.edges)
     const ordered = order(augmented.layers, augmented.chains, seed)
     const gap = edges.some((edge) => (diagram.edges[edge.index] as DiagramEdge).label !== '') ? LABELLED_LAYER_GAP : LAYER_GAP

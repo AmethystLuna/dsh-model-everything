@@ -191,6 +191,21 @@ for (const c of CASES) {
   })
 }
 
+// `together { }` puts its members on one row. The metamorphic check is the chain it collapses: two boxes joined by an
+// edge are on two rows, and the same pair inside together is on one.
+test('together puts its members on one row', () => {
+  const rows = (source) => {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+    if (r.ignored.length !== 0) throw new Error('reported as ignored: ' + JSON.stringify(r.ignored))
+    return r.canvas.shapes.filter((shape) => shape.kind === 'box').map((box) => box.y)
+  }
+  const apart = rows(['@startuml', 'component A', 'component B', 'A --> B', '@enduml'].join('\n'))
+  if (new Set(apart).size !== 2) throw new Error('the chain did not take two rows: ' + JSON.stringify(apart))
+  const together = rows(['@startuml', 'together {', '  component A', '  component B', '}', 'A --> B', '@enduml'].join('\n'))
+  if (new Set(together).size !== 1) throw new Error('together did not share a row: ' + JSON.stringify(together))
+})
+
 // A hidden edge is a layout instruction with no line: it ranks the two boxes and draws nothing. The metamorphic
 // check is the direction - writing it the other way puts the other box on top, so it is the edge doing the ordering.
 test('a hidden edge ranks two boxes the way it points and draws nothing', () => {

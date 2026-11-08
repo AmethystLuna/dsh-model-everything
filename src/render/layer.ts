@@ -30,6 +30,41 @@ export interface Layering {
 }
 
 /**
+ * Pull every group onto one row.
+ *
+ * The row is the deepest a member already occupies, so the group keeps the room the rest of the drawing gave it and
+ * the boxes above it do not move. Empty rows are dropped afterwards: a row elsewhere is a place with content, and a
+ * hole in the middle of the page is not.
+ */
+export function mergeRanks(layering: Layering, groups: readonly (readonly string[])[]): Layering {
+  const layerOf = new Map(layering.layerOf)
+  const layers = layering.layers.map((row) => [...row])
+  for (const group of groups) {
+    const present = group.filter((id) => layerOf.has(id))
+    if (present.length < 2) continue
+    const deepest = Math.max(...present.map((id) => layerOf.get(id) as number))
+    for (const id of present) {
+      const from = layerOf.get(id) as number
+      if (from === deepest) continue
+      const row = layers[from] as string[]
+      const at = row.indexOf(id)
+      if (at >= 0) row.splice(at, 1)
+      ;(layers[deepest] as string[]).push(id)
+      layerOf.set(id, deepest)
+    }
+  }
+  const kept: string[][] = []
+  const renumbered = new Map<number, number>()
+    layers.forEach((row, at) => {
+    if (row.length === 0) return
+    renumbered.set(at, kept.length)
+    kept.push(row)
+  })
+  for (const [id, rank] of layerOf) layerOf.set(id, renumbered.get(rank) ?? 0)
+  return { layers: kept, layerOf }
+}
+
+/**
  * The longest-path ranking: the highest layer each node can possibly take.
  *
  * Every source starts on layer zero and every other node one below its latest predecessor, which is the shortest

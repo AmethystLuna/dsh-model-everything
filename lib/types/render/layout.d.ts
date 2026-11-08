@@ -31,6 +31,8 @@ export interface LayoutGraph {
     edges: LayoutEdge[];
     /** The box that must stay on layer zero, when the source named one. */
     init?: string;
+    /** Boxes a source asked to share a row: `together { A B }`. */
+    sameRank?: string[][];
 }
 export interface Ranked {
     /** The state ids of each row, top to bottom, already ordered left to right. */

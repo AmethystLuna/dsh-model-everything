@@ -25,4 +25,12 @@ export interface Layering {
     layers: string[][];
     layerOf: Map<string, number>;
 }
+/**
+ * Pull every group onto one row.
+ *
+ * The row is the deepest a member already occupies, so the group keeps the room the rest of the drawing gave it and
+ * the boxes above it do not move. Empty rows are dropped afterwards: a row elsewhere is a place with content, and a
+ * hole in the middle of the page is not.
+ */
+export declare function mergeRanks(layering: Layering, groups: readonly (readonly string[])[]): Layering;
 export declare function layer(graph: LayoutGraph, edges: LayoutEdge[]): Layering;
