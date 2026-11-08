@@ -209,6 +209,40 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A side carries as many edges as the source gives it. What it must not do is put two of them on one pixel: that reads as
+// one line splitting, and no layout below it can recover the two statements.
+test('two edges never leave one side from the same point', () => {
+  const portsOn = (source, boxId, side) => {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+    const box = r.canvas.shapes.find((shape) => shape.kind === 'box' && shape.id === boxId)
+    if (box === undefined) throw new Error('no box ' + boxId)
+    const on = (point) => {
+      if (side === 'bottom') return Math.abs(point.y - (box.y + box.height)) <= 1.5 && point.x >= box.x - 1.5 && point.x <= box.x + box.width + 1.5
+      return Math.abs(point.y - box.y) <= 1.5 && point.x >= box.x - 1.5 && point.x <= box.x + box.width + 1.5
+    }
+    const found = []
+    for (const route of r.canvas.shapes.filter((shape) => shape.kind === 'path' || shape.kind === 'link')) {
+      const ends = route.kind === 'path' ? [route.points[0], route.points[route.points.length - 1]] : [{ x: route.x1, y: route.y1 }, { x: route.x2, y: route.y2 }]
+      for (const end of ends) if (on(end)) found.push(end)
+    }
+    return found
+  }
+  const many = ['@startuml', 'component hub', ...Array.from({ length: 10 }, (_, i) => 'component t' + i), ...Array.from({ length: 10 }, (_, i) => 'hub --> t' + i), '@enduml'].join('\n')
+  const ports = portsOn(many, 'hub', 'bottom')
+  if (ports.length < 8) throw new Error('the fan-out did not reach the side: ' + String(ports.length))
+  for (let i = 0; i < ports.length; i += 1) {
+    for (let j = i + 1; j < ports.length; j += 1) {
+      const gap = Math.hypot(ports[i].x - ports[j].x, ports[i].y - ports[j].y)
+      if (gap < 4) throw new Error('two ports sit ' + gap.toFixed(1) + 'px apart')
+    }
+  }
+  const few = ['@startuml', 'component hub', 'component a', 'component b', 'hub --> a', 'hub --> b', '@enduml'].join('\n')
+  const two = portsOn(few, 'hub', 'bottom')
+  if (two.length !== 2) throw new Error('the small case did not keep two ports: ' + String(two.length))
+  if (Math.abs(two[0].x - two[1].x) < 18) throw new Error('two ports lost their separation: ' + Math.abs(two[0].x - two[1].x).toFixed(1))
+})
+
 // A route never steps sideways by a couple of pixels between two parallel legs: that reads as a kink, and the port the
 // node offered is the statement the lane must follow.
 test('no route carries a jog shorter than a pen width', () => {

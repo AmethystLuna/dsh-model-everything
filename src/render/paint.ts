@@ -231,15 +231,20 @@ export const MULTI_EDGE_SPACING = 20
  * row back onto the box without closing those gaps.
  */
 function packPorts(wanted: number[], low: number, high: number): number[] {
+  // A side only has so much room: when the row cannot hold its ports at the full separation, the separation shrinks
+  // to what the span allows rather than stacking the overflow on one coordinate. Two edges leaving from the same
+  // pixel read as one line that splits, which is worse than two lines drawn close together.
+  const span = high - low
+  const separation = wanted.length <= 1 ? PORT_SEPARATION : Math.min(PORT_SEPARATION, span / (wanted.length - 1))
   const placed: number[] = []
-  let previous = low - PORT_SEPARATION
+  let previous = low - separation
   for (const value of wanted) {
-    previous = Math.min(high, Math.max(value, previous + PORT_SEPARATION))
+    previous = Math.min(high, Math.max(value, previous + separation))
     placed.push(previous)
   }
-  let next = high + PORT_SEPARATION
+  let next = high + separation
   for (let index = placed.length - 1; index >= 0; index -= 1) {
-    next = Math.max(low, Math.min(placed[index], next - PORT_SEPARATION))
+    next = Math.max(low, Math.min(placed[index], next - separation))
     placed[index] = next
   }
   return placed
