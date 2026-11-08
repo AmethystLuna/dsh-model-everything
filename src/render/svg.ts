@@ -33,7 +33,7 @@ import { LABEL_HEIGHT, type Canvas, type Shape } from './paint.js'
 import { textWidth } from './text.js'
 import type { EdgeArrow } from './model.js'
 import type { Palette } from './palette.js'
-import { cylinderCaps, diamondPoints, foldPoints, frameTab, hexagonPoints, stadiumRadius, type Cubic } from './symbol.js'
+import { cylinderCaps, diamondPoints, foldPoints, frameTab, hexagonPoints, queueOutline, stackShelves, stadiumRadius, storageCrown, type Cubic } from './symbol.js'
 
 /** One decimal place is enough at any zoom, and it keeps the markup readable. */
 const n = (value: number): string => {
@@ -116,6 +116,37 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
           '<text x="' + n(tab.x + 6) + '" y="' + n(tab.y + 13) + '" font-size="10" fill="' + stroke + '">' + escape(shape.label) + '</text>' +
           boxText({ ...shape, label: '', lines: [] }, stroke)
         )
+      }
+      // A queue: the right end is a half circle, drawn as an arc from the top of the cap round to the bottom.
+      case 'queue': {
+        const shapeOfQueue = queueOutline(shape)
+        const path =
+          'M' + n(shapeOfQueue.left) + ' ' + n(y) +
+          ' L' + n(shapeOfQueue.right) + ' ' + n(y) +
+          ' A' + n(shapeOfQueue.cap) + ' ' + n(shapeOfQueue.cap) + ' 0 0 1 ' + n(shapeOfQueue.right) + ' ' + n(y + h) +
+          ' L' + n(shapeOfQueue.left) + ' ' + n(y + h) + ' Z'
+        return '<path d="' + path + tail + boxText(shape, stroke)
+      }
+      // A stack: two shelves across the top say it is a pile of the same thing.
+      case 'stack': {
+        const shelves = stackShelves(shape)
+        return (
+          '<rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '" rx="6' + tail +
+          shelves.map((shelf) => '<line x1="' + n(x + 1) + '" y1="' + n(shelf) + '" x2="' + n(x + w - 1) + '" y2="' + n(shelf) +
+            '" stroke="' + stroke + '" stroke-width="1" />').join('') +
+          boxText(shape, stroke)
+        )
+      }
+      // A storage: the top edge is curved, so it reads as a container and not as a service.
+      case 'storage': {
+        const crown = storageCrown(shape)
+        const path =
+          'M' + n(x) + ' ' + n(y + h) + ' L' + n(x) + ' ' + n(y + crown) +
+          ' Q' + n(x) + ' ' + n(y) + ' ' + n(x + crown) + ' ' + n(y) +
+          ' L' + n(x + w - crown) + ' ' + n(y) +
+          ' Q' + n(x + w) + ' ' + n(y) + ' ' + n(x + w) + ' ' + n(y + crown) +
+          ' L' + n(x + w) + ' ' + n(y + h) + ' Z'
+        return '<path d="' + path + tail + boxText(shape, stroke)
       }
       // A subroutine carries its double side lines.
       case 'subroutine':

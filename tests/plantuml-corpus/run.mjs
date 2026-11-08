@@ -209,6 +209,21 @@ test('left to right direction lays the chain out along a row', () => {
   if (right.canvas.width <= right.canvas.height) throw new Error('the turned canvas is not wider than tall: ' + right.canvas.width + 'x' + right.canvas.height)
 })
 
+// A queue, a stack and a storage are one rectangle whose edge says what it holds: an arc, two shelves, a curve.
+test('a queue, a stack and a storage draw their own edge', () => {
+  const source = ['@startuml', 'queue "q" as q', 'stack "s" as s', 'storage "o" as o', 'component A', 'A --> q', 'A --> s', 'A --> o', '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  const shapeOf = (id) => r.diagram.nodes.find((node) => node.id === id)?.shape
+  for (const [id, shape] of [['q', 'queue'], ['s', 'stack'], ['o', 'storage']]) {
+    if (shapeOf(id) !== shape) throw new Error(id + ' is not a ' + shape + ': ' + String(shapeOf(id)))
+  }
+  if (!r.markup.includes(' A')) throw new Error('the queue has no rounded cap')
+  if (!r.markup.includes(' Q')) throw new Error('the storage has no curved crown')
+  const cloud = render({ source: ['@startuml', 'cloud Network', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (cloud.refused.length !== 1) throw new Error('a cloud was not refused: ' + JSON.stringify(cloud.refused))
+})
+
 // A file, a card and a frame each carry a mark that says what they are: the mark is drawn, and a keyword the renderer
 // has no mark for stays refused.
 test('a file, a card and a frame draw their own marks', () => {

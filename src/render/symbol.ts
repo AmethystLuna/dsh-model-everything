@@ -189,6 +189,33 @@ export function cylinderPointOn(box: Box, side: 'top' | 'bottom', along: number)
   return cubicPoint(side === 'top' ? caps.top : caps.bottom, t)
 }
 
+/**
+ * A queue: a rectangle whose right end is a half circle, the way a channel is drawn.
+ *
+ * The rounded end is the mark. For a port the shape is still a rectangle - an edge leaves the right end at the
+ * middle, which is the widest point of the cap - so no other stage needs to know about it.
+ */
+export function queueOutline(box: Box): { left: number; right: number; cap: number } {
+  const cap = Math.min(box.width / 2, box.height / 2)
+  return { left: box.x, right: box.x + box.width - cap, cap }
+}
+
+/**
+ * The two shelf lines of a stack, drawn across the top of the box.
+ *
+ * They sit above the label, not through it: the label is centred in the box, so the shelves are packed into the few
+ * pixels between the top edge and the first line of text.
+ */
+export function stackShelves(box: Box): [number, number] {
+  const inset = Math.min(3.5, box.height / 8)
+  return [box.y + inset, box.y + inset * 2]
+}
+
+/** How much of the top edge a storage's curve takes. */
+export function storageCrown(box: Box): number {
+  return Math.min(8, box.height / 4)
+}
+
 /** How much of the top-right corner a note folds away. */
 export function noteFold(width: number, height: number): number {
   return Math.min(12, width / 4, height / 3)

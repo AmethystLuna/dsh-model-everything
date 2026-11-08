@@ -24,6 +24,9 @@ export type NodeShape =
   | 'file'
   | 'card'
   | 'frame'
+  | 'queue'
+  | 'stack'
+  | 'storage'
 
 export interface DiagramNode {
   id: string

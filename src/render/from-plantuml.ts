@@ -64,6 +64,10 @@ const SHAPES: Record<string, NodeShape> = {
   file: 'file',
   card: 'card',
   frame: 'frame',
+  // The three containers whose mark is a line or a curve on the box itself.
+  queue: 'queue',
+  stack: 'stack',
+  storage: 'storage',
   // These five are boxes with compartments in PlantUML. The name is the part a component-level view needs, so the
   // box is drawn and the compartments are refused line by line: the element is visible and the source is told what
   // was not carried.
@@ -86,9 +90,6 @@ const NOT_DRAWN: Record<string, string> = {
   boundary: 'the boundary symbol is not one of the shapes this renderer draws',
   control: 'the control symbol is not one of the shapes this renderer draws',
   collections: 'a collections symbol is not one of the shapes this renderer draws',
-  queue: 'a queue is not one of the shapes this renderer draws',
-  stack: 'a stack is not one of the shapes this renderer draws',
-  storage: 'a storage symbol is not one of the shapes this renderer draws',
   legend: 'a legend is not one of the shapes this renderer draws',
 }
 
