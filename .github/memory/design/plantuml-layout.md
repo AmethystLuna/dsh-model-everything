@@ -60,49 +60,29 @@ metadata:
 同一条管线的其他约束仍然成立：端口间距按边实际能容纳的跨度收缩（永不重合）、短于 6px 的横向台阶并掉、
 标签找不到干净位置时如实报 `LABELS`。
 
-## 布局引擎今天能被约束的地方
+## 引擎能被约束的地方（已实现）
 
-- **分层**（`layer.ts`）：由边决定 rank，环先断（`cycle-break.ts`）。没有任何来自源码的 rank 约束。
-- **层内顺序**（`order.ts`）：中位数扫描 + 贪心交换，唯一目标是少交叉。**没有「钉住这个位置」的概念**。
-- **坐标与走线**（`coords.ts`/`route.ts`）：正交走线，通道分配后基本确定。
-- 唯一的现成开关是 `folded`（把一组折成一个盒子），那是读图时的折叠，不是布局约束。
+- **分层**（`layer.ts`）：由边决定 rank，环先断（`cycle-break.ts`）；`mergeRanks` 把 `together` 的成员拉到组内最深一行。
+- **层内顺序**（`order.ts`）：中位数扫描 + 贪心交换；`orderRowPairs` 在排序后把 `-right->`/`-left->` 声明的先后摆正。
+- **方向**（`place.ts` + `paint.ts`）：`left to right direction` 与 Mermaid 的 `LR` 走同一条管线，测量转置、画布转回。
+- **走线**（`coords.ts`/`route.ts`/`paint.ts`）：正交走线、端口打包、短台阶合并、穿盒修复。
+- `folded` 仍是唯一与「读图」有关的开关（把一组折成一个盒子），不是布局约束。
 
-所以「可控」要分两步：先让源码能表达约束（解析器），再让引擎认这些约束（分层与排序）。
+## 四项约束的落地状态（P1–P4）
 
-## 实现顺序
+| 项 | 落地成什么 | 验收它的语料用例 |
+|---|---|---|
+| P1 `together` | 解析预扫描收集成员 → `mergeRanks` 拉到同一行 | `together puts its members on one row` |
+| P2 `-[hidden]->` | 照常参与排名，绘制前跳过（不占端口、不画线） | `a hidden edge ranks two boxes the way it points and draws nothing` |
+| P3 `left to right direction` | 实体宽高对调 → 同一条管线 → 画布 `(x,y)→(y,x)`；标题与图注按页面锚定 | `left to right direction lays the chain out along a row`、`a turned drawing grows along the page and keeps its packages` |
+| P4 `-up-/-down-/-left-/-right->` | `up` 反转排名两端；`right`/`left` 进同行组并由 `orderRowPairs` 摆正 | `a direction hint decides where the far box goes`、`a direction hint means the same thing in a turned drawing` |
 
-### P1 · 让声明顺序与 `together` 成为约束（最便宜，不动几何算法）
-
-接受裸标识符行；`together { }` 解析成一组成员，映射为「同一 rank」。排序上，无交叉压力时保持声明顺序
-（现在的中位数扫描会打散并列项，需要把并列时按声明序而不是 id 字典序）。
-
-验收：`together` 内三个节点落在同一 rank；删掉 `together` 后图形回到原样；`together` 与边矛盾时报行号。
-
-### P2 · `-[hidden]->`
-
-解析成「只参与分层/排序、不画」的边。它是最常用的排版手艺：加一条隐形边把两个节点拉到相邻。
-
-验收：加一条 hidden 边不产生箭头，只改顺序或 rank；同一源删掉它，SVG 回到未加时的字节。
-
-### P3 · `left to right direction`
-
-唯一的**大工程**：横排意味着文本度量、层间距、走线方向全部换一套（现在 `paint` 假定自上而下）。
-它不是「转置整张画布」：盒子宽高互换后文字会溢出，必须在布局阶段就按横排度量。
-
-验收：同一张图两种方向，包围盒的宽高互换；没有文字溢出（用 `diagram_review` 的边界预算做判据）。
-
-### P4 · 逐边方向 `-down->` / `-right->`
-
-`-down->`/`-up->` 是 rank 约束（P3 之前也能做）；`-right->`/`-left->` 只在横排里有意义，依赖 P3。
-约束互相矛盾时的成规：**报行号并忽略该条**，而不是画一张歪的图。
-
-顺序的理由：P1、P2 只喂约束、不改几何，是最便宜的「真正可控」；P3 贵且影响全部已有图形，放后面，
-但它解锁 P4 的一半和一切横向表达；P4 收尾。
+矛盾约束的成规兑现了：`together` 造成的排序环由 `coords.ts` 的 `placing` 集合丢弃一条，而不是无限递归。
 
 ## 测试与风险
 
 - 每个构造一条**正例**（画出来）与一条**近似反例**（该拒收的仍拒收，且行号正确）。
 - 约束类改动要**变形检查**：加 `together` / hidden 边只允许改变 rank 与顺序，不允许改变节点集合、标签、形状。
-- 断言用**金样**：一组固定语料渲染成 SVG 存快照，任何布局改动都必须显式更新快照——布局变化最容易悄悄发生。
-- 不做的：`note`/`legend`/`caption` 的绘制、`skinparam` 的样式语义、真正的 PlantUML 兼容层。这些属于绘图工具，
-  不属于「一张图能不能被核对」。
+- 几何缺陷要**量化**：共线、斜线、穿盒、短于 6px 的台阶、端口重合、标签压线——六项在六张大图与十九格验收图上
+  都必须为 0；`LABELS` 非零时如实上报，不假装修好。
+- 不做的：序列图族（`actor`/`participant`/`alt`…）、`cloud`/`agent` 的轮廓、真正的 PlantUML 兼容层。
