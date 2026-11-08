@@ -558,6 +558,46 @@ test('a state block is a solid boundary, and a package is still dashed', () => {
   if (!packaged.markup.includes('stroke-dasharray')) throw new Error('a package lost its dashes')
 })
 
+// Page furniture lives in page space, so the turn must not carry it into the drawing: a header went inside the drawing and the
+// legend went off the right edge, and both captions landed on one line.
+test('a turned drawing keeps its page furniture in page order', () => {
+  const source = [
+    '@startuml',
+    'left to right direction',
+    'header',
+    '  internal',
+    'end header',
+    'component a',
+    'component b',
+    'a --> b',
+    'legend',
+    '  dashed means dependency',
+    'end legend',
+    'footer',
+    '  revision 2',
+    'end footer',
+    '@enduml',
+  ].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  const header = r.canvas.shapes.find((shape) => shape.kind === 'header')
+  const title = r.canvas.shapes.find((shape) => shape.kind === 'title')
+  const legend = r.canvas.shapes.find((shape) => shape.kind === 'legend')
+  const captions = r.canvas.shapes.filter((shape) => shape.kind === 'caption')
+  const boxes = r.canvas.shapes.filter((shape) => shape.kind === 'box')
+  if (header === undefined || title === undefined || legend === undefined || captions.length !== 2) {
+    throw new Error('page furniture is missing: ' + JSON.stringify(r.canvas.shapes.map((shape) => shape.kind)))
+  }
+  const boxTop = Math.min(...boxes.map((box) => box.y))
+  const boxBottom = Math.max(...boxes.map((box) => box.y + box.height))
+  if (!(header.y < title.y && title.y < boxTop)) throw new Error('the top of the page is out of order')
+  if (!(legend.y > boxBottom)) throw new Error('the legend is not under the drawing')
+  if (!(captions[0].y > legend.y && captions[1].y > captions[0].y)) throw new Error('the captions are not stacked under the legend')
+  for (const shape of [header, title, legend, ...captions]) {
+    if (shape.x < 20 - 0.01) throw new Error('page furniture left the left margin: ' + String(shape.x))
+  }
+})
+
 // A background colour is paper, not arrangement, so it is honoured; a font size is a type scale this renderer does not have,
 // and saying "layout control" about it was the wrong reason.
 test('a background colour is drawn, and styling skinparams say why they are not', () => {

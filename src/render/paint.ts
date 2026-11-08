@@ -1758,7 +1758,11 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   const turned = diagram.direction === 'right'
   // The title band is reserved at the top of the page in either direction: the layout reserved it on the rank axis,
   // which after the turn is the horizontal one, so the content is dropped by the band it no longer needs there.
-  const flip = (point: Point): Point => (turned ? { x: point.y, y: point.x + TITLE_HEIGHT } : point)
+  // The page keeps its margins and its band after the turn: the layout worked in a space whose origin is the top-left of
+  // the *content*, and a turned drawing has to be dropped into the page below the title band, or the first box lands on the
+  // title.
+  const flip = (point: Point): Point =>
+    turned ? { x: point.y + MARGIN, y: point.x + topOffset } : point
   const drawnShapes = !turned
     ? shapes
     : shapes.map((shape): Shape => {
@@ -1782,20 +1786,40 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
       })
   // The title and the caption are anchored to the page, not to the drawing: turning the drawing does not turn them,
   // and the space the caption reserved below the content is now a column of the page it does not need.
-  const laidOut = turned ? drawnShapes.filter((shape) => shape.kind !== 'caption' && shape.kind !== 'title') : drawnShapes
+  const pageKinds = new Set(['caption', 'title', 'header', 'legend'])
+  const laidOut = turned ? drawnShapes.filter((shape) => !pageKinds.has(shape.kind)) : drawnShapes
   const content = turned ? drawnExtent(laidOut) : undefined
-  const turnedCaptionTop = content === undefined ? 0 : content.height + CAPTION_GAP
+  // The page furniture is a column down the left edge in the order the unturned layout uses: legend, then the source's
+  // caption and footer, then this renderer's count. A turned drawing used to transpose the legend and the header into the
+  // drawing's own coordinates, and put both captions on one line.
+  const furnitureAt = new Map<number, number>()
+  let furnitureBottom = content === undefined ? 0 : content.height + CAPTION_GAP
+  const turnedCaptionTop = furnitureBottom
+  if (turned) {
+    drawnShapes.forEach((shape, index) => {
+      if (shape.kind === 'legend') {
+        furnitureAt.set(index, furnitureBottom)
+        furnitureBottom += shape.lines.length * CAPTION_LINE + CAPTION_GAP
+        return
+      }
+      if (shape.kind !== 'caption') return
+      furnitureAt.set(index, furnitureBottom)
+      furnitureBottom += shape.lines.length * CAPTION_LINE
+    })
+  }
   const placed = !turned
     ? drawnShapes
-    : drawnShapes.map((shape): Shape => {
-        if (shape.kind === 'title') return { ...shape, x: MARGIN, y: MARGIN + 12 }
-        if (shape.kind === 'caption') return { ...shape, x: MARGIN, y: turnedCaptionTop }
+    : drawnShapes.map((shape, index): Shape => {
+        if (shape.kind === 'header') return { ...shape, x: MARGIN, y: MARGIN + 12 }
+        if (shape.kind === 'title') return { ...shape, x: MARGIN, y: MARGIN + 12 + headerShift }
+        const top = furnitureAt.get(index)
+        if (top !== undefined && (shape.kind === 'legend' || shape.kind === 'caption')) return { ...shape, x: MARGIN, y: top }
         return shape
       })
   return {
     canvas: {
       width: Math.round(turned ? Math.max(content === undefined ? 0 : content.width + MARGIN, canvasWidth) : canvasWidth),
-      height: Math.round(turned ? turnedCaptionTop + CAPTION_LINE + MARGIN / 2 : canvasHeight),
+      height: Math.round(turned ? furnitureBottom + CAPTION_LINE + MARGIN / 2 : canvasHeight),
       shapes: placed,
       routingFailures,
     ...(diagram.background === undefined ? {} : { background: diagram.background }),
