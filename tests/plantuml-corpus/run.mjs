@@ -650,6 +650,23 @@ test('a turned drawing keeps its page furniture in page order', () => {
   }
 })
 
+// The renderer's own caption is metadata: when the source wrote its own, the machine's line is not drawn - unless it carries
+// the refusal count, which is the one thing an author's caption cannot say.
+test('the machine caption is drawn only when it adds something', () => {
+  const captions = (r) => r.canvas.shapes.filter((shape) => shape.kind === 'caption').flatMap((shape) => shape.lines)
+  const bare = render({ source: ['@startuml', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (captions(bare).length !== 1 || !captions(bare)[0].startsWith('plantuml,')) throw new Error('bare: ' + JSON.stringify(captions(bare)))
+  const authored = render({ source: ['@startuml', 'component a', 'caption Figure 1', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (JSON.stringify(captions(authored)) !== JSON.stringify(['Figure 1'])) throw new Error('authored: ' + JSON.stringify(captions(authored)))
+  const refused = render({ source: ['@startuml', 'component a', 'cloud c', 'caption Figure 2', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  const drawn = captions(refused)
+  if (drawn.length !== 2) throw new Error('a refusal count was dropped: ' + JSON.stringify(drawn))
+  if (!drawn[1].includes('refused')) throw new Error('the second line: ' + String(drawn[1]))
+  // The label beside the drawing still names both halves, drawn or not.
+  const label = /aria-label="([^"]*)"/.exec(authored.markup)?.[1] ?? ''
+  if (!label.includes('plantuml, 1 box')) throw new Error('label: ' + label)
+})
+
 // Text that needs escaping has to arrive escaped in every position it can appear in. The corpus had no such source, so a
 // renderer that escaped only `<` passed the whole suite.
 test('text that needs escaping survives in every position', () => {

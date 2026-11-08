@@ -1749,9 +1749,15 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift + titleShift
   if (extra.length > 0) shapes.push({ kind: 'caption', x: MARGIN, y: captionTop, lines: extra, colour: 'text' })
   // Anchored at the left margin, where the title is. The writer starts the text there: centred on a left-edge x,
   // half of a long caption fell outside the drawing and was clipped at the bottom edge of the picture.
+  // The line this renderer adds is metadata, not content. When the source wrote its own caption it is not drawn - unless it
+  // carries the refusal count, which is the one thing the author's caption cannot say.
+  const machineCaption = diagram.caption ?? ''
+  const showMachine = diagram.sourceCaption === undefined || machineCaption.includes('refused')
   const noteTop = captionTop + extra.length * CAPTION_LINE
-  shapes.push({ kind: 'caption', x: MARGIN, y: noteTop, lines: captionLines, colour: captionRole(diagram.caption) })
-  const height = noteTop + captionLines.length * CAPTION_LINE + MARGIN / 2
+  if (showMachine) {
+    shapes.push({ kind: 'caption', x: MARGIN, y: noteTop, lines: captionLines, colour: captionRole(diagram.caption) })
+  }
+  const height = noteTop + (showMachine ? captionLines.length * CAPTION_LINE : 0) + MARGIN / 2
 
   // Everything drawn counts, including the parts that leave the box grid: an edge routed beside the drawing and a
   // label wider than the gap between two boxes were both cut off at the right edge.
