@@ -148,6 +148,8 @@ metadata:
 | M6 交叉数恒为 0 | `tests/ordering`（3 条） |
 | M7 走廊贴着盒子边取 | `tests/render`（2 条） |
 | M8 折叠边界不生效 | `tests/diagram`（11 条） |
+| M9 读了 `header` 却不画 | 页面文本用例（plantuml-corpus） |
+| M10 读了 `legend` 块却不画 | `a legend block is text under the drawing…`（plantuml-corpus） |
 
 补这两道闸门之前，M1 与 M5 是**全绿**的：没有断言的 pass 等于装饰，而一个真修过的 bug 没有快照就等于没修。
 
