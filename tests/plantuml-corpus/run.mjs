@@ -299,6 +299,22 @@ test('a turned drawing grows along the page and keeps its packages', () => {
   if (!(price.x > group.x + group.width)) throw new Error('the root box is not the next column: ' + String(price.x) + ' vs ' + String(group.x + group.width))
 })
 
+// The same source renders to the same bytes, in any order, in any process: a drawing a reader can point at is a drawing
+// that does not change under them, and every snapshot in these suites rests on it.
+test('the same source renders to the same bytes', () => {
+  const wide = ['@startuml', 'left to right direction', 'together {', '  component x', '  component y', '}', 'component z', 'z --> x', 'x -[hidden]-> y', '@enduml'].join('\n')
+  const machine = ['@startuml', 'state "甲" as a', 'state "乙" as b', '[*] --> a', 'a --> b : 走', 'b --> a', '@enduml'].join('\n')
+  const big = ['@startuml', ...Array.from({ length: 30 }, (_, i) => 'component n' + i), ...Array.from({ length: 29 }, (_, i) => 'n' + i + ' --> n' + (i + 1)), '@enduml'].join('\n')
+  const once = new Map()
+  for (const source of [wide, machine, big]) once.set(source, render({ source }, {}, { scheme: 'default' }).markup)
+  // Rendered again after the others, and in the opposite order: a drawing that depends on what was drawn before it is
+  // the failure this catches.
+  for (const source of [big, machine, wide]) {
+    const again = render({ source }, {}, { scheme: 'default' }).markup
+    if (again !== once.get(source)) throw new Error('the same source rendered differently: ' + source.slice(0, 30))
+  }
+})
+
 // A drawing is a model, not a notation. The same graph written either way must produce the same model - the same nodes
 // with the same labels, the same edges with the same heads and dashes, the same containment - or "switch notation" would
 // silently switch the picture.
