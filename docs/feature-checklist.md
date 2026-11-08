@@ -169,6 +169,7 @@ node tests/separate/run.mjs
 node tests/lift/run.mjs
 node tests/repair/run.mjs
 node tests/ports/run.mjs
+node tests/labels/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -232,6 +233,7 @@ And the gates around it:
 | `lift` | 7 | the last leg is read, and a route too short has none |
 | `repair` | 4 | a path that does not cross is not repaired |
 | `ports` | 7 | two ports on a side with room keep the full separation |
+| `labels` | 4 | a label with nothing in the way sits on its longest run |
 | `presentation` | 57 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

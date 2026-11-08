@@ -36,6 +36,9 @@
  * Pure: a diagram in, shapes out, every decision assertable.
  */
 import { type Box } from './place.js';
+import { type LabelPlacement } from './labels.js';
+export { LABEL_HEIGHT, placeLabel } from './labels.js';
+export type { LabelPlacement } from './labels.js';
 import { type ColourRole, type Palette, type PaletteOptions } from './palette.js';
 import { type Diagram, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js';
 export interface Point {
@@ -65,15 +68,6 @@ export interface BoxShape {
  * it could not avoid, so a reader of the drawing (or a test) can tell a crowded drawing from a placement bug. The
  * label never leaves its own edge to earn any of these numbers.
  */
-export interface LabelPlacement {
-    /** The straight run it sits on, 0 being the edge's longest. */
-    run: number;
-    /** Everything its mask overlaps: the other labels, boxes and edges it would have had to move off its line to clear. */
-    collisions: number;
-    boxes: number;
-    labels: number;
-    edges: number;
-}
 export interface LinkShape {
     kind: 'link';
     x1: number;
@@ -177,50 +171,6 @@ export declare const MULTI_EDGE_SPACING = 20;
 /** Which colour a box earns from its role. One mapping, used by every container. */
 export declare function roleOfNode(node: DiagramNode): ColourRole;
 /**
- * How tall the mask an edge label is drawn over is.
- *
- * Exported because two modules must agree on it: the painter reserves the rectangle when it looks for a clear
- * place, and the writer draws the rectangle that was reserved. A label with two sizes is a label half masked.
- */
-export declare const LABEL_HEIGHT = 12;
-/** A straight piece of an edge, as the collision test needs it. */
-interface Segment {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-}
-/** Where a label sits: the point it is centred on, and the rectangle its mask covers. */
-interface LabelSpot {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-/**
- * The point an edge's label is drawn at.
- *
- * A label is not furniture parked beside the line: it names the transition, so it sits on the line - anchored on one
- * of its own straight runs - and the writer masks the stretch of line it covers. Text beside a line can be read as
- * belonging to whatever it happens to sit next to; text that interrupts its own line reads as part of it.
- *
- * The anchor then has to be earned. A mask over a box hides a border, over another label it makes both unreadable,
- * and over a third edge's line it hides that line. So the label walks along a run in small steps, in both directions
- * and bounded so its rectangle stays on that run, and takes the first place that is clear. It tries the longest run
- * first and then the shorter ones: on a dense drawing the longest run can be crowded for its whole length while a
- * shorter run of the same edge is empty, and a label that gives up after one run leaves the drawing with a collision
- * it did not have to accept.
- *
- * When no run offers a clear place, the label takes the place with the fewest collisions - boxes and other labels
- * first, because text over a border hides the border and text over text is unreadable, then other edges, which a mask
- * merely interrupts. It never leaves its own edge: a label moved onto a neighbouring edge is a label that names the
- * wrong thing. The choice is returned with the label, so a crowded drawing can be told from a placement bug.
- *
- * Exported because the choice is pure and worth asserting without a layout: a test can hand it one polyline, one box
- * and one other route, and read which run it took and what it could not clear.
- */
-export declare function placeLabel(label: string, points: Point[], boxes: Iterable<Box>, placed: LabelSpot[], otherRoutes: Segment[][]): LabelPlacement & LabelSpot;
-/**
  * The boxes a polyline passes through other than the two it terminates at.
  *
  * This is the drawing's one clearance rule, and it is deliberately written once: a channel run, a lane, a
@@ -234,4 +184,3 @@ export declare function paintWith(diagram: Diagram, overrides?: Partial<Palette>
     colours: Palette;
 };
 export declare function paint(diagram: Diagram, overrides?: Partial<Palette>): Canvas;
-export {};
