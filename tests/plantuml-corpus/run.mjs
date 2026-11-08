@@ -657,6 +657,39 @@ test('a file, a card and a frame draw their own marks', () => {
   if (cloud.refused.length !== 1) throw new Error('a cloud was not refused: ' + JSON.stringify(cloud.refused))
 })
 
+// A note beside a box names a side, and the side is honoured through the same placement machinery every other constraint
+// uses: a hidden edge with a direction hint. Four sides, one box, four arrangements.
+test('a note beside a box lands on the side the source named', () => {
+  const place = (side) => {
+    const source = ['@startuml', 'component a', 'note ' + side + ' of a : retry', '@enduml'].join('\n')
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(side + ' refused: ' + JSON.stringify(r.refused))
+    const box = (label) => r.canvas.shapes.find((shape) => shape.kind === 'box' && shape.label === label)
+    const note = box('retry')
+    const anchor = box('a')
+    if (note === undefined) throw new Error(side + ': the note was not drawn')
+    if (note.shape !== 'note') throw new Error(side + ': the note lost its fold')
+    return { note, anchor }
+  }
+  const right = place('right')
+  if (!(right.note.x > right.anchor.x && Math.abs(right.note.y - right.anchor.y) < 1)) throw new Error('right did not put the note on the right')
+  const left = place('left')
+  if (!(left.note.x < left.anchor.x && Math.abs(left.note.y - left.anchor.y) < 1)) throw new Error('left did not put the note on the left')
+  const top = place('top')
+  if (!(top.note.y < top.anchor.y && Math.abs(top.note.x - top.anchor.x) < 1)) throw new Error('top did not put the note above')
+  const bottom = place('bottom')
+  if (!(bottom.note.y > bottom.anchor.y && Math.abs(bottom.note.x - bottom.anchor.x) < 1)) throw new Error('bottom did not put the note below')
+  // The note is placed by a hidden edge: it must not draw one.
+  if (place('right').note === undefined) throw new Error('unreachable')
+  const drawn = render({ source: ['@startuml', 'component a', 'note right of a : retry', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (drawn.canvas.shapes.some((shape) => shape.kind === 'path' || shape.kind === 'link')) throw new Error('the placement edge was drawn')
+  // Two defects of the form: no words, and a position over the box that no edge can express.
+  const wordless = render({ source: ['@startuml', 'component a', 'note right of a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (wordless.refused.length !== 1 || !wordless.refused[0].includes('names no text')) throw new Error('a wordless note: ' + JSON.stringify(wordless.refused))
+  const over = render({ source: ['@startuml', 'component a', 'note over a : x', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (over.refused.length !== 1 || !over.refused[0].includes('position this renderer cannot draw')) throw new Error('a note over a box: ' + JSON.stringify(over.refused))
+})
+
 // A note is an element with a folded corner; a note placed beside a box is a position, which this renderer decides.
 test('a note draws with its fold, and a placed note is refused', () => {
   const note = render(
@@ -668,15 +701,14 @@ test('a note draws with its fold, and a placed note is refused', () => {
   const shape = note.diagram.nodes.find((node) => node.id === 'n')
   if (shape?.shape !== 'note') throw new Error('the note is not a note: ' + JSON.stringify(shape))
   if (!note.markup.includes('<path d="M')) throw new Error('the note has no crease')
-  const placed = render(
+  // A placed note is a note *and* a position now: the note is drawn and the position is honoured by a hidden edge.
+  const beside = render(
     { source: ['@startuml', 'component A', 'note left of A : hi', '@enduml'].join('\n') },
     {},
     { scheme: 'default' },
   )
-  if (placed.refused.length !== 1) throw new Error('a placed note was not refused: ' + JSON.stringify(placed.refused))
-  if (!placed.refused[0].includes('a position this renderer decides')) {
-    throw new Error('the placed note was refused for the wrong reason: ' + placed.refused[0])
-  }
+  if (beside.refused.length !== 0) throw new Error('a placed note was refused: ' + JSON.stringify(beside.refused))
+  if (!beside.markup.includes('hi')) throw new Error('a placed note was not drawn')
 })
 
 // A direction hint is written in the reader's coordinates: the same `-right->` puts the far box on the right in either

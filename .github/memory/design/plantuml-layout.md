@@ -40,7 +40,8 @@ metadata:
 | `-right->` `-down->` `-up->` `-left->` | 逐边方向 | **支持**；横排下方向词按读者坐标读（right 仍是向右） |
 | `-[hidden]->` | 只参与排版、不画的边 | **支持**：照常排名，恒不绘制 |
 | `together { }` | 同一层成组 | **支持**：成员拉到组内最深一行 |
-| `note left of` / `note right:` / `note over` | 相对定位的注释 | 按行拒收：位置由渲染器决定 |
+| `note right of X : 文字` 等四个方位 | 紧邻某盒的注释 | 支持：注释画成折角盒子，方位通过一条**隐形边 + 方向提示**实现 |
+| `note over X` | 覆盖在盒子上方的注释 | 按行拒收：没有任何边能表达“压在盒子上” |
 | `actor`/`participant`/`cloud`/`agent` | 序列图记号与云朵 | 按行拒收：没有对应轮廓 |
 | 序列图语句（`alt`/`opt`/`loop`/`par` …） | 时间轴片段 | 按行拒收 |
 | `skinparam` / `!theme` / `hide` / `show` / `scale` / `!pragma layout` | 样式与缩放 | 进 `ignored`，带行号说明「无效果」 |
