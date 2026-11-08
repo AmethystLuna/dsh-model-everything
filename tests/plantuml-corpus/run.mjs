@@ -299,6 +299,74 @@ test('a turned drawing grows along the page and keeps its packages', () => {
   if (!(price.x > group.x + group.width)) throw new Error('the root box is not the next column: ' + String(price.x) + ' vs ' + String(group.x + group.width))
 })
 
+// Two routes that run along the same line read as one line, and a reader loses one of the two statements. The property is
+// asserted over drawings with many long edges, where a routed lane can land on another edge's lane.
+test('no two routes draw the same line', () => {
+  const segmentsOf = (shape) => {
+    const points = shape.kind === 'path' ? shape.points : [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }]
+    const out = []
+    for (let i = 1; i < points.length; i += 1) out.push([points[i - 1].x, points[i - 1].y, points[i].x, points[i].y])
+    return out
+  }
+  const shared = (routes) => {
+    let total = 0
+    for (let a = 0; a < routes.length; a += 1) {
+      for (let b = a + 1; b < routes.length; b += 1) {
+        for (const mine of segmentsOf(routes[a])) {
+          for (const theirs of segmentsOf(routes[b])) {
+            const mineVertical = Math.abs(mine[0] - mine[2]) < 0.01
+            const theirsVertical = Math.abs(theirs[0] - theirs[2]) < 0.01
+            if (mineVertical !== theirsVertical) continue
+            if (mineVertical && Math.abs(mine[0] - theirs[0]) >= 5) continue
+            if (!mineVertical && Math.abs(mine[1] - theirs[1]) >= 5) continue
+            const lo = mineVertical ? Math.max(Math.min(mine[1], mine[3]), Math.min(theirs[1], theirs[3])) : Math.max(Math.min(mine[0], mine[2]), Math.min(theirs[0], theirs[2]))
+            const hi = mineVertical ? Math.min(Math.max(mine[1], mine[3]), Math.max(theirs[1], theirs[3])) : Math.min(Math.max(mine[0], mine[2]), Math.max(theirs[0], theirs[2]))
+            total += Math.max(0, hi - lo)
+          }
+        }
+      }
+    }
+    return total
+  }
+  const sources = [
+    // A layered drawing: long edges pass several rows, which is where two lanes can coincide.
+    ['@startuml', 'package "edge" as edge {', '  component web', '  component api', '}', 'package "app" as app {', '  component order', '  component stock', '}', 'component bus', 'component store', 'web --> api', 'api --> order', 'api --> stock', 'order --> bus', 'stock --> bus', 'bus --> store', 'order ..> store', 'stock ..> store', '@enduml'].join('\n'),
+    // A fan-out: every edge leaves the same side.
+    ['@startuml', 'component hub', ...Array.from({ length: 6 }, (_, i) => 'component t' + i), ...Array.from({ length: 6 }, (_, i) => 'hub --> t' + i), '@enduml'].join('\n'),
+    // A ring with a shortcut.
+    ['@startuml', 'component a', 'component b', 'component c', 'component d', 'a --> b', 'b --> c', 'c --> d', 'd --> a', 'a --> c', '@enduml'].join('\n'),
+  ]
+  for (const source of sources) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused.slice(0, 2)))
+    const routes = r.canvas.shapes.filter((shape) => shape.kind === 'path' || shape.kind === 'link')
+    const total = shared(routes)
+    if (total > 0.5) throw new Error('two routes share ' + total.toFixed(1) + 'px of line')
+  }
+})
+
+// A fan-out of six is the smallest drawing where the separation pass's decisions show: its routes are pinned here so a
+// change to how the pass computes what to move is visible in the drawing, not only in a timing.
+test('a six-way fan-out keeps its routing', () => {
+  const source = ['@startuml', 'component hub', ...Array.from({ length: 6 }, (_, i) => 'component t' + i), ...Array.from({ length: 6 }, (_, i) => 'hub --> t' + i), '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  const routes = r.canvas.shapes.filter((shape) => shape.kind === 'path' || shape.kind === 'link')
+  const drawn = routes.map((shape) => shape.kind === 'path'
+    ? shape.points.map((point) => Math.round(point.x) + ',' + Math.round(point.y)).join(' ')
+    : Math.round(shape.x1) + ',' + Math.round(shape.y1) + ' ' + Math.round(shape.x2) + ',' + Math.round(shape.y2))
+  const expected = [
+    '321,73 321,85 64,85 64,117',
+    '335,73 335,93 182,93 182,117',
+    '349,73 349,101 300,101 300,117',
+    '369,73 369,87 418,87 418,117',
+    '383,73 383,107 536,107 536,117',
+    '397,73 397,101 654,101 654,117',
+  ]
+  if (JSON.stringify(drawn) !== JSON.stringify(expected)) {
+    throw new Error('the fan-out routes changed: ' + JSON.stringify(drawn))
+  }
+})
+
 // A drawing large enough to matter must still finish quickly. The ceiling is forty times what the drawing costs today, so it
 // fails on the order of magnitude a cubic pass brings back, not on a loaded machine: the count and the routing are asserted
 // beside it, so a fast wrong picture does not pass either.

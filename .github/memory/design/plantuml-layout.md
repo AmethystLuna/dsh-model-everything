@@ -133,6 +133,25 @@ metadata:
 
 矛盾约束的成规兑现了：`together` 造成的排序环由 `coords.ts` 的 `placing` 集合丢弃一条，而不是无限递归。
 
+## 缺陷注入：哪道闸门真的会红（第 20 轮实测）
+
+把五种典型缺陷注入 `src/`（每次改完 `npm run build`、跑四个套件、再用 `git checkout -- src lib` 还原），看谁报错：
+
+| 注入的缺陷 | 修复前 | 现在 |
+|---|---|---|
+| 关掉 separation pass（`SHARED_LINE_ROUNDS = 0`） | **没抓到** | `no two routes draw the same line` |
+| 端口打包改回固定 14px（忽略边能容纳的跨度） | 抓到 | 抓到 |
+| 关掉短台阶合并（`SNAP_JOG = 0`） | 抓到 | 抓到 |
+| Mermaid `==>` 又映射成虚线 | 抓到 | 抓到 |
+| 分离段只更新被移动那一行的 row（第 18 轮的真 bug） | **没抓到** | `a six-way fan-out keeps its routing` |
+
+两条结论：**没有断言的 pass 等于装饰**——分离段与它的分解在注入缺陷时全绿；补上「两条路线不共线」这条**性质**闸门（不看实现）
+与一张扇出路由快照后，两类缺陷都会红。补的闸门还顺带证明分离段**今天确实会触发**：给的一份分层源关掉它就会出现共线。
+
+另一个环境事实：`npm run build` 之后 `git status` 会报 145 个 `lib/` 文件「已修改」，而 `git hash-object` 与
+`HEAD:lib/...` **哈希相同**、`git diff --exit-code -- lib` 退出码为 0。这是 `core.autocrlf=true` 下 Windows 检出的
+stat 缓存噪音，不是内容变化——发布规则看的是 `git diff`，它是对的。
+
 ## 测试与风险
 
 - 每个构造一条**正例**（画出来）与一条**近似反例**（该拒收的仍拒收，且行号正确）。
