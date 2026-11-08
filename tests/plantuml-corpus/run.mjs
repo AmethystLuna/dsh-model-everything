@@ -583,7 +583,10 @@ test('a page-text block is text, not diagram lines', () => {
   const headerShape = r.canvas.shapes.find((shape) => shape.kind === 'header')
   const title = r.canvas.shapes.find((shape) => shape.kind === 'title')
   if (headerShape === undefined || title === undefined) throw new Error('the header or the title is missing')
-  if (!(title.y > headerShape.y + 15)) throw new Error('the title sits on the second header line')
+  // The title has to clear the *last* line the header drew, not just the first: a header of two lines one band tall puts the
+  // title on top of its second line, which is a defect a weaker assertion passes.
+  const lastHeaderLine = headerShape.y + (headerShape.lines.length - 1) * 15
+  if (!(title.y >= lastHeaderLine + 6)) throw new Error('the title sits on the last header line')
 })
 
 // Page text in the source's own words: a header above the drawing pushes it down, a caption and a footer sit under it.
