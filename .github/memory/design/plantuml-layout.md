@@ -20,21 +20,45 @@ metadata:
 
 | 构造 | PlantUML 里的意思 | 今天 |
 |---|---|---|
-| `component`/`package`/`node`/`folder`/`rectangle`/`artifact`/`state`/`database`/`entity`/`usecase`/`[x]` | 元素或边界 | 支持（`state` 画成圆角矩形，`database`/`entity` 画成圆柱） |
-| `-->` `..>` `--\|>` `..\|>` `*--` `o--`，可带 `: label` | 关联/依赖/泛化/实现/组合/聚合 | 支持；两端都带记号、点线组合、点线聚合按行拒收 |
+| `component`/`node`/`rectangle`/`artifact`/`state` | 普通元素 | 支持，圆角矩形 |
+| `database`/`entity` | 数据存储 | 支持，圆柱 |
+| `usecase` | 用例 | 支持，椭圆 |
+| `class`/`object`/`interface`/`enum`/`annotation` | 带分隔栏的盒子 | 支持为**命名盒子**，分隔栏按行拒收 |
+| `note`/`file`/`card` | 折角盒子 | 支持；`note` 折右上，`file` 折右上同形，`card` 折左上 |
+| `frame` | 页签盒子 | 支持，名字写进页签 |
+| `queue`/`stack`/`storage` | 容器 | 支持：半圆封口 / 顶部层线 / 弧形顶边 |
+| `boundary`/`control`/`collections` | 角色盒子 | 支持，角标记号（双竖线 / 圆 / 方） |
+| `package`/`folder`/`node`/`component`/`rectangle`/`artifact` 块 | 边界 | 支持，可嵌套 |
+| `-->` `..>` `<\|--` `\|>` `*--` `o--` `--` `*..` `o..`，可带 `: label` | 关联/依赖/泛化/实现/组合/聚合/无头连线 | 支持；两端都带记号的边按行拒收 |
 | `component "文字" as X`、`package "文字" as P { }` | 别名 | 支持，别名是边引用的 id |
 | `[*] --> A` | 起点 | 支持 |
 | `title` | 标题 | 支持 |
-| `left to right direction` / `top to bottom direction` | 全局方向 | **接受但无效果**（只有一套自上而下布局） |
-| `-right->` `-down->` `-up->` `-left->` | 逐边方向约束 | **按行拒收** |
-| `-[hidden]->` | 只参与排版、不画的边 | **按行拒收** |
-| `together { }` | 同一层成组 | 外壳被忽略，里面裸标识符按行拒收 → 实际不可用 |
-| 裸标识符一行（`A`） | 声明/引用 | **按行拒收**（`component A` 可以） |
-| `note` / `legend` / `caption` / `header` / `footer` | 注释与题注 | **按行拒收**（连内容行一起） |
-| `skinparam` / `!theme` / `hide` / `show` / `scale` | 样式与缩放 | 静默忽略 |
+| `legend` … `end legend` | 图例块 | 支持，画在图下、图注之上，**不参与布局**；`legend right` 等角位进 `ignored` |
+| `left to right direction`（PlantUML）与 `flowchart LR`（Mermaid） | 全局方向 | **支持**：测量转置后跑同一条管线，末尾把画布转回来 |
+| `top to bottom direction` | 全局方向 | 接受但无效果（本来就是自上而下），进 `ignored` |
+| `-right->` `-down->` `-up->` `-left->` | 逐边方向 | **支持**；横排下方向词按读者坐标读（right 仍是向右） |
+| `-[hidden]->` | 只参与排版、不画的边 | **支持**：照常排名，恒不绘制 |
+| `together { }` | 同一层成组 | **支持**：成员拉到组内最深一行 |
+| `note left of` / `note right:` / `note over` | 相对定位的注释 | 按行拒收：位置由渲染器决定 |
+| `actor`/`participant`/`cloud`/`agent` | 序列图记号与云朵 | 按行拒收：没有对应轮廓 |
+| 序列图语句（`alt`/`opt`/`loop`/`par` …） | 时间轴片段 | 按行拒收 |
+| `skinparam` / `!theme` / `hide` / `show` / `scale` / `!pragma layout` | 样式与缩放 | 进 `ignored`，带行号说明「无效果」 |
 
-拒收都带行号（`line N: …`），这是设计：画不了的行点名报出来，而不是画半张图。静默忽略的那几行
-（尤其方向）是**危险**的一类——源码说了一件事，图里没有，读者却以为有。
+拒收都带行号（`line N: …`），画不了的行点名报出来，而不是画半张图。`ignored` 是第三类：读懂了、没有效果、
+并且**明确说出来**——源码说了什么而图里没有，读者必须知道。
+
+## 转置布局的坑（第 10 轮实测）
+
+横排不是第二套引擎：`place()` 把每个盒子的宽高对调后跑同一条纵向管线，`paintWith` 最后把画布 `(x,y)→(y,x)`
+转回来。能这么做的前提是**每个以几何为依据的决策都问过「这是在谁的坐标系里」**。已经踩过的两个：
+
+- **分带（wrap）必须用读者坐标系判断**。转置前 rank 往下堆，一张横排图在规划器眼里永远是「高条」，于是它
+  开了第二条带；转置后这条带落在第一列下面，根节点还会被画进包里。结论：横排图不分带（请求就是向右长）。
+- **方向词按读者坐标读**。`-right->` 在横排下仍要「右边」；直接套用转置后的行列语义会让盒子跑到下面。
+  进布局前做一次 90° 映射（right↔down、up↔left）。
+
+同一条管线的其他约束仍然成立：端口间距按边实际能容纳的跨度收缩（永不重合）、短于 6px 的横向台阶并掉、
+标签找不到干净位置时如实报 `LABELS`。
 
 ## 布局引擎今天能被约束的地方
 

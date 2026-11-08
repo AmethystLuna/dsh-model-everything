@@ -64,6 +64,10 @@ asked for.
 A refusal is one line in `refused`, phrased `line N: …`. The drawing you get does not show the refused lines, and
 the tool says so rather than leaving you to notice.
 
+**What this engine covers.** Component, layered and state drawings: boxes, boundaries, arrows between them, and the
+layout controls below. A sequence diagram is a different picture - a time axis with lifelines - and it is out of scope
+by design, which is why its keywords are refused by name rather than drawn as boxes.
+
 **Why a keyword is refused.** Each name left in the table above is a symbol this engine has no outline for, not a
 line it skipped: `actor` and `participant` are the stick figure and the lifeline of a sequence diagram, and a
 sequence diagram is a different picture with a time axis; `agent` is that same stick figure under another name; a
