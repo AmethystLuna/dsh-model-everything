@@ -121,6 +121,20 @@ const MUTATIONS = [
     ].join('\n'),
     to: "        hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,",
   },
+  {
+    id: 'M12',
+    what: 'the lines inside a page-text block reach the parser',
+    file: 'src/render/from-plantuml.ts',
+    from: ["      inLegend.add(index)", "      if (new RegExp('^end\\\\s*' + (open === 'sourceCaption' ? 'caption' : open) + '\\\\b').test(text)) {"].join('\n'),
+    to: "      if (new RegExp('^end\\\\s*' + (open === 'sourceCaption' ? 'caption' : open) + '\\\\b').test(text)) {",
+  },
+  {
+    id: 'M13',
+    what: 'a header takes one band however many lines it has',
+    file: 'src/render/paint.ts',
+    from: 'const headerShift = diagram.header === undefined ? 0 : Math.max(1, diagram.header.length) * 16',
+    to: 'const headerShift = diagram.header === undefined ? 0 : 16',
+  },
 ]
 
 const argument = process.argv[2]
