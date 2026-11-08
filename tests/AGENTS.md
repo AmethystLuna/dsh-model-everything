@@ -43,6 +43,18 @@ Write the matrix before deciding the construct is supported: the bare form, the 
 a body line, and whatever the notation allows after them. Each row is a source, and the answer is the element's id, its label,
 and what was refused or ignored.
 
+## Auditing for the fourth answer
+
+A renderer answers in three ways: it draws the line, it ignores it with a reason, or it refuses it by number. A fourth answer
+exists and is worse than any of the three - the line is read into something wrong, or the source produces nothing and says
+nothing. Sampling edge inputs and sorting each answer into the three is how that fourth one is found: `component a,` became a box
+called `a,`, `component a; component b` became one box named after the rest of the line, and an empty source produced an empty
+picture with no word at all.
+
+The sample worth keeping: punctuation at the end of a statement, a separator the notation allows and this code does not, a comment
+in each of its forms, a source with nothing in it, and every whitespace and line-ending variant. Each is cheap to render and each
+has exactly one right answer.
+
 ## Rules for a finding-code case
 
 1. **One code per case.** The input produces that code and no other *error* code. A warning

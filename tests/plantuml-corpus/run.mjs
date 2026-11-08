@@ -970,6 +970,18 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// `/' ... '/` is a comment, not a defect: its lines are text, and a reader who writes one should not be told twice that it is
+// undrawable.
+test('a block comment is skipped, not refused', () => {
+  const r = render({ source: ['@startuml', "/' a note to self", "still a note '/", 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if (JSON.stringify(r.diagram.nodes.map((node) => node.id)) !== JSON.stringify(['a'])) throw new Error('nodes: ' + JSON.stringify(r.diagram.nodes.map((node) => node.id)))
+  // The single-line form and a trailing apostrophe are comments too.
+  const inline = render({ source: ['@startuml', "' a comment", 'component a', "component b ' and a trailing one", '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (inline.refused.length !== 0) throw new Error('inline: ' + JSON.stringify(inline.refused))
+  if (JSON.stringify(inline.diagram.nodes.map((node) => node.id)) !== JSON.stringify(['a', 'b'])) throw new Error('inline nodes: ' + JSON.stringify(inline.diagram.nodes.map((node) => node.id)))
+})
+
 // A line's punctuation is not part of a name, a statement separator this renderer does not read is refused, and a source with
 // nothing in it says so. All three used to be silent or folded into a name.
 test('punctuation and empty sources are answered, not folded in', () => {
