@@ -139,6 +139,8 @@ export interface PathShape {
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
   kind: 'group'
+  /** A package is dashed and a composite state is solid; the notation decides, so the shape carries it. */
+  outline?: 'dashed' | 'solid'
   /** The group's own id, so a container can fold it without guessing from the label. */
   id: string
   x: number
@@ -393,7 +395,8 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   for (const group of groups) {
     const rect = groupRects.get(group.id)
     if (rect === undefined) continue
-    shapes.push({ kind: 'group', id: group.id, x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: group.label, colour: 'muted' })
+    shapes.push({ kind: 'group',
+      ...(group.outline === undefined ? {} : { outline: group.outline }), id: group.id, x: rect.x, y: rect.y, width: rect.width, height: rect.height, label: group.label, colour: 'muted' })
   }
 
   const drawn = new Set<string>()

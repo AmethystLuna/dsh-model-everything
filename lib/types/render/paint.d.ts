@@ -102,6 +102,8 @@ export interface PathShape {
 /** A boundary around several states: a package, a layer, a subgraph. */
 export interface GroupShape {
     kind: 'group';
+    /** A package is dashed and a composite state is solid; the notation decides, so the shape carries it. */
+    outline?: 'dashed' | 'solid';
     /** The group's own id, so a container can fold it without guessing from the label. */
     id: string;
     x: number;

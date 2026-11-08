@@ -78,6 +78,11 @@ export interface DiagramGroup {
      * best a hand-written model can offer.
      */
     parent?: string;
+    /**
+     * How the boundary is outlined. A package is dashed; a composite state is solid, and the difference is the notation's,
+     * not the painter's - so it travels on the group.
+     */
+    outline?: 'dashed' | 'solid';
 }
 export interface Diagram {
     kind: 'machine' | 'graph' | 'none';

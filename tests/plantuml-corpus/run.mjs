@@ -82,12 +82,11 @@ const CASES = [
   },
   {
     name: "composite state with inner transitions",
-    // The block line is refused; its body lines and every name another line mentions still draw. That is the
-    // decided degradation (the reader is told which line was dropped), not an oversight: dropping the members
-    // too would lose edges that parsed, and the counts below pin the choice.
-    why: "must refuse the state body, and keep the members that did parse",
+    // A composite state used to be refused as a boundary, with its body kept. It is a boundary now, drawn solid: the
+    // state is one state whose inside happens to be states, which is exactly what the notation says.
+    why: "a state block is a boundary, and the transitions inside it are edges",
     source: "@startuml\nstate Running {\n  [*] --> Busy\n  Busy --> Idle\n}\n[*] --> Running\n@enduml",
-    expect: { nodes: 3, edges: 1, groups: 0, refused: ["`state` block is not a boundary"] },
+    expect: { nodes: 2, edges: 1, groups: 1, refused: [] },
   },
   {
     name: "state alias with a long label",
@@ -518,6 +517,30 @@ test('a mermaid direction token turns the drawing the way plantuml does', () => 
   const down = render({ source: 'flowchart TD\n  a --> b\n  b --> c' }, {}, { scheme: 'default' })
   const downBoxes = down.canvas.shapes.filter((shape) => shape.kind === 'box')
   if (new Set(downBoxes.map((box) => box.y)).size !== 3) throw new Error('the TD chain lost its rows')
+})
+
+// A composite state is a boundary, and the notation says so with a solid outline: a package is dashed because it groups
+// unrelated things, while a composite state is one state whose inside happens to be states.
+test('a state block is a solid boundary, and a package is still dashed', () => {
+  const composite = render(
+    { source: ['@startuml', 'state "compound" as C {', '  state a', '  state b', '  a --> b', '}', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (composite.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(composite.refused))
+  const group = (composite.diagram.groups ?? [])[0]
+  if (group === undefined) throw new Error('the composite state is not a boundary')
+  if (group.label !== 'compound') throw new Error('label: ' + String(group.label))
+  if (JSON.stringify(group.members.slice().sort()) !== JSON.stringify(['a', 'b'])) throw new Error('members: ' + JSON.stringify(group.members))
+  const shape = composite.canvas.shapes.find((entry) => entry.kind === 'group')
+  if (shape?.outline !== 'solid') throw new Error('the composite state is not drawn solid')
+  if (composite.markup.includes('stroke-dasharray')) throw new Error('a solid boundary was drawn dashed')
+  const packaged = render(
+    { source: ['@startuml', 'package "p" as p {', '  component a', '}', '@enduml'].join('\n') },
+    {},
+    { scheme: 'default' },
+  )
+  if (!packaged.markup.includes('stroke-dasharray')) throw new Error('a package lost its dashes')
 })
 
 // Page text in the source's own words: a header above the drawing pushes it down, a caption and a footer sit under it.

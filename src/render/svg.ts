@@ -55,7 +55,8 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
     return (
       '<g data-group-id="' + escape(shape.id) + '" style="cursor:pointer">' +
       '<rect x="' + n(shape.x) + '" y="' + n(shape.y) + '" width="' + n(shape.width) + '" height="' + n(shape.height) +
-      '" rx="8" fill="none" stroke="' + stroke + '" stroke-width="1" stroke-dasharray="4 3" />' +
+      '" rx="8" fill="none" stroke="' + stroke + '" stroke-width="1"' +
+      (shape.outline === 'solid' ? '' : ' stroke-dasharray="4 3"') + ' />' +
       '<text x="' + n(shape.x + 6) + '" y="' + n(shape.y + 12) + '" font-size="10" fill="' + stroke + '">' + escape(shape.label) + '</text>' +
       '</g>'
     )

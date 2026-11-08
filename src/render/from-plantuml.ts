@@ -83,7 +83,10 @@ const SHAPES: Record<string, NodeShape> = {
 }
 
 /** The keywords that open a boundary around what is written inside them. */
-const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle', 'artifact'])
+const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle', 'artifact', 'state'])
+
+/** The boundary keywords a source draws solid: a composite state is one state, not a container of unrelated ones. */
+const SOLID_BOUNDARY = new Set(['state'])
 
 /** Element keywords this renderer deliberately does not draw, with the reason it gives for each. */
 const NOT_DRAWN: Record<string, string> = {
@@ -351,7 +354,9 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     const startMarker = /^\[\*\]\s*-->\s*(.+)$/.exec(line)
     if (startMarker !== null) {
       const target = reference(startMarker[1])
-      ensure(builder, target.id, target.label, target.shape)
+      // The state a marker enters is named, not declared here: a `state X { }` block named on this line is the boundary,
+      // and a plain name becomes a box only if nothing else declares it.
+      ensure(builder, target.id, target.label, target.shape, true)
       if (startId === undefined) startId = target.id
       return
     }
@@ -461,7 +466,12 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       }
       groupCount += 1
       const boundary = boundaryOf(declaration, opener, groupCount)
-      builder.open.push({ id: boundary.id, label: boundary.label, members: [] })
+      builder.open.push({
+        id: boundary.id,
+        label: boundary.label,
+        members: [],
+        ...(SOLID_BOUNDARY.has(opener) ? { outline: 'solid' as const } : {}),
+      })
       return
     }
 

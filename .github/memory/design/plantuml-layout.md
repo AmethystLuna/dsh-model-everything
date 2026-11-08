@@ -29,6 +29,7 @@ metadata:
 | `queue`/`stack`/`storage` | 容器 | 支持：半圆封口 / 顶部层线 / 弧形顶边 |
 | `boundary`/`control`/`collections` | 角色盒子 | 支持，角标记号（双竖线 / 圆 / 方） |
 | `package`/`folder`/`node`/`component`/`rectangle`/`artifact` 块 | 边界 | 支持，可嵌套 |
+| `state "名字" as X { }` | 复合状态 | 支持，画成**实线**边界（包是虚线） |
 | `-->` `..>` `<\|--` `\|>` `*--` `o--` `--` `*..` `o..`，可带 `: label` | 关联/依赖/泛化/实现/组合/聚合/无头连线 | 支持；两端都带记号的边按行拒收 |
 | `component "文字" as X`、`package "文字" as P { }` | 别名 | 支持，别名是边引用的 id |
 | `[*] --> A` | 起点 | 支持 |
