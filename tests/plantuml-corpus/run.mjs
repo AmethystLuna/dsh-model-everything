@@ -151,6 +151,31 @@ for (const c of CASES) {
     // A refusal must never cost the lines that did parse: the drawing is what the reader sees.
     if (!/<svg[^>]*viewBox="0 0 \d+ \d+"/.test(drawn.markup)) throw new Error('no drawing: ' + drawn.markup.slice(0, 80))
     if (drawn.dropped !== 0) throw new Error('dropped ' + String(drawn.dropped) + ' shape(s)')
+    // No two edges are drawn on one line. Two lines that share a stretch read as one line with two heads, and the
+    // reader cannot tell which head belongs to which statement - the rule the painter enforces when it routes.
+    const piecesOf = (points) => {
+      const out = []
+      for (let i = 1; i < points.length; i += 1) {
+        const before = points[i - 1]
+        const after = points[i]
+        if (Math.abs(before.y - after.y) < 0.5 && Math.abs(before.x - after.x) > 1) out.push({ axis: 'y', at: before.y, lo: Math.min(before.x, after.x), hi: Math.max(before.x, after.x) })
+        if (Math.abs(before.x - after.x) < 0.5 && Math.abs(before.y - after.y) > 1) out.push({ axis: 'x', at: before.x, lo: Math.min(before.y, after.y), hi: Math.max(before.y, after.y) })
+      }
+      return out
+    }
+    const routes = drawn.canvas.shapes.filter((shape) => shape.kind === 'path').map((shape) => piecesOf(shape.points))
+    let shared = 0
+    for (let left = 0; left < routes.length; left += 1) {
+      for (let right = left + 1; right < routes.length; right += 1) {
+        for (const mine of routes[left]) {
+          for (const theirs of routes[right]) {
+            if (mine.axis !== theirs.axis || Math.abs(mine.at - theirs.at) >= 0.5) continue
+            shared += Math.max(0, Math.min(mine.hi, theirs.hi) - Math.max(mine.lo, theirs.lo) - 1)
+          }
+        }
+      }
+    }
+    if (shared > 0) throw new Error('two edges share ' + String(shared) + ' points of line')
   })
 }
 
