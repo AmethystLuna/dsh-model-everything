@@ -6,7 +6,16 @@
 //
 // This is not PlantUML. A construct this renderer has no symbol for is refused by line, and the case
 // records that refusal as the expected answer - that is the contract, not a bug to fix later.
-import { render } from '../../lib/render/index.js'
+import { render as draw } from '../../lib/render/index.js'
+import { wellFormed } from '../svg-document.mjs'
+
+// Every drawing this suite makes is also checked as a document: a case that reads a construct correctly can still emit
+// markup a container cannot open, and no assertion about geometry would notice.
+const render = (...args) => {
+  const result = draw(...args)
+  if (result.markup !== '') wellFormed(result.markup)
+  return result
+}
 
 let failures = 0
 const test = (name, body) => {
@@ -638,6 +647,27 @@ test('a turned drawing keeps its page furniture in page order', () => {
   if (!(captions[0].y > legend.y && captions[1].y > captions[0].y)) throw new Error('the captions are not stacked under the legend')
   for (const shape of [header, title, legend, ...captions]) {
     if (shape.x < 20 - 0.01) throw new Error('page furniture left the left margin: ' + String(shape.x))
+  }
+})
+
+// Text that needs escaping has to arrive escaped in every position it can appear in. The corpus had no such source, so a
+// renderer that escaped only `<` passed the whole suite.
+test('text that needs escaping survives in every position', () => {
+  const sources = [
+    ['@startuml', 'component "A & B" as a', 'component b', 'a --> b : x < y & z > w', '@enduml'].join('\n'),
+    ['@startuml', 'title <draft> & "quoted"', 'header', '  R&D <lab>', 'end header', 'component a', '@enduml'].join('\n'),
+    ['@startuml', 'package "R & D" as rd {', '  component a', '}', '@enduml'].join('\n'),
+    ['@startuml', 'legend', '  x & y <z>', 'end legend', 'note right of a : 5 < 6 & 7 > 2', 'component a', '@enduml'].join('\n'),
+    'flowchart LR\n  a[A & B] -->|x < y| b[z]',
+  ]
+  for (const source of sources) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    // The document check runs inside `render`; this also names what the reader should see.
+    for (const text of ['A &amp; B', 'x &lt; y', 'R &amp; D', '&lt;draft&gt;']) {
+      if (source.includes(text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')) && !r.markup.includes(text)) {
+        throw new Error('the escaped form is missing: ' + text)
+      }
+    }
   }
 })
 

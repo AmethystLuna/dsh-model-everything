@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { wellFormed } from '../svg-document.mjs'
 // White-box suite for the renderer's pure half.
 //
 // Everything a drawing decides is decided here, in Node, with no browser: which nodes exist, what row each
@@ -3162,25 +3163,6 @@ test('the same source draws the same bytes in another process', () => {
 
 // Markup is a document, and a document has to parse. An unescaped `&` or a tag written once is invisible to every
 // geometric assertion in this suite and breaks the picture in the container instead.
-const wellFormed = (markup) => {
-  for (const match of markup.matchAll(/&/g)) {
-    const entity = /^&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/.exec(markup.slice(Number(match.index)))
-    if (entity === null) throw new Error('an unescaped & at ' + String(match.index))
-  }
-  const stack = []
-  for (const tag of markup.matchAll(/<(\/?)([a-z]+)([^>]*)>/g)) {
-    const closing = tag[1] === '/'
-    const selfClosing = tag[3].trimEnd().endsWith('/')
-    if (closing) {
-      const open = stack.pop()
-      if (open !== tag[2]) throw new Error('</' + tag[2] + '> closes <' + String(open) + '>')
-    } else if (!selfClosing) {
-      stack.push(tag[2])
-    }
-  }
-  if (stack.length !== 0) throw new Error('unclosed: ' + stack.join(','))
-}
-
 test('the document check rejects a document that does not parse', () => {
   // A checker that cannot reject a known-bad document asserts nothing, so it is given two it must refuse.
   for (const bad of ['<svg><text>a & b</text></svg>', '<svg><text>x</svg>']) {

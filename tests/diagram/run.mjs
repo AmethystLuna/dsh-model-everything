@@ -8,7 +8,16 @@ import { collapse } from '../../lib/render/collapse.js'
 import { checkBudget } from '../../lib/render/budget.js'
 import { diffStructure } from '../../lib/render/diff.js'
 import { fromPlantUml } from '../../lib/render/from-plantuml.js'
-import { detectNotation, render } from '../../lib/render/index.js'
+import { detectNotation, render as draw } from '../../lib/render/index.js'
+import { wellFormed } from '../svg-document.mjs'
+
+// Each drawing is also checked as a document, for the same reason the corpus does it: geometry assertions read the markup as
+// a string and cannot see a tag that never closes.
+const render = (...args) => {
+  const result = draw(...args)
+  if (result.markup !== '') wellFormed(result.markup)
+  return result
+}
 import { writeSvg } from '../../lib/render/write.js'
 import { registerAnnotateCommand } from '../../lib/diagram.js'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
