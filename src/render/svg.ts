@@ -208,6 +208,10 @@ const writers: { [K in Shape['kind']]: Writer<K> } = {
       edgeLabel(shape.label, shape.labelX, shape.labelY, colours)
     )
   },
+  header: (shape, colours) => {
+    const colour = colours[shape.colour]
+    return '<text x="' + n(shape.x) + '" y="' + n(shape.y) + '" font-size="10" fill="' + colour + '">' + escape(String(shape.text)) + '</text>'
+  },
   title: (shape, colours) => {
     return '<text x="' + n(shape.x) + '" y="' + n(shape.y) + '" font-size="12" fill="' + colours[shape.colour] + '">' + escape(shape.text) + '</text>'
   },

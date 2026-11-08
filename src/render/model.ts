@@ -124,6 +124,12 @@ export interface Diagram {
   direction?: 'down' | 'right'
   /** The lines a `legend` block wrote: page furniture, drawn under the drawing and never part of it. */
   legend?: string[]
+  /** A `header` line: page text above the drawing, in the source's own words. */
+  header?: string
+  /** A `footer` line: page text below the drawing, in the source's own words. */
+  footer?: string
+  /** A `caption` line: the source's own caption, drawn under the drawing beside the one this renderer writes. */
+  sourceCaption?: string
   /** One line under the drawing: what was decided, in words the drawing cannot carry. */
   caption: string
 }

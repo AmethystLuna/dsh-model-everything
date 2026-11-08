@@ -165,6 +165,15 @@ export interface CaptionShape {
   colour: ColourRole
 }
 
+/** A `header` line: page text above the drawing, in the source's own words. */
+export interface HeaderShape {
+  kind: 'header'
+  x: number
+  y: number
+  text: string
+  colour: ColourRole
+}
+
 export interface TitleShape {
   kind: 'title'
   x: number
@@ -173,7 +182,7 @@ export interface TitleShape {
   colour: ColourRole
 }
 
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape | HeaderShape
 
 /** Which side of each box an edge leaves by and arrives at, and, for a long edge, the lane x it meets there. */
 interface Facing {
@@ -361,7 +370,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const shapes: Shape[] = []
 
   const groups = diagram.groups ?? []
-  const topOffset = MARGIN + TITLE_HEIGHT
+  // A header is page text above the drawing, so it takes the band the title would have had and pushes everything down by
+// one line. A drawing without one keeps the geometry it always had.
+const headerShift = diagram.header === undefined ? 0 : 16
+const topOffset = MARGIN + TITLE_HEIGHT + headerShift
   const placement = place(diagram, topOffset)
   const { boxes, groupRects } = placement
 
@@ -1664,7 +1676,10 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   })
   const labelCollisions = routes.reduce((total, { shape }) => total + ((shape.labelPlacement?.collisions ?? 0) > 0 ? 1 : 0), 0)
 
-  shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12, text: diagram.title, colour: 'text' })
+  if (diagram.header !== undefined) {
+    shapes.push({ kind: 'header', x: MARGIN, y: MARGIN + 12, text: diagram.header, colour: 'text' })
+  }
+  shapes.push({ kind: 'title', x: MARGIN, y: MARGIN + 12 + headerShift, text: diagram.title, colour: 'text' })
 
   const contentRight = Math.max(
     MARGIN,
@@ -1686,10 +1701,17 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
   const legendTop = contentBottom + CAPTION_GAP
   if (legend.length > 0) shapes.push({ kind: 'legend', x: MARGIN, y: legendTop, lines: legend, colour: 'text' })
   const captionTop = legendTop + (legend.length === 0 ? 0 : legend.length * CAPTION_LINE + CAPTION_GAP)
+  // The source's own words come first and this renderer's note last: a reader reads the diagram's caption before the
+  // machine's count of boxes.
+  const extra: string[] = []
+  if (diagram.sourceCaption !== undefined) extra.push(diagram.sourceCaption)
+  if (diagram.footer !== undefined) extra.push(diagram.footer)
+  if (extra.length > 0) shapes.push({ kind: 'caption', x: MARGIN, y: captionTop, lines: extra, colour: 'text' })
   // Anchored at the left margin, where the title is. The writer starts the text there: centred on a left-edge x,
   // half of a long caption fell outside the drawing and was clipped at the bottom edge of the picture.
-  shapes.push({ kind: 'caption', x: MARGIN, y: captionTop, lines: captionLines, colour: captionRole(diagram.caption) })
-  const height = captionTop + captionLines.length * CAPTION_LINE + MARGIN / 2
+  const noteTop = captionTop + extra.length * CAPTION_LINE
+  shapes.push({ kind: 'caption', x: MARGIN, y: noteTop, lines: captionLines, colour: captionRole(diagram.caption) })
+  const height = noteTop + captionLines.length * CAPTION_LINE + MARGIN / 2
 
   // Everything drawn counts, including the parts that leave the box grid: an edge routed beside the drawing and a
   // label wider than the gap between two boxes were both cut off at the right edge.

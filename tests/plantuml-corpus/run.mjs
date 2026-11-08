@@ -520,6 +520,26 @@ test('a mermaid direction token turns the drawing the way plantuml does', () => 
   if (new Set(downBoxes.map((box) => box.y)).size !== 3) throw new Error('the TD chain lost its rows')
 })
 
+// Page text in the source's own words: a header above the drawing pushes it down, a caption and a footer sit under it.
+test('page text in the source is drawn, and it moves the drawing only when it must', () => {
+  const bare = render({ source: ['@startuml', 'component a', 'component b', 'a --> b', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  const dressed = render(
+    {
+      source: ['@startuml', 'header internal', 'component a', 'component b', 'a --> b', 'caption figure one', 'footer revised', '@enduml'].join('\n'),
+    },
+    {},
+    { scheme: 'default' },
+  )
+  if (dressed.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(dressed.refused))
+  for (const text of ['internal', 'figure one', 'revised']) {
+    if (!dressed.markup.includes(text)) throw new Error('the page text is missing: ' + text)
+  }
+  const boxOf = (r) => r.canvas.shapes.filter((shape) => shape.kind === 'box')[0]
+  if (!(boxOf(dressed).y > boxOf(bare).y)) throw new Error('a header did not push the drawing down')
+  // Without page text the drawing is the one it always was: the band is only reserved when there is something to put in it.
+  if (bare.markup.includes('internal')) throw new Error('a drawing without page text grew one')
+})
+
 // A legend is page furniture. The metamorphic point is what it does *not* do: an arrow written inside it is text, not
 // an edge, and it takes no part in the layout.
 test('a legend block is text under the drawing, not lines in it', () => {

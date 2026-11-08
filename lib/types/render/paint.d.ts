@@ -126,6 +126,14 @@ export interface CaptionShape {
     lines: string[];
     colour: ColourRole;
 }
+/** A `header` line: page text above the drawing, in the source's own words. */
+export interface HeaderShape {
+    kind: 'header';
+    x: number;
+    y: number;
+    text: string;
+    colour: ColourRole;
+}
 export interface TitleShape {
     kind: 'title';
     x: number;
@@ -133,7 +141,7 @@ export interface TitleShape {
     text: string;
     colour: ColourRole;
 }
-export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape;
+export type Shape = GroupShape | BoxShape | LinkShape | PathShape | CaptionShape | LegendShape | TitleShape | HeaderShape;
 /** One segment of a drawn route that could not be kept out of a box it does not terminate at. */
 export interface RoutingFailure {
     /** The edge's index in the diagram. */

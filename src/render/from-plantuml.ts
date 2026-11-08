@@ -280,7 +280,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []
   const ignored: string[] = []
-  const heading: { value: 'down' | 'right' } = { value: 'down' }
+  const heading: { value: 'down' | 'right'; header?: string; footer?: string; sourceCaption?: string } = { value: 'down' }
   const builder: Builder = { nodes: new Map(), edges: [], edgeLines: [], edgeScopes: [], groups: [], open: [], implicit: new Set() }
   let startId: string | undefined
   let seenAny = false
@@ -320,6 +320,21 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     if (/^@(start|end)uml\b/.test(line)) return
     seenAny = true
     if (/^title\b/.test(line)) return
+    // Page text in the source's own words. A block form (`header` … `end header`) is a body this renderer would have to
+    // paginate; the one-line form is what a document writes for a footer or a caption.
+    const pageText = /^(header|footer|caption)\s+(.+)$/.exec(line)
+    if (pageText !== null) {
+      const value = (pageText[2] as string).replace(/^["']|["']$/g, '').trim()
+      if (value === '') {
+        refused.push(where + '`' + (pageText[1] as string) + '` names no text')
+        return
+      }
+      if (pageText[1] === 'header') heading.header = value
+      else if (pageText[1] === 'footer') heading.footer = value
+      else heading.sourceCaption = value
+      return
+    }
+
     if (/^left to right direction\b/.test(line)) {
       heading.value = 'right'
       return
@@ -619,6 +634,9 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   // `together { A B }` is a row, not a boundary: the boxes are declared by their own lines and the block only joins
   // them, so it is attached to the drawing rather than drawn as a group.
   const sameRank = togetherGroups(lines)
-  const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}), ...(legend.length === 0 ? {} : { legend }) }
+  const joined = { ...diagram, ...(sameRank.length === 0 ? {} : { sameRank }), ...(heading.value === 'right' ? { direction: heading.value } : {}), ...(legend.length === 0 ? {} : { legend }),
+    ...(heading.header === undefined ? {} : { header: heading.header }),
+    ...(heading.footer === undefined ? {} : { footer: heading.footer }),
+    ...(heading.sourceCaption === undefined ? {} : { sourceCaption: heading.sourceCaption }) }
   return { diagram: joined, refused, ignored }
 }
