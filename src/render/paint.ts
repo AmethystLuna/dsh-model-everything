@@ -39,7 +39,7 @@
 import { MARGIN, place, textOf, type Box } from './place.js'
 import { PORT_INSET } from './channels.js'
 import { anchor, approachSides, crossesBox, normalOf, ROUTE_STUB, routeEdge, simplify, type Ports, type Side } from './route.js'
-import { cylinderApex, cylinderCaps, hasDiscretePorts, hexagonCut, stadiumRadius } from './symbol.js'
+import { cylinderApex, cylinderCaps, cylinderPointOn, hasDiscretePorts, hexagonCut, stadiumRadius } from './symbol.js'
 import { textWidth } from './text.js'
 import { palette, roleForVerdict, type ColourRole, type Palette, type PaletteOptions } from './palette.js'
 import { labelOf, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
@@ -635,7 +635,12 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
         return vertical ? within(box.x + radius, box.x + box.width - radius) : within(middle, middle)
       }
       case 'cylinder': {
-        if (vertical) return within(middle, middle)
+        // A cap is a curve: an edge may meet it anywhere but its shoulders, so a fan-in from a cylinder is as many
+        // lines as it has arrows rather than one line from the apex.
+        if (vertical) {
+          const inset = Math.max(4, box.width * 0.08)
+          return within(box.x + inset, box.x + box.width - inset)
+        }
         const cap = cylinderCaps(box).cap
         return within(box.y + cap, box.y + box.height - cap)
       }
@@ -661,8 +666,8 @@ export function paintWith(diagram: Diagram, overrides: Partial<Palette> = {}, op
     const box = endBox(boxId) as Box
     if (side === 'left') return { x: box.x, y: along }
     if (side === 'right') return { x: box.x + box.width, y: along }
-    if (side === 'top') return { x: along, y: shapeOf(boxId) === 'cylinder' ? cylinderApex(box, 'top').y : box.y }
-    return { x: along, y: shapeOf(boxId) === 'cylinder' ? cylinderApex(box, 'bottom').y : box.y + box.height }
+    if (side === 'top') return shapeOf(boxId) === 'cylinder' ? cylinderPointOn(box, 'top', along) : { x: along, y: box.y }
+    return shapeOf(boxId) === 'cylinder' ? cylinderPointOn(box, 'bottom', along) : { x: along, y: box.y + box.height }
   }
   /** The side each edge end's port is on, where the port is a point rather than a place along a run. */
   const claimed = new Map<string, Side>()

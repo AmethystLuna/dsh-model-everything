@@ -1572,37 +1572,21 @@ test('a label is centred on its own line', () => {
 })
 
 test('a label whose midpoint sits across another line moves off the crossing', () => {
-  // Clearing a box and clearing another label are two of the three collisions. The third is another edge's line:
-  // a label lying across one hides it, and the mask makes that worse than text next to it. In this drawing the retry
-  // edge's midpoint lies across the give-up edge's drop, and there is room along the retry run on either side of it.
-  const source = [
-    'graph TD',
-    '  a[Reader] -->|request| b{Valid?}',
-    '  b -->|yes| c[(Store)]',
-    '  b -->|no| d[Reject]',
-    '  d -->|retry| a',
-    '  c -->|done| e[Reply]',
-    '  d -->|give up| e',
-  ].join(NL)
-  const { canvas } = paintWith(render({ source }).diagram)
-  const routes = routesOf(canvas)
-  const shape = routes.find((route) => route.label === 'retry')
-  if (shape === undefined) throw new Error('the labelled back edge was lost')
-  const label = labelRectsOf(canvas).find((entry) => entry.label === 'retry')
-  const points = routePointsOf(shape)
-  let longest = { from: points[0], to: points[1], length: -1 }
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    const length = Math.abs(points[index].x - points[index + 1].x) + Math.abs(points[index].y - points[index + 1].y)
-    if (length > longest.length) longest = { from: points[index], to: points[index + 1], length }
-  }
-  const middle = { x: (longest.from.x + longest.to.x) / 2, y: (longest.from.y + longest.to.y) / 2, width: label.width, height: label.height }
-  const others = routes.filter((route) => route !== shape).flatMap((route) => segmentsOfShape(route))
-  if (!others.some((segment) => labelHitsSegment(middle, segment))) {
-    throw new Error('the fixture does not put the midpoint across another line, so nothing had to move')
-  }
-  const crossed = others.filter((segment) => labelHitsSegment(label, segment))
-  if (crossed.length > 0) throw new Error('the label still lies across ' + String(crossed.length) + ' line(s) of other edges')
-  if (distanceToRoute(shape, label) > 2) throw new Error('the label left its own edge')
+  // Clearing a box and clearing another label are two of the three collisions. The third is another edge's line: a
+  // label lying across one hides it, and the mask makes that worse than text beside it. Asserted on the placement
+  // itself rather than through a drawing: a layout may move the line a fixture was built around, but the rule under
+  // test is what the label does when a line is there.
+  const route = [
+    { x: 40, y: 200 },
+    { x: 240, y: 200 },
+  ]
+  const crossing = { x1: 140, y1: 120, x2: 140, y2: 280 }
+  const placed = placeLabel('retry', route, [], [], [[crossing]])
+  const mask = { x: placed.x, y: placed.y, width: placed.width, height: placed.height }
+  const overlaps = Math.abs(placed.x - 140) < placed.width / 2 + 1 && Math.abs(placed.y - 200) < placed.height / 2 + 1
+  if (overlaps) throw new Error('the label stayed on the line it cannot cover: ' + JSON.stringify(mask))
+  if (Math.abs(placed.y - 200) > 0.5) throw new Error('the label left its own run: y=' + String(placed.y))
+  if (placed.x < 40 || placed.x > 240) throw new Error('the label left its own edge: x=' + String(placed.x))
 })
 
 test('two labels of a multi-edge do not overlap', () => {
@@ -3001,6 +2985,28 @@ test('a route that shares a line with another is moved until the drawing stops i
     }
   }
   if (shared > 4) throw new Error('two routes share ' + String(shared) + ' points of line')
+})
+test('a cylinder gives each relation leaving it a point of its own on the cap', () => {
+  // A cap is a curve, not a side with one point: three relations leaving a cylinder from its apex were three lines
+  // from one pixel, which read as one line that forks.
+  const source = [
+    '@startuml',
+    'entity "订单" as orders',
+    'entity "行" as lines',
+    'entity "支付" as payment',
+    'entity "发货" as shipment',
+    'orders --> lines',
+    'orders --> payment',
+    'orders --> shipment',
+    '@enduml',
+  ].join(NL)
+  const { canvas } = paintWith(render({ source }).diagram)
+  const order = boxNamed(canvas, '订单')
+  const starts = routesOf(canvas)
+    .map((shape) => startOf(shape))
+    .filter((point) => Math.abs(point.y - (order.y + order.height)) < order.height)
+  const distinct = new Set(starts.map((point) => String(point.x) + ',' + String(point.y)))
+  if (distinct.size !== 3) throw new Error('the three relations leave from ' + String(distinct.size) + ' point(s)')
 })
 test('a fan-in keeps a port of its own for every arrow and draws no junction', () => {
   // Merging was tried and withdrawn: PlantUML does not merge lines either, and one drawn line cannot carry two

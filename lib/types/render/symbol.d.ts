@@ -69,5 +69,14 @@ export declare function stadiumRadius(box: Box): number;
  * box, not `cap` inside it.
  */
 export declare function cylinderCaps(box: Box): CylinderCaps;
-/** The apex of a cylinder's top or bottom cap: the only point on that side an edge meets the outline at. */
+/**
+ * A point on a cylinder's cap, at the fraction of the way across it an edge asked for.
+ *
+ * The apex is one point, and three relations leaving a cylinder all started there: three lines from one pixel, which
+ * read as one. The cap is a curve, so an edge may leave anywhere on it - the answer Graphviz gives by taking the
+ * border point in the direction of the other node. The shoulders are kept off: an edge leaving one would run along
+ * the side the symbol is drawn by.
+ */
+export declare function cylinderPointOn(box: Box, side: 'top' | 'bottom', along: number): Point;
+/** The apex of a cylinder's top or bottom cap: the point its middle is drawn at. */
 export declare function cylinderApex(box: Box, side: 'top' | 'bottom'): Point;
