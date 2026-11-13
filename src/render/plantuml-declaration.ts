@@ -46,6 +46,21 @@ export function readDeclaration(line: string, where: string): Declaration | unde
     }
   }
 
+  // `abstract class C` states a class with a modifier this renderer does not draw: the class is drawn and the modifier is reported.
+  const abstracted = /^abstract\s+(.+)$/.exec(line)
+  if (abstracted !== null) {
+    const inner = readDeclaration(abstracted[1] as string, where)
+    if (inner !== undefined) {
+      return {
+        elements: inner.elements,
+        notes: [
+          { channel: 'ignored', message: where + '`abstract` is a modifier: every element here is drawn the same way' },
+          ...inner.notes,
+        ],
+      }
+    }
+  }
+
   const declared = DECLARED.exec(line)
   if (declared !== null) {
     const shape = SHAPES[declared[1] as string] as NodeShape
@@ -60,6 +75,14 @@ export function readDeclaration(line: string, where: string): Declaration | unde
     if (quoted !== null) return { elements: [{ id: quoted[2] as string, label: text(quoted[1] as string), shape }], notes }
     const bracketed = BRACKET_ALIAS.exec(rest)
     if (bracketed !== null) return { elements: [{ id: bracketed[2] as string, label: text(bracketed[1] as string), shape }], notes }
+    // `usecase (Login)` is the notation's own spelling: the parentheses are syntax, not part of the name.
+    const parenAlias = /^\((.+?)\)\s+as\s+([A-Za-z_][\w-]*)$/.exec(rest)
+    if (parenAlias !== null) return { elements: [{ id: parenAlias[2] as string, label: text(parenAlias[1] as string), shape }], notes }
+    const parenName = /^\((.+?)\)$/.exec(rest)
+    if (parenName !== null) {
+      const name = text(parenName[1] as string)
+      return { elements: [{ id: name, label: name, shape }], notes }
+    }
     const plain = PLAIN_ALIAS.exec(rest)
     if (plain !== null) return { elements: [{ id: plain[2] as string, label: text(plain[1] as string), shape }], notes }
     const written = reference(rest)

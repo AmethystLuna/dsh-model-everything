@@ -231,7 +231,7 @@ And the gates around it:
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 106 | a flowchart becomes boxes and labelled arrows |
-| `plantuml-corpus` | 62 | left to right direction lays the chain out along a row |
+| `plantuml-corpus` | 63 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 177 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
@@ -253,7 +253,7 @@ And the gates around it:
 | `clearance` | 7 | only an interior run can be moved |
 | `arrows` | 8 | a plain arrow points from the left name to the right one |
 | `directives` | 13 | a preprocessor directive is dropped with a reason |
-| `declaration` | 7 | a plain declaration declares one element with its own name |
+| `declaration` | 9 | a plain declaration declares one element with its own name |
 | `boundary` | 7 | a closing brace closes, and nothing else does |
 | `edge` | 4 | an arrow between two elements is an edge with its two ends |
 | `note` | 8 | a note beside a box names the box, its text and its side |

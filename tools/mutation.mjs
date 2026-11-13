@@ -507,6 +507,13 @@ const MUTATIONS = [
     from: "        const noteId = 'note-' + target + '-' + String(noteCount)",
     to: "        const noteId = 'note-' + target",
   },
+  {
+    id: 'M60',
+    what: 'a parenthesised name keeps its parentheses',
+    file: 'src/render/plantuml-declaration.ts',
+    from: "    const parenAlias = /^\\((.+?)\\)\\s+as\\s+([A-Za-z_][\\w-]*)$/.exec(rest)",
+    to: '    const parenAlias = null as RegExpExecArray | null',
+  },
 ]
 
 const argument = process.argv[2]

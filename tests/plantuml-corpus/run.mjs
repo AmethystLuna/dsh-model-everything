@@ -1117,6 +1117,18 @@ test('the same statement reaches the same class of answer in either notation', (
   if (driven.diagram.nodes.length !== 3) throw new Error('mermaid notes: ' + JSON.stringify(driven.diagram.nodes.map((n) => n.id)))
 })
 
+// Two spellings the notation allows and this renderer used to read as names: a parenthesised use case, and an abstract class.
+test('a parenthesised use case and an abstract class are read as what they are', () => {
+  const paren = render({ source: ['@startuml', 'usecase (Login)', 'usecase (Logout) as out', 'Login --> out'].join('\n') }, {}, { scheme: 'default' })
+  if (paren.refused.length !== 0) throw new Error('paren refused: ' + JSON.stringify(paren.refused))
+  const ids = paren.diagram.nodes.map((node) => node.id).sort()
+  if (JSON.stringify(ids) !== JSON.stringify(['Login', 'out'])) throw new Error('ids: ' + JSON.stringify(ids))
+  const abstracted = render({ source: ['@startuml', 'abstract class Card', 'class Deck', 'Deck --> Card'].join('\n') }, {}, { scheme: 'default' })
+  if (abstracted.refused.length !== 0) throw new Error('abstract refused: ' + JSON.stringify(abstracted.refused))
+  if (!abstracted.diagram.nodes.some((node) => node.id === 'Card')) throw new Error('the class was dropped')
+  if (abstracted.ignored.length !== 1 || !abstracted.ignored[0].includes('modifier')) throw new Error('modifier note: ' + JSON.stringify(abstracted.ignored))
+})
+
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
 // called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
 test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {

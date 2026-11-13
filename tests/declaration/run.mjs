@@ -71,6 +71,21 @@ test('a line that declares nothing has no answer', () => {
   }
 })
 
+test('a parenthesised name is syntax, not part of the name', () => {
+  // `usecase (Login)` is the notation's own spelling for a use case.
+  const bare = read('usecase (Login)').elements[0]
+  if (bare.id !== 'Login' || bare.label !== 'Login') throw new Error(JSON.stringify(bare))
+  const aliased = read('usecase (Login) as l').elements[0]
+  if (aliased.id !== 'l' || aliased.label !== 'Login') throw new Error(JSON.stringify(aliased))
+})
+
+test('an abstract class is a class, and the modifier is reported', () => {
+  const got = read('abstract class Card')
+  if (got.elements[0]?.id !== 'Card') throw new Error(JSON.stringify(got.elements))
+  if (got.notes.length !== 1 || got.notes[0].channel !== 'ignored') throw new Error(JSON.stringify(got.notes))
+  if (!got.notes[0].message.includes('modifier')) throw new Error(got.notes[0].message)
+})
+
 if (failures > 0) {
   console.log('declaration tests failed:', failures)
   process.exit(1)
