@@ -67,6 +67,7 @@ const SUITES = [
   'tests/mermaid-chain/run.mjs',
   'tests/uml-families/run.mjs',
   'tests/uml-capability/run.mjs',
+  'tests/uml-docs/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -559,6 +560,13 @@ const MUTATIONS = [
     file: 'src/uml-syntax.ts',
     from: "    if (support.fidelity === 'approximate') {",
     to: '    if (false) {',
+  },
+  {
+    id: 'M67',
+    what: 'the skill claims a family the engine cannot draw',
+    file: 'skills/model-everything-uml/SKILL.md',
+    from: 'which draws a cloud architecture rather than UML components.',
+    to: 'and a class diagram, which is faithful there.',
   },
 ]
 
