@@ -533,11 +533,16 @@ export function umlCapability(notation: UmlNotation, family: UmlFamilyId, action
   }
 
   if (options.requireParse === false) return { ok: true }
+  // The notation is asked about first: a cell that cannot draw the family at all is refused for that reason, not for the family's own
+  // - a `profile` asked for in mermaid was answered with a sentence about plantuml.
+  if (support.fidelity === 'none') {
+    return { ok: false, errorCode: 'UML_VIEW_UNREPRESENTABLE', message: support.note ?? (notation + ' cannot read a ' + spec.name) }
+  }
   if (!spec.parseable) {
     return { ok: false, errorCode: spec.parseRefusalCode ?? 'UML_NOT_A_STATE_DIAGRAM', message: spec.parseRefusal ?? ('a ' + spec.name + ' cannot be read back into a model') }
   }
   if (support.fidelity !== 'faithful') {
-    if (support.fidelity === 'none') return { ok: false, errorCode: 'UML_VIEW_UNREPRESENTABLE', message: support.note ?? (notation + ' cannot draw a ' + spec.name) }
+    // `none` was answered above: what is left here is an approximation.
     // An approximation is readable only when the family says so. The families that do are
     // the ones whose round trip has been measured; the rest refuse rather than guess.
     if (spec.parseThroughApproximation === true) return { ok: true, warning: 'UML_PARSE_APPROXIMATE_VIEW: ' + (support.note ?? (notation + ' draws an approximation of a ' + spec.name)) }

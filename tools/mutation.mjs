@@ -66,6 +66,7 @@ const SUITES = [
   'tests/mermaid-node/run.mjs',
   'tests/mermaid-chain/run.mjs',
   'tests/uml-families/run.mjs',
+  'tests/uml-capability/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -551,6 +552,13 @@ const MUTATIONS = [
     file: 'src/uml-composite.ts',
     from: "  const selfHead = model.self.label === undefined || model.self.label === '' || model.self.label === model.self.id",
     to: '  const selfHead = false',
+  },
+  {
+    id: 'M66',
+    what: 'an approximation is drawn with no warning',
+    file: 'src/uml-syntax.ts',
+    from: "      return { ok: true, warning: 'UML_RENDER_APPROXIMATE_VIEW: '",
+    to: "      return { ok: true, warning: undefined as unknown as string, '",
   },
 ]
 
