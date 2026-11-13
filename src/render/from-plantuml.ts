@@ -30,6 +30,7 @@
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
 import { bareName, decorationReason } from './names.js'
+import { ARROW, BRACKET, BRACKET_ALIAS, PLAIN_ALIAS, QUOTED_ALIAS, readArrow, reference, type ArrowParts, type Reference } from './plantuml-reference.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -102,13 +103,8 @@ const NOT_DRAWN: Record<string, string> = {
 const FRAGMENT = new Set(['sequence', 'alt', 'opt', 'loop', 'par', 'group', 'ref', 'break', 'critical', 'activate', 'deactivate', 'destroy', 'create', 'newpage', 'autonumber'])
 
 // One dash is an arrow in PlantUML (`A -> B`), the same as two; the mark and the label rules are unchanged.
-const ARROW = /^(.+?)\s*(<\|?|[*o])?(-{1,}|\.{1,})(\|?>|[*o])?\s*(.+?)(?:\s*:\s*(.+))?$/
 const SHAPE_KEYWORDS = Object.keys(SHAPES)
 const DECLARED = new RegExp('^(' + SHAPE_KEYWORDS.join('|') + ')\\s+(.+)$')
-const QUOTED_ALIAS = /^["'](.+?)["']\s+as\s+([A-Za-z_][\w-]*)$/
-const BRACKET_ALIAS = /^\[(.+?)\]\s+as\s+([A-Za-z_][\w-]*)$/
-const PLAIN_ALIAS = /^([A-Za-z_][\w.-]*)\s+as\s+([A-Za-z_][\w-]*)$/
-const BRACKET = /^\[(.+?)\]$/
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
 /** The ignored lines that ask for an arrangement: accepted, dropped, and reported. */
 const LAYOUT_CONTROL = /^(top to bottom direction|!pragma\s+layout)\b/
@@ -136,11 +132,6 @@ interface Builder {
   implicit: Set<string>
 }
 
-interface Reference {
-  id: string
-  label?: string
-  shape?: NodeShape
-}
 
 function ensure(builder: Builder, id: string, label?: string, shape?: NodeShape, implicit = false): void {
   const existing = builder.nodes.get(id)
@@ -170,20 +161,6 @@ function ensure(builder: Builder, id: string, label?: string, shape?: NodeShape,
  * A trailing stereotype (`<<service>>`) is not part of the name: kept, it becomes a second box called
  * `A <<service>>` beside the real `A`, which draws a component the source never named.
  */
-function reference(token: string): Reference {
-  // An endpoint carries decorations the name does not: `a "1" --> "*" b` names two boxes, not two labels.
-  const bare = bareName(token)
-  let text = bare.name === '' ? token.trim() : bare.name
-  if (text === '') text = token.trim()
-  const bracket = BRACKET.exec(text)
-  if (bracket !== null) {
-    const label = bracket[1].trim().replace(/\\n/g, '\n')
-    return { id: label, label, shape: 'rect' }
-  }
-  const quoted = /^["'](.+?)["']$/.exec(text)
-  if (quoted !== null) return { id: quoted[1], label: quoted[1].replace(/\\n/g, '\n') }
-  return { id: text }
-}
 
 function keywordOf(line: string): string {
   return line.split(/[\s{]/)[0].toLowerCase()
@@ -209,13 +186,6 @@ function boundaryOf(
   return { id: 'group-' + String(ordinal), label: label === '' ? keyword : label, ...adornment }
 }
 
-interface ArrowParts {
-  from: Reference
-  to: Reference
-  label: string
-  dashed: boolean
-  arrow: EdgeArrow
-}
 
 /**
  * Read one arrow line.
@@ -224,51 +194,6 @@ interface ArrowParts {
  * The arrow the source writes decides which end carries the mark: `A <|-- B` is B generalising to A, so the
  * edge runs from B to A with the triangle at A, and `A *-- B` puts its diamond at A, so A is the source.
  */
-function readArrow(line: string): ArrowParts | string | undefined {
-  const match = ARROW.exec(line)
-  if (match === null) return undefined
-  const left = reference(match[1])
-  const right = reference(match[5])
-  const leftMark = match[2]
-  const rightMark = match[4]
-  const dotted = match[3].startsWith('.')
-  const label = (match[6] ?? '').trim()
-
-  if (leftMark !== undefined && rightMark !== undefined) {
-    return 'an edge marked at both ends is not one this renderer draws'
-  }
-  if (leftMark === '*' || leftMark === 'o' || rightMark === '*' || rightMark === 'o') {
-    const atRight = rightMark === '*' || rightMark === 'o'
-    const mark = atRight ? rightMark : leftMark
-    return {
-      from: atRight ? right : left,
-      to: atRight ? left : right,
-      label,
-      dashed: dotted,
-      arrow: mark === '*' ? 'composition' : 'aggregation',
-    }
-  }
-  if (leftMark !== undefined) {
-    return {
-      from: right,
-      to: left,
-      label,
-      dashed: dotted,
-      arrow: leftMark === '<|' ? (dotted ? 'realization' : 'generalization') : dotted ? 'dependency' : 'association',
-    }
-  }
-  if (rightMark !== undefined) {
-    return {
-      from: left,
-      to: right,
-      label,
-      dashed: dotted,
-      arrow: rightMark === '|>' ? (dotted ? 'realization' : 'generalization') : dotted ? 'dependency' : 'association',
-    }
-  }
-  // No mark at either end: the source states a connection and no direction.
-  return { from: left, to: right, label, dashed: dotted, arrow: 'none' }
-}
 
 /**
  * The boxes a `together { }` block names, read from the text before the lines are parsed.

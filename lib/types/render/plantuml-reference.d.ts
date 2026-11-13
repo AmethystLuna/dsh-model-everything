@@ -1,12 +1,10 @@
 /**
- * The pieces a PlantUML line is made of: a reference to an element, and the patterns that say what a line is.
+ * What an endpoint of a PlantUML line states: a name, the label it carries, and the shape it asks for.
  *
- * None of them needs a drawing: a reference is a name with its decorations removed, and the patterns are the vocabulary a line is
- * matched against. They lived in the parser because that is where they were first needed, and a unit test cannot reach them there
- * without building a diagram.
+ * A reference is read from one token and needs no drawing - the name with its decorations removed. It lived in the parser because
+ * that is where it was first needed, and a unit test cannot reach it there without building a diagram.
  */
-import type { NodeShape } from './model.js';
-export declare const ARROW: RegExp;
+import type { EdgeArrow, NodeShape } from './model.js';
 export declare const QUOTED_ALIAS: RegExp;
 export declare const BRACKET_ALIAS: RegExp;
 export declare const PLAIN_ALIAS: RegExp;
@@ -17,3 +15,12 @@ export interface Reference {
     shape?: NodeShape;
 }
 export declare function reference(token: string): Reference;
+export declare const ARROW: RegExp;
+export interface ArrowParts {
+    from: Reference;
+    to: Reference;
+    label: string;
+    dashed: boolean;
+    arrow: EdgeArrow;
+}
+export declare function readArrow(line: string): ArrowParts | string | undefined;
