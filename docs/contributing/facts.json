@@ -217,6 +217,7 @@
     "resolve",
     "routing",
     "routing-map",
+    "scan-vs-compose",
     "separate",
     "skill-routing",
     "skill-table",

@@ -87,6 +87,7 @@ const SUITES = [
   'tests/compose-inputs/run.mjs',
   'tests/datamodel-inputs/run.mjs',
   'tests/des-vs-uml/run.mjs',
+  'tests/scan-vs-compose/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -712,6 +713,13 @@ const MUTATIONS = [
     file: 'src/design-engine.ts',
     from: "code: 'DES1_CYCLE',",
     to: "code: 'UML022_CYCLE',",
+  },
+  {
+    id: 'M86',
+    what: 'the scanner stops saying the claim is unverified',
+    file: 'src/concurrency.ts',
+    from: "detected; this plugin does not verify it",
+    to: "detected; this plugin accepts it",
   },
 ]
 
