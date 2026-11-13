@@ -349,6 +349,14 @@ const MUTATIONS = [
     from: "      ignored.push(where + '`' + name + '` ' + reason)",
     to: "      refused.push(where + '`' + name + '` ' + reason)",
   },
+
+  {
+    id: 'M40',
+    what: 'a together opener is not recognised and is refused as a boundary',
+    file: 'src/render/from-plantuml.ts',
+    from: '    if (/^together\\b[^{]*\\{\\s*$/.test(line)) {',
+    to: '    if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
