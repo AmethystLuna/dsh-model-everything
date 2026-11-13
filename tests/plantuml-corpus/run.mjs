@@ -970,6 +970,20 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// `%%{init: {...}}%%` is a configuration block, and Mermaid allows it over several lines. Its body is not diagram source, so reading
+// it line by line refused a block the notation explicitly allows.
+test('a Mermaid configuration block is skipped and reported', () => {
+  const oneLine = render({ source: '%%{init: {"theme": "dark"}}%%\nflowchart TD\n  a --> b', notation: 'mermaid' }, {}, { scheme: 'default' })
+  const many = render({ source: '%%{init: {\n  "theme": "dark"\n}}%%\nflowchart TD\n  a --> b', notation: 'mermaid' }, {}, { scheme: 'default' })
+  for (const [name, r] of [['one line', oneLine], ['several lines', many]]) {
+    if (r.refused.length !== 0) throw new Error(name + ' refused: ' + JSON.stringify(r.refused))
+    if (r.diagram.nodes.length !== 2 || r.diagram.edges.length !== 1) throw new Error(name + ' lost the drawing')
+    if (r.ignored.length !== 1 || !r.ignored[0].includes('configuration block does not change the drawing')) {
+      throw new Error(name + ' note: ' + JSON.stringify(r.ignored))
+    }
+  }
+})
+
 // A Mermaid state diagram carries three constructs the PlantUML reader already had: a composite state, a state type, and a note
 // beside a state. Each was refused as a line the renderer could not draw, in one notation only.
 test('a Mermaid state keeps its composite, its type and its note', () => {

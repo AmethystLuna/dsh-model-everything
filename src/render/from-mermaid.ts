@@ -121,7 +121,29 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
     builder.edges.push(edge)
   }
 
+  // `%%{init: {...}}%%` is a configuration block, and Mermaid allows it over several lines. Its lines are not diagram source:
+  // reading them as lines refused the body of a block the notation explicitly allows.
+  const configuration = new Set<number>()
+  {
+    let open = false
+    lines.forEach((line, index) => {
+      const text = line.trim()
+      if (!open && !text.startsWith('%%{')) return
+      configuration.add(index)
+      if (open) {
+        if (text.includes('}%%')) open = false
+        return
+      }
+      // The block can open and close on one line, or open here and close later.
+      if (!text.slice(text.indexOf('%%{') + 3).includes('}%%')) open = true
+    })
+    if (configuration.size > 0) {
+      ignored.push('a `%%{ }%%` configuration block does not change the drawing here: the palette and the type scale are fixed')
+    }
+  }
+
   lines.forEach((raw, index) => {
+    if (configuration.has(index)) return
     const line = raw.replace(/%%(.*)$/, '').trim()
     if (line === '') return
     const where = 'line ' + String(index + 1) + ': '

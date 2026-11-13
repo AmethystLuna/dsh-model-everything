@@ -21,6 +21,7 @@ const parser = readFileSync(repo + 'src/render/from-plantuml.ts', 'utf8')
 
 const rows = ['PlantUML elements', 'PlantUML boundaries', 'PlantUML edges', 'PlantUML page and layout']
 
+
 const cell = (label) => {
   const line = skill.split('\n').find((entry) => entry.startsWith('| ' + label + ' |'))
   if (line === undefined) throw new Error('no row for ' + label)
@@ -125,6 +126,22 @@ test('every Mermaid token the table names behaves the way the table says', async
     if (drawn.diagram.edges.length !== 1) failuresHere.push('`' + edge + '` is claimed drawn but drew ' + String(drawn.diagram.edges.length) + ' edge(s)')
   }
   if (failuresHere.length > 0) throw new Error(failuresHere.join(' | '))
+})
+
+// The table has cells with escaped pipes and cells with several backticked words, and a reader that splits on every pipe or matches
+// one case of word reads the wrong column. Both mistakes happened while these checks were written.
+test('the table reader keeps its columns and its tokens', () => {
+  const row = cell('Mermaid')
+  if (!row.drawn.includes('flowchart')) throw new Error('the drawn cell does not start where the table says: ' + row.drawn.slice(0, 40))
+  if (!row.refused.includes('sequenceDiagram')) throw new Error('the refused cell: ' + row.refused.slice(0, 40))
+  // The drawn cell carries an escaped pipe in its edge-label example; if the split ignored the escape, that fragment would land in
+  // the refused column.
+  const escapePipe = String.fromCharCode(92) + '|'
+  if (!row.drawn.includes('-->' + escapePipe + 'text' + escapePipe)) throw new Error('the escaped pipe left the drawn cell: ' + row.drawn.slice(0, 60))
+  if (row.refused.includes('-->' + escapePipe + 'text')) throw new Error('an escaped pipe split the cell at the wrong place')
+  const mermaid = tokens(row.refused)
+  if (!mermaid.includes('sequenceDiagram')) throw new Error('a camel-case keyword was not read')
+  if (symbols(row.drawn).includes('stateDiagram')) throw new Error('a camel-case keyword leaked into the lowercase reader')
 })
 
 if (failures > 0) {
