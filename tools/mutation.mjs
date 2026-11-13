@@ -97,6 +97,7 @@ const SUITES = [
   'tests/row-spacing/run.mjs',
   'tests/card-contract/run.mjs',
   'tests/card-vs-text/run.mjs',
+  'tests/checks-line/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -792,6 +793,13 @@ const MUTATIONS = [
     file: 'src/report-view.ts',
     from: '  if (current !== undefined) lines.push(`CURRENT  verdict=${current}`)',
     to: "  if (false) lines.push(`CURRENT  verdict=${current}`)",
+  },
+  {
+    id: 'M96',
+    what: 'a passing check is left out of the inventory line',
+    file: 'src/report-view.ts',
+    from: "    ['pass', byStatus('pass')],",
+    to: "    ['pass', []],",
   },
 ]
 

@@ -158,6 +158,7 @@
     "catalog",
     "channels",
     "check-status",
+    "checks-line",
     "clearance",
     "client",
     "components",
