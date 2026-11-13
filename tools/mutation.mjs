@@ -692,7 +692,7 @@ const MUTATIONS = [
   },
   {
     id: 'M83',
-    what: 'a rendezvous no machine declares is skipped, as it was before';
+    what: 'a rendezvous no machine declares is skipped, as it was before',
     file: 'src/engine.ts',
     from: '    if (allEventsSet.has(event)) continue',
     to: '    if (true) continue',
