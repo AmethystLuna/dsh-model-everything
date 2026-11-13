@@ -33,6 +33,7 @@ import { bareName, decorationReason } from './names.js'
 import { isTogetherOpener, readDirective } from './plantuml-directives.js'
 import { readPageLine } from './plantuml-page.js'
 import { readDeclaration } from './plantuml-declaration.js'
+import { readBoundary } from './plantuml-boundary.js'
 import {
   ARROW,
   BRACKET,
@@ -66,10 +67,8 @@ export interface Parsed {
 /** The element keywords this renderer draws, and the symbol each one becomes. */
 
 /** The keywords that open a boundary around what is written inside them. */
-const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle', 'artifact', 'state'])
 
 /** The boundary keywords a source draws solid: a composite state is one state, not a container of unrelated ones. */
-const SOLID_BOUNDARY = new Set(['state'])
 
 /** Element keywords this renderer deliberately does not draw, with the reason it gives for each. */
 const NOT_DRAWN: Record<string, string> = {
@@ -440,37 +439,31 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
 
-    if (line === '}') {
-      const closing = builder.open.pop()
-      if (closing !== undefined) {
-        const container = builder.open[builder.open.length - 1]
-        if (container !== undefined) closing.parent = container.id
-        builder.groups.push(closing)
+    // A boundary is opened or closed by one module that decides what the line states; the open stack is the parser's.
+    const boundary = readBoundary(line, index, groupCount + 1, where)
+    if (boundary !== undefined) {
+      if (boundary.kind === 'close') {
+        const closing = builder.open.pop()
+        if (closing !== undefined) {
+          const container = builder.open[builder.open.length - 1]
+          if (container !== undefined) closing.parent = container.id
+          builder.groups.push(closing)
+        }
+        return
       }
-      return
-    }
-
-    if (line.endsWith('{')) {
-      const declaration = line.slice(0, -1).trim()
-      const opener = keywordOf(declaration)
-      if (!BOUNDARY.has(opener)) {
-        const reason = SHAPES[opener] === undefined
-          ? '`' + declaration + '` is not a boundary this renderer draws'
-          : 'a `' + opener + '` block is not a boundary this renderer draws'
-        refused.push(where + reason)
+      if (boundary.kind === 'note') {
+        if (boundary.channel === 'ignored') ignored.push(boundary.message)
+        else refused.push(boundary.message)
         return
       }
       groupCount += 1
-      const boundary = boundaryOf(declaration, opener, groupCount)
-      for (const decoration of boundary.decorations) {
-        ignored.push(where + '`' + decoration + '` ' + decorationReason(decoration))
-      }
-      builder.groupLines.set(boundary.id, index + 1)
+      for (const note of boundary.notes) ignored.push(note)
+      builder.groupLines.set(boundary.id, boundary.line)
       builder.open.push({
         id: boundary.id,
         label: boundary.label,
         members: [],
-        ...(SOLID_BOUNDARY.has(opener) ? { outline: 'solid' as const } : {}),
+        ...(boundary.solid ? { outline: 'solid' as const } : {}),
       })
       return
     }
