@@ -1071,6 +1071,22 @@ test('the state-machine variants each get one answer', () => {
   if (markers.diagram.nodes.length !== 0 || markers.refused.length !== 0) throw new Error('a machine of markers alone drew something')
 })
 
+// A Mermaid machine has one start as well, and the same rule: the first marker in source order is drawn and the rest are reported. The
+// state a reported marker names is still a state, which matters when a composite holds nothing but that marker.
+test('a Mermaid machine reports a second start marker and keeps the state it named', () => {
+  const draw = (lines) => render({ source: ['stateDiagram-v2', ...lines].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+  const nested = draw(['[*] --> Busy', 'state Busy {', '  [*] --> Inner', '}'])
+  if (nested.refused.length !== 0) throw new Error('nested refused: ' + JSON.stringify(nested.refused))
+  if (nested.diagram.init !== 'Busy') throw new Error('init: ' + String(nested.diagram.init))
+  if (nested.ignored.length !== 1 || !nested.ignored[0].includes('already starts at')) throw new Error('second start: ' + JSON.stringify(nested.ignored))
+  const group = (nested.diagram.groups ?? [])[0]
+  if (JSON.stringify(group?.members) !== JSON.stringify(['Inner'])) throw new Error('group: ' + JSON.stringify(group))
+  const two = draw(['[*] --> a', '[*] --> b'])
+  if (two.diagram.init !== 'a') throw new Error('two starts init: ' + String(two.diagram.init))
+  if (two.diagram.nodes.length !== 2) throw new Error('the named state was dropped: ' + JSON.stringify(two.diagram.nodes.map((n) => n.id)))
+  if (two.ignored.length !== 1) throw new Error('two starts notes: ' + JSON.stringify(two.ignored))
+})
+
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
 // called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
 test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {

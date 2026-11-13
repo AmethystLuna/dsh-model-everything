@@ -287,7 +287,16 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       const to = transition[2]
       const label = (transition[3] ?? '').trim()
       if (from === '[*]') {
-        // A start marker names the state it enters, not a box of its own.
+        // A start marker names the state it enters, not a box of its own. A drawing has one start: the first marker in source order is
+        // the one drawn, and the rest are reported - the same rule the PlantUML reader follows, and for the same reason. Dropping them
+        // in silence left a source that asked to begin somewhere else with a drawing that began elsewhere.
+        if (startId !== undefined && startId !== to) {
+          // The state it names is still a state: it is ensured before the line is reported, or a composite holding only this marker
+          // would come out empty and be refused for the wrong reason.
+          ensure(builder, to)
+          ignored.push(where + '`' + line + '`: the machine already starts at `' + startId + '`, and one start is drawn')
+          return
+        }
         ensure(builder, to)
         if (startId === undefined) startId = to
         return

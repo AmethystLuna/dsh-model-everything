@@ -493,6 +493,13 @@ const MUTATIONS = [
     from: "        if (startId !== undefined && startId !== marked.target.id) {",
     to: '        if (false) {',
   },
+  {
+    id: 'M58',
+    what: 'a Mermaid machine drops a second start marker in silence',
+    file: 'src/render/from-mermaid.ts',
+    from: '        if (startId !== undefined && startId !== to) {',
+    to: '        if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
