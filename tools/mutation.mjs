@@ -85,6 +85,7 @@ const SUITES = [
   'tests/diff-families/run.mjs',
   'tests/diff-next-steps/run.mjs',
   'tests/compose-inputs/run.mjs',
+  'tests/datamodel-inputs/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -696,6 +697,13 @@ const MUTATIONS = [
     file: 'src/engine.ts',
     from: '    if (allEventsSet.has(event)) continue',
     to: '    if (true) continue',
+  },
+  {
+    id: 'M84',
+    what: 'a dropped field with no migration mapping is not reported',
+    file: 'src/data-engine.ts',
+    from: '    if (!afterPaths.has(mapped) && !migrationFrom.has(path)) {',
+    to: '    if (false) {',
   },
 ]
 
