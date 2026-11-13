@@ -71,6 +71,7 @@ const SUITES = [
   'tests/report-contract/run.mjs',
   'tests/report-views/run.mjs',
   'tests/next-steps/run.mjs',
+  'tests/doc-paths/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -584,6 +585,13 @@ const MUTATIONS = [
     file: 'src/uml.ts',
     from: "nextSteps.push('Run model_verify on this model",
     to: "nextSteps.push('Run model_verifier on this model",
+  },
+  {
+    id: 'M70',
+    what: 'a report carries a modelHash that disagrees with its hashes',
+    file: 'src/data-engine.ts',
+    from: '      modelHash: dataModelHash(model),',
+    to: "      modelHash: '',",
   },
 ]
 

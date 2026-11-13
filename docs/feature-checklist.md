@@ -143,6 +143,7 @@ node tests/uml-docs/run.mjs
 node tests/report-contract/run.mjs
 node tests/report-views/run.mjs
 node tests/next-steps/run.mjs
+node tests/doc-paths/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -228,6 +229,7 @@ And the gates around it:
 | `report-contract` | 4 | every report keeps the four fields a reader acts on |
 | `report-views` | 3 | the full view is the report itself, and it parses back to the same conclusion |
 | `next-steps` | 3 | every step names something to do |
+| `doc-paths` | 3 | a path the documentation names resolves in the report that carries it |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
