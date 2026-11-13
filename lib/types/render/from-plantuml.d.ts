@@ -40,4 +40,18 @@ export interface Parsed {
      */
     ignored: string[];
 }
+/**
+ * Read one arrow line.
+ *
+ * Returns the edge it states, `undefined` when the line is not an arrow at all, or the reason it is refused.
+ * The arrow the source writes decides which end carries the mark: `A <|-- B` is B generalising to A, so the
+ * edge runs from B to A with the triangle at A, and `A *-- B` puts its diamond at A, so A is the source.
+ */
+/**
+ * The boxes a `together { }` block names, read from the text before the lines are parsed.
+ *
+ * Every declaration inside the block registers its box on its own; what the block adds is that they share a row. Reading
+ * it as a pre-pass keeps the declaration paths - quoted alias, bracketed alias, plain alias, bare name - untouched, and
+ * a block whose members are declared elsewhere still contributes the ids it names.
+ */
 export declare function fromPlantUml(source: string, title?: string): Parsed;

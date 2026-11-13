@@ -17,7 +17,12 @@ function test(name, body) {
 
 const repo = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 const skill = readFileSync(repo + 'skills/model-everything-diagram/SKILL.md', 'utf8')
-const parser = readFileSync(repo + 'src/render/from-plantuml.ts', 'utf8')
+// The parser is two files now: the reading loop, and the vocabulary and line readers beside it. The table is checked against both,
+// because a keyword is known wherever it is declared.
+const parser = [
+  readFileSync(repo + 'src/render/from-plantuml.ts', 'utf8'),
+  readFileSync(repo + 'src/render/plantuml-reference.ts', 'utf8'),
+].join('\n')
 
 const rows = ['PlantUML elements', 'PlantUML boundaries', 'PlantUML edges', 'PlantUML page and layout']
 

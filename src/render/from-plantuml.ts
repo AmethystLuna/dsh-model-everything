@@ -30,7 +30,21 @@
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
 import { bareName, decorationReason } from './names.js'
-import { ARROW, BRACKET, BRACKET_ALIAS, PLAIN_ALIAS, QUOTED_ALIAS, boundaryOf, readArrow, reference, type ArrowParts, type Reference } from './plantuml-reference.js'
+import {
+  ARROW,
+  BRACKET,
+  BRACKET_ALIAS,
+  DECLARED,
+  PLAIN_ALIAS,
+  QUOTED_ALIAS,
+  SHAPES,
+  boundaryOf,
+  readArrow,
+  togetherGroups,
+  reference,
+  type ArrowParts,
+  type Reference,
+} from './plantuml-reference.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -47,43 +61,6 @@ export interface Parsed {
 }
 
 /** The element keywords this renderer draws, and the symbol each one becomes. */
-const SHAPES: Record<string, NodeShape> = {
-  component: 'rect',
-  node: 'rect',
-  rectangle: 'rect',
-  artifact: 'rect',
-  state: 'rect',
-  database: 'cylinder',
-  // PlantUML draws an entity as a cylinder in a component diagram; `entity` in an ER diagram is a different
-  // symbol, and that diagram family is not one this renderer accepts.
-  entity: 'cylinder',
-  // A use case is an ellipse. The `circle` symbol is written as an ellipse whose radii follow the box, so it
-  // reads as the familiar use-case oval; `stadium` is the pill a terminal state is drawn as.
-  usecase: 'circle',
-  // A note is a rectangle with a folded corner: the fold is what makes it a remark rather than an element.
-  note: 'note',
-  // A file and a card are the same folded outline on different corners, and a frame puts its name in a tab: the mark
-  // is what tells them apart from a component, so each one is drawn rather than reduced to a rectangle.
-  file: 'file',
-  card: 'card',
-  frame: 'frame',
-  // The three containers whose mark is a line or a curve on the box itself.
-  queue: 'queue',
-  stack: 'stack',
-  storage: 'storage',
-  // Three rectangles whose role is a small mark in the corner.
-  boundary: 'boundary',
-  control: 'control',
-  collections: 'collections',
-  // These five are boxes with compartments in PlantUML. The name is the part a component-level view needs, so the
-  // box is drawn and the compartments are refused line by line: the element is visible and the source is told what
-  // was not carried.
-  class: 'rect',
-  object: 'rect',
-  interface: 'rect',
-  enum: 'rect',
-  annotation: 'rect',
-}
 
 /** The keywords that open a boundary around what is written inside them. */
 const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle', 'artifact', 'state'])
@@ -103,8 +80,6 @@ const NOT_DRAWN: Record<string, string> = {
 const FRAGMENT = new Set(['sequence', 'alt', 'opt', 'loop', 'par', 'group', 'ref', 'break', 'critical', 'activate', 'deactivate', 'destroy', 'create', 'newpage', 'autonumber'])
 
 // One dash is an arrow in PlantUML (`A -> B`), the same as two; the mark and the label rules are unchanged.
-const SHAPE_KEYWORDS = Object.keys(SHAPES)
-const DECLARED = new RegExp('^(' + SHAPE_KEYWORDS.join('|') + ')\\s+(.+)$')
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
 /** The ignored lines that ask for an arrangement: accepted, dropped, and reported. */
 const LAYOUT_CONTROL = /^(top to bottom direction|!pragma\s+layout)\b/
@@ -183,76 +158,6 @@ function keywordOf(line: string): string {
  * it as a pre-pass keeps the declaration paths - quoted alias, bracketed alias, plain alias, bare name - untouched, and
  * a block whose members are declared elsewhere still contributes the ids it names.
  */
-/**
- * The boxes a `together { }` block names, read from the text before the lines are parsed, plus the lines that name a box
- * without declaring it - `together { a b }` is legal PlantUML, and its members are as real as an arrow's endpoints.
- */
-function togetherGroups(lines: readonly string[]): {
-  groups: string[][]
-  implicit: Map<number, string>
-  /** The lines of `together { }` blocks that name nothing: reported, not swallowed. */
-  empty: number[]
-  /** The lines of blocks that name one box: a row of one is not a row. */
-  oneMember: number[]
-} {
-  const groups: string[][] = []
-  const implicit = new Map<number, string>()
-  let open: string[] | undefined
-  let depth = 0
-  let index = -1
-  const empty: number[] = []
-  const oneMember: number[] = []
-  for (const raw of lines) {
-    index += 1
-    const line = raw.replace(/'.*$/, '').trim()
-    if (line === '') continue
-    if (/^together\b/.test(line) && line.endsWith('{')) {
-      // A nested block joins the row its parent is collecting: a row of a row is still one row.
-      if (open === undefined) {
-        open = []
-        depth = 0
-      } else {
-        depth += 1
-      }
-      continue
-    }
-    if (open === undefined) continue
-    if (line === '}') {
-      // A brace that closes something inside the block - a boundary, a nested `together` - is not the block's own end.
-      if (open !== undefined && depth > 0) {
-        depth -= 1
-        continue
-      }
-      if (open === undefined) continue
-      if (open.length > 1) groups.push(open)
-      else if (open.length === 1) oneMember.push(index)
-      else empty.push(index)
-      open = undefined
-      continue
-    }
-
-    if (line.endsWith('{')) {
-      depth += 1
-      continue
-    }
-
-    const declared = DECLARED.exec(line)
-    if (declared === null) {
-      // A bare name inside the block names a box; the arrow rules make such a name an element, and so does this.
-      if (/^[A-Za-z_][\w.-]*$/.test(line)) {
-        open.push(line)
-        implicit.set(index, line)
-      }
-      continue
-    }
-    const rest = declared[2].trim()
-    const quoted = QUOTED_ALIAS.exec(rest)
-    const bracketed = BRACKET_ALIAS.exec(rest)
-    const plain = PLAIN_ALIAS.exec(rest)
-    open.push(quoted !== null ? quoted[2] : bracketed !== null ? bracketed[2] : plain !== null ? plain[2] : reference(rest).id)
-  }
-  return { groups, implicit, empty, oneMember }
-}
 
 export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   const lines = source.split(/\r?\n/)

@@ -35,3 +35,18 @@ export declare function boundaryOf(declaration: string, keyword: string, ordinal
     label: string;
     decorations: string[];
 };
+export declare const SHAPES: Record<string, NodeShape>;
+export declare const SHAPE_KEYWORDS: string[];
+export declare const DECLARED: RegExp;
+/**
+ * The boxes a `together { }` block names, read from the text before the lines are parsed, plus the lines that name a box
+ * without declaring it - `together { a b }` is legal PlantUML, and its members are as real as an arrow's endpoints.
+ */
+export declare function togetherGroups(lines: readonly string[]): {
+    groups: string[][];
+    implicit: Map<number, string>;
+    /** The lines of `together { }` blocks that name nothing: reported, not swallowed. */
+    empty: number[];
+    /** The lines of blocks that name one box: a row of one is not a row. */
+    oneMember: number[];
+};
