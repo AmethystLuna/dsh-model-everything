@@ -42,6 +42,7 @@ const SUITES = [
   'tests/diagram/run.mjs',
   'tests/skill-table/run.mjs',
   'tests/blocks/run.mjs',
+  'tests/clearance/run.mjs',
 ]
 
 const MUTATIONS = [

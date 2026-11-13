@@ -1284,6 +1284,51 @@ test('the acceptance corpus comes out clean', () => {
   if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
+// A route never crosses a box; this is the stricter claim beside it: no drawn line comes closer than a hair to a box it does not end
+// at. The clearance pass exists for the one figure that did, and this keeps it from coming back on any of them.
+test('no drawn line grazes a box it does not end at', () => {
+  const near = (a, b, box) => {
+    const left = box.x
+    const right = box.x + box.width
+    const top = box.y
+    const bottom = box.y + box.height
+    const horizontal = Math.abs(a.y - b.y) < 0.01
+    if (horizontal) {
+      const y = a.y
+      const lo = Math.min(a.x, b.x)
+      const hi = Math.max(a.x, b.x)
+      if (y > top && y < bottom && hi > left && lo < right) return 0
+      const dy = y <= top ? top - y : y - bottom
+      const dx = hi < left ? left - hi : lo > right ? lo - right : 0
+      return Math.max(dy, dx)
+    }
+    const x = a.x
+    const lo = Math.min(a.y, b.y)
+    const hi = Math.max(a.y, b.y)
+    if (x > left && x < right && hi > top && lo < bottom) return 0
+    const dx = x <= left ? left - x : x - right
+    const dy = hi < top ? top - hi : lo > bottom ? lo - bottom : 0
+    return Math.max(dx, dy)
+  }
+  const tight = []
+  for (const [name, source] of ACCEPTANCE) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    const boxes = r.canvas.shapes.filter((shape) => shape.kind === 'box')
+    for (const shape of r.canvas.shapes) {
+      if (shape.kind !== 'path') continue
+      for (let index = 0; index + 1 < shape.points.length; index += 1) {
+        const a = shape.points[index]
+        const b = shape.points[index + 1]
+        for (const box of boxes) {
+          const gap = near(a, b, box)
+          if (gap > 0 && gap < 5) tight.push(name + ': ' + String(gap.toFixed(1)) + 'px from a box')
+        }
+      }
+    }
+  }
+  if (tight.length > 0) throw new Error(tight.slice(0, 3).join(' | '))
+})
+
 if (failures > 0) {
   console.log('diagram tests failed: ' + String(failures))
   process.exit(1)
