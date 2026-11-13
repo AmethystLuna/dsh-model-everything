@@ -93,6 +93,7 @@ const SUITES = [
   'tests/route-causality/run.mjs',
   'tests/layout-growth/run.mjs',
   'tests/ports-sides/run.mjs',
+  'tests/text-wrap/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -760,6 +761,13 @@ const MUTATIONS = [
     file: 'src/render/route.ts',
     from: "      return { x: box.x + box.width / 2, y: box.y }",
     to: "      return { x: box.x + box.width / 2, y: box.y + box.height / 2 } ",
+  },
+  {
+    id: 'M92',
+    what: 'a long label is not wrapped, so the text runs past the box',
+    file: 'src/render/text.ts',
+    from: '  const lines = explicitLines(label).flatMap((line) => wrapLine(line))',
+    to: '  const lines = explicitLines(label)',
   },
 ]
 

@@ -230,6 +230,7 @@
     "structure",
     "suite-registry",
     "summary-counters",
+    "text-wrap",
     "tool-boundary",
     "tool-defaults",
     "tool-routing",
