@@ -207,6 +207,29 @@ delta 无条件回退到 `report.summary`，而 summary 没有 delta 键，于�
 | 门禁命令 | 99 |
 | 变异点 | 95 |
 
+## 3.9 第七段：文档断言 → 用例（第 140–144 轮）
+
+技能里的每一句结构断言，要么有一条用例，要么明确写着“不可测”。这一段把《怎么看报告》《怎么验证》里的断言逐条落地：
+
+| 断言 | 守卫 |
+|---|---|
+| `CHECKS` 行是完整名单（含 pass 与 skip） | `tests/checks-line` |
+| findings 在哪一族放在哪里；`nextSteps` 永不为空；设计评审三表不交叠 | `tests/reading-order` |
+| 三态 verdict 与 `summary` 计数一致；`ok` 不可当 verdict | `tests/verdict-table` |
+| 哈希跨运行、跨键序稳定，改模型则变；每族带 `hashSpec` | `tests/model-hash` |
+| 每族一个 `schema` 名，互不重复，且都在注册表里 | `tests/schema-registry` |
+
+### 这一段修掉的缺陷：数据模型报告不报 `hashSpec`
+
+其他族都写着 `v1`，只有数据模型族返回了 `modelHash` 却不说明版本——规范化规则一改，旧哈希就换了含义，而读者没有东西可比。已补 `DATA_HASH_SPEC`，契约快照按新输出重录。
+
+### 第七段基线（第 144 轮实测）
+
+| 指标 | 数值 |
+|---|---|
+| 门禁命令 | 104 |
+| 变异点 | 100 |
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
