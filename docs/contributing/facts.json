@@ -162,6 +162,7 @@
     "clearance",
     "client",
     "client-bundle",
+    "compatibility",
     "components",
     "compose-inputs",
     "concurrency",

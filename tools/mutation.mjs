@@ -111,6 +111,7 @@ const SUITES = [
   'tests/examples/run.mjs',
   'tests/diagram-card/run.mjs',
   'tests/version/run.mjs',
+  'tests/compatibility/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -904,6 +905,13 @@ const MUTATIONS = [
     file: '.version-bump.json',
     from: '    "package.json": "version",',
     to: '    "package-x.json": "version",',
+  },
+  {
+    id: 'M110',
+    what: 'the compatibility declaration names a range the host does not read',
+    file: 'package.json',
+    from: "    \"0.2.1-rc.4\": \"compatible\",",
+    to: "    \"0.2.1-rc.3\": \"unknown\",",
   },
 ]
 
