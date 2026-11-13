@@ -50,6 +50,25 @@ test('every markdown link resolves', () => {
   if (missing.length > 0) throw new Error(missing.slice(0, 3).join(' | '))
 })
 
+// A reference file is named two ways in these documents: as a markdown link, and in the prose as `references/x.md`. The prose form is the
+// common one, and a rename breaks it just as quietly.
+test('every reference file named in the prose exists', () => {
+  const missing = []
+  for (const file of DOCS) {
+    const text = readFileSync(file, 'utf8')
+    // A reference belongs to the skill that names it: the datamodel skill's guide lives in its own directory. A document that names the
+    // full path (`skills/<skill>/references/x.md`) and one that names only the file both have to resolve.
+    const beside = dirname(file)
+    const skills = readdirSync(join(repo, 'skills')).filter((name) => existsSync(join(repo, 'skills', name, name === 'references' ? '' : 'SKILL.md')))
+    for (const match of text.matchAll(/(references\/[a-z0-9-]+\.md)/g)) {
+      const candidates = [join(beside, match[1]), join(repo, match[1]), join(repo, 'skills', 'model-everything', match[1])]
+      for (const name of skills) candidates.push(join(repo, 'skills', name, match[1]))
+      if (!candidates.some((candidate) => existsSync(candidate))) missing.push(relative(repo, file) + ' -> ' + match[1])
+    }
+  }
+  if (missing.length > 0) throw new Error(missing.slice(0, 3).join(' | '))
+})
+
 test('every `npm run` a document names is a script the package has', () => {
   const scripts = new Set(Object.keys(JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).scripts ?? {}))
   const unknown = []

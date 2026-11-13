@@ -231,7 +231,7 @@ And the gates around it:
 | `report-views` | 3 | the full view is the report itself, and it parses back to the same conclusion |
 | `next-steps` | 3 | every step names something to do |
 | `doc-paths` | 3 | a path the documentation names resolves in the report that carries it |
-| `docs-paths` | 4 | the documents were read, so the checks below mean something |
+| `docs-paths` | 5 | the documents were read, so the checks below mean something |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
