@@ -114,6 +114,7 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   let mode: 'none' | 'graph' | 'state' = 'none'
   const direction: { value: 'down' | 'right' } = { value: 'down' }
   let startId: string | undefined
+  let noteCount = 0
   const openedAt = new Map<string, number>()
   let endCount = 0
 
@@ -249,7 +250,10 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       const placed = /^note\s+(left|right|top|bottom)\s+of\s+([A-Za-z_][\w-]*)\s*:\s*(.+)$/.exec(line)
       if (placed !== null) {
         const target = placed[2] as string
-        const noteId = 'note-' + target
+        // Two notes may sit beside one state: the ordinal keeps them apart. Without it the second found the first already drawn under
+        // the same id and was dropped in silence - the same defect the PlantUML reader had.
+        noteCount += 1
+        const noteId = 'note-' + target + '-' + String(noteCount)
         ensure(builder, target)
         ensure(builder, noteId, (placed[3] as string).trim(), 'note')
         const side = placed[1] as string

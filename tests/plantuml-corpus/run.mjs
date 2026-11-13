@@ -1087,6 +1087,36 @@ test('a Mermaid machine reports a second start marker and keeps the state it nam
   if (two.ignored.length !== 1) throw new Error('two starts notes: ' + JSON.stringify(two.ignored))
 })
 
+// The same semantics in either notation has to reach the same class of answer: drawn, dropped with a reason, or refused. Not the same text
+// - each notation says what its own source did - but a reader who switches notation must not get a different kind of answer for the same
+// statement.
+test('the same statement reaches the same class of answer in either notation', () => {
+  const pairs = [
+    ['an empty group', ['@startuml', 'package p {', '}', 'component a', '@enduml'], ['flowchart TD', 'subgraph one', 'end', 'a --> c']],
+    ['an empty source', ['@startuml', '@enduml'], ['flowchart TD']],
+    ['a family this renderer does not draw', ['@startuml', 'sequenceDiagram', 'A -> B', '@enduml'], ['sequenceDiagram', 'A->>B: hi']],
+    ['a comment', ['@startuml', "' a note", 'component a', '@enduml'], ['flowchart TD', '%% a note', 'a --> c']],
+    ['two start markers', ['@startuml', 'state a', 'state b', '[*] --> a', '[*] --> b', '@enduml'], ['stateDiagram-v2', '[*] --> a', '[*] --> b']],
+    ['an exit marker', ['@startuml', 'state a', 'a --> [*]', '@enduml'], ['stateDiagram-v2', '[*] --> a', 'a --> [*]']],
+    ['a state type', ['@startuml', 'state fork <<choice>>', 'state a', 'a --> fork', '@enduml'], ['stateDiagram-v2', 'state fork <<choice>>', '[*] --> fork']],
+    ['a description line', ['@startuml', 'state a', 'state a : entry', '@enduml'], ['stateDiagram-v2', '[*] --> a', 'a : entry']],
+    ['two notes beside one element', ['@startuml', 'component a', 'note right of a : one', 'note left of a : two', '@enduml'], ['stateDiagram-v2', '[*] --> a', 'note right of a : one', 'note left of a : two']],
+  ]
+  const klass = (r) => (r.refused.length > 0 ? 'refused' : r.ignored.length > 0 ? 'ignored' : 'drawn')
+  for (const [name, plant, mermaid] of pairs) {
+    const a = render({ source: plant.join('\n'), notation: 'plantuml' }, {}, { scheme: 'default' })
+    const b = render({ source: mermaid.join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+    if (klass(a) !== klass(b)) throw new Error(name + ': plantuml ' + klass(a) + ', mermaid ' + klass(b))
+    // Every diagnostic is locatable: it names the line it came from, or - when the whole source is the defect - the source itself.
+    for (const note of [...a.refused, ...a.ignored, ...b.refused, ...b.ignored]) {
+      if (!note.startsWith('line ') && !note.startsWith('the source ')) throw new Error(name + ': nowhere to look: ' + note)
+    }
+  }
+  // Two notes beside one element are two notes, whichever notation wrote them.
+  const driven = render({ source: ['stateDiagram-v2', '[*] --> a', 'note right of a : one', 'note left of a : two'].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+  if (driven.diagram.nodes.length !== 3) throw new Error('mermaid notes: ' + JSON.stringify(driven.diagram.nodes.map((n) => n.id)))
+})
+
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
 // called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
 test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {

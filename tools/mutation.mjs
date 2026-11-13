@@ -500,6 +500,13 @@ const MUTATIONS = [
     from: '        if (startId !== undefined && startId !== to) {',
     to: '        if (false) {',
   },
+  {
+    id: 'M59',
+    what: 'two notes beside one Mermaid state share an id again',
+    file: 'src/render/from-mermaid.ts',
+    from: "        const noteId = 'note-' + target + '-' + String(noteCount)",
+    to: "        const noteId = 'note-' + target",
+  },
 ]
 
 const argument = process.argv[2]
