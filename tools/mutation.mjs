@@ -70,6 +70,7 @@ const SUITES = [
   'tests/uml-docs/run.mjs',
   'tests/report-contract/run.mjs',
   'tests/report-views/run.mjs',
+  'tests/next-steps/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -576,6 +577,13 @@ const MUTATIONS = [
     file: 'src/report-view.ts',
     from: "  if (resolved.full) return JSON.stringify(value as JsonValue)",
     to: "  if (resolved.full) return JSON.stringify(value as JsonValue)\n  if (true) return JSON.stringify(value as JsonValue)",
+  },
+  {
+    id: 'M69',
+    what: 'a step names a tool this plugin does not ship',
+    file: 'src/engine.ts',
+    from: "'Run model_verify on this model",
+    to: "'Run model_verifier on this model",
   },
 ]
 
