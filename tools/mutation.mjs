@@ -83,6 +83,7 @@ const SUITES = [
   'tests/edit-refusals/run.mjs',
   'tests/export-warnings/run.mjs',
   'tests/diff-families/run.mjs',
+  'tests/diff-next-steps/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -679,6 +680,13 @@ const MUTATIONS = [
     what: 'two reports of different families are compared as if they shared a vocabulary',
     file: 'src/baseline.ts',
     from: '  if (beforeFamily !== undefined && afterFamily !== undefined && beforeFamily !== afterFamily) {',
+    to: '  if (false) {',
+  },
+  {
+    id: 'M82',
+    what: 'a clean delta over a failing report says nothing about the report',
+    file: 'src/baseline.ts',
+    from: "  if (verdictOfReport(current) === 'fail') {",
     to: '  if (false) {',
   },
 ]

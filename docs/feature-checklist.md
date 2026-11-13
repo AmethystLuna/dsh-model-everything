@@ -155,6 +155,7 @@ node tests/summary-counters/run.mjs
 node tests/edit-refusals/run.mjs
 node tests/export-warnings/run.mjs
 node tests/diff-families/run.mjs
+node tests/diff-next-steps/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -252,6 +253,7 @@ And the gates around it:
 | `edit-refusals` | 4 | an ops that is not a list is refused and writes nothing |
 | `export-warnings` | 3 | every invariant a format cannot translate is named in its warnings |
 | `diff-families` | 5 | two reports of different families are refused, naming both |
+| `diff-next-steps` | 5 | every state says something to do |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
