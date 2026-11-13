@@ -1129,6 +1129,18 @@ test('a parenthesised use case and an abstract class are read as what they are',
   if (abstracted.ignored.length !== 1 || !abstracted.ignored[0].includes('modifier')) throw new Error('modifier note: ' + JSON.stringify(abstracted.ignored))
 })
 
+// A component diagram writes an interface as its own circle, and a port as a mark on a boundary. The first is drawable, the second is not,
+// and both used to answer "not something this renderer draws" without saying what was missing.
+test('an interface circle is drawn, and a port is refused by name', () => {
+  const circle = render({ source: ['@startuml', '() "Api" as api', 'component Web', 'Web --> api'].join('\n') }, {}, { scheme: 'default' })
+  if (circle.refused.length !== 0) throw new Error('circle refused: ' + JSON.stringify(circle.refused))
+  if (!circle.diagram.nodes.some((node) => node.id === 'api')) throw new Error('the interface was dropped')
+  if (circle.diagram.edges.length !== 1) throw new Error('edges: ' + String(circle.diagram.edges.length))
+  if (circle.ignored.length !== 1 || !circle.ignored[0].includes('interface')) throw new Error('note: ' + JSON.stringify(circle.ignored))
+  const port = render({ source: ['@startuml', 'component a', 'port p1'].join('\n') }, {}, { scheme: 'default' })
+  if (port.refused.length !== 1 || !port.refused[0].includes('mark on a box')) throw new Error('port: ' + JSON.stringify(port.refused))
+})
+
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
 // called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
 test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {

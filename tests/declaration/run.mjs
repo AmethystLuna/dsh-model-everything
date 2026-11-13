@@ -86,6 +86,14 @@ test('an abstract class is a class, and the modifier is reported', () => {
   if (!got.notes[0].message.includes('modifier')) throw new Error(got.notes[0].message)
 })
 
+test('an interface written as its own circle is an interface', () => {
+  const aliased = read('() "Api" as api')
+  if (aliased.elements[0]?.id !== 'api' || aliased.elements[0]?.label !== 'Api') throw new Error(JSON.stringify(aliased.elements))
+  if (aliased.notes.length !== 1 || !aliased.notes[0].message.includes('interface')) throw new Error(JSON.stringify(aliased.notes))
+  const bare = read('() Api')
+  if (bare.elements[0]?.id !== 'Api') throw new Error(JSON.stringify(bare.elements))
+})
+
 if (failures > 0) {
   console.log('declaration tests failed:', failures)
   process.exit(1)

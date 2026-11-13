@@ -514,6 +514,13 @@ const MUTATIONS = [
     from: "    const parenAlias = /^\\((.+?)\\)\\s+as\\s+([A-Za-z_][\\w-]*)$/.exec(rest)",
     to: '    const parenAlias = null as RegExpExecArray | null',
   },
+  {
+    id: 'M61',
+    what: 'an interface circle is refused as a line that cannot be read',
+    file: 'src/render/plantuml-declaration.ts',
+    from: "  const circle = /^\\(\\)\\s*(?:\"(.+?)\"|([^\"\\s][^\"\\s]*))?\\s*(?:as\\s+([A-Za-z_][\\w-]*))?\\s*$/.exec(line)",
+    to: '  const circle = null as RegExpExecArray | null',
+  },
 ]
 
 const argument = process.argv[2]

@@ -81,6 +81,9 @@ const NOT_DRAWN: Record<string, string> = {
   participant: 'a participant is a lifeline, not one of the shapes this renderer draws',
   cloud: 'a cloud outline is not one of the shapes this renderer draws',
   agent: 'an agent is not one of the shapes this renderer draws',
+  port: 'a port is a mark on a box\'s boundary, which this renderer does not draw',
+  portin: 'a port is a mark on a box\'s boundary, which this renderer does not draw',
+  portout: 'a port is a mark on a box\'s boundary, which this renderer does not draw',
 }
 
 /** A sequence fragment: a block that only means something in a sequence diagram, which this renderer refuses. */

@@ -89,6 +89,14 @@ export function readDeclaration(line: string, where: string): Declaration | unde
     return { elements: [{ id: written.id, label: written.label, shape }], notes }
   }
 
+  // `() "Api" as api` is an interface written as its own circle. The keyword is missing, the element is not.
+  const circle = /^\(\)\s*(?:"(.+?)"|([^"\s][^"\s]*))?\s*(?:as\s+([A-Za-z_][\w-]*))?\s*$/.exec(line)
+  if (circle !== null && (circle[1] !== undefined || circle[2] !== undefined || circle[3] !== undefined)) {
+    const label = text((circle[1] ?? circle[2] ?? circle[3]) as string)
+    const id = (circle[3] ?? label) as string
+    return { elements: [{ id, label, shape: 'rect' }], notes: [{ channel: 'ignored', message: where + '`()` is an interface: drawn as a box, since the circle is a mark this renderer does not have' }] }
+  }
+
   // A line that is only a bracketed name is a plain rectangle, which is how a flowchart writes a box.
   const single = BRACKET.exec(line)
   if (single !== null) {
