@@ -555,10 +555,10 @@ const MUTATIONS = [
   },
   {
     id: 'M66',
-    what: 'an approximation is drawn with no warning',
+    what: 'an approximation is drawn as if it were faithful',
     file: 'src/uml-syntax.ts',
-    from: "      return { ok: true, warning: 'UML_RENDER_APPROXIMATE_VIEW: '",
-    to: "      return { ok: true, warning: undefined as unknown as string, '",
+    from: "    if (support.fidelity === 'approximate') {",
+    to: '    if (false) {',
   },
 ]
 
