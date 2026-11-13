@@ -820,10 +820,10 @@ const MUTATIONS = [
   },
   {
     id: 'M99',
-    what: 'the hash is computed over the key order the input happened to use',
+    what: 'the model hash is computed over the key order the input happened to use',
     file: 'src/engine.ts',
-    from: '  return stableStringify(value)',
-    to: '  return JSON.stringify(value)',
+    from: "  return createHash('sha256').update(stableStringify(hashPayload(value, spec))).digest('hex')",
+    to: "  return createHash('sha256').update(JSON.stringify(hashPayload(value, spec))).digest('hex')",
   },
 ]
 
