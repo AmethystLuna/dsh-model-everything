@@ -81,6 +81,7 @@ const SUITES = [
   'tests/check-status/run.mjs',
   'tests/summary-counters/run.mjs',
   'tests/edit-refusals/run.mjs',
+  'tests/export-warnings/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -664,6 +665,13 @@ const MUTATIONS = [
     file: 'src/editor.ts',
     from: "  if (!validation.ok && options.allowInvalid !== true) {",
     to: '  if (false) {',
+  },
+  {
+    id: 'M80',
+    what: 'an export drops an invariant the target cannot express, in silence',
+    file: 'src/exporters.ts',
+    from: "    if (invariant.kind !== 'never-states') warnings.push('UPPAAL export carries invariant kind",
+    to: "    if (false) warnings.push('UPPAAL export carries invariant kind",
   },
 ]
 
