@@ -94,6 +94,7 @@ const SUITES = [
   'tests/layout-growth/run.mjs',
   'tests/ports-sides/run.mjs',
   'tests/text-wrap/run.mjs',
+  'tests/row-spacing/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -768,6 +769,13 @@ const MUTATIONS = [
     file: 'src/render/text.ts',
     from: '  const lines = explicitLines(label).flatMap((line) => wrapLine(line))',
     to: '  const lines = explicitLines(label)',
+  },
+  {
+    id: 'M93',
+    what: 'the boxes in one rank are packed with no gap between them',
+    file: 'src/render/place.ts',
+    from: 'const NODE_GAP = 30',
+    to: 'const NODE_GAP = 0',
   },
 ]
 

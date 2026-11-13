@@ -166,6 +166,7 @@ node tests/route-causality/run.mjs
 node tests/layout-growth/run.mjs
 node tests/ports-sides/run.mjs
 node tests/text-wrap/run.mjs
+node tests/row-spacing/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -274,6 +275,7 @@ And the gates around it:
 | `layout-growth` | 4 | a longer label grows its box and pushes the next rank down by the difference |
 | `ports-sides` | 4 | an anchor is the middle of the side it names |
 | `text-wrap` | 6 | a short label stays on one line |
+| `row-spacing` | 3 | two boxes in one rank keep a gap |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
