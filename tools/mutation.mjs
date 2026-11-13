@@ -692,10 +692,10 @@ const MUTATIONS = [
   },
   {
     id: 'M83',
-    what: 'a rendezvous nobody can fire is not reported as unresolved',
+    what: 'a rendezvous no machine declares is skipped, as it was before';
     file: 'src/engine.ts',
-    from: "const unresolvedCount = c2Findings.filter((finding) => finding.code === 'C2_RENDEZVOUS_UNRESOLVED').length",
-    to: "const unresolvedCount = c2Findings.filter((finding) => finding.code === 'never').length",
+    from: '    if (allEventsSet.has(event)) continue',
+    to: '    if (true) continue',
   },
 ]
 
