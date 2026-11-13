@@ -366,6 +366,14 @@ const MUTATIONS = [
     from: '      from: right,',
     to: '      from: left,',
   },
+
+  {
+    id: 'M42',
+    what: 'a boundary keeps its decorations in its name',
+    file: 'src/render/plantuml-reference.ts',
+    from: '  const rest = bare.name',
+    to: '  const rest = declaration.slice(keyword.length).trim()',
+  },
 ]
 
 const argument = process.argv[2]
