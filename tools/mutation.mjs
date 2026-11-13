@@ -76,6 +76,7 @@ const SUITES = [
   'tests/tool-schema/run.mjs',
   'tests/tool-defaults/run.mjs',
   'tests/diff-claims/run.mjs',
+  'tests/suite-registry/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -624,6 +625,13 @@ const MUTATIONS = [
     file: 'src/baseline.ts',
     from: "  const where = locator === '{}' ? 'message:' + finding.message : locator",
     to: "  const where = 'message:' + finding.message",
+  },
+  {
+    id: 'M75',
+    what: 'a suite on disk is dropped from the gate',
+    file: 'package.json',
+    from: 'node tests/uml/run.mjs && ',
+    to: '',
   },
 ]
 
