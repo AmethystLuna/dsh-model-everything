@@ -80,6 +80,27 @@ test('a keyword is never claimed both drawn and refused in one row', () => {
   }
 })
 
+// The table says an element is drawn or refused; this makes the renderer say it too. A keyword that reads correctly in the table and
+// not in the renderer teaches a reader the wrong thing twice - once here, once when the drawing refuses the line.
+test('every keyword the table names behaves the way the table says', async () => {
+  const { render } = await import('../../lib/render/index.js')
+  const row = cell('PlantUML elements')
+  const failuresHere = []
+  for (const name of symbols(row.drawn)) {
+    const source = ['@startuml', name + ' Sample', '@enduml'].join('\n')
+    const drawn = render({ source }, {}, { scheme: 'default' })
+    if (drawn.diagram.nodes.length === 0 || drawn.refused.length > 0) {
+      failuresHere.push('`' + name + '` is claimed drawn but draws ' + String(drawn.diagram.nodes.length) + ' node(s) and refuses ' + String(drawn.refused.length))
+    }
+  }
+  for (const name of symbols(row.refused)) {
+    const source = ['@startuml', name + ' Sample', '@enduml'].join('\n')
+    const refused = render({ source }, {}, { scheme: 'default' })
+    if (refused.refused.length === 0) failuresHere.push('`' + name + '` is claimed refused but the line was not refused')
+  }
+  if (failuresHere.length > 0) throw new Error(failuresHere.join(' | '))
+})
+
 if (failures > 0) {
   console.log('skill table tests failed:', failures)
   process.exit(1)
