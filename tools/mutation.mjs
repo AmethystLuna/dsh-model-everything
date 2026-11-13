@@ -689,6 +689,18 @@ if (argument === '--list') {
   for (const mutation of MUTATIONS) console.log(mutation.id, mutation.what)
   process.exit(0)
 }
+// A suite that is on neither list was written and never added: it runs under `test:engine` and never under a mutation, so a defect it would
+// catch is reported as missed. Three mutations were reported that way before this check existed, each of them a suite that was simply not on the
+// run list. It is loud on every run now, because the alternative is discovering it from a MISSED line and blaming the suite.
+const pkgForAudit = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+const everySuite = [...String(pkgForAudit.scripts['test:engine'] ?? '').matchAll(/node (tests\/[^\s&]+)/g)].map((match) => match[1])
+const unclassified = everySuite.filter((suite) => !SUITES.includes(suite) && !NOT_DRAWING.has(suite))
+if (unclassified.length > 0) {
+  console.error('warning: ' + String(unclassified.length) + ' suite(s) are on neither the mutation run list nor the not-a-drawing list:')
+  for (const suite of unclassified) console.error('  ' + suite)
+  console.error('a mutation that only this suite would catch will read as MISSED; add it to SUITES or to NOT_DRAWING.')
+}
+
 const chosen = argument === undefined ? MUTATIONS : MUTATIONS.filter((mutation) => mutation.id === argument)
 if (chosen.length === 0) {
   console.error('no mutation matches ' + argument)
