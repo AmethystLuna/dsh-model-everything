@@ -1003,6 +1003,20 @@ test('a Mermaid configuration block is skipped and reported', () => {
   }
 })
 
+// `X --> [*]` leaves the machine. Read as an endpoint it would draw a box called `*`; read as leaving it is a self-loop, drawn dashed,
+// labelled `end` when the source wrote no label. The unit suite decides the plan; this decides the drawing that comes of it.
+test('an exit marker closes on its source and is drawn dashed', () => {
+  const r = render({ source: ['@startuml', 'state a', 'a --> [*]'].join('\n') }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if (r.diagram.nodes.some((node) => node.id === '*')) throw new Error('the marker became a box')
+  const edge = r.diagram.edges.find((candidate) => candidate.from === 'a' && candidate.to === 'a')
+  if (edge === undefined) throw new Error('no self-loop: ' + JSON.stringify(r.diagram.edges))
+  if (edge.label !== 'end') throw new Error('label: ' + String(edge.label))
+  if (edge.dashed !== true) throw new Error('the exit is drawn solid')
+  const drawn = r.canvas.shapes.filter((shape) => shape.kind === 'path')
+  if (!drawn.some((shape) => shape.points.length > 2)) throw new Error('no routed self-loop')
+})
+
 // A Mermaid state diagram carries three constructs the PlantUML reader already had: a composite state, a state type, and a note
 // beside a state. Each was refused as a line the renderer could not draw, in one notation only.
 test('a Mermaid state keeps its composite, its type and its note', () => {
