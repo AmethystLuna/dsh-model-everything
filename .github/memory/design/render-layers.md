@@ -51,6 +51,38 @@ metadata:
 尝试中再次确认。老方法写在这里，下次拆分直接照做。
 一个小的搬运脚本读 AST 边界；不要再用人工数出来的行号。已回滚，因此没有遗留风险。
 
+## 总账：行族 × 模块 × 套件 × 变异点（第 86 轮）
+
+`src/render/` 下 43 个模块；49 个变异点分布在 13 个文件上；`test:engine` 跑 62 个套件。
+
+| 行族 | 模块 | 套件 | 变异点 |
+|---|---|---|---|
+| 引用、箭头、边界名、关键字表、块成员 | `plantuml-reference.ts` | `arrows`、`names` | M41 M42 M43 |
+| 非图源行（预处理、布局、hide、include、`;`） | `plantuml-directives.ts` | `directives` | M44 |
+| 页面行（标题、页文、方向、scale、背景、skinparam） | `plantuml-page.ts` | `directives` | M45 |
+| 声明行 | `plantuml-declaration.ts` | `declaration` | M46 |
+| 边界开闭 | `plantuml-boundary.ts` | `boundary` | M47 |
+| 箭头含义（含 `[*]` 出口） | `plantuml-edge.ts` | `edge` | M48 |
+| 注释定位 | `plantuml-note.ts` | `note` | M49 |
+| 带标记的边（方向、hidden、起始） | `plantuml-marked-edge.ts` | `marked-edge` | M50 |
+
+**覆盖率的诚实说明**：这 8 个模块只有 10 个变异点，而 `paint.ts` 一个文件就有 9 个。原因不是它们更安全，而是它们的判定更容易被**单测**
+逐条钉住——8 个套件共 60 余条用例，每条断言一个回答。变异点的数量在这里衡量的是“哪些代码没有别的套件盯着”，不是“哪里风险高”。
+
+## 剩余构成（第 86 轮实测）
+
+`from-plantuml.ts` 628 行（含类型与 `ensure`/`keywordOf` 166 行）：`fromPlantUml` 从 167 行开始，分三段——
+
+| 段 | 行数 | 内容 |
+|---|---|---|
+| 块预收集 | 111 | legend / page text / title / note 的 `collectBlocks` 与未闭合报告 |
+| 单行分派 | 174 | 主循环：together 记帐、页面、指令、标记边、箭头、边界、声明、注释、拒收 |
+| 尾声 | 177 | 边界与同名节点的消解、`together` 报告、图的最终组装 |
+
+尾声是剩下的第二大盘子，也是最难拆的一处：它要同时看 `builder.nodes`、`builder.groups`、`builder.implicit` 和若干 `Map`，
+本质是一次**图的修正**，不是“读一行”。下一轮若要继续，目标是把它提成 `resolveBoundaries(builder): void`，并用同样的方式验证
+（20 张图逐字节 + 现有 62 套件）。
+
 ## 解析器现在的样子（第 75–83 轮拆分后）
 
 `from-plantuml.ts` 从 982 行降到 612 行，读一行的判决按“行族”分散到六个模块，每个都能脱离画布测试：
