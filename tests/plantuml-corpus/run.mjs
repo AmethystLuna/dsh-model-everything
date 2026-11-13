@@ -1044,6 +1044,33 @@ test('a partition is drawn as a boundary and a note shape is drawn as a note', (
   for (const note of shaped.ignored) if (!note.includes('note shape')) throw new Error('reason: ' + note)
 })
 
+// The state-machine variants, decided together: an empty block is one defect, the start and end markers inside a block still mean start
+// and end, a note inside a block belongs to that block, a divider separates nothing here, and two exits are two edges.
+test('the state-machine variants each get one answer', () => {
+  const draw = (lines) => render({ source: ['@startuml', ...lines, '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  // An empty block is reported once, and the message names what is missing: a rectangle an edge could attach to.
+  const empty = draw(['state Idle {', '}', 'state a', 'a --> Idle'])
+  if (empty.refused.length !== 1 || !empty.refused[0].includes('nothing drawn inside it')) throw new Error('empty block: ' + JSON.stringify(empty.refused))
+  if (!empty.refused[0].startsWith('line 5:')) throw new Error('empty block line: ' + empty.refused[0])
+  // A drawing has one start. The first marker in source order is the one drawn, and a second is reported rather than dropped in silence
+  // - which is what it used to be, and what made a nested block look like the machine's beginning.
+  const entering = draw(['state Busy {', '  [*] --> Inner', '}', '[*] --> Busy'])
+  if (entering.refused.length !== 0) throw new Error('entering: ' + JSON.stringify(entering.refused))
+  if (entering.diagram.init !== 'Inner') throw new Error('init: ' + String(entering.diagram.init))
+  if (entering.ignored.length !== 1 || !entering.ignored[0].includes('already starts at')) throw new Error('second start: ' + JSON.stringify(entering.ignored))
+  const leaving = draw(['state Busy {', '  [*] --> Inner', '  Inner --> [*]', '}'])
+  if (leaving.diagram.edges.length !== 1) throw new Error('exit edges: ' + String(leaving.diagram.edges.length))
+  if (leaving.diagram.edges[0].label !== 'end') throw new Error('exit label: ' + String(leaving.diagram.edges[0].label))
+  const noted = draw(['state Busy {', '  state Inner', '  note right of Inner : queued', '}'])
+  if (noted.diagram.nodes.length !== 2) throw new Error('note in a block: ' + String(noted.diagram.nodes.length))
+  const divided = draw(['state a', '--', 'state b'])
+  if (divided.refused.length !== 0 || divided.ignored.length !== 1) throw new Error('divider: ' + JSON.stringify([divided.refused, divided.ignored]))
+  const twice = draw(['state a', 'a --> [*]', 'a --> [*]'])
+  if (twice.diagram.edges.length !== 2) throw new Error('two exits: ' + String(twice.diagram.edges.length))
+  const markers = draw(['[*] --> [*]'])
+  if (markers.diagram.nodes.length !== 0 || markers.refused.length !== 0) throw new Error('a machine of markers alone drew something')
+})
+
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
 // called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
 test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {

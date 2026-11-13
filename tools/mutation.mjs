@@ -486,6 +486,13 @@ const MUTATIONS = [
     from: "      noteId: 'note-' + target.id + '-' + String(ordinal),",
     to: "      noteId: 'note-' + target.id,",
   },
+  {
+    id: 'M57',
+    what: 'a second start marker is dropped in silence again',
+    file: 'src/render/from-plantuml.ts',
+    from: "        if (startId !== undefined && startId !== marked.target.id) {",
+    to: '        if (false) {',
+  },
 ]
 
 const argument = process.argv[2]

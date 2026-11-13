@@ -253,6 +253,12 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     if (marked !== undefined) {
       if (marked.kind === 'selfLoop') return
       if (marked.kind === 'start') {
+        // A drawing has one start. A second marker is not drawn, and saying so is the difference between a dropped line and a wrong
+        // drawing: the source asked for the machine to begin somewhere else.
+        if (startId !== undefined && startId !== marked.target.id) {
+          ignored.push(where + '`' + line + '`: the machine already starts at `' + startId + '`, and one start is drawn')
+          return
+        }
         // The state a marker enters is named, not declared here: a `state X { }` block named on this line is the boundary, and a plain
         // name becomes a box only if nothing else declares it.
         ensure(builder, marked.target.id, marked.target.label, marked.target.shape, true)
