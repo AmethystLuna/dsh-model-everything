@@ -333,6 +333,14 @@ const MUTATIONS = [
     from: 'export const HUG = 3',
     to: 'export const HUG = 0',
   },
+
+  {
+    id: 'M38',
+    what: 'a Mermaid configuration block is read as diagram source',
+    file: 'src/render/from-mermaid.ts',
+    from: "      if (!open && !text.startsWith('%%{')) return",
+    to: '      if (!open) return',
+  },
 ]
 
 const argument = process.argv[2]
