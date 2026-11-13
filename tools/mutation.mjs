@@ -284,6 +284,28 @@ const MUTATIONS = [
     from: '    if (/^direction\\s+(tb|td|bt|lr|rl)\\b/i.test(line) && builder.open.length > 0) {',
     to: '    if (false) {',
   },
+
+  {
+    id: 'M33',
+    what: 'a composite state is refused again',
+    file: 'src/render/from-mermaid.ts',
+    from: '      if (composite !== null) {',
+    to: '      if (false) {',
+  },
+  {
+    id: 'M34',
+    what: 'a composite state keeps a box of the same name',
+    file: 'src/render/from-mermaid.ts',
+    from: '  for (const group of builder.groups) builder.nodes.delete(group.id)',
+    to: '  void builder.groups',
+  },
+  {
+    id: 'M35',
+    what: 'a state type is refused again',
+    file: 'src/render/from-mermaid.ts',
+    from: '      const typed = /^state\\s+([A-Za-z_][\\w-]*)\\s*(<<[^<>]*>>)\\s*$/.exec(line)',
+    to: '      const typed = null as RegExpExecArray | null',
+  },
 ]
 
 const argument = process.argv[2]
