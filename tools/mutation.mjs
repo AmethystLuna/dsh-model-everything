@@ -590,8 +590,8 @@ const MUTATIONS = [
     id: 'M70',
     what: 'a report carries a modelHash that disagrees with its hashes',
     file: 'src/data-engine.ts',
-    from: '      modelHash: dataModelHash(model),',
-    to: "      modelHash: '',",
+    from: "  return createHash('sha256').update(stableStringify(model)).digest('hex')",
+    to: "  return ''",
   },
 ]
 
