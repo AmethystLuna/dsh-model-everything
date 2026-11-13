@@ -33,6 +33,22 @@ metadata:
 | 字段路径 | 技能里写 `summary.errors` 之类 | `tests/doc-paths` | 让我去看一个不存在的字段 |
 | 链接与命令 | 文档里的链接、`npm run`、`node` 路径 | `tests/docs-paths` | 重命名之后句子还指着旧文件名 |
 
+## 1.5 已经有人守着的，不要再写一遍（第 116 轮核对）
+
+打算给“技能登记表”加检查时先量了一遍，结论是**已经覆盖**，于是没有新增套件：
+
+| 想加的检查 | 已经由谁守着 |
+|---|---|
+| 每个 `skills/<目录>` 有 `SKILL.md` | `tests/skills`：从磁盘枚举目录，`readFrontmatter` 缺文件即抛 |
+| frontmatter 的 `name` 等于目录名 | 同上（有一条断言原话就是 “name does not match directory”） |
+| `description` 格式与 500 字符可见预算 | 同上 |
+| 同名技能 | 不可能：`name` 必须等于目录名，目录名唯一 |
+| 中英成对文档同步 | `tests/translation` 的 `PAIRS` 表（其中一对就是 interleaving 的 `SKILL.zh-CN.md`） |
+
+同一轮把**变异运行名单**与**门禁名单**两侧都补上了守卫：前者是 `tools/mutation.mjs` 开跑前的警告，后者是 `tests/suite-registry`。
+
+**做法上的收获**：想加检查之前先量“是否已有”，比加一个重复的检查更有价值——重复的检查会在改规则时给出两个不一致的答案。
+
 ## 2. 两类能测与不能测
 
 - **结构可测**：路径、链接、命令、家族 id、字段名、能力判定。它们有名字、有位置，能机械核对。第 109 轮的 `docs-paths` 就是这么来的。
