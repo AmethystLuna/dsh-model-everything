@@ -30,6 +30,7 @@
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
 import { bareName, decorationReason } from './names.js'
+import { isTogetherOpener, readDirective } from './plantuml-directives.js'
 import {
   ARROW,
   BRACKET,
@@ -353,41 +354,13 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
 
-    // An include brings content this renderer never reads. Dropping it quietly would hand back a drawing that is missing
-    // whatever the file held, and look complete.
-    if (/^!include\b/.test(line)) {
-      refused.push(where + '`' + line + '` names a file this renderer does not read, so the drawing would be missing what it holds')
-      return
-    }
-    // `!pragma layout` asks for a particular layout engine, which is this renderer's own decision: it keeps the layout-control
-    // reason, and only the pragmas that are not about arrangement get the preprocessor one.
-    if (LAYOUT_CONTROL.test(line)) {
-      ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
-      return
-    }
-    if (/^!(define|theme|pragma|procedure|function|unquoted)\b/.test(line)) {
-      ignored.push(where + '`' + line + '` is a preprocessor directive: nothing is expanded here, the source is drawn as written')
-      return
-    }
-    if (/^allowmixing\b/.test(line)) {
-      ignored.push(where + '`' + line + '` permits mixing diagram families; only one family is drawn here, so it has no effect')
-      return
-    }
-    if (HIDE_DIRECTIVE.test(line)) {
-      ignored.push(where + '`' + line + '` hides something this renderer does not draw: an element here has no compartments or stereotypes')
-      return
-    }
-    if (/^together\s*$/.test(line)) {
-      ignored.push(where + '`' + line + '` names no boxes: a `together { }` block keeps its own members on one row')
-      return
-    }
-
-    // `together { ... }` is a row, not a boundary: the block's members were collected before the lines were parsed, so the opener
-    // itself has nothing left to do. It used to be swallowed by a catch-all bucket with no note, which is why removing that bucket
-    // broke every `together` drawing.
-    if (/^together\b[^{]*\{\s*$/.test(line)) {
-      // Its members are already on one row, collected before the lines were read, so there is nothing left to report: the line did
-      // what it said. An empty or one-member block is reported when it closes.
+    // A directive is not diagram source: it is read and dropped with its reason, or refused. The rules live in one module so one
+    // line can be put in and one answer taken out, without a diagram around it.
+    if (isTogetherOpener(line)) return
+    const directive = readDirective(line, where)
+    if (directive !== undefined) {
+      if (directive.channel === 'ignored') ignored.push(directive.message)
+      else refused.push(directive.message)
       return
     }
 
