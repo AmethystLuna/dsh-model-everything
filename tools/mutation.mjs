@@ -107,6 +107,7 @@ const SUITES = [
   'tests/packaging/run.mjs',
   'tests/tarball/run.mjs',
   'tests/locale-pairs/run.mjs',
+  'tests/gate-text/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -872,6 +873,13 @@ const MUTATIONS = [
     file: 'gate/locale/zh.json',
     from: '  "meta": {',
     to: '  "metaX": {',
+  },
+  {
+    id: 'M106',
+    what: 'a routing row names a skill that does not ship',
+    file: 'src/gate.ts',
+    from: "  const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '` |')",
+    to: "  const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '-x` |')",
   },
 ]
 

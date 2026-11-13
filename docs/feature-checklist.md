@@ -179,6 +179,7 @@ node tests/client-bundle/run.mjs
 node tests/packaging/run.mjs
 node tests/tarball/run.mjs
 node tests/locale-pairs/run.mjs
+node tests/gate-text/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -300,6 +301,7 @@ And the gates around it:
 | `packaging` | 5 | the two files the loader reads are in the package |
 | `tarball` | 2 | the tarball is named after this package and this version |
 | `locale-pairs` | 3 | both languages of every card name the same keys |
+| `gate-text` | 5 | the message was rendered from shipped skills, so the checks below mean something |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
