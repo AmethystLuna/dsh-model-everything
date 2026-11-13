@@ -582,8 +582,8 @@ const MUTATIONS = [
     id: 'M69',
     what: 'a step names a tool this plugin does not ship',
     file: 'src/uml.ts',
-    from: "nextSteps.push('Run model_verify on this model for the behavioural checks"),"
-    to: "nextSteps.push('Run model_verifier on this model for the behavioural checks'),"
+    from: "nextSteps.push('Run model_verify on this model",
+    to: "nextSteps.push('Run model_verifier on this model",
   },
 ]
 
