@@ -99,6 +99,7 @@ const SUITES = [
   'tests/card-vs-text/run.mjs',
   'tests/checks-line/run.mjs',
   'tests/reading-order/run.mjs',
+  'tests/verdict-table/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -808,6 +809,13 @@ const MUTATIONS = [
     file: 'src/design-engine.ts',
     from: "  const signals = all.filter((finding) => DESIGN_CODE_LEVEL[finding.code] === 'signal')",
     to: '  const signals = all',
+  },
+  {
+    id: 'M98',
+    what: 'a warning is enough to fail the verdict',
+    file: 'src/engine.ts',
+    from: '  if (errors > 0) {',
+    to: '  if (errors > 1) {',
   },
 ]
 

@@ -247,6 +247,7 @@
     "uml-capability",
     "uml-docs",
     "uml-families",
-    "usage"
+    "usage",
+    "verdict-table"
   ]
 }
