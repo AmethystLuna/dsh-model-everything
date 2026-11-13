@@ -77,6 +77,7 @@ const SUITES = [
   'tests/tool-defaults/run.mjs',
   'tests/diff-claims/run.mjs',
   'tests/suite-registry/run.mjs',
+  'tests/intent/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -632,6 +633,13 @@ const MUTATIONS = [
     file: 'package.json',
     from: 'node tests/uml/run.mjs && ',
     to: '',
+  },
+  {
+    id: 'M76',
+    what: 'an intent no action can serve is accepted',
+    file: 'src/uml.ts',
+    from: '  if (!served.includes(intent)) {',
+    to: '  if (false) {',
   },
 ]
 
