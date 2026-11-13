@@ -71,6 +71,15 @@ await test('an edit that leaves the model invalid is refused, writes nothing, an
   if (report.errorCode !== 'EDIT_RESULT_INVALID') throw new Error('the code: ' + String(report.errorCode))
 })
 
+await test('a refusal names the operation that broke the model, in either spelling', async () => {
+  // The shorthand form (`{removeState: 's0'}`) carries no `op` field of its own: replaying the raw entries blamed operation 1 every time and called
+  // the operation `(undefined)`. The loop walks the normalised entries now, so the number and the name are both the real ones.
+  const single = await refused('naming-single', [{ removeState: 's0' }])
+  if (!/Operation 1 \(removeState\)/.test(String(single.verdictReason))) throw new Error('single: ' + String(single.verdictReason).slice(-120))
+  const batch = await refused('naming-batch', [{ addState: { id: 's2' } }, { removeState: 's0' }])
+  if (!/Operation 2 \(removeState\)/.test(String(batch.verdictReason))) throw new Error('batch: ' + String(batch.verdictReason).slice(-120))
+})
+
 await test('the escape hatch writes the invalid model, and says what it is', async () => {
   // Without this case a guard that refuses everything would pass the four above.
   const path = freshFile('escape-hatch')

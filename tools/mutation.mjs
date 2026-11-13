@@ -929,6 +929,13 @@ const MUTATIONS = [
     from: '    acceptedLabelForms: [',
     to: '    acceptedLabelFormsX: [',
   },
+  {
+    id: 'M113',
+    what: 'a refusal blames the raw shorthand entry instead of the operation that broke the model',
+    file: 'src/editor.ts',
+    from: '    for (const [index, raw] of normalized.entries()) {\n      try { applyOperation(partial, raw) } catch { firstBad = index; break }',
+    to: '    for (const [index, raw] of (operations as EditOperation[]).entries()) {\n      try { applyOperation(partial, raw) } catch { firstBad = index; break }',
+  },
 ]
 
 const argument = process.argv[2]

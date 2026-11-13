@@ -282,11 +282,13 @@ export function applyEdits(path: unknown, operations: unknown, options: { allowI
     // reads "a transition to an unknown state" still has to find which entry introduced it.
     let firstBad = -1
     const partial = CLONE(original) as Json
-    for (const [index, raw] of (operations as EditOperation[]).entries()) {
+    // The loop walks the **normalised** operations: a shorthand entry (`{removeState: 'x'}`) has no `op` field of its own, so replaying the raw
+    // input threw on the first entry and blamed it - naming `(undefined)` and pointing at operation 1 whatever the real culprit was.
+    for (const [index, raw] of normalized.entries()) {
       try { applyOperation(partial, raw) } catch { firstBad = index; break }
       if (!validateModel(partial).ok) { firstBad = index; break }
     }
-    const where = firstBad < 0 ? '' : ` Operation ${String(firstBad + 1)} (${String((operations as EditOperation[])[firstBad]?.op)}) is where it first stops validating.`
+    const where = firstBad < 0 ? '' : ` Operation ${String(firstBad + 1)} (${String(normalized[firstBad]?.op)}) is where it first stops validating.`
     throw new OptionShapeError('EDIT_RESULT_INVALID', 'the batch would leave an invalid model, so nothing was written: ' + validation.errors.join('; ') + '.' + where + ' Fix the list, or pass allowInvalid to write it anyway and continue in a second call.')
   }
   const text = JSON.stringify(validation.ok ? validation.model : next, null, 2) + '\n'
