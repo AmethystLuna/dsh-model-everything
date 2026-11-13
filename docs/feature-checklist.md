@@ -151,6 +151,7 @@ node tests/diff-claims/run.mjs
 node tests/suite-registry/run.mjs
 node tests/intent/run.mjs
 node tests/check-status/run.mjs
+node tests/summary-counters/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -244,6 +245,7 @@ And the gates around it:
 | `suite-registry` | 5 | the registry was read, so the checks below mean something |
 | `intent` | 5 | an intent an action serves is accepted |
 | `check-status` | 2 | a cap that leaves a check nothing to decide reports skip, not pass |
+| `summary-counters` | 4 | a verification report counts what its checks carry |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |

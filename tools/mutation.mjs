@@ -79,6 +79,7 @@ const SUITES = [
   'tests/suite-registry/run.mjs',
   'tests/intent/run.mjs',
   'tests/check-status/run.mjs',
+  'tests/summary-counters/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -648,6 +649,13 @@ const MUTATIONS = [
     file: 'src/engine.ts',
     from: "    skipped.status = 'skip'",
     to: "    skipped.status = 'pass'",
+  },
+  {
+    id: 'M78',
+    what: 'the summary counts a check the report skipped as run',
+    file: 'src/engine.ts',
+    from: "  checksRun: checks.filter((check) => check.status !== 'skip').length,",
+    to: "  checksRun: checks.length,",
   },
 ]
 
