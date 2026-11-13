@@ -168,6 +168,7 @@ node tests/ports-sides/run.mjs
 node tests/text-wrap/run.mjs
 node tests/row-spacing/run.mjs
 node tests/card-contract/run.mjs
+node tests/card-vs-text/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -278,6 +279,7 @@ And the gates around it:
 | `text-wrap` | 6 | a short label stays on one line |
 | `row-spacing` | 3 | two boxes in one rank keep a gap |
 | `card-contract` | 5 | the verdict on the card is the report\ |
+| `card-vs-text` | 4 | the verdict on the card is the verdict the body opens with |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |

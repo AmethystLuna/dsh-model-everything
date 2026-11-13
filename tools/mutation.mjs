@@ -96,6 +96,7 @@ const SUITES = [
   'tests/text-wrap/run.mjs',
   'tests/row-spacing/run.mjs',
   'tests/card-contract/run.mjs',
+  'tests/card-vs-text/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -784,6 +785,13 @@ const MUTATIONS = [
     file: 'src/presentation.ts',
     from: "    summaryForDelta !== undefined && ['added', 'removed', 'changed', 'addedErrors'].some((key) => key in summaryForDelta)",
     to: '    summaryForDelta !== undefined',
+  },
+  {
+    id: 'M95',
+    what: 'a diff body never says what the current report decided',
+    file: 'src/report-view.ts',
+    from: '  if (current !== undefined) lines.push(`CURRENT  verdict=${current}`)',
+    to: "  if (false) lines.push(`CURRENT  verdict=${current}`)",
   },
 ]
 
