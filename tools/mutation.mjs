@@ -409,6 +409,14 @@ const MUTATIONS = [
     from: '    const rest = bare.name',
     to: '    const rest = declared[2] as string',
   },
+
+  {
+    id: 'M47',
+    what: 'every boundary is drawn dashed, including a state',
+    file: 'src/render/plantuml-boundary.ts',
+    from: '    solid: SOLID_BOUNDARY.has(opener),',
+    to: '    solid: false,',
+  },
 ]
 
 const argument = process.argv[2]
