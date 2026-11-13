@@ -51,6 +51,28 @@ metadata:
 尝试中再次确认。老方法写在这里，下次拆分直接照做。
 一个小的搬运脚本读 AST 边界；不要再用人工数出来的行号。已回滚，因此没有遗留风险。
 
+## 解析器现在的样子（第 75–83 轮拆分后）
+
+`from-plantuml.ts` 从 982 行降到 612 行，读一行的判决按“行族”分散到六个模块，每个都能脱离画布测试：
+
+| 模块 | 决定什么 | 套件 |
+|---|---|---|
+| `plantuml-reference.ts` | 一个引用、一个箭头、一个边界名、元素关键字、块成员 | `arrows`、`names` |
+| `plantuml-directives.ts` | 非图源行：预处理、布局控制、`hide`、`include` | `directives` |
+| `plantuml-page.ts` | 标题、页文、方向、`scale`、背景、`skinparam` | `directives` |
+| `plantuml-declaration.ts` | 声明行的元素与装饰 | `declaration` |
+| `plantuml-boundary.ts` | 边界的开与闭、实线/虚线 | `boundary` |
+| `plantuml-edge.ts` | 箭头意味着什么（含 `[*]` 出口） | `edge` |
+
+解析器仍保留：块预收集（header/legend/note）、注释定位、`together` 的记帐、边界栈、会话尾声。主循环 390 行、34 个分支，
+其中 6 处是“把这一行交给某个模块”。
+
+两条由哈希而非套件发现的教训（都在这一轮系列里）：**note 守卫**和**出口虚线的 dashed 丢失**——套件测行为，属性丢失只改字节。
+所以每次搬家都必须跑 20 张图的逐字节比对，不能只看套件绿。
+
+第三个发现更隐蔽：解析器里 `...(effect.dashed === undefined ? {} : { dashed: true })` 会让 `false` 也变成虚线，
+于是“出口是否虚线”这个变异在语料里看不见（图仍然虚线）。改成 `=== true` 之后语料立刻能抓到。**展开条件写错方向，等于把测试废掉。**
+
 ## 不算进去的东西
 
 布局（rank/order/lane）与绘制（形状、遮罩、文本）各自成层，策略模块**不**画任何东西，也不持有盒子列表。把盒子传进
