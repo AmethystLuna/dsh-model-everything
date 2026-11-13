@@ -545,6 +545,13 @@ const MUTATIONS = [
     from: "  const order: readonly UmlFamilyId[] = ['class', 'object', 'component', 'deployment', 'package', 'sequence', 'use-case', 'activity']",
     to: "  const order: readonly UmlFamilyId[] = ['class', 'object', 'component', 'deployment', 'package', 'sequence', 'activity']",
   },
+  {
+    id: 'M65',
+    what: 'a composite classifier is drawn with a label the model never had',
+    file: 'src/uml-composite.ts',
+    from: "  const selfHead = model.self.label === undefined || model.self.label === '' || model.self.label === model.self.id",
+    to: '  const selfHead = false',
+  },
 ]
 
 const argument = process.argv[2]

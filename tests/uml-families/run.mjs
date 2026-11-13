@@ -4,7 +4,7 @@
 // written with its own keyword was read as a state machine and refused. That is what this suite is for: one minimal source per family,
 // and the family the engine says it is.
 import { UML_FAMILIES, detectUmlFamily } from '../../lib/uml-syntax.js'
-import { parseUml } from '../../lib/uml.js'
+import { parseUml, renderUml } from '../../lib/uml.js'
 
 let failures = 0
 function test(name, body) {
@@ -50,6 +50,24 @@ test('a family the table calls parseable parses from that source', () => {
     const [notation, source] = sample
     const parsed = parseUml(source, notation)
     if (parsed.family !== family.id) throw new Error(family.id + ' parsed as ' + parsed.family)
+  }
+})
+
+// A family the table calls readable back has to survive the trip: parse a source, draw the model, read the drawing, and get the same model.
+// A composite structure was the one that did not - its own classifier was written `component "c" as c`, which reads back carrying a label
+// the source never had.
+test('a model survives being drawn and read back, in the notation the table calls faithful', () => {
+  for (const family of UML_FAMILIES) {
+    if (!family.parseable) continue
+    const sample = SAMPLES[family.id]
+    if (sample === undefined) continue
+    const [notation, source] = sample
+    const first = parseUml(source, notation)
+    const drawn = renderUml(first.model, notation, family.id)
+    const second = parseUml(drawn.primary, notation)
+    if (JSON.stringify(first.model) !== JSON.stringify(second.model)) {
+      throw new Error(family.id + ': the model changed on the way back: ' + JSON.stringify(first.model) + ' -> ' + JSON.stringify(second.model))
+    }
   }
 })
 

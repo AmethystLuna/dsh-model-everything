@@ -199,8 +199,12 @@ export function renderComposite(input: unknown, notation: UmlNotation): UmlFamil
   const lines: string[] = ['@startuml']
   lines.push(directiveLine('plantuml', 'uml v1 notation=plantuml family=composite-structure'))
   lines.push(directiveLine('plantuml', 'compositeSelf ' + model.self.kind + ' ' + model.self.id))
-  const label = model.self.label === undefined ? quote(model.self.id) : quote(model.self.label)
-  lines.push(model.self.kind + ' ' + label + ' as ' + model.self.id + ' {')
+  // A classifier with no label of its own is written with its id alone: `component "c" as c` reads back as a model that carries a
+  // label the source never had, which is a round trip that changes the model. Parts already follow this rule.
+  const selfHead = model.self.label === undefined || model.self.label === '' || model.self.label === model.self.id
+    ? model.self.kind + ' ' + model.self.id
+    : model.self.kind + ' ' + quote(model.self.label) + ' as ' + model.self.id
+  lines.push(selfHead + ' {')
   for (const port of model.ports) {
     // A port declaration takes no alias, so its id is what the reader sees; a port whose
     // id PlantUML cannot use is reported rather than silently renamed.
