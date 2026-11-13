@@ -75,6 +75,7 @@ const SUITES = [
   'tests/docs-paths/run.mjs',
   'tests/tool-schema/run.mjs',
   'tests/tool-defaults/run.mjs',
+  'tests/diff-claims/run.mjs',
 ]
 
 const MUTATIONS = [
