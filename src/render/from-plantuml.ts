@@ -30,12 +30,13 @@
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
 import { bareName, decorationReason } from './names.js'
-import { isTogetherOpener, readDirective } from './plantuml-directives.js'
+import { isTogetherOpener, readDirective, statementSeparator } from './plantuml-directives.js'
 import { readPageLine } from './plantuml-page.js'
 import { readDeclaration } from './plantuml-declaration.js'
 import { readBoundary } from './plantuml-boundary.js'
 import { planArrow } from './plantuml-edge.js'
 import { readNote } from './plantuml-note.js'
+import { readMarked } from './plantuml-marked-edge.js'
 import {
   ARROW,
   BRACKET,
@@ -314,48 +315,32 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     // With every alternative matched above, the catch-all bucket that used to sit here was unreachable - and a bucket nobody reaches
     // is not a safety net, it is a place where a line would be dropped without a word. A line that gets this far is refused below.
 
-    if (line === '[*] --> [*]') return
-
-    const startMarker = /^\[\*\]\s*-->\s*(.+)$/.exec(line)
-    if (startMarker !== null) {
-      const target = reference(startMarker[1])
-      // The state a marker enters is named, not declared here: a `state X { }` block named on this line is the boundary,
-      // and a plain name becomes a box only if nothing else declares it.
-      ensure(builder, target.id, target.label, target.shape, true)
-      if (startId === undefined) startId = target.id
-      return
-    }
-    // A direction on the edge is a constraint on the drawing: `-down->` is what a layered drawing does, `-up->` says
-    // the far box goes on top, and `-right->` / `-left->` say the two share a row in that order.
-    const directed = /^(.+?)\s*-(up|down|left|right)-+>?\s*(.+?)(?:\s*:\s*(.+))?$/.exec(line)
-    if (directed !== null) {
-      const from = reference(directed[1])
-      const to = reference(directed[3])
-      ensure(builder, from.id, from.label, from.shape, true)
-      ensure(builder, to.id, to.label, to.shape, true)
+    // A marked edge carries more than an arrow: a direction, a hidden marker, or a start marker. What the line states is decided in
+    // one module; the writes below are the same for all of them.
+    const marked = readMarked(line)
+    if (marked !== undefined) {
+      if (marked.kind === 'selfLoop') return
+      if (marked.kind === 'start') {
+        // The state a marker enters is named, not declared here: a `state X { }` block named on this line is the boundary, and a plain
+        // name becomes a box only if nothing else declares it.
+        ensure(builder, marked.target.id, marked.target.label, marked.target.shape, true)
+        if (startId === undefined) startId = marked.target.id
+        return
+      }
+      ensure(builder, marked.from.id, marked.from.label, marked.from.shape, true)
+      ensure(builder, marked.to.id, marked.to.label, marked.to.shape, true)
       builder.edges.push({
-        from: from.id,
-        to: to.id,
-        label: (directed[4] ?? '').trim(),
-        hint: directed[2] as 'up' | 'down' | 'left' | 'right',
+        from: marked.from.id,
+        to: marked.to.id,
+        label: marked.label,
+        ...(marked.hint === undefined ? {} : { hint: marked.hint }),
+        ...(marked.invisible === undefined ? {} : { invisible: true }),
       })
       builder.edgeLines.push(index + 1)
       builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
       return
     }
 
-    // `A -[hidden]-> B` names a place, not a connection: the edge ranks the two boxes and is never drawn.
-    const invisible = /^(.+?)\s*-\s*\[\s*hidden\s*\]\s*-+>?\s*(.+?)(?:\s*:\s*(.+))?$/.exec(line)
-    if (invisible !== null) {
-      const from = reference(invisible[1])
-      const to = reference(invisible[2])
-      ensure(builder, from.id, from.label, from.shape, true)
-      ensure(builder, to.id, to.label, to.shape, true)
-      builder.edges.push({ from: from.id, to: to.id, label: (invisible[3] ?? '').trim(), invisible: true })
-      builder.edgeLines.push(index + 1)
-      builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
-      return
-    }
 
     // A note places itself beside a box through the same hidden edge every other placement uses; what the line states is decided in
     // one module, so each of its three answers can be asked without a drawing.
@@ -442,8 +427,10 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
 
     // PlantUML allows several statements on one line separated by `;`. This renderer reads one per line, and folding them
     // together would draw one element whose name is the rest of the line - so it is refused, naming the form to write.
-    if (/;[^;]*\S/.test(line) && !/^note\b/.test(line)) {
-      refused.push(where + '`;` separates two statements on one line; write one statement per line')
+    // One statement per line is the rule; a line holding two is refused by name, never drawn as one element named after the rest of it.
+    const separated = statementSeparator(line, where)
+    if (separated !== undefined) {
+      refused.push(separated.message)
       return
     }
     // A declaration states its elements and what decorates them; the rules are in one module so each can be asked about one line.

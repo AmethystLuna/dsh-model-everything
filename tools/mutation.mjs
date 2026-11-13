@@ -60,6 +60,7 @@ const SUITES = [
   'tests/boundary/run.mjs',
   'tests/edge/run.mjs',
   'tests/note/run.mjs',
+  'tests/marked-edge/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -433,6 +434,13 @@ const MUTATIONS = [
     file: 'src/render/plantuml-note.ts',
     from: "      hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,",
     to: "      hint: side === 'top' ? 'down' : side === 'bottom' ? 'up' : side,",
+  },
+  {
+    id: 'M50',
+    what: 'a hidden edge is drawn',
+    file: 'src/render/plantuml-marked-edge.ts',
+    from: '      invisible: true,',
+    to: '      invisible: false as unknown as true,',
   },
 ]
 
