@@ -104,6 +104,7 @@ const SUITES = [
   'tests/schema-registry/run.mjs',
   'tests/export-artifacts/run.mjs',
   'tests/client-bundle/run.mjs',
+  'tests/packaging/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -848,6 +849,13 @@ const MUTATIONS = [
     file: 'scripts/build-client.mjs',
     from: "const PACKAGE = 'dsh-model-everything'",
     to: "const PACKAGE = 'model-everything'",
+  },
+  {
+    id: 'M103',
+    what: 'the suites ship with the package',
+    file: 'package.json',
+    from: '"files": [',
+    to: '"files": [\n    "tests",',
   },
 ]
 
