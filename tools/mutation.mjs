@@ -80,6 +80,7 @@ const SUITES = [
   'tests/intent/run.mjs',
   'tests/check-status/run.mjs',
   'tests/summary-counters/run.mjs',
+  'tests/edit-refusals/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -656,6 +657,13 @@ const MUTATIONS = [
     file: 'src/engine.ts',
     from: "  checksRun: checks.filter((check) => check.status !== 'skip').length,",
     to: "  checksRun: checks.length,",
+  },
+  {
+    id: 'M79',
+    what: 'a refused edit writes the batch anyway',
+    file: 'src/editor.ts',
+    from: "  if (!validation.ok && options.allowInvalid !== true) {",
+    to: '  if (false) {',
   },
 ]
 
