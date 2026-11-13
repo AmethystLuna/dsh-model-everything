@@ -177,6 +177,7 @@
     "design-engine",
     "diagram",
     "diagram-card",
+    "diagram-diff",
     "diff-claims",
     "diff-families",
     "diff-next-steps",
