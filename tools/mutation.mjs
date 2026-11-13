@@ -108,6 +108,7 @@ const SUITES = [
   'tests/tarball/run.mjs',
   'tests/locale-pairs/run.mjs',
   'tests/gate-text/run.mjs',
+  'tests/examples/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -880,6 +881,13 @@ const MUTATIONS = [
     file: 'src/gate.ts',
     from: "  const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '` |')",
     to: "  const rows = skills.map((skill) => '| ' + (SKILL_ROWS[skill] ?? 'see its catalog line') + ' | `' + skill + '-x` |')",
+  },
+  {
+    id: 'M107',
+    what: 'the over-budget example fits inside its budget',
+    file: 'examples/control-dispatcher.overbudget.json',
+    from: '      "budget": 100',
+    to: '      "budget": 100000',
   },
 ]
 

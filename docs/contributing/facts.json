@@ -186,6 +186,7 @@
     "edit-ops",
     "edit-refusals",
     "engine",
+    "examples",
     "export-artifacts",
     "export-warnings",
     "exporters",
