@@ -46,9 +46,13 @@ test('a failing card names the first error on its second line', () => {
 test('a diff card leads with the delta, not with the current verdict', () => {
   // The same rule the text body follows: the delta is what the card is about, and the current run is context.
   const delta = diffReports(runVerification(BROKEN), runVerification(MACHINE))
+  if (delta.removed.length === 0) throw new Error('the fixture removed nothing, so the numbers cannot prove anything')
   const head = textOf(presentation.diffCardBlocks(presentation.reportCard(delta, 'report_diff'))).split('\n')[0]
   if (!/added \d+/.test(head) || !/removed \d+/.test(head)) throw new Error('the head line is: ' + head.slice(0, 80))
-  if (/^PASS\b|^FAIL\b/.test(head) && !/added/.test(head)) throw new Error('the head line leads with the verdict')
+  // The numbers have to be the report's, not a default: a card that says `removed 0` for a delta of three reads as "nothing changed".
+  if (!new RegExp('removed ' + String(delta.removed.length) + '\\b').test(head)) {
+    throw new Error('the head line says something else: ' + head.slice(0, 80))
+  }
 })
 
 test('a card says something about the next step', () => {
