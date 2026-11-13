@@ -43,6 +43,17 @@ const SUITES = [
   'tests/skill-table/run.mjs',
   'tests/blocks/run.mjs',
   'tests/clearance/run.mjs',
+  // The policy suites: pure arithmetic over points and rectangles, so they cost little and each one decides a pass that a
+  // mutation can break.
+  'tests/names/run.mjs',
+  'tests/jog/run.mjs',
+  'tests/separate/run.mjs',
+  'tests/lift/run.mjs',
+  'tests/repair/run.mjs',
+  'tests/ports/run.mjs',
+  'tests/labels/run.mjs',
+  'tests/cycle-break/run.mjs',
+  'tests/routing/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -327,6 +338,50 @@ const MUTATIONS = [
 const argument = process.argv[2]
 // A mutation is only caught if the suite that would catch it runs. The suite list below is a fast subset of
 // `test:engine`, so this mode prints what it leaves out - the places where a mutation could go unnoticed.
+// The suites the drawing mutations cannot reach, and why: a mutation rewrites the painter or a reader, and these suites look at
+// something else - the report contract, the tool surface, the skills - so running them for every mutation would cost minutes and
+// decide nothing. The list is here so `--audit` can say which of the two a missing suite is.
+const NOT_DRAWING = new Set([
+  'tests/engine/run.mjs',
+  'tests/design-engine/run.mjs',
+  'tests/catalog/run.mjs',
+  'tests/data-engine/run.mjs',
+  'tests/concurrency/run.mjs',
+  'tests/uml/run.mjs',
+  'tests/apply-smoke.mjs',
+  'tests/memory/run.mjs',
+  'tests/skills/run.mjs',
+  'tests/gate/run.mjs',
+  'tests/skill-routing/run.mjs',
+  'tests/toolset/run.mjs',
+  'tests/principles/run.mjs',
+  'tests/feature-checklist/run.mjs',
+  'tests/usage/run.mjs',
+  'tests/translation/run.mjs',
+  'tests/documentation/run.mjs',
+  'tests/contributing/run.mjs',
+  'tests/routing-map/run.mjs',
+  'tests/report-reading/run.mjs',
+  'tests/structure/run.mjs',
+  'tests/automaton/run.mjs',
+  'tests/client/run.mjs',
+  'tests/layering/run.mjs',
+  'tests/coords/run.mjs',
+  'tests/components/run.mjs',
+  'tests/placement/run.mjs',
+  'tests/presentation/run.mjs',
+  'tests/tool-routing/run.mjs',
+  'tests/tools/run.mjs',
+  'tests/baseline/run.mjs',
+  'tests/granularity/run.mjs',
+  'tests/exporters/run.mjs',
+  'tests/report-view/run.mjs',
+  'tests/contracts/run.mjs',
+  'tests/tool-boundary/run.mjs',
+  'tests/negatives/run.mjs',
+  'tests/external/run.mjs',
+])
+
 if (argument === '--audit') {
   const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
   const engine = String(pkg.scripts['test:engine'] ?? '')
@@ -334,7 +389,7 @@ if (argument === '--audit') {
   const missing = all.filter((suite) => !SUITES.includes(suite))
   console.log('on the mutation run list:', SUITES.length)
   console.log('not on it:', missing.length)
-  for (const suite of missing) console.log('  ' + suite)
+  for (const suite of missing) console.log('  ' + suite + (NOT_DRAWING.has(suite) ? '   (not a drawing suite)' : '   <-- drawing suite, add it'))
   process.exit(0)
 }
 

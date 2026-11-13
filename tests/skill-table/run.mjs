@@ -24,11 +24,14 @@ const rows = ['PlantUML elements', 'PlantUML boundaries', 'PlantUML edges', 'Pla
 const cell = (label) => {
   const line = skill.split('\n').find((entry) => entry.startsWith('| ' + label + ' |'))
   if (line === undefined) throw new Error('no row for ' + label)
-  const parts = line.split('|').map((part) => part.trim())
+  // A table cell can carry an escaped pipe (`-->\\|text\\|`), so the split has to respect it or the columns shift.
+  const parts = line.split(/(?<!\\)\|/).map((part) => part.trim())
   return { drawn: parts[2] ?? '', refused: parts[3] ?? '' }
 }
 
 const symbols = (text) => [...text.matchAll(/`([a-z]+)`/g)].map((match) => match[1])
+/** Any backticked token, camel case included: `sequenceDiagram` is a keyword as much as `cloud` is. */
+const tokens = (text) => [...text.matchAll(/`([A-Za-z][\w-]*)`/g)].map((match) => match[1])
 
 // The parser's own words: the shapes it draws, the names it refuses, and the sequence statements it refuses.
 const shapeNames = new Set([...parser.matchAll(/^\s{2}([a-z]+): '[a-z]+',$/gm)].map((match) => match[1]))
@@ -97,6 +100,29 @@ test('every keyword the table names behaves the way the table says', async () =>
     const source = ['@startuml', name + ' Sample', '@enduml'].join('\n')
     const refused = render({ source }, {}, { scheme: 'default' })
     if (refused.refused.length === 0) failuresHere.push('`' + name + '` is claimed refused but the line was not refused')
+  }
+  if (failuresHere.length > 0) throw new Error(failuresHere.join(' | '))
+})
+
+// The Mermaid row is prose, so the same questions are asked of the tokens that carry a behaviour: a refused family is refused, and a
+// drawn edge kind draws an edge.
+test('every Mermaid token the table names behaves the way the table says', async () => {
+  const { render } = await import('../../lib/render/index.js')
+  const row = cell('Mermaid')
+  const failuresHere = []
+  const families = tokens(row.refused).filter((name) => /diagram|chart|graph/i.test(name))
+  if (families.length === 0) throw new Error('no diagram families were read from the table')
+  for (const family of families) {
+    const source = family === 'gantt' || family === 'pie' || family === 'journey' || family === 'mindmap' || family === 'timeline' || family === 'quadrantChart' || family === 'gitGraph'
+      ? family
+      : family + '\n  a --> b'
+    const refused = render({ source, notation: 'mermaid' }, {}, { scheme: 'default' })
+    if (refused.refused.length === 0) failuresHere.push('`' + family + '` is claimed refused but the source was not refused')
+  }
+  const edges = { '-->': 'arrow', '---': 'line', '-.->': 'dotted' }
+  for (const edge of Object.keys(edges)) {
+    const drawn = render({ source: ['flowchart TD', 'a ' + edge + ' b'].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+    if (drawn.diagram.edges.length !== 1) failuresHere.push('`' + edge + '` is claimed drawn but drew ' + String(drawn.diagram.edges.length) + ' edge(s)')
   }
   if (failuresHere.length > 0) throw new Error(failuresHere.join(' | '))
 })
