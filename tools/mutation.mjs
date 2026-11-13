@@ -112,6 +112,7 @@ const SUITES = [
   'tests/diagram-card/run.mjs',
   'tests/diagram-diff/run.mjs',
   'tests/reading-shapes/run.mjs',
+  'tests/diagram-review/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
 ]
@@ -942,6 +943,13 @@ const MUTATIONS = [
     file: 'src/editor.ts',
     from: "    changes.push({ kind: 'updated', what: 'set ' + String(operation.path), detail: 'to ' + describeValue(operation.value) })",
     to: "    changes.push({ kind: 'updated', what: 'set ' + String(operation.path), detail: '' })",
+  },
+  {
+    id: 'M115',
+    what: 'the widest boundary is measured and never compared with its budget',
+    file: 'src/granularity.ts',
+    from: 'B1_GROUP_TOO_WIDE',
+    to: 'B1_GROUP_TOO_WIDE_UNUSED',
   },
 ]
 
