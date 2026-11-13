@@ -86,6 +86,7 @@ const SUITES = [
   'tests/diff-next-steps/run.mjs',
   'tests/compose-inputs/run.mjs',
   'tests/datamodel-inputs/run.mjs',
+  'tests/des-vs-uml/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -704,6 +705,13 @@ const MUTATIONS = [
     file: 'src/data-engine.ts',
     from: '    if (!afterPaths.has(mapped) && !migrationFrom.has(path)) {',
     to: '    if (false) {',
+  },
+  {
+    id: 'M85',
+    what: 'the design review stops naming its own cycle code',
+    file: 'src/design-engine.ts',
+    from: "code: 'DES1_CYCLE',",
+    to: "code: 'UML022_CYCLE',",
   },
 ]
 

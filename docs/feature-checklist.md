@@ -158,6 +158,7 @@ node tests/diff-families/run.mjs
 node tests/diff-next-steps/run.mjs
 node tests/compose-inputs/run.mjs
 node tests/datamodel-inputs/run.mjs
+node tests/des-vs-uml/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -258,6 +259,7 @@ And the gates around it:
 | `diff-next-steps` | 5 | every state says something to do |
 | `compose-inputs` | 6 | without the three inputs the composition passes and says nothing |
 | `datamodel-inputs` | 4 | the regression checks join the roster only when beforeModel is supplied |
+| `des-vs-uml` | 4 | the drawing tool reports the graph codes and none of the design codes |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
