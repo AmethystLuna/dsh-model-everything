@@ -179,6 +179,34 @@ metadata:
 | 门禁命令 | 95 |
 | 变异点 | 91 |
 
+## 3.8 第六段：投影必须相等（第 136–139 轮）
+
+同一份报告有几种面孔：**卡片**（`reportCard`，UI 先看到的）、**正文**（`renderReportText`，模型读的）、**full 视图**（整份 JSON）。三者不能各说各话，
+否则“读了卡片的人”和“读了正文的人”会得出相反结论，而两边都自称在复述同一份报告。
+
+| 相等关系 | 守卫 |
+|---|---|
+| 卡片的 `verdict`/计数/`first` == 报告的 | `tests/card-contract` |
+| 卡片上的每个指针 == 已注册的工具 | `tests/card-contract` |
+| 只有 diff 卡片带 `delta` | `tests/card-contract` |
+| 正文首行 verdict == 卡片 verdict | `tests/card-vs-text` |
+| diff 两处都先讲 delta，`CURRENT` 单独一行 | `tests/card-vs-text` |
+| digest 与 full **结论相同**、digest 更短 | `tests/card-vs-text` |
+
+### 这一段修掉的缺陷：卡片凭空声称有 delta
+
+delta 无条件回退到 `report.summary`，而 summary 没有 delta 键，于是**每张卡片**都带 `added 0 / removed 0`——连普通验证报告也有。读者看到的是
+“与基线相比没有新增问题”，而根本没有基线。修法：只有当 summary 真的携带 delta 键时才回退。
+
+与第 118 轮 A3、第 128 轮 `CONCURRENCY_NO_CLAIM` 同族：**“没有发生的事”不能长得像“发生了且结果良好”**。
+
+### 第六段基线（第 140 轮实测）
+
+| 指标 | 数值 |
+|---|---|
+| 门禁命令 | 99 |
+| 变异点 | 95 |
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
