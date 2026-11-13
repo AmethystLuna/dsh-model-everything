@@ -59,6 +59,7 @@ const SUITES = [
   'tests/declaration/run.mjs',
   'tests/boundary/run.mjs',
   'tests/edge/run.mjs',
+  'tests/note/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -425,6 +426,13 @@ const MUTATIONS = [
     file: 'src/render/plantuml-edge.ts',
     from: '      dashed: true,',
     to: '      dashed: false,',
+  },
+  {
+    id: 'M49',
+    what: 'a note above a box is placed below it',
+    file: 'src/render/plantuml-note.ts',
+    from: "      hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,",
+    to: "      hint: side === 'top' ? 'down' : side === 'bottom' ? 'up' : side,",
   },
 ]
 

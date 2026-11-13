@@ -35,6 +35,7 @@ import { readPageLine } from './plantuml-page.js'
 import { readDeclaration } from './plantuml-declaration.js'
 import { readBoundary } from './plantuml-boundary.js'
 import { planArrow } from './plantuml-edge.js'
+import { readNote } from './plantuml-note.js'
 import {
   ARROW,
   BRACKET,
@@ -356,43 +357,19 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
 
-    // `note right of X : text` is a note *and* a position. The note is drawn; the position is honoured through the same
-    // machinery every other placement uses - a hidden edge with a direction hint - so the note lands beside X without a
-    // second layout rule. `note over X` is a position over the box, which no edge can express, and stays refused.
-    const placed = /^note\s+(left|right|top|bottom)\s+of\s+(.+?)(?:\s*:\s*(.+))?$/.exec(line)
-    if (placed !== null) {
-      const target = reference(placed[2] as string)
-      const text = (placed[3] ?? '').trim()
-      if (text === '') {
-        refused.push(where + '`' + line + '` names no text: a note beside a box needs its words on the same line')
+    // A note places itself beside a box through the same hidden edge every other placement uses; what the line states is decided in
+    // one module, so each of its three answers can be asked without a drawing.
+    const note = readNote(line, where)
+    if (note !== undefined) {
+      if (note.kind === 'refused') {
+        refused.push(note.message)
         return
       }
-      const noteId = 'note-' + target.id
-      ensure(builder, target.id, target.label, target.shape, true)
-      ensure(builder, noteId, text, 'note', true)
-      const side = placed[1] as 'left' | 'right' | 'top' | 'bottom'
-      // The hint is stated from the box's side: `-right->` puts the far box on the right, so the note is always the far
-      // end and the box the near one, whichever side the source named.
-      builder.edges.push({
-        from: target.id,
-        to: noteId,
-        label: '',
-        hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,
-        invisible: true,
-      })
+      ensure(builder, note.target.id, note.target.label, note.target.shape, true)
+      ensure(builder, note.noteId, note.text, 'note', true)
+      builder.edges.push({ from: note.target.id, to: note.noteId, label: '', hint: note.hint, invisible: true })
       builder.edgeLines.push(index + 1)
       builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
-      return
-    }
-    // `note right: text` attaches to whatever box came last, which is a reader's reading order, not a statement the source
-    // makes: the drawing does not know which box is meant. The explicit form names it.
-    if (/^note\s+(left|right|top|bottom)\s*:/.test(line)) {
-      refused.push(where + '`' + line.split(':')[0] + '`: a note attached to the last box names no box; `note right of X : text` does')
-      return
-    }
-
-    if (/^note\s+over\b/.test(line)) {
-      refused.push(where + '`' + line.split(/\s+/).slice(0, 3).join(' ') + '`: a note over a box is a position this renderer cannot draw')
       return
     }
 

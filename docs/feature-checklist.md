@@ -179,6 +179,7 @@ node tests/directives/run.mjs
 node tests/declaration/run.mjs
 node tests/boundary/run.mjs
 node tests/edge/run.mjs
+node tests/note/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -227,7 +228,7 @@ And the gates around it:
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 105 | a flowchart becomes boxes and labelled arrows |
-| `plantuml-corpus` | 55 | left to right direction lays the chain out along a row |
+| `plantuml-corpus` | 56 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 177 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
@@ -252,6 +253,7 @@ And the gates around it:
 | `declaration` | 7 | a plain declaration declares one element with its own name |
 | `boundary` | 6 | a closing brace closes, and nothing else does |
 | `edge` | 4 | an arrow between two elements is an edge with its two ends |
+| `note` | 7 | a note beside a box names the box, its text and its side |
 | `presentation` | 58 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
