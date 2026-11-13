@@ -110,6 +110,7 @@ const SUITES = [
   'tests/gate-text/run.mjs',
   'tests/examples/run.mjs',
   'tests/diagram-card/run.mjs',
+  'tests/version/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -896,6 +897,13 @@ const MUTATIONS = [
     file: 'src/diagram-render-tool.ts',
     from: "        caption: typeof result.caption === 'string' ? result.caption : '',",
     to: "        caption: typeof result.caption === 'string' ? result.caption : '',\n        verdict: 'pass',",
+  },
+  {
+    id: 'M109',
+    what: 'one manifest declares a different version',
+    file: 'package-lock.json',
+    from: '"version": "0.6.4",',
+    to: '"version": "0.6.3",',
   },
 ]
 
