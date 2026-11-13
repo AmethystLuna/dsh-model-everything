@@ -22,6 +22,7 @@
 
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode } from './model.js'
 import { readNode } from './mermaid-node.js'
+import { readChain } from './mermaid-chain.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -288,6 +289,37 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       ensure(builder, to)
       // A transition is the same statement as PlantUML's `-->`: an association.
       push({ from, to, label, arrow: 'association' })
+      return
+    }
+
+    // A line can state several connections: a chain, or a group of endpoints joined by `&`. Each is read into an edge of its own, and
+    // the endpoints go through the same node reader a single connection uses.
+    const chain = readChain(line)
+    if (chain !== undefined) {
+      // A node is written the first time the line names it, in the order the line names it: sources first, then targets. Ensuring both
+      // ends inside the edge loop put `c` between `a` and `b` for `a & b --> c`, which moved boxes the source never moved.
+      const ends = chain.map((link) => ({ from: nodeFrom(link.from), to: nodeFrom(link.to) }))
+      for (const end of ends) {
+        if (end.from === undefined || end.to === undefined) {
+          refused.push(where + '`' + line + '` names a connection between things that are not nodes')
+          return
+        }
+      }
+      for (const end of ends) ensure(builder, (end.from as NonNullable<typeof end.from>).id, (end.from as NonNullable<typeof end.from>).label, (end.from as NonNullable<typeof end.from>).shape)
+      for (const end of ends) ensure(builder, (end.to as NonNullable<typeof end.to>).id, (end.to as NonNullable<typeof end.to>).label, (end.to as NonNullable<typeof end.to>).shape)
+      const shapes = []
+      for (const [index, link] of chain.entries()) {
+        const from = ends[index]?.from as NonNullable<ReturnType<typeof nodeFrom>>
+        const to = ends[index]?.to as NonNullable<ReturnType<typeof nodeFrom>>
+        shapes.push({
+          from: from.id,
+          to: to.id,
+          label: link.label ?? '',
+          ...(link.arrow === '-.->' ? { dashed: true } : {}),
+          ...(link.arrow === '==>' ? { arrow: 'association' as const } : {}),
+        })
+      }
+      for (const edge of shapes) push(edge)
       return
     }
 

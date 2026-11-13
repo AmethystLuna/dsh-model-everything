@@ -184,6 +184,7 @@ node tests/marked-edge/run.mjs
 node tests/resolve/run.mjs
 node tests/page-blocks/run.mjs
 node tests/mermaid-node/run.mjs
+node tests/mermaid-chain/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -262,6 +263,7 @@ And the gates around it:
 | `resolve` | 4 | an arrow name that a block owns becomes the block, and the box is not drawn twice |
 | `page-blocks` | 7 | a legend block is collected and its lines are skipped |
 | `mermaid-node` | 5 | each delimiter pair is one shape, and the label loses its delimiters |
+| `mermaid-chain` | 7 | a chain is one connection per pair, in order |
 | `presentation` | 58 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

@@ -64,6 +64,7 @@ const SUITES = [
   'tests/resolve/run.mjs',
   'tests/page-blocks/run.mjs',
   'tests/mermaid-node/run.mjs',
+  'tests/mermaid-chain/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -528,6 +529,13 @@ const MUTATIONS = [
     file: 'src/render/mermaid-node.ts',
     from: "  [/^\\(\\[(.+)\\]\\)$/, 'stadium'],",
     to: "  [/^\\(\\[(.+)\\]\\)$/, 'rect'],",
+  },
+  {
+    id: 'M63',
+    what: 'an ampersand splits a label as if it were a separator',
+    file: 'src/render/mermaid-chain.ts',
+    from: "    if (char === '&' && depth === 0) {",
+    to: "    if (char === '&') {",
   },
 ]
 
