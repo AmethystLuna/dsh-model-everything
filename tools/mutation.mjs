@@ -269,6 +269,21 @@ const MUTATIONS = [
     from: '      if (open !== undefined && depth > 0) {',
     to: '      if (false) {',
   },
+
+  {
+    id: 'M31',
+    what: 'a bracketed subgraph label keeps its brackets',
+    file: 'src/render/from-mermaid.ts',
+    from: '        spelled !== null',
+    to: '        false',
+  },
+  {
+    id: 'M32',
+    what: 'a direction inside a subgraph is refused again',
+    file: 'src/render/from-mermaid.ts',
+    from: '    if (/^direction\\s+(tb|td|bt|lr|rl)\\b/i.test(line) && builder.open.length > 0) {',
+    to: '    if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
