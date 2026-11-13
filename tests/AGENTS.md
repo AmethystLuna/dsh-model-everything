@@ -69,6 +69,22 @@ has exactly one right answer.
 5. **Every code gets a negative case** in `tests/negatives/run.mjs`: take the positive shape
    and put one condition right. Absence of the code is the assertion.
 
+## Read the answer before asserting it
+
+The most common way a new case fails here is not a defect in the engine: it is a case written from what the
+author expected. Three in one phase: `intent` was assumed to modify the report (it only refuses an impossible
+pairing); DD1-DD4 were assumed to sit on the roster as `skip` when no before model is supplied (they are absent,
+as D1-D4 are); and an added warning was assumed to leave the delta verdict at `pass` (it moves it to
+`pass_with_findings`).
+
+So: **run the thing once and read what it returns, then write the assertion.** A case written from memory pins
+the author's belief, and it fails for the wrong reason on the first run - or worse, passes because the belief
+happened to be looser than the behaviour.
+
+The same rule decides what to do when the reading contradicts the documentation: if the behaviour is deliberate
+and documented (a comment, a neighbour family doing the same), pin the behaviour and record why. If it is not,
+the reading is a finding, not a test.
+
 ## The contract snapshot
 
 `tests/contracts/run.mjs` builds a report for each case in a fixed corpus, reduces it to what

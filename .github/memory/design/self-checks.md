@@ -105,6 +105,37 @@ metadata:
 | M74 | 套件没进变异运行名单 | 未命中时**先查名单**（已加开跑前警告） |
 | M77 | 用例写在 `tests/engine`，而它不在运行名单 | 断言要放在**会跑**的套件里；第 118 轮因此新建 `tests/check-status` |
 
+## 3.5 第三段：四个“输入是否装饰”的面（第 121–126 轮）
+
+| 面 | 守门套件 | 它钉住的东西 |
+|---|---|---|
+| 导出 | `tests/export-warnings` | 每种格式点名它翻译不了的性质；**PRISM 能表达概率，所以它不得为概率报警** |
+| diff 的家族边界 | `tests/diff-families` | 不同 schema 的报告拒收；部分报告刻意接受 |
+| diff 的建议 | `tests/diff-next-steps` | 四种 delta 各有说法，“干净但当前仍失败”必须说出来 |
+| 组合的可选输入 | `tests/compose-inputs` | `rendezvous`→C2、`shared`+`accesses`→C4/C5、未声明的锁→C3 |
+| 数据模型的回归输入 | `tests/datamodel-inputs` | 无 `beforeModel` 时 DD 不在名单（跳过原因写在 DA5）；映射只降级 error、不抹掉 `DD3` |
+
+### 这一段的教训：**先读答案，再写断言**
+
+这六轮里我有**五次**把“我以为的行为”写成断言，每次都是用例先红、代码没错：
+
+| 我以为 | 实际 |
+|---|---|
+| `intent` 会改报告 | 它只拒收服务不了的配对 |
+| 无 `beforeModel` 时 DD1–DD4 是 `skip` | 它们**不在名单**（`model_verify` 的 D1–D4 同） |
+| 新增 warning 后 delta 仍是 `pass` | 变成 `pass_with_findings` |
+| 空块消息含 “nothing inside it” | 是 “nothing **drawn** inside it” |
+| diff 的 added 条目在 `after.severity` 里 | `severity` 就在条目上 |
+
+规则已写进 `tests/AGENTS.md`：**先跑一次、读返回、再写断言**。若读数与文档冲突，而文档说这是刻意的（有注释、邻居家族同样），就**钉住行为并记录理由**；否则读数就是一条 finding，不是一条测试。
+
+### 第三段基线（第 126 轮实测）
+
+| 指标 | 数值 |
+|---|---|
+| 门禁命令 | 88 |
+| 变异点 | 84 |
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
