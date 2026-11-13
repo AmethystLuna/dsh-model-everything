@@ -68,6 +68,7 @@ const SUITES = [
   'tests/uml-families/run.mjs',
   'tests/uml-capability/run.mjs',
   'tests/uml-docs/run.mjs',
+  'tests/report-contract/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -560,6 +561,13 @@ const MUTATIONS = [
     file: 'src/uml-syntax.ts',
     from: "    if (support.fidelity === 'approximate') {",
     to: '    if (false) {',
+  },
+  {
+    id: 'M67',
+    what: 'a failing verdict names no failing code',
+    file: 'src/engine.ts',
+    from: "  verdictReason: String(errors) + ' error finding(s)' + (firstCode === undefined ? '' : ' (first error: ' + firstCode + ')'),",
+    to: "  verdictReason: String(errors) + ' error finding(s)',",
   },
 ]
 
