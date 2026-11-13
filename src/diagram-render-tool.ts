@@ -108,6 +108,8 @@ export const diagramRenderTool = defineTool({
     const source = typeof args.source === 'string' ? args.source : ''
     if (source.trim() === '') {
       // One shape for every answer, so the output contract has nothing to special-case.
+      // One shape for every answer, so the output contract has nothing to special-case: the fields a successful render adds are present here
+      // with neutral values, rather than missing and read as `undefined` by whatever consumes them.
       return {
         ok: false,
         notation: 'mermaid',
@@ -116,7 +118,11 @@ export const diagramRenderTool = defineTool({
         groups: 0,
         caption: 'no source',
         refused: ['source is empty: pass the diagram text to draw'],
+        ignored: [],
         dropped: 0,
+        labelCollisions: 0,
+        width: 0,
+        height: 0,
         svg: '',
       }
     }

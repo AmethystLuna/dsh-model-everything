@@ -109,6 +109,7 @@ const SUITES = [
   'tests/locale-pairs/run.mjs',
   'tests/gate-text/run.mjs',
   'tests/examples/run.mjs',
+  'tests/diagram-card/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -888,6 +889,13 @@ const MUTATIONS = [
     file: 'examples/control-dispatcher.overbudget.json',
     from: '      "budget": 100',
     to: '      "budget": 100000',
+  },
+  {
+    id: 'M108',
+    what: 'a drawing card answers a verdict',
+    file: 'src/diagram-render-tool.ts',
+    from: "        caption: typeof result.caption === 'string' ? result.caption : '',",
+    to: "        caption: typeof result.caption === 'string' ? result.caption : '',\n        verdict: 'pass',",
   },
 ]
 

@@ -181,6 +181,7 @@ node tests/tarball/run.mjs
 node tests/locale-pairs/run.mjs
 node tests/gate-text/run.mjs
 node tests/examples/run.mjs
+node tests/diagram-card/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -304,6 +305,7 @@ And the gates around it:
 | `locale-pairs` | 3 | both languages of every card name the same keys |
 | `gate-text` | 5 | the message was rendered from shipped skills, so the checks below mean something |
 | `examples` | 6 | the directory holds examples, so the cases below have something to read |
+| `diagram-card` | 5 | a drawing card carries the source it was drawn from |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
