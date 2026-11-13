@@ -122,7 +122,13 @@ export function reportCard(value: unknown, family: string): ReportCard {
   const first = errors[0] ?? warnings[0]
   const next = array(report.nextSteps).map((step) => String(step))[0]
   const route = routeFor(family)
-  const deltaSummary = record(record(report.reportDelta)?.summary) ?? record(report.summary)
+  // A plain report's summary has no delta keys. Falling back to it unconditionally put a zeroed delta on every card - `added 0, removed 0`
+  // on a report nothing was compared against, which reads as "nothing new since the baseline". The fallback is for a diff report whose
+  // summary is itself the delta, so it applies only when the summary actually carries one.
+  const summaryForDelta = record(report.summary)
+  const summaryCarriesDelta =
+    summaryForDelta !== undefined && ['added', 'removed', 'changed', 'addedErrors'].some((key) => key in summaryForDelta)
+  const deltaSummary = record(record(report.reportDelta)?.summary) ?? (summaryCarriesDelta ? summaryForDelta : undefined)
   const delta = deltaSummary === undefined
     ? undefined
     : {

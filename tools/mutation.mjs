@@ -95,6 +95,7 @@ const SUITES = [
   'tests/ports-sides/run.mjs',
   'tests/text-wrap/run.mjs',
   'tests/row-spacing/run.mjs',
+  'tests/card-contract/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -776,6 +777,13 @@ const MUTATIONS = [
     file: 'src/render/place.ts',
     from: 'const NODE_GAP = 30',
     to: 'const NODE_GAP = 0',
+  },
+  {
+    id: 'M94',
+    what: 'a card carries a zeroed delta for a report nothing was compared against',
+    file: 'src/presentation.ts',
+    from: "    summaryForDelta !== undefined && ['added', 'removed', 'changed', 'addedErrors'].some((key) => key in summaryForDelta)",
+    to: '    summaryForDelta !== undefined',
   },
 ]
 
