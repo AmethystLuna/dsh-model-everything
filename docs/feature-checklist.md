@@ -178,6 +178,7 @@ node tests/arrows/run.mjs
 node tests/directives/run.mjs
 node tests/declaration/run.mjs
 node tests/boundary/run.mjs
+node tests/edge/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -250,6 +251,7 @@ And the gates around it:
 | `directives` | 13 | a preprocessor directive is dropped with a reason |
 | `declaration` | 7 | a plain declaration declares one element with its own name |
 | `boundary` | 6 | a closing brace closes, and nothing else does |
+| `edge` | 4 | an arrow between two elements is an edge with its two ends |
 | `presentation` | 58 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

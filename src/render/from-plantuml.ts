@@ -34,6 +34,7 @@ import { isTogetherOpener, readDirective } from './plantuml-directives.js'
 import { readPageLine } from './plantuml-page.js'
 import { readDeclaration } from './plantuml-declaration.js'
 import { readBoundary } from './plantuml-boundary.js'
+import { planArrow } from './plantuml-edge.js'
 import {
   ARROW,
   BRACKET,
@@ -404,24 +405,16 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
         refused.push(where + arrow)
         return
       }
-      // `X --> [*]` leaves the machine. Read as an endpoint it would draw a box called `*`, so it is the exit
-      // marker instead: the same self-loop the Mermaid adapter draws, labelled `end`. The start marker is the
-      // case above.
-      if (arrow.to.id === '*') {
-        ensure(builder, arrow.from.id, arrow.from.label, arrow.from.shape, true)
-        builder.edges.push({ from: arrow.from.id, to: arrow.from.id, label: arrow.label === '' ? 'end' : arrow.label, dashed: true })
-        builder.edgeLines.push(index + 1)
-        builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
-        return
-      }
-      ensure(builder, arrow.from.id, arrow.from.label, arrow.from.shape, true)
-      ensure(builder, arrow.to.id, arrow.to.label, arrow.to.shape, true)
+      // What the arrow means is decided in one module: an endpoint, or the machine's exit. The writes below are the same for both.
+      const effect = planArrow(arrow)
+      ensure(builder, effect.from.id, effect.from.label, effect.from.shape, true)
+      if (!effect.exit) ensure(builder, effect.to.id, effect.to.label, effect.to.shape, true)
       builder.edges.push({
-        from: arrow.from.id,
-        to: arrow.to.id,
-        label: arrow.label,
-        ...(arrow.dashed ? { dashed: true } : {}),
-        arrow: arrow.arrow,
+        from: effect.from.id,
+        to: effect.to.id,
+        label: effect.label,
+        ...(effect.dashed === undefined ? {} : { dashed: true }),
+        ...(effect.arrow === undefined ? {} : { arrow: effect.arrow as EdgeArrow }),
       })
       builder.edgeLines.push(index + 1)
       builder.edgeScopes.push(builder.open[builder.open.length - 1]?.id)
