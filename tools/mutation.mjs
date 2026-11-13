@@ -91,6 +91,7 @@ const SUITES = [
   'tests/review-vs-verify/run.mjs',
   'tests/edit-ops/run.mjs',
   'tests/route-causality/run.mjs',
+  'tests/layout-growth/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -744,6 +745,13 @@ const MUTATIONS = [
     file: 'src/render/route.ts',
     from: '  const others = obstacles.filter((box) => box !== from && box !== to)',
     to: '  const others: Obstacle[] = []',
+  },
+  {
+    id: 'M90',
+    what: 'the ranks have no gap, so a taller box sits against the next one',
+    file: 'src/render/place.ts',
+    from: 'const LAYER_GAP = 44',
+    to: 'const LAYER_GAP = 0',
   },
 ]
 

@@ -163,6 +163,7 @@ node tests/scan-vs-compose/run.mjs
 node tests/review-vs-verify/run.mjs
 node tests/edit-ops/run.mjs
 node tests/route-causality/run.mjs
+node tests/layout-growth/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -268,6 +269,7 @@ And the gates around it:
 | `review-vs-verify` | 3 | a model that is thin as a drawing and sound as a machine gets two different answers |
 | `edit-ops` | 7 | addState appends the state and reports it |
 | `route-causality` | 4 | with nothing between them the route is a straight line and says so |
+| `layout-growth` | 4 | a longer label grows its box and pushes the next rank down by the difference |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
