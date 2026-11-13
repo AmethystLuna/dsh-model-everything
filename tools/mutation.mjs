@@ -56,6 +56,7 @@ const SUITES = [
   'tests/routing/run.mjs',
   'tests/arrows/run.mjs',
   'tests/directives/run.mjs',
+  'tests/declaration/run.mjs',
 ]
 
 const MUTATIONS = [
