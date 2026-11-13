@@ -692,10 +692,10 @@ const MUTATIONS = [
   },
   {
     id: 'M83',
-    what: 'a rendezvous nobody can fire is not reported',
+    what: 'a rendezvous nobody can fire is not reported as unresolved',
     file: 'src/engine.ts',
-    from: "      code: 'C2_RENDEZVOUS_UNRESOLVED',",
-    to: "      code: 'C2_RENDEZVOUS_UNRESOLVED_DISABLED',",
+    from: "const unresolvedCount = c2Findings.filter((finding) => finding.code === 'C2_RENDEZVOUS_UNRESOLVED').length",
+    to: "const unresolvedCount = c2Findings.filter((finding) => finding.code === 'never').length",
   },
 ]
 
