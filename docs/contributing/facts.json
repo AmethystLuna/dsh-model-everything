@@ -240,6 +240,7 @@
     "structure",
     "suite-registry",
     "summary-counters",
+    "tarball",
     "text-wrap",
     "tool-boundary",
     "tool-defaults",

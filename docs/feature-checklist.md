@@ -177,6 +177,7 @@ node tests/schema-registry/run.mjs
 node tests/export-artifacts/run.mjs
 node tests/client-bundle/run.mjs
 node tests/packaging/run.mjs
+node tests/tarball/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -296,6 +297,7 @@ And the gates around it:
 | `export-artifacts` | 4 | a hostile identifier never reaches an artifact raw |
 | `client-bundle` | 4 | the bundle is a generated file and says so |
 | `packaging` | 5 | the two files the loader reads are in the package |
+| `tarball` | 2 | the tarball is named after this package and this version |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |

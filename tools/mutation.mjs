@@ -105,6 +105,7 @@ const SUITES = [
   'tests/export-artifacts/run.mjs',
   'tests/client-bundle/run.mjs',
   'tests/packaging/run.mjs',
+  'tests/tarball/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -856,6 +857,13 @@ const MUTATIONS = [
     file: 'package.json',
     from: '"files": [',
     to: '"files": [\n    "tests",',
+  },
+  {
+    id: 'M104',
+    what: 'the package name and the packed tarball disagree',
+    file: 'package.json',
+    from: '"name": "dsh-model-everything",',
+    to: '"name": "model-everything",',
   },
 ]
 
