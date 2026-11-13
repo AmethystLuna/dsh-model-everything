@@ -970,6 +970,29 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A Mermaid state diagram carries three constructs the PlantUML reader already had: a composite state, a state type, and a note
+// beside a state. Each was refused as a line the renderer could not draw, in one notation only.
+test('a Mermaid state keeps its composite, its type and its note', () => {
+  const composite = render({ source: ['stateDiagram-v2', '[*] --> Busy', 'state Busy {', '  [*] --> Inner', '}', 'Busy --> Done'].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+  if (composite.refused.length !== 0) throw new Error('composite refused: ' + JSON.stringify(composite.refused))
+  const group = (composite.diagram.groups ?? [])[0]
+  if (group?.label !== 'Busy' || JSON.stringify(group?.members) !== JSON.stringify(['Inner'])) throw new Error('group: ' + JSON.stringify(group))
+  if (!(composite.diagram.nodes ?? []).some((node) => node.id === 'Inner')) throw new Error('the inner state is missing')
+  // The composite state is the boundary: no box of the same name is drawn beside it.
+  if (composite.canvas.shapes.some((shape) => shape.kind === 'box' && shape.id === 'Busy')) throw new Error('a box and a boundary share the name Busy')
+  const typed = render({ source: ['stateDiagram-v2', 'state fork <<choice>>', '[*] --> fork'].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+  if (typed.refused.length !== 0) throw new Error('a state type was refused: ' + JSON.stringify(typed.refused))
+  if (typed.ignored.length !== 1 || !typed.ignored[0].includes('state type this renderer does not draw')) {
+    throw new Error('the type note: ' + JSON.stringify(typed.ignored))
+  }
+  const noted = render({ source: ['stateDiagram-v2', '[*] --> Busy', 'note right of Busy : queued'].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+  if (noted.refused.length !== 0) throw new Error('a placed note was refused: ' + JSON.stringify(noted.refused))
+  const note = (noted.diagram.nodes ?? []).find((node) => node.shape === 'note')
+  if (note?.label !== 'queued') throw new Error('the note: ' + JSON.stringify(note))
+  // The placement edge is hidden: the note is beside the state, not wired to it.
+  if (noted.canvas.shapes.some((shape) => shape.kind === 'path' || shape.kind === 'link')) throw new Error('the placement edge was drawn')
+})
+
 // A subgraph with nothing inside it has no rectangle, and the two notations answer alike: refused by its own line, not dropped
 // at paint time without a word.
 test('an empty subgraph is refused by its line, in either notation', () => {

@@ -164,7 +164,22 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       builder.open.push({ id, label: label === '' ? id : label, members: [] })
       return
     }
-    if (lower === 'end') {
+    if (mode === 'state') {
+      // `state Busy { ... }` is a composite state: a boundary whose contents are states, closed by a brace rather than `end`.
+      const composite = /^state\s+(?:["'](.+?)["']\s+as\s+)?([A-Za-z_][\w-]*)\s*\{\s*$/.exec(line)
+      if (composite !== null) {
+        const id = composite[2] as string
+        const label = (composite[1] as string | undefined) ?? id
+        // The composite state *is* the boundary: a state of the same name that a start marker or an edge already created is
+        // the same thing seen from outside, and keeping both drew a box and a rectangle with one name.
+        builder.nodes.delete(id)
+        openedAt.set(id, index + 1)
+        builder.open.push({ id, label, members: [] })
+        return
+      }
+    }
+
+    if (lower === 'end' || lower === '}') {
       const closed = builder.open.pop()
       if (closed !== undefined) {
         const container = builder.open[builder.open.length - 1]
@@ -189,6 +204,33 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
     }
 
     if (mode === 'state') {
+      // A state can be typed - `state fork <<choice>>`, `state X <<fork>>` - and nothing here draws a state type: it is stripped
+      // from the name and reported, the way a PlantUML stereotype is.
+      const typed = /^state\s+([A-Za-z_][\w-]*)\s*(<<[^<>]*>>)\s*$/.exec(line)
+      if (typed !== null) {
+        ensure(builder, typed[1] as string)
+        ignored.push(where + '`' + (typed[2] as string) + '` is a state type this renderer does not draw')
+        return
+      }
+      // `note right of X : text` names a side and a box, exactly as PlantUML's form does, and is placed the same way: a hidden
+      // edge carries the side, so the note lands beside the state without a second layout rule.
+      const placed = /^note\s+(left|right|top|bottom)\s+of\s+([A-Za-z_][\w-]*)\s*:\s*(.+)$/.exec(line)
+      if (placed !== null) {
+        const target = placed[2] as string
+        const noteId = 'note-' + target
+        ensure(builder, target)
+        ensure(builder, noteId, (placed[3] as string).trim(), 'note')
+        const side = placed[1] as string
+        builder.edges.push({
+          from: target,
+          to: noteId,
+          label: '',
+          hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,
+          invisible: true,
+        } as DiagramEdge)
+        return
+      }
+
       const alias = STATE_ALIAS.exec(line)
       if (alias !== null) {
         ensure(builder, alias[2], alias[1])
@@ -288,6 +330,10 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
     }
     return { diagram: emptyDiagram(title, 'no mermaid diagram found'), refused, ignored }
   }
+
+  // A composite state is the boundary, so any node of the same name an edge created is the same thing seen from outside.
+  // PlantUML resolves this the same way; keeping both drew a box and a rectangle with one name and crashed the painter.
+  for (const group of builder.groups) builder.nodes.delete(group.id)
 
   if (builder.nodes.size === 0) {
     if (refused.length === 0) {
