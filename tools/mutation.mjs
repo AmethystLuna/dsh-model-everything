@@ -114,6 +114,7 @@ const SUITES = [
   'tests/reading-shapes/run.mjs',
   'tests/diagram-review/run.mjs',
   'tests/diagram-out/run.mjs',
+  'tests/card-blocks/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
 ]
@@ -958,6 +959,13 @@ const MUTATIONS = [
     file: 'src/diagram-render-tool.ts',
     from: "        writeProblem = 'could not write ' + target + ': ' + reason.split('\\n')[0]",
     to: '        void writeProblem',
+  },
+  {
+    id: 'M117',
+    what: 'a diff card leads with the current verdict instead of the delta',
+    file: 'src/presentation.ts',
+    from: 'const delta = card.delta',
+    to: 'const delta = undefined',
   },
 ]
 
