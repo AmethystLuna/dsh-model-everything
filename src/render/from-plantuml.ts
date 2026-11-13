@@ -38,6 +38,7 @@ import { planArrow } from './plantuml-edge.js'
 import { readNote } from './plantuml-note.js'
 import { readMarked } from './plantuml-marked-edge.js'
 import { resolveBoundaries } from './plantuml-resolve.js'
+import { collectPageBlocks } from './plantuml-page-blocks.js'
 import {
   ARROW,
   BRACKET,
@@ -178,102 +179,20 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
   let seenAny = false
   let groupCount = 0
 
-  // Three kinds of block carry text that is not diagram source, and all three were collected by hand before the lines were
-  // parsed. They share the walking now; what differs is what a block means, which is each definition's business.
-  const legend: string[] = []
-  const inLegend = new Set<number>()
-  const pageBlocks: { header: string[]; footer: string[]; sourceCaption: string[] } = { header: [], footer: [], sourceCaption: [] }
-
-  const legendWalk = collectBlocks(lines, inLegend, {
-    skipOpening: true,
-    open: (line, index) => {
-      if (!/^legend\b/.test(line)) return undefined
-      const corner = /^legend\s+(left|right|top|bottom|center)/.exec(line)
-      if (corner !== null && corner[1] !== 'bottom') {
-        ignored.push('line ' + String(index + 1) + ': `' + line + '` asks for a corner: this renderer puts the legend under the drawing')
-      }
-      return { text: [] as string[] }
-    },
-    closes: (line) => /^end\s*legend\b/.test(line),
-    text: (state, line) => { state.text.push(line) },
-    close: (state) => { legend.push(...state.text) },
-  })
-
-  // The page text's block form. A one-line statement is the same block with one line in it, and the line form is read by the
-  // parser, so this walk only handles the form that spans lines.
-  const pageWalk = collectBlocks(lines, inLegend, {
-    skipOpening: true,
-    open: (line) => {
-      const opener = /^(header|footer|caption)\s*$/.exec(line)
-      if (opener === null) return undefined
-      const keyOf = { header: 'header', footer: 'footer', caption: 'sourceCaption' } as const
-      const key = keyOf[opener[1] as 'header' | 'footer' | 'caption']
-      return { key }
-    },
-    closes: (line, state) => new RegExp('^end\\s*' + (state.key === 'sourceCaption' ? 'caption' : state.key) + '\\b').test(line),
-    text: (state, line) => { pageBlocks[state.key].push(line) },
-    close: () => {},
-  })
-
-  // A placed note's block form: its lines are the note's words, and the opener is rewritten into the one-line form the
-  // parser already knows, so the note is created by the same path.
-  // `/' ... '/` is PlantUML's block comment: a body whose lines are not diagram source, and refusing them line by line made a
-  // comment look like a defect.
-  collectBlocks(lines, inLegend, {
-    skipOpening: true,
-    open: (line) => (/^\/'/.test(line) ? { closed: false } : undefined),
-    closes: (line) => /'\s*\/$/.test(line),
-    text: () => {},
-    close: () => {},
-  })
-
-  const titleWalk = collectBlocks(lines, inLegend, {
-    skipOpening: true,
-    open: (line, index) => (line === 'title' ? { index, text: [] as string[] } : undefined),
-    closes: (line) => /^end\s*title\b/.test(line),
-    text: (state, line) => { state.text.push(line) },
-    close: (state) => { sourceTitle = state.text.join('\n') },
-  })
-
-  const noteWalk = collectBlocks(lines, inLegend, {
-    open: (line, index) => {
-      // A colon on the line means the note's text is on that line: the one-line form, which the parser reads. Only a line
-      // with no text of its own opens a block - and a note with an alias can be opened the same way (`note as N`).
-      const placed = /^note\s+(left|right|top|bottom)\s+of\s+([^:]+)$/.exec(line)
-      if (placed !== null) return { index, kind: 'placed' as const, side: placed[1] as string, target: placed[2] as string, text: [] as string[] }
-      const named = /^note\s+as\s+([A-Za-z_][\w-]*)\s*$/.exec(line)
-      if (named !== null) return { index, kind: 'named' as const, side: '', target: named[1] as string, text: [] as string[] }
-      return undefined
-    },
-    closes: (line) => /^end\s*note\b/.test(line),
-    text: (state, line) => { state.text.push(line) },
-    close: (state, lines, openedAt) => {
-      const words = state.text.join(' ').replace(/"/g, '')
-      lines[openedAt] =
-        state.kind === 'placed'
-          ? 'note ' + state.side + ' of ' + state.target + ' : ' + words
-          : 'note "' + words + '" as ' + state.target
-    },
-  })
-  // A block whose closing line is missing swallows the rest of the source. Saying nothing there is the worst answer of all:
-  // the drawing comes out nearly empty and looks deliberate.
-
-  for (const walk of [legendWalk, pageWalk]) {
-    if (walk === undefined) continue
-    refused.push('line ' + String(walk.openedAt + 1) + ': this block is never closed, so the lines after it were not read')
+  // The blocks whose lines are not diagram source are collected before any line is read: a block decides what the lines inside it mean.
+  const collected = collectPageBlocks(lines)
+  const legend = collected.blocks.legend
+  const pageBlocks = {
+    header: collected.blocks.header,
+    footer: collected.blocks.footer,
+    sourceCaption: collected.blocks.sourceCaption,
   }
-  // A placed note that is never closed is one mistake, not two: the line names no text *and* the block has no end, and a
-  // reader needs one sentence. The opener is skipped so the line parser does not add its own version of the same news.
-  // A block title that is never closed is still a title: its lines are kept, and the walk reports the missing end.
-  if (titleWalk !== undefined) {
-    sourceTitle = titleWalk.state.text.join('\n')
-  }
-  if (noteWalk !== undefined) {
-    inLegend.add(noteWalk.openedAt)
-    refused.push(
-      'line ' + String(noteWalk.openedAt + 1) + ': `' + lines[noteWalk.openedAt].trim() +
-        '` is never closed, and it names no text of its own',
-    )
+  // The lines a block consumed are never read as statements, and a title that never closes is still a title.
+  const inLegend = collected.skip
+  if (collected.blocks.title !== undefined) sourceTitle = collected.blocks.title
+  for (const note of collected.notes) {
+    if (note.channel === 'ignored') ignored.push(note.message)
+    else refused.push(note.message)
   }
 
   lines.forEach((raw, index) => {

@@ -182,6 +182,7 @@ node tests/edge/run.mjs
 node tests/note/run.mjs
 node tests/marked-edge/run.mjs
 node tests/resolve/run.mjs
+node tests/page-blocks/run.mjs
 node tests/presentation/run.mjs
 node tests/routing/run.mjs
 node tests/tool-routing/run.mjs
@@ -258,6 +259,7 @@ And the gates around it:
 | `note` | 7 | a note beside a box names the box, its text and its side |
 | `marked-edge` | 6 | a direction says where the far box goes, and keeps the label |
 | `resolve` | 4 | an arrow name that a block owns becomes the block, and the box is not drawn twice |
+| `page-blocks` | 7 | a legend block is collected and its lines are skipped |
 | `presentation` | 58 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |

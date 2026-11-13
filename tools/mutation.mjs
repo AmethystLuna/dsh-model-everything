@@ -62,6 +62,7 @@ const SUITES = [
   'tests/note/run.mjs',
   'tests/marked-edge/run.mjs',
   'tests/resolve/run.mjs',
+  'tests/page-blocks/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -449,6 +450,13 @@ const MUTATIONS = [
     file: 'src/render/plantuml-resolve.ts',
     from: '      boundaryAt.set(id, groupId)',
     to: '      boundaryAt.set(id, id)',
+  },
+  {
+    id: 'M52',
+    what: 'a note block keeps its own lines instead of becoming one note',
+    file: 'src/render/plantuml-page-blocks.ts',
+    from: '      all[openedAt] =',
+    to: '      all[openedAt] = all[openedAt],',
   },
 ]
 
