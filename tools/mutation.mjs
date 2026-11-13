@@ -82,6 +82,7 @@ const SUITES = [
   'tests/summary-counters/run.mjs',
   'tests/edit-refusals/run.mjs',
   'tests/export-warnings/run.mjs',
+  'tests/diff-families/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -672,6 +673,13 @@ const MUTATIONS = [
     file: 'src/exporters.ts',
     from: "    if (invariant.kind !== 'never-states') warnings.push('UPPAAL export carries invariant kind",
     to: "    if (false) warnings.push('UPPAAL export carries invariant kind",
+  },
+  {
+    id: 'M81',
+    what: 'two reports of different families are compared as if they shared a vocabulary',
+    file: 'src/baseline.ts',
+    from: '  if (beforeFamily !== undefined && afterFamily !== undefined && beforeFamily !== afterFamily) {',
+    to: '  if (false) {',
   },
 ]
 
