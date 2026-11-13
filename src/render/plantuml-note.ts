@@ -18,6 +18,8 @@ export type NoteLine =
       text: string
       /** The direction the hidden edge carries, stated from the box's side. */
       hint: 'left' | 'right' | 'up' | 'down'
+      /** The note's own keyword when the source asked for a shape other than the default fold. */
+      shape?: string
     }
   | { kind: 'refused'; message: string }
 
@@ -27,23 +29,27 @@ export type NoteLine =
  * The hint is turned here rather than at the write: `-right->` puts the far box on the right, so a note on a box's left is stated as
  * `left` and the layout gets the direction the source meant.
  */
-export function readNote(line: string, where: string): NoteLine | undefined {
-  const placed = /^note\s+(left|right|top|bottom)\s+of\s+(.+?)(?:\s*:\s*(.+))?$/.exec(line)
+export function readNote(line: string, where: string, ordinal = 1): NoteLine | undefined {
+  // `hnote` and `rnote` place a note exactly as `note` does and differ only in the shape drawn: the placement is honoured, the shape is
+  const placed = /^(note|hnote|rnote)\s+(left|right|top|bottom)\s+of\s+(.+?)(?:\s*:\s*(.+))?$/.exec(line)
   if (placed !== null) {
-    const target = reference(placed[2] as string)
-    const text = (placed[3] ?? '').trim()
+    const target = reference(placed[3] as string)
+    const text = (placed[4] ?? '').trim()
     if (text === '') {
       return {
         kind: 'refused',
         message: where + '`' + line + '` names no text: a note beside a box needs its words on the same line',
       }
     }
-    const side = placed[1] as 'left' | 'right' | 'top' | 'bottom'
+    const side = placed[2] as 'left' | 'right' | 'top' | 'bottom'
     return {
       kind: 'placed',
       target,
-      noteId: 'note-' + target.id,
+      // Two notes may sit beside one box: the ordinal is what keeps them apart. Without it the second note found the first one
+      // already drawn under the same id and was dropped in silence.
+      noteId: 'note-' + target.id + '-' + String(ordinal),
       text,
+      shape: (placed[1] as string) === 'note' ? undefined : (placed[1] as string),
       hint: side === 'top' ? 'up' : side === 'bottom' ? 'down' : side,
     }
   }

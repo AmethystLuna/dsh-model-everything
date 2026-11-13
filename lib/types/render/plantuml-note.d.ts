@@ -15,6 +15,8 @@ export type NoteLine = {
     text: string;
     /** The direction the hidden edge carries, stated from the box's side. */
     hint: 'left' | 'right' | 'up' | 'down';
+    /** The note's own keyword when the source asked for a shape other than the default fold. */
+    shape?: string;
 } | {
     kind: 'refused';
     message: string;
@@ -25,4 +27,4 @@ export type NoteLine = {
  * The hint is turned here rather than at the write: `-right->` puts the far box on the right, so a note on a box's left is stated as
  * `left` and the layout gets the direction the source meant.
  */
-export declare function readNote(line: string, where: string): NoteLine | undefined;
+export declare function readNote(line: string, where: string, ordinal?: number): NoteLine | undefined;

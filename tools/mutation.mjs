@@ -472,6 +472,20 @@ const MUTATIONS = [
     from: '  const styled = STYLED.exec(line)',
     to: '  const styled = null as RegExpExecArray | null',
   },
+  {
+    id: 'M55',
+    what: 'a partition is refused as a block that cannot be drawn',
+    file: 'src/render/plantuml-boundary.ts',
+    from: "export const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle', 'artifact', 'state', 'partition'])",
+    to: "export const BOUNDARY = new Set(['package', 'folder', 'node', 'component', 'rectangle', 'artifact', 'state'])",
+  },
+  {
+    id: 'M56',
+    what: 'two notes beside one box share an id, so the second is dropped',
+    file: 'src/render/plantuml-note.ts',
+    from: "      noteId: 'note-' + target.id + '-' + String(ordinal),",
+    to: "      noteId: 'note-' + target.id,",
+  },
 ]
 
 const argument = process.argv[2]

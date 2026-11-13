@@ -62,6 +62,12 @@ test('a block this renderer cannot draw is refused with the form that works', ()
   if (!shape.message.includes('a `usecase` block is not a boundary')) throw new Error(shape.message)
 })
 
+test('a partition is a boundary, and its alias names it', () => {
+  const got = open('partition "Order flow" as of {')
+  if (got.id !== 'of' || got.label !== 'Order flow') throw new Error(JSON.stringify(got))
+  if (got.solid) throw new Error('a partition was drawn solid')
+})
+
 if (failures > 0) {
   console.log('boundary tests failed:', failures)
   process.exit(1)

@@ -231,7 +231,7 @@ And the gates around it:
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 106 | a flowchart becomes boxes and labelled arrows |
-| `plantuml-corpus` | 58 | left to right direction lays the chain out along a row |
+| `plantuml-corpus` | 59 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 177 | every verdict earns its own role |
 | `cycle-break` | 8 | Tarjan finds the cycle as one component and leaves the rest alone |
@@ -254,9 +254,9 @@ And the gates around it:
 | `arrows` | 8 | a plain arrow points from the left name to the right one |
 | `directives` | 13 | a preprocessor directive is dropped with a reason |
 | `declaration` | 7 | a plain declaration declares one element with its own name |
-| `boundary` | 6 | a closing brace closes, and nothing else does |
+| `boundary` | 7 | a closing brace closes, and nothing else does |
 | `edge` | 4 | an arrow between two elements is an edge with its two ends |
-| `note` | 7 | a note beside a box names the box, its text and its side |
+| `note` | 8 | a note beside a box names the box, its text and its side |
 | `marked-edge` | 7 | a direction says where the far box goes, and keeps the label |
 | `resolve` | 4 | an arrow name that a block owns becomes the block, and the box is not drawn twice |
 | `page-blocks` | 7 | a legend block is collected and its lines are skipped |

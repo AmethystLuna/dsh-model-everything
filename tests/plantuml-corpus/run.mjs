@@ -963,8 +963,9 @@ test('a note block carries its lines as text', () => {
   const r = render({ source }, {}, { scheme: 'default' })
   if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
   const ids = r.diagram.nodes.map((node) => node.id).sort()
-  if (JSON.stringify(ids) !== JSON.stringify(['a', 'note-a'])) throw new Error('nodes: ' + JSON.stringify(ids))
-  const note = r.diagram.nodes.find((node) => node.id === 'note-a')
+  // A note's id carries the ordinal that keeps two notes beside one box apart.
+  if (JSON.stringify(ids) !== JSON.stringify(['a', 'note-a-1'])) throw new Error('nodes: ' + JSON.stringify(ids))
+  const note = r.diagram.nodes.find((node) => node.id === 'note-a-1')
   if (note?.label !== 'first line component ghost') throw new Error('the block text: ' + String(note?.label))
   if (note.shape !== 'note') throw new Error('the block lost its fold')
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
@@ -1026,6 +1027,21 @@ test('a styled arrow is drawn as an edge and its style is reported', () => {
   if (r.diagram.edges.length !== 1) throw new Error('edges: ' + String(r.diagram.edges.length))
   if (r.diagram.edges[0].label !== 'uses') throw new Error('label: ' + String(r.diagram.edges[0].label))
   if (r.ignored.length !== 1 || !r.ignored[0].includes('`#blue` is a line style')) throw new Error('ignored: ' + JSON.stringify(r.ignored))
+})
+
+// A partition is a region of an activity diagram and a note shape is a way of drawing a note: both are things this renderer can draw, and
+// both used to be refused as lines it could not read.
+test('a partition is drawn as a boundary and a note shape is drawn as a note', () => {
+  const partition = render({ source: ['@startuml', 'partition "Order flow" as of {', '  component a', '  component b', '}'].join('\n') }, {}, { scheme: 'default' })
+  if (partition.refused.length !== 0) throw new Error('partition refused: ' + JSON.stringify(partition.refused))
+  const group = (partition.diagram.groups ?? [])[0]
+  if (group?.label !== 'Order flow' || JSON.stringify(group?.members) !== JSON.stringify(['a', 'b'])) throw new Error('group: ' + JSON.stringify(group))
+  const shaped = render({ source: ['@startuml', 'component a', 'hnote right of a : hex', 'rnote left of a : rect'].join('\n') }, {}, { scheme: 'default' })
+  if (shaped.refused.length !== 0) throw new Error('note shapes refused: ' + JSON.stringify(shaped.refused))
+  const notes = shaped.canvas.shapes.filter((shape) => shape.kind === 'box' && shape.shape === 'note')
+  if (notes.length !== 2) throw new Error('notes drawn: ' + String(notes.length))
+  if (shaped.ignored.length !== 2) throw new Error('ignored: ' + JSON.stringify(shaped.ignored))
+  for (const note of shaped.ignored) if (!note.includes('note shape')) throw new Error('reason: ' + note)
 })
 
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
