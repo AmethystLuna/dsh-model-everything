@@ -229,6 +229,7 @@
     "routing-map",
     "row-spacing",
     "scan-vs-compose",
+    "schema-registry",
     "separate",
     "skill-routing",
     "skill-table",

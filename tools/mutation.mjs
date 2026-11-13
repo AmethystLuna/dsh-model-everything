@@ -101,6 +101,7 @@ const SUITES = [
   'tests/reading-order/run.mjs',
   'tests/verdict-table/run.mjs',
   'tests/model-hash/run.mjs',
+  'tests/schema-registry/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -824,6 +825,13 @@ const MUTATIONS = [
     file: 'src/engine.ts',
     from: "  return createHash('sha256').update(stableStringify(hashPayload(value, spec))).digest('hex')",
     to: "  return createHash('sha256').update(JSON.stringify(hashPayload(value, spec))).digest('hex')",
+  },
+  {
+    id: 'M100',
+    what: 'the design family reports the verify schema',
+    file: 'src/engine.ts',
+    from: "  design: 'model-everything/design/v1',",
+    to: "  design: 'model-everything/verify/v1',",
   },
 ]
 
