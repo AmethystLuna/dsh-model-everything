@@ -51,24 +51,22 @@ await test('addState appends the state and reports it', async () => {
   if (report.modelValid === false) throw new Error('the model is invalid after adding a state')
 })
 
-await test('removeState drops a state nothing refers to any more', async () => {
-  // Removing `s1` on its own would leave `s0 --> s1` pointing at nothing, which is refused - so the batch removes the edge first. A refused
-  // batch writes nothing, which is why the two-step form is the one that can be measured.
-  // The batch has to leave a valid model, not just drop a state: both edges go first, and a terminal state with an edge replaces the one removed.
-  // A removed state that some transition still names is refused, and so is an init state with nothing to do.
+await test('removeState drops the edges that pointed at it too', async () => {
+  // The state removed still has an edge of its own (`s1 --back--> s0`) when the batch reaches it, so the operation itself has to take that edge
+  // out. A removal that left it behind would name a state the model no longer has, and the whole batch would be refused.
   const { model } = await run('removeState', [
-    { removeTransition: ['s0', 'go'] },
-    // The narrative names that event, and a narrative naming a removed event is invalid in its own right.
+    // The narrative names the event the next op removes, and a narrative naming a removed event is invalid in its own right.
     { remove: '/narrative' },
-    { removeTransition: ['s1', 'back'] },
+    { removeTransition: ['s0', 'go'] },
     { addState: { id: 's9', terminal: true } },
     { addTransition: ['s0', 'end', 's9'] },
     { removeState: 's1' },
   ])
   if (model.states.some((state) => state.id === 's1')) throw new Error('the state survived')
   if (!model.states.some((state) => state.id === 's9')) throw new Error('the batch stopped after the removal')
+  const dangling = (model.transitions ?? []).filter((transition) => transition.from === 's1' || transition.to === 's1')
+  if (dangling.length > 0) throw new Error('an edge still names the removed state: ' + JSON.stringify(dangling))
 })
-
 await test('addTransition adds one edge', async () => {
   const { model } = await run('addTransition', [{ addTransition: ['s1', 'reset', 's0'] }])
   if ((model.transitions ?? []).length !== 3) throw new Error('transitions: ' + String(model.transitions.length))
