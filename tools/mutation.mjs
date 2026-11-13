@@ -383,6 +383,14 @@ const MUTATIONS = [
     from: "      if (/^[A-Za-z_][\\w.-]*$/.test(line)) {",
     to: '      if (false) {',
   },
+
+  {
+    id: 'M44',
+    what: 'a file include is dropped instead of refused',
+    file: 'src/render/plantuml-directives.ts',
+    from: "      channel: 'refused',",
+    to: "      channel: 'ignored',",
+  },
 ]
 
 const argument = process.argv[2]
