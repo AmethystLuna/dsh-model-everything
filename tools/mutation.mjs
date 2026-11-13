@@ -74,6 +74,7 @@ const SUITES = [
   'tests/doc-paths/run.mjs',
   'tests/docs-paths/run.mjs',
   'tests/tool-schema/run.mjs',
+  'tests/tool-defaults/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -608,6 +609,13 @@ const MUTATIONS = [
     file: 'src/uml-tool.ts',
     from: 'const FAMILIES = [...UML_DIAGRAMS]',
     to: "const FAMILIES = [...UML_DIAGRAMS, 'block-diagram']",
+  },
+  {
+    id: 'M73',
+    what: 'the sequence render ignores the step cap',
+    file: 'src/uml.ts',
+    from: 'export function renderUml(input: unknown, notation: UmlNotation = \'mermaid\', diagram: UmlDiagram = \'state\', maxSteps = 60, intent?',
+    to: 'export function renderUml(input: unknown, notation: UmlNotation = \'mermaid\', diagram: UmlDiagram = \'state\', maxSteps = 1000, intent?',
   },
 ]
 
