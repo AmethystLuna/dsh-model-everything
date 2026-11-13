@@ -561,13 +561,6 @@ const MUTATIONS = [
     from: "    if (support.fidelity === 'approximate') {",
     to: '    if (false) {',
   },
-  {
-    id: 'M67',
-    what: 'the skill claims a family the engine cannot draw',
-    file: 'skills/model-everything-uml/SKILL.md',
-    from: 'which draws a cloud architecture rather than UML components.',
-    to: 'and a class diagram, which is faithful there.',
-  },
 ]
 
 const argument = process.argv[2]
