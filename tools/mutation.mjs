@@ -445,10 +445,10 @@ const MUTATIONS = [
   },
   {
     id: 'M51',
-    what: 'an arrow name that a block owns keeps its own box',
+    what: 'an edge re-pointed at a block lands on nothing',
     file: 'src/render/plantuml-resolve.ts',
-    from: '      builder.nodes.delete(id)',
-    to: '      builder.nodes.set(id, builder.nodes.get(id) as DiagramNode)',
+    from: '      boundaryAt.set(id, groupId)',
+    to: '      boundaryAt.set(id, id)',
   },
 ]
 
