@@ -141,6 +141,7 @@ node tests/uml-families/run.mjs
 node tests/uml-capability/run.mjs
 node tests/uml-docs/run.mjs
 node tests/report-contract/run.mjs
+node tests/report-views/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -224,6 +225,7 @@ And the gates around it:
 | `uml-capability` | 5 | a cell the table calls unrepresentable refuses both actions |
 | `uml-docs` | 5 | every family the skill names is a family the engine has |
 | `report-contract` | 4 | every report keeps the four fields a reader acts on |
+| `report-views` | 3 | the full view is the report itself, and it parses back to the same conclusion |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |

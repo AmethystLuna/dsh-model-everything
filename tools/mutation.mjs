@@ -69,6 +69,7 @@ const SUITES = [
   'tests/uml-capability/run.mjs',
   'tests/uml-docs/run.mjs',
   'tests/report-contract/run.mjs',
+  'tests/report-views/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -568,6 +569,13 @@ const MUTATIONS = [
     file: 'src/engine.ts',
     from: "  verdictReason: String(errors) + ' error finding(s)' + (firstCode === undefined ? '' : ' (first error: ' + firstCode + ')'),",
     to: "  verdictReason: String(errors) + ' error finding(s)',",
+  },
+  {
+    id: 'M68',
+    what: 'the body view drops the next step a reader needs',
+    file: 'src/report-view.ts',
+    from: "  if (resolved.full) return JSON.stringify(value as JsonValue)",
+    to: "  if (resolved.full) return JSON.stringify(value as JsonValue)\n  if (true) return JSON.stringify(value as JsonValue)",
   },
 ]
 

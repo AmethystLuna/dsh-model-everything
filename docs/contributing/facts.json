@@ -200,6 +200,7 @@
     "report-contract",
     "report-reading",
     "report-view",
+    "report-views",
     "resolve",
     "routing",
     "routing-map",
