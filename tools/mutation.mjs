@@ -72,6 +72,7 @@ const SUITES = [
   'tests/report-views/run.mjs',
   'tests/next-steps/run.mjs',
   'tests/doc-paths/run.mjs',
+  'tests/docs-paths/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -592,6 +593,13 @@ const MUTATIONS = [
     file: 'src/data-engine.ts',
     from: "  return createHash('sha256').update(stableStringify(model)).digest('hex')",
     to: "  return ''",
+  },
+  {
+    id: 'M71',
+    what: 'a document links to a reference file that is not there',
+    file: 'skills/model-everything/SKILL.md',
+    from: 'references/logic-verification-guide.md#manual',
+    to: 'references/logic-verification-handbook.md#manual',
   },
 ]
 
