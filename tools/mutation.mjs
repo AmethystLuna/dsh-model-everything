@@ -92,6 +92,7 @@ const SUITES = [
   'tests/edit-ops/run.mjs',
   'tests/route-causality/run.mjs',
   'tests/layout-growth/run.mjs',
+  'tests/ports-sides/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -752,6 +753,13 @@ const MUTATIONS = [
     file: 'src/render/place.ts',
     from: 'const LAYER_GAP = 44',
     to: 'const LAYER_GAP = 0',
+  },
+  {
+    id: 'M91',
+    what: 'an edge attaches at the box centre instead of its facing side',
+    file: 'src/render/route.ts',
+    from: "      return { x: box.x + box.width / 2, y: box.y }",
+    to: "      return { x: box.x + box.width / 2, y: box.y + box.height / 2 } ",
   },
 ]
 
