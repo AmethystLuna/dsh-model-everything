@@ -908,10 +908,10 @@ const MUTATIONS = [
   },
   {
     id: 'M110',
-    what: 'the compatibility declaration names a range the host does not read',
+    what: 'the compatibility declaration drops a release from the range the host reads',
     file: 'package.json',
-    from: "    \"0.2.1-rc.4\": \"compatible\",",
-    to: "    \"0.2.1-rc.3\": \"unknown\",",
+    from: "  \"dsh\": \"^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-rc.4 || ^0.2.2-rc.1\",",
+    to: "  \"dsh\": \"^0.2.0-rc.1\",",
   },
 ]
 
