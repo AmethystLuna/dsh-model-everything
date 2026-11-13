@@ -341,6 +341,14 @@ const MUTATIONS = [
     from: "      if (!open && !text.startsWith('%%{')) return",
     to: '      if (!open) return',
   },
+
+  {
+    id: 'M39',
+    what: 'a style directive is refused instead of dropped with a reason',
+    file: 'src/render/from-mermaid.ts',
+    from: "      ignored.push(where + '`' + name + '` ' + reason)",
+    to: "      refused.push(where + '`' + name + '` ' + reason)",
+  },
 ]
 
 const argument = process.argv[2]
