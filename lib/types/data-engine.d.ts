@@ -185,6 +185,7 @@ export interface DataVerificationReport {
     modelHash: string;
     /** Every hash this report carries, in one place. The data-model hash follows the same normalization as the published spec, but is not covered by it. */
     hashes: {
+        hashSpec: string;
         modelHash: string;
     };
     summary: {
@@ -200,6 +201,13 @@ export interface DataVerificationReport {
     /** What to do next, derived from the findings — never empty. */
     nextSteps: string[];
 }
+/**
+ * The hash scheme this family's `modelHash` is computed with.
+ *
+ * Every other family states it beside the hash (`v1`), and it is the version a reader needs to know that two hashes mean the same thing: a
+ * canonicalisation change gives new hashes for old models, and without the spec there is nothing to compare them against.
+ */
+export declare const DATA_HASH_SPEC = "v1";
 export declare function dataModelHash(model: DataModelV1): string;
 export declare function validateDataModel(input: unknown): {
     ok: true;

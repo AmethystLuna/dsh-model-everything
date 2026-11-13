@@ -100,6 +100,7 @@ const SUITES = [
   'tests/checks-line/run.mjs',
   'tests/reading-order/run.mjs',
   'tests/verdict-table/run.mjs',
+  'tests/model-hash/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -816,6 +817,13 @@ const MUTATIONS = [
     file: 'src/engine.ts',
     from: '  if (errors > 0) {',
     to: '  if (errors > 1) {',
+  },
+  {
+    id: 'M99',
+    what: 'the hash is computed over the key order the input happened to use',
+    file: 'src/engine.ts',
+    from: '  return stableStringify(value)',
+    to: '  return JSON.stringify(value)',
   },
 ]
 

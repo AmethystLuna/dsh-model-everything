@@ -139,7 +139,7 @@ export interface DataVerificationReport {
   schemaVersion: 1
   modelHash: string
   /** Every hash this report carries, in one place. The data-model hash follows the same normalization as the published spec, but is not covered by it. */
-  hashes: { modelHash: string }
+  hashes: { hashSpec: string; modelHash: string }
   summary: {
     entities: number
     fields: number
@@ -165,6 +165,14 @@ function stableStringify(value: unknown): string {
   const record = value as Record<string, unknown>
   return '{' + Object.keys(record).sort().map((key) => JSON.stringify(key) + ':' + stableStringify(record[key])).join(',') + '}'
 }
+
+/**
+ * The hash scheme this family's `modelHash` is computed with.
+ *
+ * Every other family states it beside the hash (`v1`), and it is the version a reader needs to know that two hashes mean the same thing: a
+ * canonicalisation change gives new hashes for old models, and without the spec there is nothing to compare them against.
+ */
+export const DATA_HASH_SPEC = 'v1'
 
 export function dataModelHash(model: DataModelV1): string {
   return createHash('sha256').update(stableStringify(model)).digest('hex')
@@ -1080,7 +1088,7 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
       schema: REPORT_SCHEMAS.datamodel,
       schemaVersion: 1,
       modelHash: '',
-      hashes: { modelHash: '' },
+      hashes: { hashSpec: DATA_HASH_SPEC, modelHash: '' },
       summary: { entities: 0, fields: 0, errors: validation.errors.length, warnings: 0, checksRun: 0 },
       checks: [modelCheck],
       nextSteps: dataNextSteps([modelCheck]),
@@ -1118,7 +1126,7 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
         schema: REPORT_SCHEMAS.datamodel,
         schemaVersion: 1,
         modelHash: dataModelHash(model),
-        hashes: { modelHash: dataModelHash(model) },
+        hashes: { hashSpec: DATA_HASH_SPEC, modelHash: dataModelHash(model) },
         summary: {
           entities: model.entities.length,
           fields: allFieldPaths(model).length,
@@ -1166,7 +1174,7 @@ export function runDataVerification(input: unknown, options: DataVerificationOpt
     schema: REPORT_SCHEMAS.datamodel,
     schemaVersion: 1,
     modelHash: dataModelHash(model),
-    hashes: { modelHash: dataModelHash(model) },
+    hashes: { hashSpec: DATA_HASH_SPEC, modelHash: dataModelHash(model) },
     summary: {
       entities: model.entities.length,
       fields: allFieldPaths(model).length,
