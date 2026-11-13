@@ -106,6 +106,7 @@ const SUITES = [
   'tests/client-bundle/run.mjs',
   'tests/packaging/run.mjs',
   'tests/tarball/run.mjs',
+  'tests/locale-pairs/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -864,6 +865,13 @@ const MUTATIONS = [
     file: 'package.json',
     from: '"name": "dsh-model-everything",',
     to: '"name": "model-everything",',
+  },
+  {
+    id: 'M105',
+    what: 'the Chinese card loses a key the English one has',
+    file: 'gate/locale/zh.json',
+    from: '  "meta": {',
+    to: '  "metaX": {',
   },
 ]
 

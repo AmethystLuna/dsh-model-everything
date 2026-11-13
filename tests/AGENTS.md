@@ -164,6 +164,10 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
   exercised the cleanup that drops them, so a mutation inside that cleanup changed nothing. The question to ask before blaming the suite is
   not only "is it on the run list" but "did this case reach the line" - and the way to answer it is to make the case's own input need the
   branch: here, leave an edge of the removed state's own in place.
+- **some guards have no source-level mutation, and that is a recorded result rather than a gap.** The tarball's reproducibility cannot be broken
+  by any edit here - the only way to make two packs differ is for the packing environment to stamp something variable. The suite stays, with the
+  measurement as its evidence and a comment saying what would make it fail (a future npm that stamps mtimes). The rule: an uncaught mutation is
+  withdrawn or explained; a guard that needs no mutation is explained, in the commit and in the suite.
 - **so run the pristine copy first.** The order that works: copy `lib/` and the suite, run it and require a green
   result with no `SKIP`, and only then apply the mutation. A red or skipping baseline means the mutation cannot be
   judged - report that, not "missed". The same `node_modules` junction that makes a tool-loading suite work belongs in
