@@ -242,6 +242,19 @@ loaded, when the session engaged.** Two consequences, both learned by running it
 A misroute is a corpus or a description defect, not a model defect: fix whichever of the two
 the answer exposes, then re-run.
 
+## Editing a skill body costs three regenerations
+
+A `SKILL.md` is quoted by three generated documents, and each one has a suite that fails until it is regenerated:
+
+| Generated | Quotes | Regenerate with |
+|---|---|---|
+| `docs/toolset/mindmap.mmd` (+ `facts.json`) | what each surface costs, in characters | `node docs/toolset/generate-mindmap.mjs` |
+| `docs/usage/facts.json` + `guide.md` | the skill bodies' total character count | `node docs/usage/generate.mjs`, then the figure in the guide |
+| `docs/feature-checklist.md` | the checks and their suites | `node docs/feature-checklist/generate.mjs` |
+
+That is not bureaucracy: the figures are the argument for loading a skill one at a time, so a stale one is a wrong argument. A body edit that
+skips one of these shows up as a red gate naming the number, which is how the total went from 93158 to 93377 unnoticed until then.
+
 ## House rules the suites follow
 
 - One directory per suite, `run.mjs`, zero dependencies, `console.log('PASS', name)` on

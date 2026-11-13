@@ -332,6 +332,27 @@ delta 无条件回退到 `report.summary`，而 summary 没有 delta 键，于�
 | 门禁命令 | 112 |
 | 变异点 | 108 |
 
+## 3.13 第十一段：声明、契约外的族、读取表的完整性（第 154–157 轮）
+
+| 面 | 守卫 | 它钉住的东西 |
+|---|---|---|
+| 兼容声明 | `tests/compatibility` | 声明的范围 == 宿主实际读的 `peerDependencies`；每个 `compatible` 版本在记录里有行 |
+| 发布版本 | `tests/version` | 声明的清单版本一致；**声明之外没有文件仍带当前版本** |
+| 报告契约之外的两族 | `tests/diagram-diff`、`tests/reading-shapes` | `diagram_diff` 只有 `changes`；`uml_explain_labels` 是载荷；automaton 族是顶层 findings |
+
+### 这一段的教训：改技能正文要连带三处生成物
+
+`tools/mindmap`、`usage/guide` 的字数、`feature-checklist` 都引用正文，各自有生成器与门禁。**这条链不是官僚流程**：那些数字正是“一次只加载一个技能”的论据，错一个就是错的论据。
+
+已写进 `tests/AGENTS.md` 的 house rules，附三条重生成命令。
+
+### 第十一段基线（第 157 轮实测）
+
+| 指标 | 数值 |
+|---|---|
+| 门禁命令 | 116 |
+| 变异点 | 112 |
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
