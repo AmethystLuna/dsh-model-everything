@@ -617,6 +617,13 @@ const MUTATIONS = [
     from: 'export function renderUml(input: unknown, notation: UmlNotation = \'mermaid\', diagram: UmlDiagram = \'state\', maxSteps = 60, intent?',
     to: 'export function renderUml(input: unknown, notation: UmlNotation = \'mermaid\', diagram: UmlDiagram = \'state\', maxSteps = 1000, intent?',
   },
+  {
+    id: 'M74',
+    what: 'a finding is identified by its prose, so a reworded message is a new finding',
+    file: 'src/baseline.ts',
+    from: "  const where = locator === '{}' ? 'message:' + finding.message : locator",
+    to: "  const where = 'message:' + finding.message",
+  },
 ]
 
 const argument = process.argv[2]

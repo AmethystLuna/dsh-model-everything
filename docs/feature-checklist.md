@@ -147,6 +147,7 @@ node tests/doc-paths/run.mjs
 node tests/docs-paths/run.mjs
 node tests/tool-schema/run.mjs
 node tests/tool-defaults/run.mjs
+node tests/diff-claims/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -236,6 +237,7 @@ And the gates around it:
 | `docs-paths` | 5 | the documents were read, so the checks below mean something |
 | `tool-schema` | 5 | the entry registers every tool this suite knows, and no more |
 | `tool-defaults` | 5 | the description states the defaults this suite checks |
+| `diff-claims` | 5 | two runs over the same input add nothing |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
