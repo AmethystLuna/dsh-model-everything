@@ -84,6 +84,7 @@ const SUITES = [
   'tests/export-warnings/run.mjs',
   'tests/diff-families/run.mjs',
   'tests/diff-next-steps/run.mjs',
+  'tests/compose-inputs/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -688,6 +689,13 @@ const MUTATIONS = [
     file: 'src/baseline.ts',
     from: "  if (verdictOfReport(current) === 'fail') {",
     to: '  if (false) {',
+  },
+  {
+    id: 'M83',
+    what: 'a rendezvous nobody can fire is not reported',
+    file: 'src/engine.ts',
+    from: "      code: 'C2_RENDEZVOUS_UNRESOLVED',",
+    to: "      code: 'C2_RENDEZVOUS_UNRESOLVED_DISABLED',",
   },
 ]
 
