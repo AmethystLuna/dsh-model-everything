@@ -374,6 +374,14 @@ const MUTATIONS = [
     from: '  const rest = bare.name',
     to: '  const rest = declaration.slice(keyword.length).trim()',
   },
+
+  {
+    id: 'M43',
+    what: 'a bare name inside a together block is not collected as a member',
+    file: 'src/render/plantuml-reference.ts',
+    from: "      if (/^[A-Za-z_][\\w.-]*$/.test(line)) {",
+    to: '      if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
