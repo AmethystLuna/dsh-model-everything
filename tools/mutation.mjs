@@ -306,6 +306,21 @@ const MUTATIONS = [
     from: '      const typed = /^state\\s+([A-Za-z_][\\w-]*)\\s*(<<[^<>]*>>)\\s*$/.exec(line)',
     to: '      const typed = null as RegExpExecArray | null',
   },
+
+  {
+    id: 'M36',
+    what: 'a run beside a box is moved towards it instead of away',
+    file: 'src/render/clearance.ts',
+    from: '  if (high !== undefined) return high - CLEARANCE',
+    to: '  if (high !== undefined) return high + CLEARANCE',
+  },
+  {
+    id: 'M37',
+    what: 'a run may hug a box as closely as it likes',
+    file: 'src/render/clearance.ts',
+    from: 'export const HUG = 3',
+    to: 'export const HUG = 0',
+  },
 ]
 
 const argument = process.argv[2]
