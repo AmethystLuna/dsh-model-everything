@@ -161,6 +161,7 @@ node tests/datamodel-inputs/run.mjs
 node tests/des-vs-uml/run.mjs
 node tests/scan-vs-compose/run.mjs
 node tests/review-vs-verify/run.mjs
+node tests/edit-ops/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -264,6 +265,7 @@ And the gates around it:
 | `des-vs-uml` | 4 | the drawing tool reports the graph codes and none of the design codes |
 | `scan-vs-compose` | 4 | the scanner reports claims as claims, in its own names |
 | `review-vs-verify` | 3 | a model that is thin as a drawing and sound as a machine gets two different answers |
+| `edit-ops` | 7 | addState appends the state and reports it |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
