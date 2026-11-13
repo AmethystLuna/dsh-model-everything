@@ -137,6 +137,7 @@ node tests/catalog/run.mjs
 node tests/data-engine/run.mjs
 node tests/concurrency/run.mjs
 node tests/uml/run.mjs
+node tests/uml-families/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -216,6 +217,7 @@ And the gates around it:
 | `data-engine` | 15 | valid data model passes |
 | `concurrency` | 10 | flags absolute concurrency claims and risk keywords |
 | `uml` | 98 | render: mermaid state diagram carries directives, guards and terminal marks |
+| `uml-families` | 3 | every family with a faithful notation is detected from a minimal source |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |

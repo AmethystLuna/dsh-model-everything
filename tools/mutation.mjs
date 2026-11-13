@@ -65,6 +65,7 @@ const SUITES = [
   'tests/page-blocks/run.mjs',
   'tests/mermaid-node/run.mjs',
   'tests/mermaid-chain/run.mjs',
+  'tests/uml-families/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -536,6 +537,13 @@ const MUTATIONS = [
     file: 'src/render/mermaid-chain.ts',
     from: "    if (char === '&' && depth === 0) {",
     to: "    if (char === '&') {",
+  },
+  {
+    id: 'M64',
+    what: 'a use case diagram written with its own keyword is read as a state machine',
+    file: 'src/uml-syntax.ts',
+    from: "  const order: readonly UmlFamilyId[] = ['class', 'object', 'component', 'deployment', 'package', 'sequence', 'use-case', 'activity']",
+    to: "  const order: readonly UmlFamilyId[] = ['class', 'object', 'component', 'deployment', 'package', 'sequence', 'activity']",
   },
 ]
 

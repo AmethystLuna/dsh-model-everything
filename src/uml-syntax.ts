@@ -465,7 +465,9 @@ export function detectUmlFamily(text: string, notation: UmlNotation, options: Um
 
   // Declaration keywords, most specific family first. component before package
   // matters: a component diagram may contain packages, and the component is the topic.
-  const order: readonly UmlFamilyId[] = ['class', 'object', 'component', 'deployment', 'package', 'sequence', 'activity']
+  // `use-case` is here because of its keyword: `usecase Login` was in the table's declarations and in no scan, so a use case diagram
+  // written with the keyword was read as a state machine - a family the table calls parseable could not be reached at all.
+  const order: readonly UmlFamilyId[] = ['class', 'object', 'component', 'deployment', 'package', 'sequence', 'use-case', 'activity']
   for (const family of order) {
     const keyword = plantumlDeclaration(text, family)
     if (keyword === undefined) continue
