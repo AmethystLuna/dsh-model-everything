@@ -947,9 +947,9 @@ const MUTATIONS = [
   {
     id: 'M115',
     what: 'the widest boundary is measured and never compared with its budget',
-    file: 'src/granularity.ts',
-    from: 'B1_GROUP_TOO_WIDE',
-    to: 'B1_GROUP_TOO_WIDE_UNUSED',
+    file: 'src/render/budget.ts',
+    from: '    if (size > caps.maxMembers) {',
+    to: '    if (size > caps.maxMembers + 1000) {',
   },
 ]
 
