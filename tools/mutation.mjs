@@ -90,6 +90,7 @@ const SUITES = [
   'tests/scan-vs-compose/run.mjs',
   'tests/review-vs-verify/run.mjs',
   'tests/edit-ops/run.mjs',
+  'tests/route-causality/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -736,6 +737,13 @@ const MUTATIONS = [
     file: 'src/editor.ts',
     from: '    model.transitions = transitionsOf(model).filter((entry) => entry.from !== id && entry.to !== id)',
     to: '    model.transitions = transitionsOf(model)',
+  },
+  {
+    id: 'M89',
+    what: 'the router ignores the obstacles it is given',
+    file: 'src/render/route.ts',
+    from: '  const others = obstacles.filter((box) => box !== from && box !== to)',
+    to: '  const others: Obstacle[] = []',
   },
 ]
 
