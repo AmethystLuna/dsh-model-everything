@@ -183,6 +183,7 @@ node tests/gate-text/run.mjs
 node tests/examples/run.mjs
 node tests/diagram-card/run.mjs
 node tests/diagram-diff/run.mjs
+node tests/reading-shapes/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
 node tests/apply-smoke.mjs
@@ -310,6 +311,7 @@ And the gates around it:
 | `examples` | 6 | the directory holds examples, so the cases below have something to read |
 | `diagram-card` | 5 | a drawing card carries the source it was drawn from |
 | `diagram-diff` | 5 | an added node is an info change and the delta passes |
+| `reading-shapes` | 4 | the automaton family reports top-level findings and a next step |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 5 | the declaration carries a range, a release map and a profile list |
 | `apply-smoke.mjs` | 0 | (read the file) |

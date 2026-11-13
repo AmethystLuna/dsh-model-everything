@@ -111,6 +111,7 @@ const SUITES = [
   'tests/examples/run.mjs',
   'tests/diagram-card/run.mjs',
   'tests/diagram-diff/run.mjs',
+  'tests/reading-shapes/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
 ]
@@ -920,6 +921,13 @@ const MUTATIONS = [
     file: 'src/diagram-diff-tool.ts',
     from: "        verdict: 'fail' as const,",
     to: "        verdict: 'pass' as const,",
+  },
+  {
+    id: 'M112',
+    what: 'the label-conventions answer stops listing the accepted forms',
+    file: 'src/uml.ts',
+    from: '    acceptedLabelForms: [',
+    to: '    acceptedLabelFormsX: [',
   },
 ]
 
