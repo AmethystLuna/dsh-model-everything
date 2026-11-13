@@ -562,21 +562,26 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       ignored.push(where + '`' + line + '` permits mixing diagram families; only one family is drawn here, so it has no effect')
       return
     }
+    if (HIDE_DIRECTIVE.test(line)) {
+      ignored.push(where + '`' + line + '` hides something this renderer does not draw: an element here has no compartments or stereotypes')
+      return
+    }
     if (/^together\s*$/.test(line)) {
       ignored.push(where + '`' + line + '` names no boxes: a `together { }` block keeps its own members on one row')
       return
     }
 
-    if (IGNORED.test(line)) {
-      if (HIDE_DIRECTIVE.test(line)) {
-        ignored.push(where + '`' + line + '` hides something this renderer does not draw: an element here has no compartments or stereotypes')
-        return
-      }
-      if (LAYOUT_CONTROL.test(line)) {
-        ignored.push(where + '`' + line + '` is a layout control: this renderer arranges the drawing itself, so the line has no effect')
-      }
+    // `together { ... }` is a row, not a boundary: the block's members were collected before the lines were parsed, so the opener
+    // itself has nothing left to do. It used to be swallowed by a catch-all bucket with no note, which is why removing that bucket
+    // broke every `together` drawing.
+    if (/^together\b[^{]*\{\s*$/.test(line)) {
+      // Its members are already on one row, collected before the lines were read, so there is nothing left to report: the line did
+      // what it said. An empty or one-member block is reported when it closes.
       return
     }
+
+    // With every alternative matched above, the catch-all bucket that used to sit here was unreachable - and a bucket nobody reaches
+    // is not a safety net, it is a place where a line would be dropped without a word. A line that gets this far is refused below.
 
     if (line === '[*] --> [*]') return
 
