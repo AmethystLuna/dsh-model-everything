@@ -391,6 +391,14 @@ const MUTATIONS = [
     from: "      channel: 'refused',",
     to: "      channel: 'ignored',",
   },
+
+  {
+    id: 'M45',
+    what: 'a delivery size outside its range is taken anyway',
+    file: 'src/render/plantuml-page.ts',
+    from: '    if (!(factor >= SCALE_RANGE.min && factor <= SCALE_RANGE.max)) {',
+    to: '    if (false) {',
+  },
 ]
 
 const argument = process.argv[2]
