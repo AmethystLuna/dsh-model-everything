@@ -61,6 +61,7 @@ const SUITES = [
   'tests/edge/run.mjs',
   'tests/note/run.mjs',
   'tests/marked-edge/run.mjs',
+  'tests/resolve/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -441,6 +442,13 @@ const MUTATIONS = [
     file: 'src/render/plantuml-marked-edge.ts',
     from: '      invisible: true,',
     to: '      invisible: false as unknown as true,',
+  },
+  {
+    id: 'M51',
+    what: 'an arrow name that a block owns keeps its own box',
+    file: 'src/render/plantuml-resolve.ts',
+    from: '      builder.nodes.delete(id)',
+    to: '      builder.nodes.set(id, builder.nodes.get(id) as DiagramNode)',
   },
 ]
 

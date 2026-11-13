@@ -1334,6 +1334,19 @@ test('no drawn line grazes a box it does not end at', () => {
   if (tight.length > 0) throw new Error(tight.slice(0, 3).join(' | '))
 })
 
+// A block's name can be an edge endpoint, and the edge then attaches to the rectangle. The case with no coverage was the one where the
+// edge is written inside the very block it names: the block is the scope, not an element, and saying nothing would draw a line from a box
+// into its own boundary.
+test('an edge that names the block it is written inside is refused', () => {
+  const source = ['@startuml', 'package Web {', '  component Api', '  Web --> Api', '}', '@enduml'].join('\n')
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length !== 1) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if (!r.refused[0].includes('is the block this edge is written inside')) throw new Error(r.refused[0])
+  if (!r.refused[0].startsWith('line 4:')) throw new Error('wrong line: ' + r.refused[0])
+  // The box it names stays drawn: only the line is refused.
+  if (!r.diagram.nodes.some((node) => node.id === 'Api')) throw new Error('the inner box was dropped with the edge')
+})
+
 if (failures > 0) {
   console.log('diagram tests failed: ' + String(failures))
   process.exit(1)
