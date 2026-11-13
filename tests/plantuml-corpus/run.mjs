@@ -970,6 +970,25 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A style, an interaction or an accessibility directive changes nothing this renderer draws. Refusing it reported a refusal while
+// the message said the renderer ignores it - two answers in one line.
+test('a Mermaid style directive is dropped with a reason, not refused', () => {
+  const cases = {
+    classDef: ['classDef warn fill:#f00', 'is a style this renderer does not have'],
+    style: ['style a fill:#0f0', 'is a style this renderer does not have'],
+    linkStyle: ['linkStyle 0 stroke:#00f', 'changes an edge line style'],
+    click: ['click a callback', 'is an interaction'],
+    accTitle: ['accTitle: My chart', 'is accessibility metadata'],
+  }
+  for (const [name, [line, reason]] of Object.entries(cases)) {
+    const r = render({ source: ['flowchart TD', '  a --> b', '  ' + line].join('\n'), notation: 'mermaid' }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(name + ' was refused: ' + JSON.stringify(r.refused))
+    if (r.ignored.length !== 1) throw new Error(name + ': ignored ' + JSON.stringify(r.ignored))
+    if (!r.ignored[0].includes(reason)) throw new Error(name + ': ' + r.ignored[0])
+    if (r.diagram.edges.length !== 1) throw new Error(name + ' lost the drawing')
+  }
+})
+
 // `%%{init: {...}}%%` is a configuration block, and Mermaid allows it over several lines. Its body is not diagram source, so reading
 // it line by line refused a block the notation explicitly allows.
 test('a Mermaid configuration block is skipped and reported', () => {

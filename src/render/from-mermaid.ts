@@ -154,8 +154,18 @@ export function fromMermaid(source: string, title = 'mermaid'): Parsed {
       refused.push(where + '`' + keyword + '` is not a diagram this renderer draws')
       return
     }
+    // A style, an interaction or an accessibility directive changes nothing this renderer draws, so it is dropped with its reason.
+    // Refusing it said "ignores" while reporting a refusal - the reader was told two different things in one line.
     if (DIRECTIVE.test(line)) {
-      refused.push(where + '`' + line.split(/\s/)[0] + '` is a directive this renderer ignores')
+      const name = line.split(/\s/)[0] as string
+      const reason = /^(classDef|class|style)$/i.test(name)
+        ? 'is a style this renderer does not have: the palette is fixed'
+        : /^linkStyle$/i.test(name)
+          ? 'changes an edge line style, which is fixed here'
+          : /^click$/i.test(name)
+            ? 'is an interaction, and this drawing is a picture'
+            : 'is accessibility metadata; the drawing is labelled from its title'
+      ignored.push(where + '`' + name + '` ' + reason)
       return
     }
     if (/^(graph|flowchart)\b/.test(lower)) {

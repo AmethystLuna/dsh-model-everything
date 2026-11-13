@@ -94,9 +94,14 @@ test('an unsupported diagram kind is refused with its line, not drawn as nonsens
   if (diagram.kind !== 'none') throw new Error('kind: ' + diagram.kind)
 })
 
-test('styling directives are refused by name rather than silently dropped nodes', () => {
-  const { refused } = fromMermaid('graph TD\n  a --> b\n  click a "https://example.com"\n  classDef red fill:#f00')
-  if (refused.length !== 2) throw new Error('refused: ' + JSON.stringify(refused))
+test('styling directives are dropped with a reason rather than silently drawing a node', () => {
+  // These change a colour or an interaction, not the picture, so they are reported as dropped - not as lines the renderer could
+  // not read, which is what the report used to say while the message claimed it ignored them.
+  const { ignored, refused, diagram } = fromMermaid('graph TD\n  a --> b\n  click a "https://example.com"\n  classDef red fill:#f00')
+  if (refused.length !== 0) throw new Error('refused: ' + JSON.stringify(refused))
+  if (ignored.length !== 2) throw new Error('ignored: ' + JSON.stringify(ignored))
+  for (const note of ignored) if (!/is an interaction|is a style/.test(note)) throw new Error('the reason: ' + note)
+  if (diagram.nodes.length !== 2) throw new Error('nodes: ' + String(diagram.nodes.length))
 })
 
 test('a comment and a blank line are not errors', () => {
@@ -471,8 +476,8 @@ test('writing a file puts the markup where a document can link to it', () => {
   }
 })
 
-test('a refused source still produces a drawing and reports what it refused', () => {
-  const rendered = render({ source: 'graph TD\n  a --> b\n  click a "x"' })
+test('a source with an undrawable line still draws and reports what it refused', () => {
+  const rendered = render({ source: 'graph TD\n  a --> b\n  a ==> b' })
   if (rendered.refused.length !== 1) throw new Error('refused: ' + JSON.stringify(rendered.refused))
   if (!rendered.diagram.caption.includes('refused')) throw new Error('caption: ' + rendered.diagram.caption)
 })
