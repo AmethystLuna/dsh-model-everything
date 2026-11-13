@@ -900,10 +900,10 @@ const MUTATIONS = [
   },
   {
     id: 'M109',
-    what: 'one manifest declares a different version',
-    file: 'package-lock.json',
-    from: '"version": "0.6.4",',
-    to: '"version": "0.6.3",',
+    what: 'the declaration stops holding package.json to the version',
+    file: '.version-bump.json',
+    from: '    "package.json": "version",',
+    to: '    "package-x.json": "version",',
   },
 ]
 

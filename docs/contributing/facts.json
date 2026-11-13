@@ -258,6 +258,7 @@
     "uml-docs",
     "uml-families",
     "usage",
-    "verdict-table"
+    "verdict-table",
+    "version"
   ]
 }
