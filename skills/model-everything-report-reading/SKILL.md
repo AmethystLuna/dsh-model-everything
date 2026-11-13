@@ -57,6 +57,12 @@ expected, start there.
 names the route to whatever covers the ground the report does not: another check, a
 source-side scan, or an external checker.
 
+One family is outside this: the diagram tools answer with a payload rather than a review.
+`diagram_diff` states a `verdict` and a `changes` list, and no `verdictReason` and no
+`nextSteps` — the reason for a refused side is the `message` of its `D1_SIDE_UNREADABLE`
+change. `diagram_render` and `diagram_review` carry no `verdict` at all: a drawing is not a
+decision.
+
 ## Where the Findings Are
 
 This is the part that varies, and it is worth knowing before you go looking:
@@ -66,6 +72,7 @@ This is the part that varies, and it is worth knowing before you go looking:
 | Inside each check, as `checks[].findings` | `model_verify`, `model_compose_verify`, `model_datamodel_verify`, `model_design_review` |
 | At the top level, as `findings` | `uml_structure_verify`, the `uml` review path, `model_interleaving_scan` |
 | Nowhere — compare `added` / `changed` / `removed` | `report_diff` |
+| As a `changes` list, each with a `code` and a `message` | `diagram_diff` |
 
 A check-carried finding is attributed to a check, and the check carries a status of its own: `pass`,
 `fail`, or `skip`. A top-level finding has no check to attribute it to, which is why those families

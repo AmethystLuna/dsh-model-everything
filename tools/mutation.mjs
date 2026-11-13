@@ -110,6 +110,7 @@ const SUITES = [
   'tests/gate-text/run.mjs',
   'tests/examples/run.mjs',
   'tests/diagram-card/run.mjs',
+  'tests/diagram-diff/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
 ]
@@ -912,6 +913,13 @@ const MUTATIONS = [
     file: 'package.json',
     from: "  \"dsh\": \"^0.1.7-alpha.2 || ^0.1.7-rc.1 || ^0.2.0-rc.1 || ^0.2.1-alpha.1 || ^0.2.1-rc.4 || ^0.2.2-rc.1\",",
     to: "  \"dsh\": \"^0.2.0-rc.1\",",
+  },
+  {
+    id: 'M111',
+    what: 'an unreadable side of a drawing diff passes without a word',
+    file: 'src/diagram-diff-tool.ts',
+    from: "        verdict: 'fail' as const,",
+    to: "        verdict: 'pass' as const,",
   },
 ]
 
