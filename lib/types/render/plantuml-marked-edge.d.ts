@@ -24,6 +24,8 @@ export type MarkedLine =
     label: string;
     hint?: 'up' | 'down' | 'left' | 'right';
     invisible?: true;
+    /** A line style the arrow asked for, which is reported and not drawn. */
+    style?: string;
 };
 /**
  * The marked line, or `undefined` when the line is a plain arrow or not an edge at all.

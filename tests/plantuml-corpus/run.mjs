@@ -1017,6 +1017,17 @@ test('an exit marker closes on its source and is drawn dashed', () => {
   if (!drawn.some((shape) => shape.points.length > 2)) throw new Error('no routed self-loop')
 })
 
+// `a -[#blue]-> b` asks for a line style. Read as none of the edge forms it became one element named after the whole line - a fourth
+// answer, and the worst one: a box nobody wrote.
+test('a styled arrow is drawn as an edge and its style is reported', () => {
+  const r = render({ source: ['@startuml', 'component a', 'component b', 'a -[#blue]-> b : uses'].join('\n') }, {}, { scheme: 'default' })
+  if (r.refused.length !== 0) throw new Error('refused: ' + JSON.stringify(r.refused))
+  if (r.diagram.nodes.length !== 2) throw new Error('boxes: ' + String(r.diagram.nodes.length))
+  if (r.diagram.edges.length !== 1) throw new Error('edges: ' + String(r.diagram.edges.length))
+  if (r.diagram.edges[0].label !== 'uses') throw new Error('label: ' + String(r.diagram.edges[0].label))
+  if (r.ignored.length !== 1 || !r.ignored[0].includes('`#blue` is a line style')) throw new Error('ignored: ' + JSON.stringify(r.ignored))
+})
+
 // Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
 // called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
 test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {

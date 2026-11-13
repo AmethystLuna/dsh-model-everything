@@ -258,6 +258,9 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
         if (startId === undefined) startId = marked.target.id
         return
       }
+      if (marked.style !== undefined) {
+        ignored.push(where + '`' + marked.style + '` is a line style this renderer does not have: the palette is fixed')
+      }
       ensure(builder, marked.from.id, marked.from.label, marked.from.shape, true)
       ensure(builder, marked.to.id, marked.to.label, marked.to.shape, true)
       builder.edges.push({

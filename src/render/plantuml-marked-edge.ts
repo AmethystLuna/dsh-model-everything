@@ -21,6 +21,8 @@ export type MarkedLine =
       label: string
       hint?: 'up' | 'down' | 'left' | 'right'
       invisible?: true
+      /** A line style the arrow asked for, which is reported and not drawn. */
+      style?: string
     }
 
 /** The direction forms, which state where the far box goes. */
@@ -30,6 +32,9 @@ const DIRECTED = /^(.+?)\s*-(up|down|left|right)-+>?\s*(.+?)(?:\s*:\s*(.+))?$/
 const HIDDEN = /^(.+?)\s*-\s*\[\s*hidden\s*\]\s*-+>?\s*(.+?)(?:\s*:\s*(.+))?$/
 
 const START = /^\[\*\]\s*-->\s*(.+)$/
+
+/** `a -[#blue]-> b` asks for a line style: the arrow is drawn, the style is reported. */
+const STYLED = /^(.+?)\s*-\[([^\]]*)\]-+>?\s*(.+?)(?:\s*:\s*(.+))?$/
 
 /**
  * The marked line, or `undefined` when the line is a plain arrow or not an edge at all.
@@ -51,6 +56,18 @@ export function readMarked(line: string): MarkedLine | undefined {
       to: reference(hidden[2] as string),
       label: (hidden[3] ?? '').trim(),
       invisible: true,
+    }
+  }
+
+  // A bracket that is not `hidden` is a style: the edge is read, the style reported.
+  const styled = STYLED.exec(line)
+  if (styled !== null) {
+    return {
+      kind: 'edge',
+      from: reference(styled[1] as string),
+      to: reference(styled[3] as string),
+      label: (styled[4] ?? '').trim(),
+      style: (styled[2] as string).trim(),
     }
   }
 

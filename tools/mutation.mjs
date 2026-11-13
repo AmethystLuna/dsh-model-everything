@@ -465,6 +465,13 @@ const MUTATIONS = [
     from: "  if (!/^([-.]{2,}|={2,}.*={2,})$/.test(line)) return undefined",
     to: "  if (true) return undefined",
   },
+  {
+    id: 'M54',
+    what: 'a styled arrow is not read as an edge',
+    file: 'src/render/plantuml-marked-edge.ts',
+    from: '  const styled = STYLED.exec(line)',
+    to: '  const styled = null as RegExpExecArray | null',
+  },
 ]
 
 const argument = process.argv[2]

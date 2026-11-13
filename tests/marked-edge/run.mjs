@@ -60,6 +60,16 @@ test('a plain arrow is not a marked line', () => {
   }
 })
 
+test('a style in brackets is reported, and the arrow is still an edge', () => {
+  // Without this, `a -[#blue]-> b` matches no edge form and is declared as one element named after the whole line.
+  const got = read('a -[#blue]-> b : uses')
+  if (got.kind !== 'edge') throw new Error('kind: ' + got.kind)
+  if (got.from.id !== 'a' || got.to.id !== 'b') throw new Error(JSON.stringify([got.from, got.to]))
+  if (got.style !== '#blue') throw new Error('style: ' + String(got.style))
+  if (got.label !== 'uses') throw new Error('label: ' + got.label)
+  if (got.invisible !== undefined) throw new Error('a styled edge was read as hidden')
+})
+
 if (failures > 0) {
   console.log('marked-edge tests failed:', failures)
   process.exit(1)
