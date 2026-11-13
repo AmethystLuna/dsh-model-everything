@@ -418,6 +418,14 @@ const MUTATIONS = [
     from: '    solid: SOLID_BOUNDARY.has(opener),',
     to: '    solid: false,',
   },
+
+  {
+    id: 'M48',
+    what: 'an exit marker is drawn solid',
+    file: 'src/render/plantuml-edge.ts',
+    from: '      dashed: true,',
+    to: '      dashed: false,',
+  },
 ]
 
 const argument = process.argv[2]
