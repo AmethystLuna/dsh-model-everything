@@ -185,6 +185,7 @@ node tests/diagram-card/run.mjs
 node tests/diagram-diff/run.mjs
 node tests/reading-shapes/run.mjs
 node tests/diagram-review/run.mjs
+node tests/diagram-out/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
 node tests/apply-smoke.mjs
@@ -314,6 +315,7 @@ And the gates around it:
 | `diagram-diff` | 5 | an added node is an info change and the delta passes |
 | `reading-shapes` | 4 | the automaton family reports top-level findings and a next step |
 | `diagram-review` | 5 | a drawing inside every budget passes and states what it measured |
+| `diagram-out` | 4 | a drawing asked for on disk is there, and is the markup that was returned |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 5 | the declaration carries a range, a release map and a profile list |
 | `apply-smoke.mjs` | 0 | (read the file) |

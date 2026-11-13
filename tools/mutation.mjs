@@ -113,6 +113,7 @@ const SUITES = [
   'tests/diagram-diff/run.mjs',
   'tests/reading-shapes/run.mjs',
   'tests/diagram-review/run.mjs',
+  'tests/diagram-out/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
 ]
@@ -950,6 +951,13 @@ const MUTATIONS = [
     file: 'src/render/budget.ts',
     from: '    if (size > caps.maxMembers) {',
     to: '    if (size > caps.maxMembers + 1000) {',
+  },
+  {
+    id: 'M116',
+    what: 'a failed write is swallowed and the report says nothing about it',
+    file: 'src/diagram-render-tool.ts',
+    from: "        writeProblem = 'could not write ' + target + ': ' + reason.split('\\n')[0]",
+    to: '        void writeProblem',
   },
 ]
 
