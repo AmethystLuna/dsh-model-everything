@@ -161,6 +161,7 @@
     "checks-line",
     "clearance",
     "client",
+    "client-bundle",
     "components",
     "compose-inputs",
     "concurrency",

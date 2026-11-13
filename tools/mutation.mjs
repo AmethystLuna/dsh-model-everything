@@ -103,6 +103,7 @@ const SUITES = [
   'tests/model-hash/run.mjs',
   'tests/schema-registry/run.mjs',
   'tests/export-artifacts/run.mjs',
+  'tests/client-bundle/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -840,6 +841,13 @@ const MUTATIONS = [
     file: 'src/exporters.ts',
     from: "    if (used.has(candidate)) candidate = candidate + '_' + index",
     to: '    void 0',
+  },
+  {
+    id: 'M102',
+    what: 'the client bundle registers under a name the manifest does not declare',
+    file: 'scripts/build-client.mjs',
+    from: "const PACKAGE = 'dsh-model-everything'",
+    to: "const PACKAGE = 'model-everything'",
   },
 ]
 
