@@ -524,10 +524,10 @@ const MUTATIONS = [
   },
   {
     id: 'M62',
-    what: 'the stadium delimiter is tried before the circle, so the label keeps a bracket',
+    what: 'a stadium is drawn as a rectangle',
     file: 'src/render/mermaid-node.ts',
     from: "  [/^\\(\\[(.+)\\]\\)$/, 'stadium'],",
-    to: "  [/^\\(\\[(.+)\\]\\)$/, 'stadium'],\n  [/^\\((.+)\\)$/, 'stadium'],",
+    to: "  [/^\\(\\[(.+)\\]\\)$/, 'rect'],",
   },
 ]
 
