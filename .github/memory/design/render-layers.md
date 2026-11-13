@@ -98,27 +98,17 @@ metadata:
 对近千行文件做**行号手术**不可行（第 74 轮两次剪错、整体回滚）。可用做法：按**函数名**定位、用括号配平算块边界、一次只搬一块、
 每步 `tsc` + 哈希比对。第 75–88 轮全部按此执行，没有一次需要回滚。
 
-## 解析器现在的样子（第 75–83 轮拆分后）
+## 解析器还留着什么（第 95 轮）
 
-`from-plantuml.ts` 从 982 行降到 612 行，读一行的判决按“行族”分散到六个模块，每个都能脱离画布测试：
+十个行族搬走之后，`from-plantuml.ts` 里剩下的都不是“读一行”的规则：
 
-| 模块 | 决定什么 | 套件 |
-|---|---|---|
-| `plantuml-reference.ts` | 一个引用、一个箭头、一个边界名、元素关键字、块成员 | `arrows`、`names` |
-| `plantuml-directives.ts` | 非图源行：预处理、布局控制、`hide`、`include` | `directives` |
-| `plantuml-page.ts` | 标题、页文、方向、`scale`、背景、`skinparam` | `directives` |
-| `plantuml-declaration.ts` | 声明行的元素与装饰 | `declaration` |
-| `plantuml-boundary.ts` | 边界的开与闭、实线/虚线 | `boundary` |
-| `plantuml-edge.ts` | 箭头意味着什么（含 `[*]` 出口） | `edge` |
+- **类型与两个助手**：`Builder`、`Diagram` 的装配类型，`ensure()`（写一个元素并登记到最内层边界），`keywordOf()`；
+- **块预收集的调用**：一行 `collectPageBlocks(lines)`，五个块走查已在 `plantuml-page-blocks.ts`；
+- **单行分派**：209 行，每一族都是“把这一行交给某个模块，然后按它的回答写入或报告”；
+- **边界修正**：一行 `resolveBoundaries(builder, …)`；
+- **组装**：把 `heading`、页文、`together` 行、`scale`、背景合进最终 `Diagram`，并生成 caption。
 
-解析器仍保留：块预收集（header/legend/note）、注释定位、`together` 的记帐、边界栈、会话尾声。主循环 390 行、34 个分支，
-其中 6 处是“把这一行交给某个模块”。
-
-两条由哈希而非套件发现的教训（都在这一轮系列里）：**note 守卫**和**出口虚线的 dashed 丢失**——套件测行为，属性丢失只改字节。
-所以每次搬家都必须跑 20 张图的逐字节比对，不能只看套件绿。
-
-第三个发现更隐蔽：解析器里 `...(effect.dashed === undefined ? {} : { dashed: true })` 会让 `false` 也变成虚线，
-于是“出口是否虚线”这个变异在语料里看不见（图仍然虚线）。改成 `=== true` 之后语料立刻能抓到。**展开条件写错方向，等于把测试废掉。**
+再往下拆的收益已经很小：剩下的每一段都直接操作 `builder` 或最终 `Diagram`，单独搬出去只会多一层参数。**到此为止。**
 
 ## 不算进去的东西
 
