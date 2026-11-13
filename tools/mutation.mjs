@@ -641,6 +641,13 @@ const MUTATIONS = [
     from: '  if (!served.includes(intent)) {',
     to: '  if (false) {',
   },
+  {
+    id: 'M77',
+    what: 'a capped check reports pass instead of skip',
+    file: 'src/engine.ts',
+    from: "    skipped.status = 'skip'",
+    to: "    skipped.status = 'pass'",
+  },
 ]
 
 const argument = process.argv[2]
