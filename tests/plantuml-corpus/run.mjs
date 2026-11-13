@@ -970,6 +970,20 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A subgraph with nothing inside it has no rectangle, and the two notations answer alike: refused by its own line, not dropped
+// at paint time without a word.
+test('an empty subgraph is refused by its line, in either notation', () => {
+  const mermaid = render({ source: 'flowchart TD\nsubgraph one\nend\na --> c', notation: 'mermaid' }, {}, { scheme: 'default' })
+  if (mermaid.refused.length !== 1) throw new Error('mermaid: ' + JSON.stringify(mermaid.refused))
+  if (!mermaid.refused[0].startsWith('line 2:')) throw new Error('the line: ' + mermaid.refused[0])
+  if (!mermaid.refused[0].includes('nothing inside it')) throw new Error('the reason: ' + mermaid.refused[0])
+  if (mermaid.canvas.shapes.some((shape) => shape.kind === 'group')) throw new Error('an empty group was drawn')
+  const plantuml = render({ source: ['@startuml', 'package p {', '}', 'component a', '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  if (plantuml.refused.length !== 1 || !plantuml.refused[0].includes('nothing inside it')) {
+    throw new Error('plantuml: ' + JSON.stringify(plantuml.refused))
+  }
+})
+
 // A Mermaid subgraph can be named three ways, and a per-subgraph direction is a hint this renderer drops rather than refuses.
 test('a Mermaid subgraph keeps its label however it is named', () => {
   const forms = {
