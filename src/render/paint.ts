@@ -42,6 +42,8 @@ import { snapJogs } from './jog.js'
 import { piecesFrom, sharedLength, sharedWith, totalFromRows, type Piece } from './separate.js'
 import { applyLift, liftedSpan } from './lift.js'
 import { repairedRoute } from './repair.js'
+import { channelTarget, interiorRuns, movedRun } from './clearance.js'
+import { NEAR_LINE } from './separate.js'
 import { centreRun, packPorts, PORT_SEPARATION } from './ports.js'
 import { LABEL_HEIGHT, placeLabel, type LabelPlacement } from './labels.js'
 import { LABEL_PAD } from './labels.js'
@@ -1614,6 +1616,32 @@ const topOffset = MARGIN + TITLE_HEIGHT + headerShift + titleShift
     if (source === undefined || target === undefined) continue
     const cleaner = snapJogs(shape.points, blockedBy(source, target))
     if (cleaner !== undefined) shape.points = cleaner
+  }
+
+  // A run that hugs a box is moved into the middle of the channel it runs down: the drawing's guarantee is that a route never
+  // crosses a box, and a line half a pixel from a border reads as touching it. A move is taken only when the moved line clears
+  // every box it does not end at and keeps its distance from the other routes.
+  for (const { shape, edge } of routes) {
+    if (shape.kind !== 'path') continue
+    const diagramEdge = diagram.edges[edge] as DiagramEdge | undefined
+    if (diagramEdge === undefined) continue
+    const source = endBox(diagramEdge.from)
+    const target = endBox(diagramEdge.to)
+    if (source === undefined || target === undefined) continue
+    for (const run of interiorRuns(shape.points)) {
+      const wanted = channelTarget(run, boxList)
+      if (wanted === undefined) continue
+      const moved = movedRun(shape.points, run, wanted)
+      if (boxesCrossedBy(moved, source, target, boxList).length > 0) continue
+      const near = (other: PathShape): boolean =>
+        piecesOf(other).some((piece) => {
+          if (piece.axis !== run.axis) return false
+          if (Math.abs(piece.at - wanted) >= NEAR_LINE) return false
+          return Math.min(run.hi, piece.hi) - Math.max(run.lo, piece.lo) > 1
+        })
+      if (routes.some((other) => other.shape !== shape && other.shape.kind === 'path' && near(other.shape))) continue
+      shape.points = moved
+    }
   }
 
   for (const { shape, edge } of routes) {
