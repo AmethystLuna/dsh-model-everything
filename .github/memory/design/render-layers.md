@@ -51,37 +51,52 @@ metadata:
 尝试中再次确认。老方法写在这里，下次拆分直接照做。
 一个小的搬运脚本读 AST 边界；不要再用人工数出来的行号。已回滚，因此没有遗留风险。
 
-## 总账：行族 × 模块 × 套件 × 变异点（第 86 轮）
+## 总账：行族 × 模块 × 套件 × 变异点（第 95 轮更新）
 
-`src/render/` 下 43 个模块；49 个变异点分布在 13 个文件上；`test:engine` 跑 62 个套件。
+`src/render/` 下十个 `plantuml-*` 模块，59 个变异点，`test:engine` 跑 64 个套件。`from-plantuml.ts` 453 行：头 172（类型、`ensure`、
+`keywordOf`）、块预收集 30、单行分派 209、尾声 43。
 
-| 行族 | 模块 | 套件 | 变异点 |
+| 行族 | 模块（行数） | 套件 | 变异点 |
 |---|---|---|---|
-| 引用、箭头、边界名、关键字表、块成员 | `plantuml-reference.ts` | `arrows`、`names` | M41 M42 M43 |
-| 非图源行（预处理、布局、hide、include、`;`） | `plantuml-directives.ts` | `directives` | M44 |
-| 页面行（标题、页文、方向、scale、背景、skinparam） | `plantuml-page.ts` | `directives` | M45 |
-| 声明行 | `plantuml-declaration.ts` | `declaration` | M46 |
-| 边界开闭 | `plantuml-boundary.ts` | `boundary` | M47 |
-| 箭头含义（含 `[*]` 出口） | `plantuml-edge.ts` | `edge` | M48 |
-| 注释定位 | `plantuml-note.ts` | `note` | M49 |
-| 带标记的边（方向、hidden、起始） | `plantuml-marked-edge.ts` | `marked-edge` | M50 |
+| 引用、箭头、边界名、关键字表、块成员 | `plantuml-reference.ts`（225） | `arrows`、`names` | M41 M42 M43 |
+| 非图源行（预处理、布局、hide、include、`;`、分隔线） | `plantuml-directives.ts`（99） | `directives` | M44 M53 |
+| 页面行 | `plantuml-page.ts`（98） | `directives` | M45 |
+| 声明行 | `plantuml-declaration.ts`（78） | `declaration` | M46 |
+| 边界开闭 | `plantuml-boundary.ts`（53） | `boundary` | M47 M55 |
+| 箭头含义（含出口） | `plantuml-edge.ts`（47） | `edge` | M48 |
+| 注释定位与形状 | `plantuml-note.ts`（83） | `note` | M49 M56 |
+| 带标记的边（方向、hidden、样式、起始） | `plantuml-marked-edge.ts`（87） | `marked-edge` | M50 M54 |
+| 边界修正（同名消解、空块、歧义名） | `plantuml-resolve.ts`（161） | `resolve` | M51 |
+| 块预收集（legend、页文、标题、注释、块注释） | `plantuml-page-blocks.ts`（130） | `page-blocks` | M52 |
 
-**覆盖率的诚实说明**：这 8 个模块只有 10 个变异点，而 `paint.ts` 一个文件就有 9 个。原因不是它们更安全，而是它们的判定更容易被**单测**
-逐条钉住——8 个套件共 60 余条用例，每条断言一个回答。变异点的数量在这里衡量的是“哪些代码没有别的套件盯着”，不是“哪里风险高”。
+**关于覆盖率的诚实说明**：这十个模块只有 13 个变异点，而 `paint.ts` 一个文件就有 9 个。原因不是它们更安全，而是它们的判定被十个套件
+逐条钉住。变异点数量在这里衡量的是“哪些代码没有别的套件盯着”，不是“哪里风险高”。
 
-## 剩余构成（第 86 轮实测）
+### 第 87–94 轮修掉的四个真缺陷
 
-`from-plantuml.ts` 628 行（含类型与 `ensure`/`keywordOf` 166 行）：`fromPlantUml` 从 167 行开始，分三段——
-
-| 段 | 行数 | 内容 |
+| 缺陷 | 症状 | 抓它的东西 |
 |---|---|---|
-| 块预收集 | 111 | legend / page text / title / note 的 `collectBlocks` 与未闭合报告 |
-| 单行分派 | 174 | 主循环：together 记帐、页面、指令、标记边、箭头、边界、声明、注释、拒收 |
-| 尾声 | 177 | 边界与同名节点的消解、`together` 报告、图的最终组装 |
+| 两条注释贴同一元素共用一个 id | 第二条被静默丢弃（只画一条） | 一条**画两条**的用例 |
+| Mermaid 侧同一缺陷 | 同上，隔了两轮才在另一个适配器里被发现 | 跨记号一致性用例 |
+| `a -[#blue]-> b` 不是任何边形式 | 整行变成一个元素（凭空多一个盒子） | 变体矩阵 |
+| `...` 匹配了箭头正则 | 画成 `.` → `.` 的一条边 | 变体矩阵 |
+| 第二个 `[*] -->` 起点被静默丢弃 | `init` 与源码不符，无任何说明 | 状态机矩阵（两侧各一次） |
 
-尾声是剩下的第二大盘子，也是最难拆的一处：它要同时看 `builder.nodes`、`builder.groups`、`builder.implicit` 和若干 `Map`，
-本质是一次**图的修正**，不是“读一行”。下一轮若要继续，目标是把它提成 `resolveBoundaries(builder): void`，并用同样的方式验证
-（20 张图逐字节 + 现有 62 套件）。
+**同一规则写在两个适配器里，就会错两遍。** 注释 id、第二个起点，都是先修 PlantUML、隔一轮才在 Mermaid 里发现同一个问题。所以第 94 轮
+把“同一语义在两种记号下必须是同一类别”做成用例——这是唯一能自动发现“第二份拷贝”的办法。
+
+### 三条被哈希（而非套件）抓到的教训
+
+1. **note 守卫**：我“合理化”地拒绝 note 行，K 图变了；
+2. **出口虚线丢失**：截断的打印让我以为没有 `dashed`，D 图变了；
+3. **展开条件写反**：`!== undefined` 让 `false` 也变虚线，把变异测试本身废掉。
+
+共同点：**套件测行为，属性丢失只改字节**。每次改动都要跑 20 张验收图的逐字节比对。
+
+### 一条操作禁令
+
+对近千行文件做**行号手术**不可行（第 74 轮两次剪错、整体回滚）。可用做法：按**函数名**定位、用括号配平算块边界、一次只搬一块、
+每步 `tsc` + 哈希比对。第 75–88 轮全部按此执行，没有一次需要回滚。
 
 ## 解析器现在的样子（第 75–83 轮拆分后）
 
