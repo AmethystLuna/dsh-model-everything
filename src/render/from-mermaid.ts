@@ -21,6 +21,7 @@
  */
 
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode } from './model.js'
+import { readNode } from './mermaid-node.js'
 
 export interface Parsed {
   diagram: Diagram
@@ -78,34 +79,7 @@ function ensure(builder: Builder, id: string, label?: string, shape?: DiagramNod
   if (label !== undefined && (existing.label === undefined || existing.label === '')) existing.label = label
 }
 
-function nodeFrom(token: string): { id: string; label?: string; shape?: DiagramNode['shape'] } | undefined {
-  const match = NODE.exec(token.trim())
-  if (match === null) return undefined
-  const id = match[1]
-  const label = [match[2], match[3], match[4], match[5], match[6], match[7]].find((value) => value !== undefined && value.trim() !== '')
-  // Group 2 `[(x)]` is a datastore, 3 `[[x]]` a subroutine, 4 `[x]` a rectangle, 5 `(x)` a rounded box, 6 `{x}` a
-  // decision, 7 `<<x>>` a hexagon. Mermaid's own mapping; a shape the notation did not state stays undefined.
-  const shape: DiagramNode['shape'] | undefined =
-    match[2] !== undefined
-      ? 'cylinder'
-      : match[3] !== undefined
-        ? 'subroutine'
-        : match[4] !== undefined
-          ? 'rect'
-          : match[5] !== undefined
-            ? 'stadium'
-            : match[6] !== undefined
-              ? 'diamond'
-              : match[7] !== undefined
-                ? 'hexagon'
-                : undefined
-  return {
-    id,
-    ...(label === undefined ? {} : { label: label.trim().replace(/^["']|["']$/g, '') }),
-    ...(shape === undefined ? {} : { shape }),
-  }
-}
-
+const nodeFrom = (token: string) => readNode(token)
 export function fromMermaid(source: string, title = 'mermaid'): Parsed {
   const lines = source.split(/\r?\n/)
   const refused: string[] = []

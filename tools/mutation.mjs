@@ -63,6 +63,7 @@ const SUITES = [
   'tests/marked-edge/run.mjs',
   'tests/resolve/run.mjs',
   'tests/page-blocks/run.mjs',
+  'tests/mermaid-node/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -520,6 +521,13 @@ const MUTATIONS = [
     file: 'src/render/plantuml-declaration.ts',
     from: "  const circle = /^\\(\\)\\s*(?:\"(.+?)\"|([^\"\\s][^\"\\s]*))?\\s*(?:as\\s+([A-Za-z_][\\w-]*))?\\s*$/.exec(line)",
     to: '  const circle = null as RegExpExecArray | null',
+  },
+  {
+    id: 'M62',
+    what: 'the stadium delimiter is tried before the circle, so the label keeps a bracket',
+    file: 'src/render/mermaid-node.ts',
+    from: "  [/^\\(\\[(.+)\\]\\)$/, 'stadium'],",
+    to: "  [/^\\(\\[(.+)\\]\\)$/, 'stadium'],\n  [/^\\((.+)\\)$/, 'stadium'],",
   },
 ]
 

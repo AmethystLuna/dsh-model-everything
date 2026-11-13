@@ -1,0 +1,20 @@
+/**
+ * What one Mermaid node token states: its id, its label and the shape it asked for.
+ *
+ * The delimiters nest - `a([Text])` is a stadium around `Text`, `a((Text))` a circle, `a[/Text/]` a parallelogram - and a matcher that tries
+ * them in the wrong order reads the outer pair and leaves the inner one in the label, which is how `[Stadium]` and `(Circle)` became names.
+ * The order below is longest delimiter first, and that order is the whole of the rule.
+ */
+import type { DiagramNode } from './model.js';
+type Shape = DiagramNode['shape'];
+/**
+ * The node a token states, or `undefined` when the token is not a node.
+ *
+ * A token with no delimiters is an id alone, which is how an edge names an element it does not declare. A quoted label loses its quotes.
+ */
+export declare function readNode(token: string): {
+    id: string;
+    label?: string;
+    shape?: Shape;
+} | undefined;
+export {};
