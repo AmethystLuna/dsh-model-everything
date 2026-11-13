@@ -73,6 +73,7 @@ const SUITES = [
   'tests/next-steps/run.mjs',
   'tests/doc-paths/run.mjs',
   'tests/docs-paths/run.mjs',
+  'tests/tool-schema/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -600,6 +601,13 @@ const MUTATIONS = [
     file: 'skills/model-everything/SKILL.md',
     from: 'references/logic-verification-guide.md#manual',
     to: 'references/logic-verification-handbook.md#manual',
+  },
+  {
+    id: 'M72',
+    what: 'the schema offers a diagram kind the engine does not know',
+    file: 'src/uml-tool.ts',
+    from: 'const FAMILIES = [...UML_DIAGRAMS]',
+    to: "const FAMILIES = [...UML_DIAGRAMS, 'block-diagram']",
   },
 ]
 
