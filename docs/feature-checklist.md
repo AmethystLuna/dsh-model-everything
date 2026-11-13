@@ -245,7 +245,7 @@ And the gates around it:
 | `names` | 9 | a bare name is left alone |
 | `clearance` | 7 | only an interior run can be moved |
 | `arrows` | 8 | a plain arrow points from the left name to the right one |
-| `directives` | 7 | a preprocessor directive is dropped with a reason |
+| `directives` | 13 | a preprocessor directive is dropped with a reason |
 | `presentation` | 58 | the card keeps the verdict, the counts and the first error |
 | `routing` | 6 | every route says what it owns and where the adjacent case goes |
 | `tool-routing` | 6 | every case names a tool the routing table covers |
