@@ -400,6 +400,14 @@ const MUTATIONS = [
     from: '    if (!(factor >= SCALE_RANGE.min && factor <= SCALE_RANGE.max)) {',
     to: '    if (false) {',
   },
+
+  {
+    id: 'M46',
+    what: 'a declaration keeps its decorations in its name',
+    file: 'src/render/plantuml-declaration.ts',
+    from: '    const rest = bare.name',
+    to: '    const rest = declared[2] as string',
+  },
 ]
 
 const argument = process.argv[2]
