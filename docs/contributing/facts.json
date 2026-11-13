@@ -194,6 +194,7 @@
     "engine",
     "examples",
     "export-artifacts",
+    "export-extras",
     "export-warnings",
     "exporters",
     "external",

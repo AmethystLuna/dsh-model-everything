@@ -115,6 +115,7 @@ const SUITES = [
   'tests/diagram-review/run.mjs',
   'tests/diagram-out/run.mjs',
   'tests/card-blocks/run.mjs',
+  'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
 ]
@@ -966,6 +967,13 @@ const MUTATIONS = [
     file: 'src/presentation.ts',
     from: 'const delta = card.delta',
     to: 'const delta = undefined',
+  },
+  {
+    id: 'M118',
+    what: 'a never-state is not translated into a UPPAAL query',
+    file: 'src/exporters.ts',
+    from: "  for (const index of forbidden) queries.push('A[] not ModelEverything.' + stateIds[index])",
+    to: '  void forbidden',
   },
 ]
 
