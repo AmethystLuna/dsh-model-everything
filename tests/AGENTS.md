@@ -160,6 +160,10 @@ suite to notice. Mutate the built `lib/` file in a scratch copy - never the repo
   `test:engine` and never during a mutation. This reported three mutations as missed before it was noticed, and each
   time the suite was correct and simply absent. The tool now prints a warning at the start of every run for exactly
   this case - read the warning before reading the MISSED line, and check the list before suspecting the suite.
+- **a MISSED result may also mean the mutated line never ran.** A removal case that took the edges out before removing the state never
+  exercised the cleanup that drops them, so a mutation inside that cleanup changed nothing. The question to ask before blaming the suite is
+  not only "is it on the run list" but "did this case reach the line" - and the way to answer it is to make the case's own input need the
+  branch: here, leave an edge of the removed state's own in place.
 - **so run the pristine copy first.** The order that works: copy `lib/` and the suite, run it and require a green
   result with no `SKIP`, and only then apply the mutation. A red or skipping baseline means the mutation cannot be
   judged - report that, not "missed". The same `node_modules` junction that makes a tool-loading suite work belongs in

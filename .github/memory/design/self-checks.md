@@ -136,6 +136,28 @@ metadata:
 | 门禁命令 | 88 |
 | 变异点 | 84 |
 
+## 3.6 第四段：三对孪生工具，和编辑操作族（第 127–131 轮）
+
+| 一对工具 | 谁判什么 | 守卫 |
+|---|---|---|
+| `uml_structure_verify` / `model_design_review` | 图的依赖形状（UML02x、MATRIX_*） / 设计自己声明的自洽（DES*） | `tests/des-vs-uml` |
+| `model_interleaving_scan` / `model_compose_verify` | 挖断言、不证明（CONCURRENCY_*） / 对给定模型判 C1–C5 | `tests/scan-vs-compose` |
+| `uml_review` / `model_verify` | 审建模（UML*，并指向验证） / 判行为（S*/A*） | `tests/review-vs-verify` |
+
+三对共有的性质：**同一个输入，两套码，互不冒用**；且每一方都不得替对方说话（扫描器明写“不证明”，评审明写“去跑 model_verify”）。
+
+### 编辑操作族（第 130 轮）
+
+`tests/edit-refusals`（拒绝侧：零写入 + 逃生舱允许写入）与 `tests/edit-ops`（成功侧：六个操作各一次，读回文件）合成完整契约。
+
+### 变异未命中的第三种原因（M88）
+
+未命中前两次是“补丁没打上/打错地方”和“套件不在名单”，这次是第三种：**那一行根本没被执行**。
+
+批次先删边、再删状态，`removeState` 里的“顺带删掉指向它的边”就无事可做，变异它当然不响。修法不是改变异，是**让用例的输入需要那条分支**：把被删状态自身的一条出边留到最后。
+
+规则已写进 `tests/AGENTS.md`：未命中时除了问“在不在名单”，还要问“这个用例走到那行了吗”。
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
