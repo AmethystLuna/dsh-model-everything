@@ -970,6 +970,51 @@ test('a note block carries its lines as text', () => {
   if (!r.markup.includes('first line component ghost')) throw new Error('the note was not drawn')
 })
 
+// A Mermaid subgraph can be named three ways, and a per-subgraph direction is a hint this renderer drops rather than refuses.
+test('a Mermaid subgraph keeps its label however it is named', () => {
+  const forms = {
+    plain: 'subgraph one',
+    quoted: 'subgraph "Group A"',
+    bracketed: 'subgraph id1["Group A"]',
+  }
+  for (const [name, opener] of Object.entries(forms)) {
+    const source = ['flowchart TD', opener, '  a --> b', 'end', 'a --> c'].join('\n')
+    const r = render({ source }, {}, { scheme: 'default' })
+    if (r.refused.length !== 0) throw new Error(name + ' refused: ' + JSON.stringify(r.refused))
+    const group = (r.diagram.groups ?? [])[0]
+    const expected = name === 'plain' ? 'one' : 'Group A'
+    if (group?.label !== expected) throw new Error(name + ' label: ' + String(group?.label))
+    if (JSON.stringify(group?.members) !== JSON.stringify(['a', 'b'])) throw new Error(name + ' members: ' + JSON.stringify(group?.members))
+  }
+  // `direction` inside a subgraph is a hint, not a line the renderer cannot read.
+  const directed = render({ source: ['flowchart TD', 'subgraph one', '  direction LR', '  a --> b', 'end'].join('\n') }, {}, { scheme: 'default' })
+  if (directed.refused.length !== 0) throw new Error('a subgraph direction was refused: ' + JSON.stringify(directed.refused))
+  if (directed.ignored.length !== 1 || !directed.ignored[0].includes('one direction per drawing')) {
+    throw new Error('the direction note: ' + JSON.stringify(directed.ignored))
+  }
+})
+
+// How a source is written - its line endings, its indentation, a byte-order mark - must not change what it draws. Measured, all of
+// them already draw the same picture; the case keeps it that way, because a parser that trims one place and not another is exactly
+// how a source stops being portable.
+test('the way a source is written does not change the drawing', () => {
+  const base = ['@startuml', 'component gateway', 'component orders', 'gateway --> orders : retry', '@enduml'].join('\n')
+  const variants = {
+    crlf: base.replace(/\n/g, '\r\n'),
+    mixed: base.replace('\n', '\r\n'),
+    trailingSpaces: base.replace(/\n/g, '   \n'),
+    tabs: base.replace(/^component /gm, '\tcomponent '),
+    bom: '\ufeff' + base,
+    blankLines: base.replace(/\n/g, '\n\n'),
+    finalNewline: base + '\n',
+  }
+  const reference = render({ source: base }, {}, { scheme: 'default' }).markup
+  for (const [name, source] of Object.entries(variants)) {
+    const drawn = render({ source }, {}, { scheme: 'default' }).markup
+    if (drawn !== reference) throw new Error(name + ' draws a different picture')
+  }
+})
+
 // `/' ... '/` is a comment, not a defect: its lines are text, and a reader who writes one should not be told twice that it is
 // undrawable.
 test('a block comment is skipped, not refused', () => {
