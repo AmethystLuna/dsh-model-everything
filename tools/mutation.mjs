@@ -358,6 +358,14 @@ const MUTATIONS = [
     from: '    if (/^together\\b[^{]*\\{\\s*$/.test(line)) {',
     to: '    if (false) {',
   },
+
+  {
+    id: 'M41',
+    what: 'an arrow mark on the left end is read as if it were on the right',
+    file: 'src/render/plantuml-reference.ts',
+    from: '      from: right,',
+    to: '      from: left,',
+  },
 ]
 
 const argument = process.argv[2]
