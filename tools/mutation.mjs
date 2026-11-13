@@ -88,6 +88,7 @@ const SUITES = [
   'tests/datamodel-inputs/run.mjs',
   'tests/des-vs-uml/run.mjs',
   'tests/scan-vs-compose/run.mjs',
+  'tests/review-vs-verify/run.mjs',
 ]
 
 const MUTATIONS = [
@@ -720,6 +721,13 @@ const MUTATIONS = [
     file: 'src/concurrency.ts',
     from: "detected; this plugin does not verify it",
     to: "detected; this plugin accepts it",
+  },
+  {
+    id: 'M87',
+    what: 'the review stops routing a reader to the behavioural checks',
+    file: 'src/uml.ts',
+    from: "nextSteps.push('Run model_verify on this model",
+    to: "nextSteps.push('Run the behavioural checks on this model",
   },
 ]
 
