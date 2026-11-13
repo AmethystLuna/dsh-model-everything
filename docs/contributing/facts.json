@@ -155,6 +155,7 @@
     "boundary",
     "catalog",
     "channels",
+    "check-status",
     "clearance",
     "client",
     "components",

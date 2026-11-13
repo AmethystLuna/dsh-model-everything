@@ -78,6 +78,7 @@ const SUITES = [
   'tests/diff-claims/run.mjs',
   'tests/suite-registry/run.mjs',
   'tests/intent/run.mjs',
+  'tests/check-status/run.mjs',
 ]
 
 const MUTATIONS = [

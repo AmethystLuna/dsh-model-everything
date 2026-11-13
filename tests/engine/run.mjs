@@ -2881,31 +2881,7 @@ async function runEntryShapeTests() {
 // skip semantics: a check that examined nothing says `skip`, not `pass`
 // ---------------------------------------------------------------------------
 
-// A cap can leave a check with nothing to decide, and that is a skip even when the model has plenty: `maxPermutationEvents: 1` on a model with
-// two events examined one. It read as `pass` with "skipped" in the detail, which a reader scanning statuses takes as "checked and absent".
-function runCappedCheckTests() {
-  const machine = {
-    schemaVersion: 1, init: 'idle',
-    states: [{ id: 'idle' }, { id: 'xDone' }, { id: 'both', terminal: true }, { id: 'yDone' }],
-    transitions: [
-      { from: 'idle', event: 'x', to: 'xDone' },
-      { from: 'idle', event: 'y', to: 'yDone' },
-      { from: 'xDone', event: 'y', to: 'both' },
-    ],
-  }
-  const capped = runVerification(machine, { maxPermutationEvents: 1 })
-  const a3 = capped.checks.find((check) => check.id === 'A3')
-  if (a3 === undefined) throw new Error('A3 is missing')
-  if (a3.status !== 'skip') throw new Error('a capped A3 reports ' + String(a3.status))
-  if (!String(a3.detail).startsWith('skipped: ')) throw new Error('the detail: ' + String(a3.detail))
-  if (!capped.summary.checksSkipped.includes('A3')) throw new Error('A3 is not in checksSkipped')
-  // The same model with the default cap decides it, so the skip came from the cap and not from the model.
-  const decided = runVerification(machine)
-  const full = decided.checks.find((check) => check.id === 'A3')
-  if (full === undefined || full.status === 'skip') throw new Error('the uncapped A3 skipped too: ' + String(full?.status))
-}
-
-async function runSkipSemanticsTests() {
+function runSkipSemanticsTests() {
   const minimal = { schemaVersion: 1, init: 'A', states: [{ id: 'A' }, { id: 'B', terminal: true }], transitions: [{ from: 'A', event: 'go', to: 'B' }] }
   const report = runVerification(minimal)
 
@@ -2964,7 +2940,6 @@ async function runSkipSemanticsTests() {
 }
 
 await runSkipSemanticsTests()
-await runCappedCheckTests()
 
 await runEntryShapeTests()
 
