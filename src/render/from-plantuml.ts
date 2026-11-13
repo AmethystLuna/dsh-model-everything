@@ -30,7 +30,7 @@
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
 import { collectBlocks } from './blocks.js'
 import { bareName, decorationReason } from './names.js'
-import { isTogetherOpener, readDirective, statementSeparator } from './plantuml-directives.js'
+import { isTogetherOpener, readDirective, readSeparator, statementSeparator } from './plantuml-directives.js'
 import { readPageLine } from './plantuml-page.js'
 import { readDeclaration } from './plantuml-declaration.js'
 import { readBoundary } from './plantuml-boundary.js'
@@ -83,8 +83,11 @@ const NOT_DRAWN: Record<string, string> = {
   agent: 'an agent is not one of the shapes this renderer draws',
 }
 
-/** A sequence fragment or lifeline event: lines that only make sense in a diagram this renderer refuses. */
-const FRAGMENT = new Set(['sequence', 'alt', 'opt', 'loop', 'par', 'group', 'ref', 'break', 'critical', 'activate', 'deactivate', 'destroy', 'create', 'newpage', 'autonumber'])
+/** A sequence fragment: a block that only means something in a sequence diagram, which this renderer refuses. */
+const FRAGMENT = new Set(['sequence', 'alt', 'opt', 'loop', 'par', 'group', 'ref', 'break', 'critical'])
+
+/** A lifeline event: a statement about something being created, started or ended. A component diagram has no such state. */
+const LIFELINE = new Set(['activate', 'deactivate', 'destroy', 'create', 'newpage', 'autonumber'])
 
 // One dash is an arrow in PlantUML (`A -> B`), the same as two; the mark and the label rules are unchanged.
 const IGNORED = /^(skinparam|!theme|!define|!include|!pragma|hide|show|scale|left to right direction|top to bottom direction|together|allowmixing)\b/
@@ -235,6 +238,14 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     // With every alternative matched above, the catch-all bucket that used to sit here was unreachable - and a bucket nobody reaches
     // is not a safety net, it is a place where a line would be dropped without a word. A line that gets this far is refused below.
 
+    // A divider separates sections of a text document; this drawing has none. It is read before the arrows, because `...` otherwise
+    // matches the arrow pattern with `.` as both of its ends.
+    const divider = readSeparator(line, where)
+    if (divider !== undefined) {
+      ignored.push(divider.message)
+      return
+    }
+
     // A marked edge carries more than an arrow: a direction, a hidden marker, or a start marker. What the line states is decided in
     // one module; the writes below are the same for all of them.
     const marked = readMarked(line)
@@ -311,7 +322,11 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
       return
     }
     if (FRAGMENT.has(keyword)) {
-      refused.push(where + '`' + keyword + '`: a sequence statement is not part of a drawing this renderer makes')
+      refused.push(where + '`' + keyword + '`: a sequence fragment is not part of a drawing this renderer makes')
+      return
+    }
+    if (LIFELINE.has(keyword)) {
+      refused.push(where + '`' + keyword + '`: a lifeline event names something a drawing here has no lasting state for')
       return
     }
 
@@ -347,6 +362,7 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
 
     // PlantUML allows several statements on one line separated by `;`. This renderer reads one per line, and folding them
     // together would draw one element whose name is the rest of the line - so it is refused, naming the form to write.
+
     // One statement per line is the rule; a line holding two is refused by name, never drawn as one element named after the rest of it.
     const separated = statementSeparator(line, where)
     if (separated !== undefined) {

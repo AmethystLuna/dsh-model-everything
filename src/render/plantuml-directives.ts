@@ -40,6 +40,18 @@ export function statementSeparator(line: string, where: string): DirectiveAnswer
   return { channel: 'refused', message: where + '`;` separates two statements on one line; write one statement per line' }
 }
 
+/**
+ * A divider: `--`, `...`, `== a section ==`. It separates sections of a text document, and this drawing has no sections - so it is dropped
+ * with its reason rather than read as an element named after the dots.
+ */
+export function readSeparator(line: string, where: string): DirectiveAnswer | undefined {
+  if (!/^([-.]{2,}|={2,}.*={2,})$/.test(line)) return undefined
+  return {
+    channel: 'ignored',
+    message: where + '`' + line + '` divides a text document into sections; this drawing has none, so the line has no effect',
+  }
+}
+
 export function readDirective(line: string, where: string): DirectiveAnswer | undefined {
   if (/^!include\b/.test(line)) {
     return {

@@ -56,6 +56,14 @@ export function readNote(line: string, where: string): NoteLine | undefined {
     }
   }
 
+  // A note on a link belongs to an edge this drawing cannot name from the line.
+  if (/^note\s+on\s+link\b/.test(line)) {
+    return {
+      kind: 'refused',
+      message: where + '`' + line.split(':')[0] + '`: a note on a link names the link, and no line here can name one',
+    }
+  }
+
   // A note over a box is a position no edge can express, so it is refused by name rather than dropped.
   if (/^note\s+over\b/.test(line)) {
     return {

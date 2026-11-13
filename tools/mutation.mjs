@@ -458,6 +458,13 @@ const MUTATIONS = [
     from: '      all[openedAt] =',
     to: '      all[openedAt] = all[openedAt],',
   },
+  {
+    id: 'M53',
+    what: 'a divider is read as a statement again, so `...` becomes an arrow',
+    file: 'src/render/plantuml-directives.ts',
+    from: "  if (!/^([-.]{2,}|={2,}.*={2,})$/.test(line)) return undefined",
+    to: "  if (true) return undefined",
+  },
 ]
 
 const argument = process.argv[2]

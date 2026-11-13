@@ -23,6 +23,11 @@ export interface DirectiveAnswer {
  * line, so the line is refused by name rather than drawn as one element named after the rest of it.
  */
 export declare function statementSeparator(line: string, where: string): DirectiveAnswer | undefined;
+/**
+ * A divider: `--`, `...`, `== a section ==`. It separates sections of a text document, and this drawing has no sections - so it is dropped
+ * with its reason rather than read as an element named after the dots.
+ */
+export declare function readSeparator(line: string, where: string): DirectiveAnswer | undefined;
 export declare function readDirective(line: string, where: string): DirectiveAnswer | undefined;
 /** The opener of a `together` block: the block itself is read before the lines are parsed, so this line has nothing left to do. */
 export declare function isTogetherOpener(line: string): boolean;

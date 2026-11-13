@@ -1017,6 +1017,26 @@ test('an exit marker closes on its source and is drawn dashed', () => {
   if (!drawn.some((shape) => shape.points.length > 2)) throw new Error('no routed self-loop')
 })
 
+// Four lines that are not statements, each of which used to become something wrong: `...` was read as an arrow between two elements
+// called `.`, `note on link` declared an element named after itself, and a lifetime event was refused as a sequence statement.
+test('a divider, a lifetime event and a note on a link are each answered for what they are', () => {
+  const draw = (lines) => render({ source: ['@startuml', 'component a', 'component b', ...lines, '@enduml'].join('\n') }, {}, { scheme: 'default' })
+  for (const divider of ['...', '--', '== section ==']) {
+    const r = draw([divider])
+    if (r.refused.length !== 0) throw new Error(divider + ' refused: ' + JSON.stringify(r.refused))
+    if (r.ignored.length !== 1 || !r.ignored[0].includes('divides a text document')) throw new Error(divider + ': ' + JSON.stringify(r.ignored))
+    if (r.diagram.nodes.length !== 2) throw new Error(divider + ' drew ' + String(r.diagram.nodes.length) + ' boxes')
+    if (r.diagram.edges.length !== 0) throw new Error(divider + ' drew an edge')
+  }
+  const lifetime = draw(['activate a'])
+  if (lifetime.refused.length !== 1 || !lifetime.refused[0].includes('lifeline event')) throw new Error(JSON.stringify(lifetime.refused))
+  const onLink = draw(['a --> b', 'note on link : retry'])
+  if (onLink.refused.length !== 1 || !onLink.refused[0].includes('no line here can name one')) throw new Error(JSON.stringify(onLink.refused))
+  if (onLink.diagram.nodes.length !== 2) throw new Error('the note declared an element: ' + JSON.stringify(onLink.diagram.nodes.map((n) => n.id)))
+  const fragment = draw(['alt one'])
+  if (!fragment.refused[0].includes('sequence fragment')) throw new Error(JSON.stringify(fragment.refused))
+})
+
 // A Mermaid state diagram carries three constructs the PlantUML reader already had: a composite state, a state type, and a note
 // beside a state. Each was refused as a line the renderer could not draw, in one notation only.
 test('a Mermaid state keeps its composite, its type and its note', () => {
