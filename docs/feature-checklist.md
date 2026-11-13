@@ -289,7 +289,7 @@ And the gates around it:
 | `des-vs-uml` | 4 | the drawing tool reports the graph codes and none of the design codes |
 | `scan-vs-compose` | 4 | the scanner reports claims as claims, in its own names |
 | `review-vs-verify` | 3 | a model that is thin as a drawing and sound as a machine gets two different answers |
-| `edit-ops` | 7 | addState appends the state and reports it |
+| `edit-ops` | 8 | addState appends the state and reports it |
 | `route-causality` | 4 | with nothing between them the route is a straight line and says so |
 | `layout-growth` | 4 | a longer label grows its box and pushes the next rank down by the difference |
 | `ports-sides` | 4 | an anchor is the middle of the side it names |

@@ -96,6 +96,16 @@ await test('remove deletes the key at a pointer', async () => {
   if ('narrative' in model) throw new Error('the key survived')
 })
 
+await test('a change says what it wrote, not only where', async () => {
+  // `set /init` alone says where; a reader still has to open the file to learn what it now holds. The two ops that replace a value carry it.
+  const written = await run('value', [{ set: ['/init', 's1'] }])
+  const detail = String((written.report.changes ?? [])[0]?.detail ?? '')
+  if (!detail.includes('s1')) throw new Error('the change does not name the value: ' + JSON.stringify(detail))
+  const patched = await run('patch', [{ updateTransition: ['s0', 'go', { to: 's0' }] }])
+  const patchDetail = String((patched.report.changes ?? [])[0]?.detail ?? '')
+  if (!/to = s0/.test(patchDetail)) throw new Error('the patch change names no value: ' + JSON.stringify(patchDetail))
+})
+
 if (failures > 0) {
   console.log('edit-ops tests failed:', failures)
   process.exit(1)

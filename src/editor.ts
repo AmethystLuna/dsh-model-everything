@@ -220,7 +220,12 @@ export function applyOperation(model: Json, operation: EditOperation): ModelChan
     if (index < 0) throw new OptionShapeError('EDIT_OPTION_INVALID', `no transition for ${from} + ${event} to update.`)
     list[index] = { ...list[index], ...patch }
     model.transitions = list
-    changes.push({ kind: 'updated', what: `transition ${from} + ${event}`, detail: Object.keys(patch).join(', ') })
+    changes.push({
+      kind: 'updated',
+      what: `transition ${from} + ${event}`,
+      // Which fields were patched, and what each now holds: a list of field names alone reads as a truncation.
+      detail: Object.entries(patch).map(([field, value]) => field + ' = ' + describeValue(value)).join(', '),
+    })
     return changes
   }
   if (op === 'set') {
@@ -228,7 +233,9 @@ export function applyOperation(model: Json, operation: EditOperation): ModelChan
     if (parts.length === 0) throw new OptionShapeError('EDIT_OPTION_INVALID', 'path must name something inside the model.')
     const { parent, key } = atPointer(model, parts, true)
     parent[key] = CLONE(operation.value)
-    changes.push({ kind: 'updated', what: 'set ' + String(operation.path), detail: '' })
+    // The value is what the caller wants to see: `set /init` alone says where, never what. A structured value is summarised as JSON, which is
+    // what the file now holds.
+    changes.push({ kind: 'updated', what: 'set ' + String(operation.path), detail: 'to ' + describeValue(operation.value) })
     return changes
   }
   if (op === 'remove') {
@@ -241,6 +248,14 @@ export function applyOperation(model: Json, operation: EditOperation): ModelChan
     return changes
   }
   throw new OptionShapeError('EDIT_OPTION_INVALID', `unknown op ${JSON.stringify(op)}. Known ops: addState, removeState, addTransition, removeTransition, updateTransition, set, remove.`)
+}
+
+/** A value as one line, for a change's `detail`: strings bare, everything else as compact JSON. */
+function describeValue(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? String(value)
+  const json = JSON.stringify(value)
+  return json.length > 60 ? json.slice(0, 57) + '...' : json
 }
 
 /** Validate the edited model and write it atomically. A refused edit leaves the file untouched. */

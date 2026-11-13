@@ -936,6 +936,13 @@ const MUTATIONS = [
     from: '    for (const [index, raw] of normalized.entries()) {\n      try { applyOperation(partial, raw) } catch { firstBad = index; break }',
     to: '    for (const [index, raw] of (operations as EditOperation[]).entries()) {\n      try { applyOperation(partial, raw) } catch { firstBad = index; break }',
   },
+  {
+    id: 'M114',
+    what: 'a change reports where it wrote and not what',
+    file: 'src/editor.ts',
+    from: "    changes.push({ kind: 'updated', what: 'set ' + String(operation.path), detail: 'to ' + describeValue(operation.value) })",
+    to: "    changes.push({ kind: 'updated', what: 'set ' + String(operation.path), detail: '' })",
+  },
 ]
 
 const argument = process.argv[2]
