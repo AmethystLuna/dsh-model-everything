@@ -90,3 +90,23 @@ export function readArrow(line: string): ArrowParts | string | undefined {
   // No mark at either end: the source states a connection and no direction.
   return { from: left, to: right, label, dashed: dotted, arrow: 'none' }
 }
+
+/**
+ * The id and label an opening boundary line states. An alias is the id, because edges will name it.
+ *
+ * A stereotype or a colour written after the name is a decoration on the boundary, not part of what it is called: left in,
+ * both ended up in the label and the alias was lost, so the boundary could not be named by an edge or by its own members.
+ */
+export function boundaryOf(
+  declaration: string,
+  keyword: string,
+  ordinal: number,
+): { id: string; label: string; decorations: string[] } {
+  const bare = bareName(declaration.slice(keyword.length))
+  const rest = bare.name
+  const adornment = { decorations: bare.stripped }
+  const alias = QUOTED_ALIAS.exec(rest) ?? BRACKET_ALIAS.exec(rest) ?? PLAIN_ALIAS.exec(rest)
+  if (alias !== null) return { id: alias[2], label: alias[1], ...adornment }
+  const label = rest.replace(/^["']|["']$/g, '')
+  return { id: 'group-' + String(ordinal), label: label === '' ? keyword : label, ...adornment }
+}

@@ -241,7 +241,7 @@ And the gates around it:
 | `labels` | 4 | a label with nothing in the way sits on its longest run |
 | `blocks` | 6 | a block\ |
 | `skill-table` | 8 | the parser lists were read, so the checks below mean something |
-| `names` | 6 | a bare name is left alone |
+| `names` | 9 | a bare name is left alone |
 | `clearance` | 7 | only an interior run can be moved |
 | `arrows` | 8 | a plain arrow points from the left name to the right one |
 | `presentation` | 58 | the card keeps the verdict, the counts and the first error |

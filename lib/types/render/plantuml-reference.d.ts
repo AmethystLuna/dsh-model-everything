@@ -24,3 +24,14 @@ export interface ArrowParts {
     arrow: EdgeArrow;
 }
 export declare function readArrow(line: string): ArrowParts | string | undefined;
+/**
+ * The id and label an opening boundary line states. An alias is the id, because edges will name it.
+ *
+ * A stereotype or a colour written after the name is a decoration on the boundary, not part of what it is called: left in,
+ * both ended up in the label and the alias was lost, so the boundary could not be named by an edge or by its own members.
+ */
+export declare function boundaryOf(declaration: string, keyword: string, ordinal: number): {
+    id: string;
+    label: string;
+    decorations: string[];
+};

@@ -4,6 +4,7 @@
 // id nobody could point at - `a "1"`, `p <<layer>>`, `\"网关\" as gw`. The cases here are the four sources' own forms, plus the
 // near miss that must not be stripped.
 import { bareName } from '../../lib/render/names.js'
+import { boundaryOf } from '../../lib/render/plantuml-reference.js'
 
 let failures = 0
 function test(name, body) {
@@ -57,6 +58,26 @@ test('a quoted name keeps its quotes: they are the name, not a decoration', () =
   // `"网关" as gw` is handled by the alias reader after this one; the quotes here are part of a quoted name only when the
   // whole token is quoted, which the alias reader takes.
   expectName('"网关"', '"网关"')
+})
+
+// A boundary declaration states an alias, a label and what decorates it. It is read here rather than in a diagram, so the three
+// answers can be asserted one at a time.
+test('a boundary declaration gives its alias as the id and its name as the label', () => {
+  const quoted = boundaryOf('package "订单域" as orders', 'package', 1)
+  if (quoted.id !== 'orders' || quoted.label !== '订单域') throw new Error(JSON.stringify(quoted))
+  const plain = boundaryOf('package billing', 'package', 2)
+  if (plain.id !== 'group-2' || plain.label !== 'billing') throw new Error(JSON.stringify(plain))
+})
+
+test('a boundary that decorates its name keeps the name and reports the decoration', () => {
+  const decorated = boundaryOf('package payments <<layer>> #lightblue', 'package', 3)
+  if (decorated.label !== 'payments') throw new Error('label: ' + decorated.label)
+  if (JSON.stringify(decorated.decorations) !== JSON.stringify(['#lightblue', '<<layer>>'])) throw new Error(JSON.stringify(decorated.decorations))
+})
+
+test('a boundary with no name falls back to its keyword', () => {
+  const empty = boundaryOf('package', 'package', 4)
+  if (empty.label !== 'package') throw new Error('label: ' + empty.label)
 })
 
 if (failures > 0) {
