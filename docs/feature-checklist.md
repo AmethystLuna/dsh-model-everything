@@ -174,6 +174,7 @@ node tests/reading-order/run.mjs
 node tests/verdict-table/run.mjs
 node tests/model-hash/run.mjs
 node tests/schema-registry/run.mjs
+node tests/export-artifacts/run.mjs
 node tests/apply-smoke.mjs
 node tests/memory/run.mjs
 node tests/skills/run.mjs
@@ -290,6 +291,7 @@ And the gates around it:
 | `verdict-table` | 4 | pass means no errors and no warnings |
 | `model-hash` | 4 | the same model hashes the same twice |
 | `schema-registry` | 4 | every name in the registry is unique |
+| `export-artifacts` | 4 | a hostile identifier never reaches an artifact raw |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
