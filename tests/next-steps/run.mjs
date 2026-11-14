@@ -23,17 +23,18 @@ const uml = await import('file:///' + repo + 'lib/uml.js')
 /** The tool names the entry registers, read from the entry itself so a new tool is picked up without an edit here. */
 const registered = () => {
   const source = readFileSync(repo + 'src/index.ts', 'utf8')
-  const variables = [...source.matchAll(/tools\.register\(([A-Za-z_]+)\)/g)].map((match) => match[1])
+  // The entry registers through one `register(name, tool)` call per tool now: the name is the tool's, the variable is its module's export.
+  const calls = [...source.matchAll(/register\('([a-z_]+)',\s*([A-Za-z_]+)\)/g)].map((match) => ({ tool: match[1], variable: match[2] }))
   const modules = [...source.matchAll(/import \{([^}]+)\} from '\.\/([a-z-]+)\.js'/g)]
   const fileOf = new Map()
   for (const [, names, file] of modules) {
     for (const name of names.split(',').map((part) => part.trim())) fileOf.set(name, file)
   }
   const names = []
-  for (const variable of variables) {
-    const file = fileOf.get(variable)
+  for (const call of calls) {
+    const file = fileOf.get(call.variable)
     if (file === undefined) continue
-    names.push({ variable, file })
+    names.push({ variable: call.variable, file, tool: call.tool })
   }
   return names
 }

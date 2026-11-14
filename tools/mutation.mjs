@@ -126,6 +126,7 @@ const SUITES = [
   'tests/shape-dispatch/run.mjs',
   'tests/abort/run.mjs',
   'tests/component-claims/run.mjs',
+  'tests/status-per-tool/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1104,6 +1105,13 @@ const MUTATIONS = [
     file: 'diagram/locale/en.json',
     from: '"title": "Diagram drawing",',
     to: '"title": "",',
+  },
+  {
+    id: 'M136',
+    what: 'a failed registration is swallowed, so the status reports the tool as installed',
+    file: 'src/index.ts',
+    from: "        registered.set(name, error instanceof Error ? error.message : String(error))",
+    to: "        registered.set(name, '')",
   },
 ]
 

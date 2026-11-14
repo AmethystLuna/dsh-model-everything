@@ -38,7 +38,8 @@ const TOOLS = {
 
 await test('the entry registers every tool this suite knows, and no more', async () => {
   const entry = readFileSync(repo + 'src/index.ts', 'utf8')
-  const registered = [...entry.matchAll(/tools\.register\(([A-Za-z_]+)\)/g)].map((match) => match[1])
+  // One `register(name, tool)` call per tool, so the entry states which name goes with which module's export.
+  const registered = [...entry.matchAll(/register\('([a-z_]+)',\s*([A-Za-z_]+)\)/g)].map((match) => match[2])
   if (registered.length !== Object.keys(TOOLS).length) {
     throw new Error('the entry registers ' + String(registered.length) + ', this suite knows ' + String(Object.keys(TOOLS).length))
   }
