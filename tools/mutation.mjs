@@ -1021,6 +1021,13 @@ const MUTATIONS = [
     from: "code: 'A14_DEADLINE_MISS',",
     to: "code: 'A14_DEADLINE_MISS_UNUSED',",
   },
+  {
+    id: 'M125',
+    what: 'the Chinese card carries the English sentence',
+    file: 'gate/locale/zh.json',
+    from: '"description": "',
+    to: '"description": "Injects a routing message into the first model step: ',
+  },
 ]
 
 const argument = process.argv[2]

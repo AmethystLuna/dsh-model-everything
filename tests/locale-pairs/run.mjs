@@ -70,6 +70,24 @@ test('the Chinese card is not the English one copied', () => {
   }
 })
 
+test('each side is written in its own language', () => {
+  // A value pasted into the wrong file keeps the key set intact and reads as a translation: only the script tells them apart. The product name is
+  // exempt on the Chinese side because a package name is not translated.
+  const cjk = /[\u4e00-\u9fff]/
+  const productName = json('package.json').name
+  for (const [enPath, zhPath] of PAIRS) {
+    const en = json(enPath)
+    const zh = json(zhPath)
+    for (const leaf of leaves(en)) {
+      const english = valueAt(en, leaf)
+      const chinese = valueAt(zh, leaf)
+      if (cjk.test(english)) throw new Error(enPath + ' has Chinese at ' + leaf)
+      if (leaf === 'meta.title' && english === productName) continue
+      if (!cjk.test(chinese)) throw new Error(zhPath + ' has no Chinese at ' + leaf)
+    }
+  }
+})
+
 if (failures > 0) {
   console.log('locale-pairs tests failed:', failures)
   process.exit(1)

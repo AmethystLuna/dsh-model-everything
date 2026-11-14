@@ -314,7 +314,7 @@ And the gates around it:
 | `client-bundle` | 4 | the bundle is a generated file and says so |
 | `packaging` | 5 | the two files the loader reads are in the package |
 | `tarball` | 2 | the tarball is named after this package and this version |
-| `locale-pairs` | 3 | both languages of every card name the same keys |
+| `locale-pairs` | 4 | both languages of every card name the same keys |
 | `gate-text` | 5 | the message was rendered from shipped skills, so the checks below mean something |
 | `examples` | 6 | the directory holds examples, so the cases below have something to read |
 | `diagram-card` | 5 | a drawing card carries the source it was drawn from |
