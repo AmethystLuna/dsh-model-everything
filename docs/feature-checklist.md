@@ -331,7 +331,7 @@ And the gates around it:
 | `release-steps` | 4 | the gate is run before the publish step |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
-| `compatibility` | 5 | the declaration carries a range, a release map and a profile list |
+| `compatibility` | 6 | the declaration carries a range, a release map and a profile list |
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |

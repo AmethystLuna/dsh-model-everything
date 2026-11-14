@@ -1036,6 +1036,13 @@ const MUTATIONS = [
     from: "- [ ] `git status` is clean, and the release commit is on the branch you mean to ship",
     to: "- [ ] `npm ci` installs the dependencies",
   },
+  {
+    id: 'M127',
+    what: 'the observation row stops naming the artifact it observed',
+    file: 'DSH-COMPATIBILITY.md',
+    from: '| Installed plugin |',
+    to: '| Plugin |',
+  },
 ]
 
 const argument = process.argv[2]

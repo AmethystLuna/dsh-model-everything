@@ -202,13 +202,34 @@ copied build, so they are evidence about the behaviour, not about the artifact.
 - **What it does not establish**: a live model session (the boot stops at AUTH), the loader tree beyond
   `--dump-config`, and any surface other than headless.
 
+## Observed: 0.6.2 on dsh 0.2.1-rc.3, a live desktop session (2026-11-14)
+
+This row is an **observation**, not a round: nothing was installed or uninstalled for it, and it is not a substitute for one.
+
+| Item | Value |
+|---|---|
+| Host dsh | `0.2.1-rc.3` (`dsh --version`) |
+| Node / npm | `v24.17.0` / `11.13.0` |
+| Profile | `desktop` |
+| Installed plugin | `dsh-model-everything` `0.6.2` (the profile's copy, not this checkout's `lib/`) |
+
+- **What it establishes**: the packaged bundle **mounts and answers in a live model session**, which the
+  earlier rows could not show - their boot stopped at AUTH. The tools that answered include the diagram
+  family (`diagram_render`, `diagram_review`, `diagram_diff`), the composition and automaton families, the
+  export and report tools, and the gate component's row being present and enabled.
+- **What it does not establish**: an install or an uninstall on `0.2.1-rc.3` (that is the rc.3 round above,
+  which ran on `0.4.0`); that `0.6.2` is the version a fresh install would resolve today; the `web` profile;
+  and the behaviour of the `0.6.4` artifact, which is what this checkout builds.
+- **Why it is worth a row**: the version under test and the host's runtime are different questions, and the
+  first row that shows the plugin working **inside a session** answers the one the reader actually has.
+
 ## What is not established
 
 - Loader-level composition beyond `--dump-config`: the probe mounts the installed
   entry into its own `Context`, not through the dsh loader.
-- A live model session: the boot stops at AUTH, before any agent step, so the
-  skill catalog and the gate's `agent/pre-step` injection were not exercised in a
-  session on these rows.
+- A live model session **for the rows above**: their boot stops at AUTH, before any agent step, so the
+  skill catalog and the gate's `agent/pre-step` injection were not exercised there. The 0.6.2-on-0.2.1-rc.3
+  observation below is the first live session in this record, and it covers the desktop profile only.
 - The `web` profile and any non-headless surface.
 - **A bare `npm install`.** Both artifact rounds installed through the profile's own
   package manager (`dsh plugin add`), which is the documented install path; a plain

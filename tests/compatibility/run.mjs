@@ -52,6 +52,19 @@ test('the declared profiles are host profiles, not free text', () => {
   }
 })
 
+test('the record states the host it observed and the artifact it observed', () => {
+  // A row that names neither is a claim nobody can place: the runtime and the package are two different versions.
+  for (const heading of ['## Round:', '## Observed:']) {
+    if (!record.includes(heading)) continue
+  }
+  const observed = record.includes('## Observed:')
+  if (!observed) return
+  const section = record.slice(record.indexOf('## Observed:'))
+  for (const needle of ['Host dsh', 'Installed plugin', 'Profile']) {
+    if (!section.includes(needle)) throw new Error('the observation names no ' + needle)
+  }
+})
+
 if (failures > 0) {
   console.log('compatibility tests failed:', failures)
   process.exit(1)
