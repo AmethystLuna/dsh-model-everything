@@ -250,6 +250,7 @@
     "scan-vs-compose",
     "schema-registry",
     "separate",
+    "shape-dispatch",
     "skill-routing",
     "skill-table",
     "skills",

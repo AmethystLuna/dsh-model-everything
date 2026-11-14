@@ -195,6 +195,7 @@ node tests/release-steps/run.mjs
 node tests/config-live/run.mjs
 node tests/refusal-schema/run.mjs
 node tests/view-agreement/run.mjs
+node tests/shape-dispatch/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -335,6 +336,7 @@ And the gates around it:
 | `config-live` | 4 | both switches are projected, so each row offers a switch on the settings page |
 | `refusal-schema` | 3 | a shape refusal names the family schema, and the id is registered |
 | `view-agreement` | 2 | the card and the text state the same verdict |
+| `shape-dispatch` | 4 | the union was read, so the checks below mean something |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |

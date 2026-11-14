@@ -123,6 +123,7 @@ const SUITES = [
   'tests/config-live/run.mjs',
   'tests/refusal-schema/run.mjs',
   'tests/view-agreement/run.mjs',
+  'tests/shape-dispatch/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1073,6 +1074,13 @@ const MUTATIONS = [
     file: 'src/presentation.ts',
     from: '    errors: summaryErrors ?? (deltaPresent ? delta?.addedErrors ?? addedErrors : errors.length),',
     to: '    errors: summaryErrors ?? errors.length,',
+  },
+  {
+    id: 'M132',
+    what: 'a shape the union names loses its own case and draws as a rectangle',
+    file: 'src/render/svg.ts',
+    from: "      case 'hexagon':",
+    to: "      case 'hexagon-unused':",
   },
 ]
 
