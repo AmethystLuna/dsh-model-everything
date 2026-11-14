@@ -1120,6 +1120,13 @@ const MUTATIONS = [
     from: "    checkAbort(signal, 'walking the source tree')",
     to: '    void signal',
   },
+  {
+    id: 'M138',
+    what: 'a drawing is diffed again, and answers that nothing changed',
+    file: 'src/baseline.ts',
+    from: "  'model-everything/diagram/render/v1': 'a drawing has no findings to diff; `diagram_diff` compares two drawings by containment',",
+    to: '  unused: \'\',',
+  },
 ]
 
 const argument = process.argv[2]

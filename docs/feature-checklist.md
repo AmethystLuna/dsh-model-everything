@@ -298,7 +298,7 @@ And the gates around it:
 | `summary-counters` | 4 | a verification report counts what its checks carry |
 | `edit-refusals` | 5 | an ops that is not a list is refused and writes nothing |
 | `export-warnings` | 3 | every invariant a format cannot translate is named in its warnings |
-| `diff-families` | 5 | two reports of different families are refused, naming both |
+| `diff-families` | 6 | two reports of different families are refused, naming both |
 | `diff-next-steps` | 5 | every state says something to do |
 | `compose-inputs` | 6 | without the three inputs the composition passes and says nothing |
 | `datamodel-inputs` | 4 | the regression checks join the roster only when beforeModel is supplied |

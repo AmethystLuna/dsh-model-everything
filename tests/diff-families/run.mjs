@@ -67,6 +67,17 @@ test('two runs of the same report compare, and the delta is clean', () => {
 })
 
 
+test('a drawing is refused, with the tool that compares drawings named', () => {
+  // Measured before this guard: two different drawings through `report_diff` answered `pass` - "no new findings, nothing
+  // resolved" - while `diagram_diff` reported two changes. A picture has no findings, so its diff is vacuously clean.
+  const drawing = { schema: 'model-everything/diagram/render/v1', ok: true, nodes: 2, edges: 1, refused: [], svg: '<svg/>' }
+  const refused = refusal(drawing, { ...drawing, svg: '<svg>different</svg>' })
+  if (refused === undefined) throw new Error('two drawings compared as if they shared a finding vocabulary')
+  if (!/diagram_diff/.test(refused.message)) throw new Error('the refusal does not name the tool that compares drawings: ' + refused.message)
+  // The control: the families that do carry findings still compare.
+  if (refusal(verify, verify) !== undefined) throw new Error('a findings report stopped comparing')
+})
+
 if (failures > 0) {
   console.log('diff-families tests failed:', failures)
   process.exit(1)
