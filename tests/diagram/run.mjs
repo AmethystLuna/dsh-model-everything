@@ -1289,6 +1289,22 @@ test('the acceptance corpus comes out clean', () => {
   if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
+// A note written inside an outer package and about a box inside a nested one has one owner, not two. With two, it was
+// drawn at the outer level - a rank below the boundary its box is in - and the containment assertion caught it.
+test('a note inside a nested boundary belongs to the inner one, and only to it', () => {
+  const source = [
+    '@startuml', 'package "外层" {', '  folder "核心" {', '    component "订单" as order', '  }',
+    '  note right of order : 订单聚合根', '}', '@enduml',
+  ].join(String.fromCharCode(10))
+  const r = render({ source }, {}, { scheme: 'default' })
+  if (r.refused.length > 0) throw new Error('refused: ' + r.refused.join('; '))
+  const owners = (r.diagram.groups ?? []).filter((group) => group.members.includes('note-order-1')).map((group) => group.id)
+  if (owners.length !== 1) throw new Error('the note has ' + String(owners.length) + ' owners: ' + owners.join(', '))
+  const inner = (r.diagram.groups ?? []).find((group) => String(group.label) === '核心')
+  if (inner === undefined) throw new Error('no inner boundary')
+  if (!inner.members.includes('note-order-1')) throw new Error('the note is not owned by the boundary its box is in')
+})
+
 // A label with nowhere clear along its own line steps aside instead of sitting on the next box. Measured on this source
 // turned left to right: `0..1` collided with the shipment box, because the placement only walked along the run.
 test('a crowded label steps off its line rather than onto a box', () => {

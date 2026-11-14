@@ -1203,6 +1203,13 @@ const MUTATIONS = [
     from: '    for (const across of [LABEL_STEP, -LABEL_STEP, LABEL_STEP * 2, -LABEL_STEP * 2]) {',
     to: '    for (const across of []) {',
   },
+  {
+    id: 'M149',
+    what: 'a note gains a second owner in the outer boundary and is drawn below it',
+    file: 'src/render/from-plantuml.ts',
+    from: '    for (const other of builder.groups) if (other.id !== groupId) other.members = other.members.filter((member) => member !== note)',
+    to: '    void groupId',
+  },
 ]
 
 const argument = process.argv[2]

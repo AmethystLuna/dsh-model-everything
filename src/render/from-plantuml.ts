@@ -433,8 +433,11 @@ export function fromPlantUml(source: string, title = 'plantuml'): Parsed {
     const groupId = owner.get(target)
     if (groupId === undefined) continue
     const group = builder.groups.find((entry) => entry.id === groupId)
-    if (group === undefined || group.members.includes(note)) continue
-    group.members.push(note)
+    if (group === undefined) continue
+    // The note moves, it does not gain a second owner: written inside an outer package it is already a member there,
+    // and two owners left it drawn at the outer level - a rank below the boundary its box is in.
+    for (const other of builder.groups) if (other.id !== groupId) other.members = other.members.filter((member) => member !== note)
+    if (!group.members.includes(note)) group.members.push(note)
   }
 
   if (!seenAny && refused.length === 0) {
