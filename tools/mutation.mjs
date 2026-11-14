@@ -116,6 +116,7 @@ const SUITES = [
   'tests/diagram-out/run.mjs',
   'tests/card-blocks/run.mjs',
   'tests/uml-hash/run.mjs',
+  'tests/gate-config/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -989,6 +990,13 @@ const MUTATIONS = [
     file: 'src/uml-tool.ts',
     from: '          modelHash: valueHash(args.model),',
     to: '          modelHash: valueHash({ schemaVersion: 1, init: \'x\', states: [], transitions: [] }),',
+  },
+  {
+    id: 'M121',
+    what: 'a deployment sentence is appended after the closing restatement',
+    file: 'src/gate.ts',
+    from: '  return extra === \'\' ? config.gateContent : config.gateContent + \'\\n\\n\' + extra',
+    to: '  return config.gateContent + \'\\n\\n\' + extra',
   },
 ]
 

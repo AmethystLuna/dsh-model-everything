@@ -201,6 +201,7 @@
     "feature-checklist",
     "fixtures",
     "gate",
+    "gate-config",
     "gate-text",
     "granularity",
     "intent",
