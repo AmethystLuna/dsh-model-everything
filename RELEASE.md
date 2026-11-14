@@ -27,7 +27,7 @@ be stale the moment the first release lands.
 - [ ] `npm run build && git diff --exit-code -- lib` (the committed build matches the source)
 - [ ] `npm run test:engine`
 - [ ] `npm run lint:md`
-- [ ] `npm run coverage` still reports 100% on `presentation`, `automaton` and `routing` (needs `c8`, run with `npx`)
+- [ ] `npm run coverage` still reports 100% of statements on `presentation`, `automaton` and `routing` (`c8` is a devDependency, so a plain `npm install` brings it)
 - [ ] `README.md` and `README.en-US.md` still say the same thing
 
 ## 0b. After the publish

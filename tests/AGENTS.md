@@ -114,7 +114,7 @@ node tests/<suite>/run.mjs   # run it three times: byte-identical output
 
 ## Measuring what a suite reaches
 
-A suite can be green and still never enter a branch. `c8` runs a suite the way it already runs and reports
+A suite can be green and still never enter a branch. `c8` (a devDependency, installed by `npm install`) runs a suite the way it already runs and reports
 the lines and branches it never took:
 
 ```bash
