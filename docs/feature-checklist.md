@@ -203,6 +203,7 @@ node tests/code-inventory/run.mjs
 node tests/diagram-mount/run.mjs
 node tests/annotation/run.mjs
 node tests/annotation-editor/run.mjs
+node tests/model-file/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -351,6 +352,7 @@ And the gates around it:
 | `diagram-mount` | 4 | the mount registers the three drawing tools and the annotate command |
 | `annotation` | 10 | a block says how many items, which drawing, and what each one marked |
 | `annotation-editor` | 7 | a contenteditable takes the block through insertHTML, with its angle brackets escaped |
+| `model-file` | 5 | a well-formed file is read, whatever its formatting |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |
