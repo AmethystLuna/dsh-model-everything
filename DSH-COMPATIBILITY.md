@@ -238,6 +238,25 @@ This row is an **observation**, not a round: nothing was installed or uninstalle
   round ran on it; an entry there is a claim about a round, not an inference from
   the neighbouring releases.
 
+### The 0.7.0 artifact, re-measured on `0.2.1-rc.4`
+
+0.7.0 is the first artifact after six renderer features (a Mermaid line stating several connections, an interface drawn
+as its own circle, a parenthesised use case and an abstract class, a partition as a boundary, a note shape, a Mermaid
+composite state) and the fixes that came out of the transformation sweeps. The round was run again rather than inherited:
+
+| step | result |
+|---|---|
+| `dsh plugin --profile headless add "file:$PWD"` | installed, admitted (no `allow-version`) |
+| `--dump-config` | row `dsh-model-everything` present, `enabled: true` |
+| the installed copy | `skills/` 8 dirs, `locale/`, `lib/`, `package.json` |
+| headless boot with a fake key | reached the provider stage; no plugin load error |
+| `model_verify` from the installed copy | `pass_with_findings`, schema `model-everything/verify/v1`, 11 checks |
+| `plugin remove` | row gone |
+
+Two facts about the round itself, worth keeping: the row id is `dsh-model-everything` (**not** the skill family's
+`model-everything`), and the probe runs from the dsh tree, so a relative `modelPath` resolves against the dsh prefix and
+is refused - pass an absolute path, or the round reports the refusal as if it were the tool's verdict.
+
 ### The 0.2.1-rc.4 round, and what it caught
 
 rc.4 validates a tool's `enum` before the handler runs. The drawing tool declared three colour schemes while the
