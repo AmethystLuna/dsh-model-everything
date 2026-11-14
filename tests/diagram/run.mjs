@@ -1289,6 +1289,25 @@ test('the acceptance corpus comes out clean', () => {
   if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
+// Two boxes on top of each other is the one defect a reader sees before reading anything, and the corpus check above
+// could not see it: it asserted refusals, routing and label collisions, and a picture with two boxes drawn at the same
+// point passed all three. Measured: a left-to-right flow whose first group holds two nodes and whose second holds one
+// placed the second group's node 44px inside the first group's second node.
+test('no two boxes in the gallery overlap', () => {
+  const overlap = (a, b) =>
+    !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y)
+  const clashes = []
+  for (const [name, source] of ACCEPTANCE) {
+    const boxes = render({ source }, {}, { scheme: 'default' }).canvas.shapes.filter((shape) => shape.kind === 'box')
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        if (overlap(boxes[i], boxes[j])) clashes.push(name + ': ' + String(boxes[i].label) + ' under ' + String(boxes[j].label))
+      }
+    }
+  }
+  if (clashes.length > 0) throw new Error(clashes.slice(0, 3).join(' | '))
+})
+
 // A route never crosses a box; this is the stricter claim beside it: no drawn line comes closer than a hair to a box it does not end
 // at. The clearance pass exists for the one figure that did, and this keeps it from coming back on any of them.
 test('no drawn line grazes a box it does not end at', () => {
