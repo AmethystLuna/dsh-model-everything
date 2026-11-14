@@ -233,6 +233,23 @@ test('interaction-overview: initial, three references, a decision and a final, r
   if (errors.length > 0) throw new Error('a well-formed overview reported errors: ' + errors.map((f) => f.code).join(', '))
 })
 
+test('a model the schema rejects is refused, even where the validator walks the same field', () => {
+  // Found by writing the state case: `updates` as an object was reported ("must be an array") and then walked anyway,
+  // so `uml_render` answered a TypeError instead of the error list. A refusal is the only answer a caller can route on.
+  for (const updates of [{ retries: { op: 'inc' } }, 'nope', 5]) {
+    const model = {
+      schemaVersion: 1, init: 'a',
+      states: [{ id: 'a' }, { id: 'b', terminal: true }],
+      transitions: [{ from: 'a', event: 'go', to: 'b', updates }],
+    }
+    let refusal
+    try { renderUml(model, 'mermaid', 'state') } catch (error) { refusal = error }
+    if (refusal === undefined) throw new Error('accepted updates ' + JSON.stringify(updates))
+    if (!/updates/.test(String(refusal.message))) throw new Error('the refusal does not name the field: ' + String(refusal.message).slice(0, 110))
+    if (refusal instanceof TypeError) throw new Error('a TypeError is not a refusal')
+  }
+})
+
 if (failures > 0) {
   console.log('uml-complex tests failed:', failures)
   process.exit(1)

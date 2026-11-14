@@ -354,7 +354,7 @@ And the gates around it:
 | `annotation` | 10 | a block says how many items, which drawing, and what each one marked |
 | `annotation-editor` | 7 | a contenteditable takes the block through insertHTML, with its angle brackets escaped |
 | `model-file` | 5 | a well-formed file is read, whatever its formatting |
-| `uml-complex` | 14 | state: a machine with nesting, a guard, a counter and a terminal state |
+| `uml-complex` | 15 | state: a machine with nesting, a guard, a counter and a terminal state |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |
