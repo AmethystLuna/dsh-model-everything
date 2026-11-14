@@ -18,6 +18,17 @@ metadata:
   那一篇同时是接手渲染工作的起点。
 - 加能力该动哪些文件、由哪个套件守着，见 [docs/feature-checklist.md](../../../docs/feature-checklist.md)。
 
+### 0. 超时只在两处真正生效（进行中）
+
+dsh 对 `timeoutMs` 的契约是：**声明它=声明本工具把 `exec.signal` 交给一个能停下来的实现**。现在只有
+`model_verify` 和 `model_compose_verify` 满足（状态空间探索、组合乘积遍历各读一次信号，`src/abort.ts`）。
+其余引擎型工具仍声明了超时却读不到信号：`model_datamodel_verify`、`model_design_review`、
+`model_automaton_verify`、`model_edit`、`uml_*`、`uml_structure_verify`（`repoPath` 扫盘那条最该有）。
+
+做法照抄现有两处：引擎入口加可选 `signal`，主循环里 `checkAbort(options.signal, '…')`，工具 `execute(args, exec)`
+把 `exec.signal` 传进去。守它是 `tests/abort`（此刻只覆盖两条）。判据：任一工具在 aborted 信号下必须回
+`ran: false` + `errorCode: TOOL_ABORTED` + 族 `schema`，而不是跑完再回一份报告。
+
 ## 未完成
 
 ### 1. 要不要拆成多个组件（待定）
