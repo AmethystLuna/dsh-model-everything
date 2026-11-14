@@ -425,6 +425,37 @@ delta 无条件回退到 `report.summary`，而 summary 没有 delta 键，于�
 - **断言先读答案**：写 `uml_parse` 的用例时按预期写 `model_verify({model:42})` 走选项拒收，实际是宿主的参数校验
   先抛 `INVALID_ARGS`；`tool.parameters.intent` 也不在原位（编译后的 schema 在 `parameters.properties` 下）。
 
+## 3.17 第十三段：补齐测试（覆盖率驱动）
+
+`npm run coverage` 此前**跑不起来**（`c8` 不在任何依赖清单），而 `RELEASE.md` 与 `tests/AGENTS.md` 都在引用它。
+`c8@12` 进入 devDependency 后有了实测基线，按数字选靶子：
+
+| 指标 | 补齐前 | 补齐后 |
+|---|---|---|
+| `All files` 语句 | 96.04% | **96.50%** |
+| `gate.js` | 83.87% | **99.28%** |
+| `diagram.js` | 89.55% | **100%** |
+| `annotation.js` | 89.47% | **95.97%** |
+| `model-file.js` | 89.58% | **100%** |
+| `presentation.js` | 98.91% | **100% 语句**（分支 96.77%，已记录） |
+
+新增套件：`code-inventory`（每个 code 必须被某测试点名，不可达的要登记遮蔽）、`diagram-mount`、`annotation`、
+`annotation-editor`、`model-file`。补的用例：gate 的 inspect provider 与两种日志形状、编辑器四条拒收、
+mermaid class 渲染与别名、composite 的两条路径、structure 的父级往返。
+
+### 这一段抓到的三个真缺陷
+
+1. **三个绘图工具正文打的是不存在的族名**（`dsh-diagram/...`），与载荷自己的 `schema` 不一致；
+2. **`editor.ts` 有一段死代码**：重放循环里的 `try/catch` 永不触发（主循环用同样的操作跑过同一份模型），已删除；
+3. **三个套件在门禁里、却不在变异点运行清单里**（`code-inventory`、`diagram-mount`、`status-per-tool`）——
+   正是 `tests/AGENTS.md` 记录的“MISSED 可能是套件没进清单”那一条，被我亲手又踩了一次。
+
+### 仍然低于 95% 的文件与原因
+
+`editor.js` 90%、`uml-*` 91%、`scan.js` 91%、`transcript.js` 91%：这些剩余分支多是**族内的文档性检查**与
+**已由 `tests/negatives` 按行为决定的拒收**，`tests/AGENTS.md` 明确说明这些不进门禁（“the rest of the tree is not
+gated”）。`uml-structure.ts` 的 mermaid 拒绝已被能力表遮蔽，用例按“钉住遮蔽”写。
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
