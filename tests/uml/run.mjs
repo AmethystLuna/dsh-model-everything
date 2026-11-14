@@ -1785,6 +1785,16 @@ test('composite: a nested block is reported, not silently flattened', () => {
   }
 })
 
+test('composite: the classifier is a part of itself, and an unnamed classifier both report', () => {
+  // Two paths the code table does not reach: the classifier's own id colliding with a part, and the classifier
+  // carrying no reader-facing name. Both are asserted on the review, which is where they are decided.
+  const itself = reviewCompositeModel({ schemaVersion: 1, self: { id: 's', label: 'S' }, parts: [{ id: 's', label: 'S' }], ports: [], connectors: [] }, {})
+  if (!itself.some((finding) => finding.code === 'UML061_COMPOSITE_PORT_COLLISION')) throw new Error('a classifier declared as its own part was not reported')
+  const unnamed = reviewCompositeModel({ schemaVersion: 1, self: { id: 's' }, parts: [{ id: 'a', label: 'A' }], ports: [], connectors: [] }, {})
+  const undocumented = unnamed.filter((finding) => finding.code === 'UML062_COMPOSITE_UNDOCUMENTED')
+  if (!undocumented.some((finding) => String(finding.message).includes('classifier'))) throw new Error('an unnamed classifier was not reported: ' + JSON.stringify(undocumented))
+})
+
 test('composite: every code the family declares is produced by its own case', () => {
   const cases = [
     ['UML057_COMPOSITE_NO_PARTS', { self: { id: 's', label: 'S' }, parts: [], ports: [], connectors: [] }],
@@ -2185,6 +2195,35 @@ test('overview: every code the family declares is produced by its own case', () 
   if (refusal === undefined || !refusal.message.includes('exactly one initial node')) {
     throw new Error('UML069 must stay unreachable from the review: ' + String(refusal))
   }
+})
+
+// ---------------------------------------------- the class family in mermaid, and its aliases --
+
+test('round trip: a class diagram renders in mermaid, the only structure family it can draw', () => {
+  const model = { schemaVersion: 1, family: 'class', nodes: [{ id: 'Order', kind: 'class' }, { id: 'User', kind: 'class' }], edges: [{ from: 'Order', to: 'User', label: 'places' }] }
+  const out = renderUml(model, 'mermaid', 'class')
+  if (!out.primary.startsWith('classDiagram')) throw new Error('the text does not open a class diagram: ' + out.primary.slice(0, 40))
+  const back = parseUml(out.primary, 'mermaid')
+  if (back.model.nodes.map((node) => node.id).join(',') !== 'Order,User') throw new Error('ids: ' + back.model.nodes.map((node) => node.id).join(','))
+})
+
+test('an id no notation can hold becomes an alias, and reads back as itself', () => {
+  // Two ids with a space in them: the renderer writes N1 and N2 and records the mapping, so the round trip still knows
+  // which box is which. The numbering also has to skip a name already taken - hence the loop.
+  const model = { schemaVersion: 1, family: 'class', nodes: [{ id: 'a b', kind: 'class' }, { id: 'c d', kind: 'class' }], edges: [] }
+  const out = renderUml(model, 'mermaid', 'class')
+  if (!/alias N1 a b/.test(out.primary) || !/alias N2 c d/.test(out.primary)) throw new Error('no alias directives: ' + out.primary)
+  const back = parseUml(out.primary, 'mermaid')
+  const ids = back.model.nodes.map((node) => node.id).join(' | ')
+  if (ids !== 'a b | c d') throw new Error('the aliases did not come back: ' + ids)
+})
+
+test('a label with a quote in it is written with single quotes and the loss is reported', () => {
+  const model = { schemaVersion: 1, family: 'class', nodes: [{ id: 'X', kind: 'class', label: 'has "quote"' }], edges: [] }
+  const out = renderUml(model, 'mermaid', 'class')
+  const warning = out.warnings.find((line) => line.startsWith('UML_RENDER_LABEL_UNSAFE'))
+  if (warning === undefined) throw new Error('no warning: ' + JSON.stringify(out.warnings))
+  if (!warning.includes('will not read back verbatim')) throw new Error('the warning does not say what was lost: ' + warning)
 })
 
 // ------------------------------------------------------- render -> parse, the long families --

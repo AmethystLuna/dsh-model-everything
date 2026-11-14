@@ -149,6 +149,8 @@
   ],
   "suites": [
     "abort",
+    "annotation",
+    "annotation-editor",
     "arrows",
     "automaton",
     "baseline",

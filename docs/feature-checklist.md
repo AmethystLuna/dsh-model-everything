@@ -201,6 +201,8 @@ node tests/component-claims/run.mjs
 node tests/status-per-tool/run.mjs
 node tests/code-inventory/run.mjs
 node tests/diagram-mount/run.mjs
+node tests/annotation/run.mjs
+node tests/annotation-editor/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -282,7 +284,7 @@ And the gates around it:
 | `catalog` | 8 | catalog: every skill row fits the budget, so nothing it needs is cut off |
 | `data-engine` | 15 | valid data model passes |
 | `concurrency` | 10 | flags absolute concurrency claims and risk keywords |
-| `uml` | 98 | render: mermaid state diagram carries directives, guards and terminal marks |
+| `uml` | 102 | render: mermaid state diagram carries directives, guards and terminal marks |
 | `uml-families` | 4 | every family with a faithful notation is detected from a minimal source |
 | `uml-capability` | 5 | a cell the table calls unrepresentable refuses both actions |
 | `uml-docs` | 5 | every family the skill names is a family the engine has |
@@ -347,6 +349,8 @@ And the gates around it:
 | `status-per-tool` | 3 | when every tool registers, the status says so and names nothing missing |
 | `code-inventory` | 3 | the sources and the tests were read, so the inventory below means something |
 | `diagram-mount` | 4 | the mount registers the three drawing tools and the annotate command |
+| `annotation` | 10 | a block says how many items, which drawing, and what each one marked |
+| `annotation-editor` | 7 | a contenteditable takes the block through insertHTML, with its angle brackets escaped |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |
