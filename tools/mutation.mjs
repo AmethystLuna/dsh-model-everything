@@ -1127,6 +1127,13 @@ const MUTATIONS = [
     from: "  'model-everything/diagram/render/v1': 'a drawing has no findings to diff; `diagram_diff` compares two drawings by containment',",
     to: '  unused: \'\',',
   },
+  {
+    id: 'M139',
+    what: 'the drawing card stops naming the lines it refused',
+    file: 'src/presentation.ts',
+    from: "      lines.push('drawn: ' + String(value.nodes) + ' box(es) · ' + String(value.edges ?? 0) + ' arrow(s)' + (refused === 0 ? '' : ' · ' + String(refused) + ' line(s) refused'))",
+    to: "      lines.push('drawn: ' + String(value.nodes) + ' box(es) · ' + String(value.edges ?? 0) + ' arrow(s)')",
+  },
 ]
 
 const argument = process.argv[2]

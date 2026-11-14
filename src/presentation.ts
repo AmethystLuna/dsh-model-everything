@@ -391,3 +391,32 @@ export function diffResultView(family: string) {
     return { card: 'generic', title: family + '  ' + (card.verdict ?? ''), content: diffCardBlocks(card) }
   }
 }
+
+/**
+ * The card for the three drawing tools.
+ *
+ * A drawing has no verdict, so its card states what was measured and what was refused - the two numbers a reader acts on. It is a
+ * rendering of the payload the tool already returns, never a second computation.
+ * @param title - the tool's name, so one helper serves all three.
+ * @returns a `presentResult` callback.
+ */
+export function drawingResultView(title: string) {
+  return (_args: unknown, result: { meta?: unknown }): ToolResultView | undefined => {
+    const value = record(result.meta)
+    if (value === undefined) return undefined
+    const lines: string[] = []
+    const verdict = typeof value.verdict === 'string' ? value.verdict : undefined
+    if (verdict !== undefined) lines.push(verdict.toUpperCase() + (typeof value.verdictReason === 'string' ? '  —  ' + value.verdictReason : ''))
+    const refused = array(value.refused).length
+    if (typeof value.nodes === 'number') {
+      lines.push('drawn: ' + String(value.nodes) + ' box(es) · ' + String(value.edges ?? 0) + ' arrow(s)' + (refused === 0 ? '' : ' · ' + String(refused) + ' line(s) refused'))
+    } else if (typeof value.measured === 'object' && value.measured !== null) {
+      const measured = record(value.measured) ?? {}
+      lines.push('measured: ' + JSON.stringify(measured).slice(0, 120))
+    }
+    const changes = array(value.changes).length
+    if (changes > 0) lines.push('changes: ' + String(changes))
+    if (lines.length === 0) return undefined
+    return { card: 'generic', title, content: [{ type: 'text', text: lines.join(String.fromCharCode(10)) }] }
+  }
+}

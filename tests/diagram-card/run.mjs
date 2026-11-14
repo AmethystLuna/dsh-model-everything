@@ -60,6 +60,30 @@ await test('a drawing reports what it refused, and counts what it drew', async (
   if (String(value.svg).length === 0) throw new Error('no svg')
 })
 
+await test('all three drawing tools declare the call and result card a host UI reads', async () => {
+  // Without the pair, a host that is not this plugin's client falls back to raw content: the drawing arriver as JSON.
+  const modules = await Promise.all([
+    import('../../lib/diagram-render-tool.js'),
+    import('../../lib/diagram-review-tool.js'),
+    import('../../lib/diagram-diff-tool.js'),
+  ])
+  for (const mod of modules) {
+    const tool = mod.diagramRenderTool ?? mod.diagramReviewTool ?? mod.diagramDiffTool
+    if (typeof tool.presentCall !== 'function') throw new Error(tool.name + ' has no presentCall')
+    if (typeof tool.presentResult !== 'function') throw new Error(tool.name + ' has no presentResult')
+  }
+})
+
+await test('a drawing card states what was drawn and what was refused', async () => {
+  const { diagramRenderTool } = await import('../../lib/diagram-render-tool.js')
+  const value = await diagramRenderTool.execute({ source: 'graph TD\n  a[A] --> b[B]\n  cloud c1', notation: 'mermaid' })
+  const view = diagramRenderTool.presentResult({}, { content: [], meta: value })
+  if (view === undefined) throw new Error('no card for a drawing')
+  const text = view.content.map((block) => block.text ?? '').join('\n')
+  if (!/drawn: 2 box\(es\)/.test(text)) throw new Error('the card does not state what was drawn: ' + text.slice(0, 120))
+  if (!/1 line\(s\) refused/.test(text)) throw new Error('the card does not state what was refused: ' + text.slice(0, 160))
+})
+
 if (failures > 0) {
   console.log('diagram-card tests failed:', failures)
   process.exit(1)

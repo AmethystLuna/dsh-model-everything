@@ -169,3 +169,14 @@ export declare function diffResultView(family: string): (_args: unknown, result:
     content: ContentBlock[];
     meta?: unknown;
 }) => ToolResultView | undefined;
+/**
+ * The card for the three drawing tools.
+ *
+ * A drawing has no verdict, so its card states what was measured and what was refused - the two numbers a reader acts on. It is a
+ * rendering of the payload the tool already returns, never a second computation.
+ * @param title - the tool's name, so one helper serves all three.
+ * @returns a `presentResult` callback.
+ */
+export declare function drawingResultView(title: string): (_args: unknown, result: {
+    meta?: unknown;
+}) => ToolResultView | undefined;

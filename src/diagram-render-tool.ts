@@ -10,6 +10,7 @@ import { render, type Notation } from './render/index.js'
 import { schemeNames, type PaletteScheme } from './render/palette.js'
 import { writeSvg } from './render/write.js'
 import { REPORT_SCHEMAS } from './engine.js'
+import { drawingResultView } from './presentation.js'
 
 /** Past this many pixels a drawing no longer fits a window, and the report says so. */
 const WIDE_DRAWING = 4000
@@ -103,6 +104,8 @@ export const diagramRenderTool = defineTool({
       }
     },
   },
+  presentCall: (args) => ({ card: 'generic', title: 'diagram_render  ' + String((args as { notation?: string })?.notation ?? 'auto') }),
+  presentResult: drawingResultView('diagram_render'),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args: { source?: unknown; notation?: unknown; title?: unknown; out?: unknown; scheme?: unknown }) {

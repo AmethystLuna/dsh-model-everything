@@ -9,6 +9,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { render, type Notation } from './render/index.js'
 import { checkBudget, DEFAULT_LIMITS, type BudgetLimits } from './render/budget.js'
 import { REPORT_SCHEMAS } from './engine.js'
+import { drawingResultView } from './presentation.js'
 
 export const DIAGRAM_REVIEW_TOOL_NAME = 'diagram_review'
 
@@ -75,6 +76,8 @@ export const diagramReviewTool = defineTool({
       return [{ type: 'text' as const, text: lines.join('\n') }]
     },
   },
+  presentCall: () => ({ card: 'generic', title: 'diagram_review' }),
+  presentResult: drawingResultView('diagram_review'),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args: { source?: unknown; notation?: unknown; maxMembers?: unknown; maxDepth?: unknown; maxNodes?: unknown }) {

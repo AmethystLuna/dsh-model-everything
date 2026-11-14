@@ -9,6 +9,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { render, type Notation } from './render/index.js'
 import { diffStructure } from './render/diff.js'
 import { REPORT_SCHEMAS } from './engine.js'
+import { drawingResultView } from './presentation.js'
 
 export const DIAGRAM_DIFF_TOOL_NAME = 'diagram_diff'
 
@@ -59,6 +60,8 @@ export const diagramDiffTool = defineTool({
       return [{ type: 'text' as const, text: lines.join('\n') }]
     },
   },
+  presentCall: () => ({ card: 'generic', title: 'diagram_diff' }),
+  presentResult: drawingResultView('diagram_diff'),
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
   async execute(args: { before?: unknown; after?: unknown; notation?: unknown }) {
