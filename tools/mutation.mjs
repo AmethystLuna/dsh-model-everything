@@ -1221,8 +1221,8 @@ const MUTATIONS = [
     id: 'M151',
     what: 'the routing map stops being regenerated, so it is a drawing nobody keeps (guarded by a text diff, not a line)',
     file: 'docs/report-reading/generate-skill-routing.mjs',
-    from: "const map = 'root((where the reading method lives))'",
-    to: "const map = 'root((where the reading method lives now))'",
+    from: "const map = ['mindmap', ...nodes].join('\\n')",
+    to: "const map = ['mindmap', ...nodes].join('\\n') + '\\n'",
   },
 ]
 
