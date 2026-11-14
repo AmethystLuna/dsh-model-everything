@@ -2290,8 +2290,9 @@
     "verdict": "pass",
     "verdictReason": "no error or warning findings",
     "schema": "model-everything/uml/render/v1",
+    "modelHash": "5e188ab2ea9c8f954d5b31d7342e16eae830af0f43f7251cf35a6bd95ce0e26e",
     "findings": [],
-    "body": "model-everything/uml/render/v1  verdict=pass  no error or warning findings  ok=true\n\n%%dsh-model-everything:uml v1 notation=mermaid diagram=state\n%%dsh-model-everything:init INIT\n%%dsh-model-everything:terminal FATAL\n%%dsh-model-everything:variable retry integer\nstateDiagram-v2\n  [*] --> INIT\n  state \"INIT\" as INIT\n  state \"STARTING\" as STARTING\n  state \"ACTIVE\" as ACTIVE\n  state \"ERROR\" as ERROR\n  state \"FATAL\" as FATAL\n  INIT --> STARTING : power_ready\n  STARTING --> ACTIVE : ack\n  STARTING --> ERROR : timeout [retry < 3] / retry := retry + 1\n  STARTING --> FATAL : timeout [retry >= 3]\n  ACTIVE --> FATAL : stop\n  ERROR --> STARTING : cooldown\n  FATAL --> [*]"
+    "body": "model-everything/uml/render/v1  verdict=pass  no error or warning findings  ok=true  modelHash=5e188ab2ea9c… hashSpec=v1\n\n%%dsh-model-everything:uml v1 notation=mermaid diagram=state\n%%dsh-model-everything:init INIT\n%%dsh-model-everything:terminal FATAL\n%%dsh-model-everything:variable retry integer\nstateDiagram-v2\n  [*] --> INIT\n  state \"INIT\" as INIT\n  state \"STARTING\" as STARTING\n  state \"ACTIVE\" as ACTIVE\n  state \"ERROR\" as ERROR\n  state \"FATAL\" as FATAL\n  INIT --> STARTING : power_ready\n  STARTING --> ACTIVE : ack\n  STARTING --> ERROR : timeout [retry < 3] / retry := retry + 1\n  STARTING --> FATAL : timeout [retry >= 3]\n  ACTIVE --> FATAL : stop\n  ERROR --> STARTING : cooldown\n  FATAL --> [*]"
   },
   "uml render: a family the notation only approximates": {
     "ok": true,
@@ -2299,8 +2300,9 @@
     "verdict": "pass_with_findings",
     "verdictReason": "no error findings; 2 warning finding(s)",
     "schema": "model-everything/uml/render/v1",
+    "modelHash": "257d05b4a30116d7a8138ee9ff9af43bd78ae71752567675659b5c9cb0a0a425",
     "findings": [],
-    "body": "model-everything/uml/render/v1  verdict=pass_with_findings  no error findings; 2 warning finding(s)  ok=true\n\n@startuml\n'dsh-model-everything:uml v1 notation=plantuml family=communication\nobject \":Customer:\" as C\nobject \":Order:\" as O\nC -- O\nC --> O : 1: create\n@enduml\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type - the page is a 404 and the navigation lists none - but this build draws one with the object diagram's vocabulary: objects for the lifelines, arrows for the links, and the sequence number in the arrow's label, `C --> O : 1: create`. Lifelines, links and the numbers read back; the nesting a dotted number like `1.1` suggests is a claim about the design, so the model keeps the number as written and says nothing about the tree.\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type; this is an object-diagram drawing of one. Lifelines, links and the sequence numbers are carried; the nesting a dotted number like 1.1 suggests is not drawn and not claimed."
+    "body": "model-everything/uml/render/v1  verdict=pass_with_findings  no error findings; 2 warning finding(s)  ok=true  modelHash=257d05b4a301… hashSpec=v1\n\n@startuml\n'dsh-model-everything:uml v1 notation=plantuml family=communication\nobject \":Customer:\" as C\nobject \":Order:\" as O\nC -- O\nC --> O : 1: create\n@enduml\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type - the page is a 404 and the navigation lists none - but this build draws one with the object diagram's vocabulary: objects for the lifelines, arrows for the links, and the sequence number in the arrow's label, `C --> O : 1: create`. Lifelines, links and the numbers read back; the nesting a dotted number like `1.1` suggests is a claim about the design, so the model keeps the number as written and says nothing about the tree.\nWARNING  UML_RENDER_APPROXIMATE_VIEW: plantuml has no communication diagram type; this is an object-diagram drawing of one. Lifelines, links and the sequence numbers are carried; the nesting a dotted number like 1.1 suggests is not drawn and not claimed."
   },
   "uml review: a communication model through the tool": {
     "ok": true,
