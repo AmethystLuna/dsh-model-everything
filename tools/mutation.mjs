@@ -1217,6 +1217,13 @@ const MUTATIONS = [
     from: '    for (const along of walkOf(run)) {\n      const found = trySpot(runIndex, run, along, 0)',
     to: '    for (const along of walkOf(run)) {\n      const found = trySpot(runIndex, run, along, LABEL_STEP)',
   },
+  {
+    id: 'M151',
+    what: 'the routing map stops being regenerated, so it is a drawing nobody keeps (guarded by a text diff, not a line)',
+    file: 'docs/report-reading/generate-skill-routing.mjs',
+    from: "writeFileSync(outDir + '/skill-routing.mmd', map + '\\n')",
+    to: "writeFileSync(outDir + '/skill-routing.mmd', map + '\\n\\n')",
+  },
 ]
 
 const argument = process.argv[2]

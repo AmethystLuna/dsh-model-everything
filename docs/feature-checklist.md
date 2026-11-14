@@ -371,7 +371,7 @@ And the gates around it:
 | `documentation` | 9 | both READMEs mention everything that must be reachable |
 | `contributing` | 8 | the contribution mind map is the one the repository produces now |
 | `routing-map` | 4 | the routing map is the one the catalog produces now |
-| `report-reading` | 6 | the mind map is the one the engines produce now |
+| `report-reading` | 7 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 29 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 111 | a flowchart becomes boxes and labelled arrows |

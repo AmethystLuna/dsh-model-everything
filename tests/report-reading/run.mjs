@@ -95,6 +95,16 @@ test('the guide names only fields the reports carry', () => {
   if (unknown.length > 0) throw new Error('the guide names fields no report carries: ' + unknown.join(', '))
 })
 
+test('the routing map is the one the catalog produces now', () => {
+  // The generator prints "a test that regenerates both and compares" - and for the reading map it did. This one was
+  // written but not compared by anything, so a catalog rename could have left a map naming a route that no longer
+  // exists. Same shape as the other generated maps: regenerate, then diff the normalised text.
+  const before = readNormalised(root + 'docs/report-reading/skill-routing.mmd')
+  execFileSync(process.execPath, [guideDir + '/generate-skill-routing.mjs'], { encoding: 'utf8', timeout: 120_000 })
+  const after = readNormalised(root + 'docs/report-reading/skill-routing.mmd')
+  if (before !== after) throw new Error('the routing map drifted from the shipped catalog')
+})
+
 test('the published copies are in step with their sources', () => {
   // The package publishes `skills`, not `docs/`, so the guide has to live inside the skill to ship.
   // The generator writes the source; this asserts the copy the model actually reads matches it.
