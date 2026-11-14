@@ -10,6 +10,11 @@
  * boot, from the Plugins page, or by disabling this row, and none of those touches the tools or the skills.
  */
 import z from '@deepseek-ai/schemastery';
+/**
+ * The switch is projected to the Plugins page and read when this component mounts: turning it off registers no
+ * diagram tool until the next mount. The field is `live` rather than plain because only a projected field appears
+ * on that page at all - a plain boolean is a setting nobody can reach.
+ */
 export interface Config {
     /** Whether the diagram tools are registered. Read through {@link enabledOf}. */
     enabled: unknown;
@@ -17,10 +22,10 @@ export interface Config {
     defaultTitle: string;
 }
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
-    enabled: z<boolean, boolean, "defined">;
+    enabled: boolean;
     defaultTitle: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
-    enabled: z<boolean, boolean, "defined">;
+    enabled: boolean;
     defaultTitle: z<string, string, "defined">;
 }>>, "plain">;
 /** Read the switch as a boolean, whichever shape this host produced. */

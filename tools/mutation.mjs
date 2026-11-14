@@ -120,6 +120,7 @@ const SUITES = [
   'tests/tool-timeouts/run.mjs',
   'tests/full-path/run.mjs',
   'tests/release-steps/run.mjs',
+  'tests/config-live/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1042,6 +1043,13 @@ const MUTATIONS = [
     file: 'DSH-COMPATIBILITY.md',
     from: '| Installed plugin |',
     to: '| Plugin |',
+  },
+  {
+    id: 'M128',
+    what: 'the diagram switch falls back to a plain boolean, so no switch is projected',
+    file: 'src/live-config.ts',
+    from: "  return typeof probe.volatile === 'function' ? (probe.volatile() as T) : field",
+    to: '  return field',
   },
 ]
 

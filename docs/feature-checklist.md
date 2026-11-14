@@ -192,6 +192,7 @@ node tests/gate-config/run.mjs
 node tests/tool-timeouts/run.mjs
 node tests/full-path/run.mjs
 node tests/release-steps/run.mjs
+node tests/config-live/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -329,6 +330,7 @@ And the gates around it:
 | `tool-timeouts` | 3 | every tool module declares a timeout |
 | `full-path` | 3 | the combined path exits zero |
 | `release-steps` | 4 | the gate is run before the publish step |
+| `config-live` | 4 | both switches are projected, so each row offers a switch on the settings page |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |

@@ -31,6 +31,8 @@ import { readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+// One definition of the live switch, shared with the diagram row so the two cannot disagree about their shape.
+import { live } from './live-config.js'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type { HostCordisInspectProviderRegistration } from '@deepseek-ai/dsh-cordis-host-runner'
@@ -148,22 +150,6 @@ The rule again, because it is the one that gets skipped: load the skill whose ro
 /** The shipped default: every row the package can advertise, no deployment guidance. */
 export const DEFAULT_GATE_TEXT = renderGateText()
 
-/**
- * A live switch, when this host's schemastery supports one.
- *
- * The settings service projects ONLY fields under a `.volatile()` node, so a plain boolean
- * cannot be flipped from the Web Plugins page without remounting the row. The returned
- * schema keeps the field's static type; {@link Config} carries the union the host actually
- * hands over, and {@link injectionEnabled} accepts both shapes - a host that predates
- * `.volatile()` simply gets a switch that needs a restart.
- */
-interface LiveField {
-  volatile?: () => unknown
-}
-function live<T>(field: T): T {
-  const probe = field as T & LiveField
-  return typeof probe.volatile === 'function' ? (probe.volatile() as T) : field
-}
 
 export interface Config {
   /** Whether the gate is injected. Read through {@link injectionEnabled}. On unless a deployment says otherwise. */
