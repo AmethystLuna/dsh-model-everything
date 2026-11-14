@@ -1155,6 +1155,13 @@ const MUTATIONS = [
     from: "    if (lines.length === 0) return undefined",
     to: '    if (lines.length >= 0) return undefined',
   },
+  {
+    id: 'M143',
+    what: 'the drawing component ignores its own switch when it mounts',
+    file: 'src/diagram.ts',
+    from: '  if (!enabledOf(config)) return',
+    to: '  void enabledOf(config)',
+  },
 ]
 
 const argument = process.argv[2]

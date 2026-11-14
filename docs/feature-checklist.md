@@ -200,6 +200,7 @@ node tests/abort/run.mjs
 node tests/component-claims/run.mjs
 node tests/status-per-tool/run.mjs
 node tests/code-inventory/run.mjs
+node tests/diagram-mount/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -345,6 +346,7 @@ And the gates around it:
 | `component-claims` | 6 | the gate header states the default the schema declares |
 | `status-per-tool` | 3 | when every tool registers, the status says so and names nothing missing |
 | `code-inventory` | 3 | the sources and the tests were read, so the inventory below means something |
+| `diagram-mount` | 4 | the mount registers the three drawing tools and the annotate command |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |
