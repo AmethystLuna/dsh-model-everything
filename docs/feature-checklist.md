@@ -297,7 +297,7 @@ And the gates around it:
 | `intent` | 5 | an intent an action serves is accepted |
 | `check-status` | 2 | a cap that leaves a check nothing to decide reports skip, not pass |
 | `summary-counters` | 4 | a verification report counts what its checks carry |
-| `edit-refusals` | 6 | an ops that is not a list is refused and writes nothing |
+| `edit-refusals` | 10 | an ops that is not a list is refused and writes nothing |
 | `export-warnings` | 3 | every invariant a format cannot translate is named in its warnings |
 | `diff-families` | 6 | two reports of different families are refused, naming both |
 | `diff-next-steps` | 5 | every state says something to do |
@@ -351,7 +351,7 @@ And the gates around it:
 | `apply-smoke.mjs` | 0 | (read the file) |
 | `memory` | 8 | the memory root, its indexes and at least one topic exist |
 | `skills` | 3 | shipped text carries no catalogue counts |
-| `gate` | 16 | the package exposes the gate as its own entry point |
+| `gate` | 19 | the package exposes the gate as its own entry point |
 | `skill-routing` | 6 | every case names a skill that ships |
 | `toolset` | 13 | every tool description names at least one sibling |
 | `principles` | 4 | the principles index is the one the repository produces now |

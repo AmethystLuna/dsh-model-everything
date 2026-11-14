@@ -101,6 +101,37 @@ await test('ops that are not a list are refused by name, not thrown as a TypeErr
   }
 })
 
+await test('an empty batch is refused, because nothing would be written', async () => {
+  const path = freshFile('empty-batch')
+  const report = await editTool.execute({ modelPath: path, ops: [] })
+  if (report.errorCode !== 'EDIT_OPTION_INVALID') throw new Error('code: ' + String(report.errorCode))
+})
+
+await test('an operation that is not an object is refused by its position', async () => {
+  const path = freshFile('not-an-object')
+  const report = await editTool.execute({ modelPath: path, ops: [null] })
+  if (report.errorCode !== 'EDIT_OPTION_INVALID') throw new Error('code: ' + String(report.errorCode))
+  if (!/operation 1/.test(String(report.error))) throw new Error('it does not name the position: ' + String(report.error))
+})
+
+await test('a value the change wrote is described, not printed as an object', async () => {
+  // The detail a reader acts on: "to {\"states\": ...}" is the value; `[object Object]` would say nothing.
+  const path = freshFile('object-value')
+  // The narrative names a state the fixture has, so the batch writes: a value the model rejects would test the wrong path.
+  const report = await editTool.execute({ modelPath: path, ops: [{ set: ['/narrative', { states: { s0: 'A longer note about the start state' } }] }] })
+  const detail = String(report.changes?.[0]?.detail ?? '')
+  if (!detail.startsWith('to ')) throw new Error('detail: ' + detail)
+  if (!detail.includes('states')) throw new Error('the value is not described: ' + detail)
+})
+
+await test('a batch that would leave the model invalid names the operation it stops at', async () => {
+  // The first op is fine and the second is not, so a report that blamed operation 1 would be wrong.
+  const path = freshFile('invalid-batch')
+  const report = await editTool.execute({ modelPath: path, ops: [{ addState: 'c' }, { set: ['/init', 'ghost'] }] })
+  if (report.errorCode !== 'EDIT_RESULT_INVALID') throw new Error('code: ' + String(report.errorCode))
+  if (!/Operation 2/.test(String(report.error))) throw new Error('it did not blame the second operation: ' + String(report.error))
+})
+
 if (failures > 0) {
   console.log('edit-refusals tests failed:', failures)
   process.exit(1)

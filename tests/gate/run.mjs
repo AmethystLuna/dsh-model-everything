@@ -246,6 +246,50 @@ await check('the switch is read per step, so it can be flipped inside a running 
   if (whileOn.messages.length !== 1) throw new Error('did not inject after the switch turned on (' + String(whileOn.messages.length) + ')')
 })
 
+// The inspect provider: the status a reader asks for instead of reading a transcript.
+await check('the status provider answers enabled and the length of the text', async () => {
+  const ctx = {
+    on() {},
+    get(name) { return name === 'cordisInspect' ? { register(provider) { ctx.provider = provider; return () => {} } } : undefined },
+    effect(fn) { return fn() },
+    provider: undefined,
+  }
+  gate.apply(ctx, { enabled: true, gateContent: gate.DEFAULT_GATE_TEXT })
+  if (ctx.provider === undefined) throw new Error('no inspect provider was registered')
+  const status = await ctx.provider.query('status')
+  if (status.enabled !== true) throw new Error('enabled: ' + String(status.enabled))
+  if (status.gateContentLength !== gate.DEFAULT_GATE_TEXT.length) throw new Error('length: ' + String(status.gateContentLength))
+  // An unknown method is answered with null, not with the status: a provider must not invent one.
+  if (await ctx.provider.query('elsewhere') !== null) throw new Error('an unknown method answered a value')
+})
+
+await check('a registry that refuses the provider does not stop the gate', async () => {
+  // The provider is optional: a headless assembly without one still injects, and a throwing registry must not.
+  const ctx = {
+    on(event, handler) { this.listener = handler },
+    get(name) { return name === 'cordisInspect' ? { register() { throw new Error('refused') } } : undefined },
+    effect(fn) { return fn() },
+  }
+  gate.apply(ctx, { enabled: true, gateContent: gate.DEFAULT_GATE_TEXT })
+  if (ctx.listener === undefined) throw new Error('the gate did not register its listener')
+  const decision = await ctx.listener({ agent: { session: { snapshotEvents: () => [] } } }, async () => ({ kind: 'enter', messages: [] }))
+  if (decision.kind !== 'enter' || decision.messages.length !== 1) throw new Error('the gate did not inject after a refused provider')
+})
+
+await check('a session that exposes its log as `events` is read too', async () => {
+  // DSH 0.1.2-alpha.4 replaced the `events` getter with `snapshotEvents()`; a release before that exposes the snapshot
+  // under the old name, and a gate that only read the new one would inject twice on those hosts.
+  const handler = mount(true)
+  const injected = await handler(
+    { agent: { session: { events: [{ type: 'user/message', data: { source: { kind: GATE_KIND } } }] } } },
+    async () => ({ kind: 'enter', messages: [] }),
+  )
+  if (injected.messages.length !== 0) throw new Error('the old shape was not read: the gate injected again')
+  // Neither shape present: an empty log, and the gate injects once.
+  const empty = await handler({ agent: { session: {} } }, async () => ({ kind: 'enter', messages: [] }))
+  if (empty.messages.length !== 1) throw new Error('a session with no log was not injected into')
+})
+
 if (failures > 0) {
   console.log('gate checks failed:', failures)
   process.exit(1)
