@@ -1148,6 +1148,13 @@ const MUTATIONS = [
     from: "        String(report.schema) + '  verdict=' + String(report.verdict) + '  ' + String(findings.length) + ' finding(s)',",
     to: "        'dsh-diagram/review/v1  verdict=' + String(report.verdict) + '  ' + String(findings.length) + ' finding(s)',",
   },
+  {
+    id: 'M142',
+    what: 'a drawing card stops answering, so a host UI falls back to raw JSON',
+    file: 'src/presentation.ts',
+    from: "    if (lines.length === 0) return undefined",
+    to: '    if (lines.length >= 0) return undefined',
+  },
 ]
 
 const argument = process.argv[2]
