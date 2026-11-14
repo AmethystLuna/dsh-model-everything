@@ -1289,6 +1289,20 @@ test('the acceptance corpus comes out clean', () => {
   if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
+// A label with nowhere clear along its own line steps aside instead of sitting on the next box. Measured on this source
+// turned left to right: `0..1` collided with the shipment box, because the placement only walked along the run.
+test('a crowded label steps off its line rather than onto a box', () => {
+  const lines = [
+    '@startuml', 'left to right direction', 'entity "A" as orders', 'entity "B" as orderlines', 'entity "C" as product',
+    'entity "D" as customer', 'entity "E" as payment', 'entity "F" as shipment',
+    'customer --> orders : a', 'orders *-- orderlines : b', 'orderlines --> product : c', 'orders --> payment : d',
+    'orders --> shipment : e', 'shipment ..> product : f', '@enduml',
+  ]
+  const r = render({ source: lines.join(String.fromCharCode(10)) }, {}, { scheme: 'default' })
+  if (r.refused.length > 0) throw new Error('refused: ' + r.refused.join('; '))
+  if (r.canvas.labelCollisions > 0) throw new Error(String(r.canvas.labelCollisions) + ' label collision(s) in a turned drawing')
+})
+
 // Every member of a boundary is drawn inside it. The overlap case above was found because a member escaped its group;
 // this is the assertion that names the defect directly, so the next one fails as "outside its boundary" instead of as a
 // collision that only some drawings show.

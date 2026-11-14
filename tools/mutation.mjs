@@ -1196,6 +1196,13 @@ const MUTATIONS = [
     from: "    return { id, group: true, ...size }",
     to: "    return { id, group: true, ...extent(size.width, size.height) }",
   },
+  {
+    id: 'M148',
+    what: 'a label never steps off its line, so a crowded edge lands on the next box',
+    file: 'src/render/labels.ts',
+    from: '    for (const across of [LABEL_STEP, -LABEL_STEP, LABEL_STEP * 2, -LABEL_STEP * 2]) {',
+    to: '    for (const across of []) {',
+  },
 ]
 
 const argument = process.argv[2]

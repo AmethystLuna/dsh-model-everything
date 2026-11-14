@@ -120,8 +120,15 @@ export function placeLabel(
     const bound = Math.max(0, run.length / 2 - along)
     const walk: number[] = [0]
     for (let step = LABEL_STEP; step <= bound + 0.001; step += LABEL_STEP) walk.push(step, -step)
-    for (const offset of walk) {
-      const spot = spotAt(middle.x + ux * offset, middle.y + uy * offset)
+    // Beside the line as well as along it. A label that has nowhere clear on a short run used to take the spot with the
+    // fewest collisions, which on a turned drawing is where the next box and its labels already are; stepping off the
+    // line a few pixels is what a reader does with a crowded edge, and the along-run spots are still tried first.
+    const steps: Array<{ along: number; across: number }> = walk.map((offset) => ({ along: offset, across: 0 }))
+    for (const across of [LABEL_STEP, -LABEL_STEP, LABEL_STEP * 2, -LABEL_STEP * 2]) {
+      for (const offset of walk) steps.push({ along: offset, across })
+    }
+    for (const { along: offset, across } of steps) {
+      const spot = spotAt(middle.x + ux * offset - uy * across, middle.y + uy * offset + ux * across)
       const placement = collisionsAt(spot, runIndex)
       // A clear place is the answer, and the first one is the preferred one: the search order is already the
       // drawing's preference - longest run, own midpoint, then either side.
