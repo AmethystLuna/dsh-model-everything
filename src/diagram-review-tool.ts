@@ -59,7 +59,7 @@ export const diagramReviewTool = defineTool({
       const measured = (report.measured ?? {}) as Record<string, unknown>
       const lines: string[] = []
       lines.push(
-        'dsh-diagram/review/v1  verdict=' + String(report.verdict) + '  ' + String(findings.length) + ' finding(s)',
+        String(report.schema) + '  verdict=' + String(report.verdict) + '  ' + String(findings.length) + ' finding(s)',
       )
       lines.push(
         'MEASURED  nodes=' + String(measured.nodes) + '  groups=' + String(measured.groups) + '  deepest=' + String(measured.deepest) +

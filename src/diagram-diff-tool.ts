@@ -49,7 +49,7 @@ export const diagramDiffTool = defineTool({
       const changes = Array.isArray(report.changes) ? (report.changes as Array<Record<string, unknown>>) : []
       const measured = (report.measured ?? {}) as Record<string, Record<string, number>>
       const lines: string[] = []
-      lines.push('dsh-diagram/diff/v1  verdict=' + String(report.verdict) + '  ' + String(changes.length) + ' change(s)')
+      lines.push(String(report.schema) + '  verdict=' + String(report.verdict) + '  ' + String(changes.length) + ' change(s)')
       lines.push(
         'MEASURED  before=' + String(measured.before?.nodes) + ' node(s)/' + String(measured.before?.groups) + ' group(s)' +
           '  after=' + String(measured.after?.nodes) + ' node(s)/' + String(measured.after?.groups) + ' group(s)',

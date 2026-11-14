@@ -52,7 +52,7 @@ export const diagramRenderTool = defineTool({
       const lines: string[] = []
       const refused = Array.isArray(result.refused) ? (result.refused as string[]) : []
       lines.push(
-        'dsh-diagram/v1  notation=' + String(result.notation) + '  nodes=' + String(result.nodes) + '  edges=' + String(result.edges) +
+        String(result.schema) + '  notation=' + String(result.notation) + '  nodes=' + String(result.nodes) + '  edges=' + String(result.edges) +
           (Number(result.groups) > 0 ? '  groups=' + String(result.groups) : '') +
           (result.path === undefined ? '' : '  written=' + String(result.path)),
       )

@@ -102,6 +102,28 @@ await test('a review or a delta card leads with its verdict and its counts', asy
   if (!/changes: [1-9]/.test(deltaText)) throw new Error('the delta card states no change count: ' + deltaText.slice(0, 120))
 })
 
+await test('the body a model reads starts with the family the payload states', async () => {
+  // The three bodies used to print `dsh-diagram/...`, an id in no registry and not the payload's own: a reader keying on the
+  // first token was told a family that does not exist. The body now prints `report.schema`.
+  const modules = await Promise.all([
+    import('../../lib/diagram-render-tool.js'),
+    import('../../lib/diagram-review-tool.js'),
+    import('../../lib/diagram-diff-tool.js'),
+  ])
+  const calls = [
+    [modules[0].diagramRenderTool, { source: 'graph TD\n  a[A] --> b[B]', notation: 'mermaid' }],
+    [modules[1].diagramReviewTool, { source: 'graph TD\n  a[A] --> b[B]', notation: 'mermaid' }],
+    [modules[2].diagramDiffTool, { before: 'graph TD\n  a[A] --> b[B]', after: 'graph TD\n  a[A] --> b[B]\n  b --> c[C]', notation: 'mermaid' }],
+  ]
+  for (const [tool, args] of calls) {
+    const value = await tool.execute(args)
+    const body = tool.output.render(args, value)[0].text
+    const first = body.split('\n')[0]
+    if (!first.startsWith(value.schema)) throw new Error(tool.name + ' body starts ' + JSON.stringify(first.slice(0, 46)) + ', payload schema ' + value.schema)
+    if (/dsh-diagram\//.test(body)) throw new Error(tool.name + ' body still names an unregistered family')
+  }
+})
+
 if (failures > 0) {
   console.log('diagram-card tests failed:', failures)
   process.exit(1)
