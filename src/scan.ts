@@ -19,6 +19,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { extname, relative, resolve } from 'node:path'
 
 import { OptionShapeError } from './option-shape.js'
+import { checkAbort, type AbortLike } from './abort.js'
 
 export interface ScannedEdge {
   from: string
@@ -675,7 +676,7 @@ function internalRootsOf(root: string, directories: string[]): string[] {
   return [...roots].sort()
 }
 
-export function scanDependencyGraph(root: unknown): ScannedGraph {
+export function scanDependencyGraph(root: unknown, signal?: AbortLike): ScannedGraph {
   if (typeof root !== 'string' || root.trim() === '') {
     throw new OptionShapeError('STRUCTURE_OPTION_INVALID', 'repoPath must be a non-empty path to a directory or a single source file.')
   }
@@ -699,6 +700,8 @@ export function scanDependencyGraph(root: unknown): ScannedGraph {
   const contents = new Map<string, string>()
   const byLanguage = new Map<string, number>()
   const walk = (directory: string): void => {
+    // The walk is the part that can take a while on a large tree: it is where a deadline is honoured.
+    checkAbort(signal, 'walking the source tree')
     if (files.length >= LIMITS.files) return
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (files.length >= LIMITS.files) return

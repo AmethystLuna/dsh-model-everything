@@ -67,7 +67,7 @@ export const umlStructureTool = defineTool({
   presentResult: structureResultView,
   timeoutMs: 10_000,
   isConcurrencySafe: () => true,
-  async execute(args) {
+  async execute(args, exec) {
     if (args.diagrams !== undefined) {
       try {
         // `diagrams` was read with `.map` behind no guard, and a level's `diagram` with `.split`, so a string
@@ -95,7 +95,7 @@ export const umlStructureTool = defineTool({
     }
     if (args.repoPath !== undefined) {
       try {
-        const scanned = scanDependencyGraph(args.repoPath)
+        const scanned = scanDependencyGraph(args.repoPath, exec?.signal)
         // A source module is a declared node that depends on others: not a container, and it has a
         // line only when it came from a drawing, so the field stays absent.
         const graph = {

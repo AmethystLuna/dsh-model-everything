@@ -49,6 +49,21 @@ await test('a composition whose deadline passed settles the same way', async () 
   if (result.schema !== REPORT_SCHEMAS.compose) throw new Error('the refusal lost its family')
 })
 
+await test('a structure scan whose deadline passed stops walking rather than finish the tree', async () => {
+  const { umlStructureTool } = await import('../../lib/structure-tool.js')
+  const result = await umlStructureTool.execute({ repoPath: new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1') }, { signal: aborted() })
+  if (result.ran !== false) throw new Error('it walked the tree under an aborted signal')
+  if (result.errorCode !== 'TOOL_ABORTED') throw new Error('it answered ' + String(result.errorCode))
+})
+
+await test('an edit whose deadline passed does not run the engine twice', async () => {
+  const { modelEditTool } = await import('../../lib/edit-tool.js')
+  // The path has to exist for the edit to reach the engine; the deadline is checked by the verification it runs.
+  const result = await modelEditTool.execute({ modelPath: 'tests/abort/fixture-model.json', ops: [{ addState: 'x' }] }, { signal: aborted() })
+  if (result.ran === true) throw new Error('the edit ran under an aborted signal')
+  if (result.errorCode !== 'TOOL_ABORTED') throw new Error('it answered ' + String(result.errorCode))
+})
+
 await test('the control: the same calls answer when no deadline passed', async () => {
   // A guard that refuses everything is not a guard.
   const verify = await modelVerifyTool.execute({ model: machine(10) })

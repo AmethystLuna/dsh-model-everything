@@ -1113,6 +1113,13 @@ const MUTATIONS = [
     from: "        registered.set(name, error instanceof Error ? error.message : String(error))",
     to: "        registered.set(name, '')",
   },
+  {
+    id: 'M137',
+    what: 'the tree walk ignores the deadline and reads the whole repository',
+    file: 'src/scan.ts',
+    from: "    checkAbort(signal, 'walking the source tree')",
+    to: '    void signal',
+  },
 ]
 
 const argument = process.argv[2]

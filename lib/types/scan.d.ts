@@ -1,3 +1,4 @@
+import { type AbortLike } from './abort.js';
 export interface ScannedEdge {
     from: string;
     to: string;
@@ -42,4 +43,4 @@ export interface Language {
 export declare const LANGUAGES: Language[];
 /** Which language a file belongs to, if any. */
 export declare function languageOf(path: string): Language | undefined;
-export declare function scanDependencyGraph(root: unknown): ScannedGraph;
+export declare function scanDependencyGraph(root: unknown, signal?: AbortLike): ScannedGraph;

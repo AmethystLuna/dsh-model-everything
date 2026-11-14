@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "init": "a",
+  "states": [
+    {
+      "id": "a"
+    },
+    {
+      "id": "b",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "from": "a",
+      "event": "go",
+      "to": "b"
+    }
+  ]
+}
