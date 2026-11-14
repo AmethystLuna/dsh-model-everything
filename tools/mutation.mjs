@@ -126,6 +126,8 @@ const SUITES = [
   'tests/shape-dispatch/run.mjs',
   'tests/abort/run.mjs',
   'tests/component-claims/run.mjs',
+  'tests/code-inventory/run.mjs',
+  'tests/diagram-mount/run.mjs',
   'tests/status-per-tool/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
