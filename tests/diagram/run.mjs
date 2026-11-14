@@ -1293,10 +1293,12 @@ test('the acceptance corpus comes out clean', () => {
 // turned left to right: `0..1` collided with the shipment box, because the placement only walked along the run.
 test('a crowded label steps off its line rather than onto a box', () => {
   const lines = [
-    '@startuml', 'left to right direction', 'entity "A" as orders', 'entity "B" as orderlines', 'entity "C" as product',
-    'entity "D" as customer', 'entity "E" as payment', 'entity "F" as shipment',
-    'customer --> orders : a', 'orders *-- orderlines : b', 'orderlines --> product : c', 'orders --> payment : d',
-    'orders --> shipment : e', 'shipment ..> product : f', '@enduml',
+    // The shapes and labels of the gallery's data model, turned: a short gap between 订单 and 发货单, and five labels
+    // competing for it. Shortened names do not reproduce it - the crowding is what makes the along-run search fail.
+    '@startuml', 'left to right direction', 'entity "订单" as orders', 'entity "订单行" as lines', 'entity "商品" as product',
+    'entity "客户" as customer', 'entity "支付流水" as payment', 'entity "发货单" as shipment',
+    'customer --> orders : 1..*', 'orders *-- lines : 1..*', 'lines --> product : 1..1', 'orders --> payment : 0..*',
+    'orders --> shipment : 0..1', 'shipment ..> product : 承运', '@enduml',
   ]
   const r = render({ source: lines.join(String.fromCharCode(10)) }, {}, { scheme: 'default' })
   if (r.refused.length > 0) throw new Error('refused: ' + r.refused.join('; '))
