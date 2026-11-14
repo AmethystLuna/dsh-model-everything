@@ -84,6 +84,24 @@ await test('a drawing card states what was drawn and what was refused', async ()
   if (!/1 line\(s\) refused/.test(text)) throw new Error('the card does not state what was refused: ' + text.slice(0, 160))
 })
 
+await test('a review or a delta card leads with its verdict and its counts', async () => {
+  // The other two shapes the same helper serves: a review has no node count but has a verdict and measured figures;
+  // a delta has neither and leads with the number of changes.
+  const { diagramReviewTool } = await import('../../lib/diagram-review-tool.js')
+  const { diagramDiffTool } = await import('../../lib/diagram-diff-tool.js')
+  const reviewed = await diagramReviewTool.execute({ source: 'graph TD\n  a[A] --> b[B]', notation: 'mermaid' })
+  const reviewCard = diagramReviewTool.presentResult({}, { content: [], meta: reviewed })
+  if (reviewCard === undefined) throw new Error('no card for a review')
+  const reviewText = reviewCard.content.map((block) => block.text ?? '').join('\n')
+  if (!/^PASS|^FAIL/.test(reviewText)) throw new Error('the review card does not lead with its verdict: ' + reviewText.slice(0, 80))
+  if (!/measured:/.test(reviewText)) throw new Error('the review card states no measurement: ' + reviewText.slice(0, 120))
+  // A node added, not a label changed: a relabelled box is not a containment change, so it produces no entry.
+  const delta = await diagramDiffTool.execute({ before: 'graph TD\n  a[A] --> b[B]', after: 'graph TD\n  a[A] --> b[B]\n  b --> c[C]', notation: 'mermaid' })
+  const deltaCard = diagramDiffTool.presentResult({}, { content: [], meta: delta })
+  const deltaText = deltaCard.content.map((block) => block.text ?? '').join('\n')
+  if (!/changes: [1-9]/.test(deltaText)) throw new Error('the delta card states no change count: ' + deltaText.slice(0, 120))
+})
+
 if (failures > 0) {
   console.log('diagram-card tests failed:', failures)
   process.exit(1)

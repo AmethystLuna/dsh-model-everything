@@ -326,7 +326,7 @@ And the gates around it:
 | `locale-pairs` | 4 | both languages of every card name the same keys |
 | `gate-text` | 5 | the message was rendered from shipped skills, so the checks below mean something |
 | `examples` | 6 | the directory holds examples, so the cases below have something to read |
-| `diagram-card` | 7 | a drawing card carries the source it was drawn from |
+| `diagram-card` | 8 | a drawing card carries the source it was drawn from |
 | `diagram-diff` | 5 | an added node is an info change and the delta passes |
 | `reading-shapes` | 4 | the automaton family reports top-level findings and a next step |
 | `diagram-review` | 6 | a drawing inside every budget passes and states what it measured |
