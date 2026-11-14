@@ -21,10 +21,14 @@
  * - `left to right direction` is accepted and has no effect: this renderer has one layout, top to bottom, so a
  *   source that asks for landscape gets the same picture as one that does not.
  *
- * Refused, by line and by name: the element keywords this renderer has no symbol for (`actor`, `class`,
- * `cloud`, ...), the diagram kinds it does not draw (`sequence`), and an edge it cannot draw as written (a
- * line with no arrow end, a mark at both ends, a dotted diamond, an edge between two boundaries, or an edge
- * into a boundary that is nested or empty).
+ * Refused, by line and by name: the element keywords this renderer has no symbol for (`actor`, `cloud`,
+ * `participant`, ...), the diagram kinds it does not draw (a `sequence` message or fragment, a
+ * `@startmindmap` block), and an edge it cannot draw as written (a mark at both ends, a dotted diamond, an
+ * edge between two boundaries, or an edge into a boundary that is nested or empty).
+ *
+ * A line with no arrow end is drawn: `a -- b` states a connection with no direction, which is what an
+ * undirected edge is. `class` and the other compartmented boxes are drawn as boxes, with their body lines
+ * refused one by one - the name is what a component-level view needs.
  */
 
 import { emptyCaption, emptyCaptionOf, emptyDiagram, type Diagram, type DiagramEdge, type DiagramGroup, type DiagramNode, type EdgeArrow, type NodeShape } from './model.js'
