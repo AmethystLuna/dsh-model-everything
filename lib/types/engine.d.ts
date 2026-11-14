@@ -1,3 +1,4 @@
+import { type AbortLike } from './abort.js';
 export declare const ENGINE_SCHEMA_VERSION = 1;
 export type VarValue = number | boolean;
 export type GuardOp = '==' | '!=' | '<' | '<=' | '>' | '>=';
@@ -164,6 +165,8 @@ export interface LogicModelV1 {
 }
 export interface VerificationOptions {
     maxStates?: number;
+    /** The tool run's abort signal: the search checks it, so a deadline settles the call instead of finishing it. */
+    signal?: AbortLike;
     maxPermutationEvents?: number;
     beforeModel?: unknown;
     stateMapping?: Record<string, string>;
@@ -444,6 +447,8 @@ export interface CompositionOptions {
     maxStates?: number;
     /** Hash specification used for the per-machine modelHash. Defaults to the current published spec (`v1`). */
     hashSpec?: HashSpec;
+    /** The tool run's abort signal: the product walk checks it, so a deadline settles the call instead of finishing it. */
+    signal?: AbortLike;
 }
 export interface CompositionSummary {
     machineCount: number;

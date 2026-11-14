@@ -148,6 +148,7 @@
     }
   ],
   "suites": [
+    "abort",
     "arrows",
     "automaton",
     "baseline",

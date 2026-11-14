@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { checkAbort, type AbortLike } from './abort.js'
 
 export const ENGINE_SCHEMA_VERSION = 1
 
@@ -191,6 +192,8 @@ export interface LogicModelV1 {
 
 export interface VerificationOptions {
   maxStates?: number
+  /** The tool run's abort signal: the search checks it, so a deadline settles the call instead of finishing it. */
+  signal?: AbortLike
   maxPermutationEvents?: number
   beforeModel?: unknown
   stateMapping?: Record<string, string>
@@ -347,7 +350,7 @@ export interface RuntimeState {
   vars: Record<string, VarValue>
 }
 
-type NormalizedOptions = Required<Pick<VerificationOptions, 'maxStates' | 'maxPermutationEvents'>>
+type NormalizedOptions = Required<Pick<VerificationOptions, 'maxStates' | 'maxPermutationEvents'>> & Pick<VerificationOptions, 'signal'>
 
 const DEFAULT_MAX_STATES = 10_000
 const DEFAULT_MAX_PERMUTATION_EVENTS = 5
@@ -1372,8 +1375,12 @@ function explore(model: LogicModelV1, options: NormalizedOptions): Exploration {
   const reachableKeys = new Set<string>()
   const queue: RuntimeState[] = [init]
   let truncated = false
+  let seen = 0
   while (queue.length > 0) {
     const runtime = queue.shift()!
+    // The signal is read every few thousand states: often enough that a deadline settles the call, rarely enough that the
+    // check costs anything on the searches the suites run.
+    if ((seen++ & 255) === 0) checkAbort(options.signal, 'exploring the state space')
     const key = runtimeKey(runtime)
     if (reachableKeys.has(key)) continue
     reachableKeys.add(key)
@@ -3841,6 +3848,7 @@ export function runVerification(input: unknown, options: VerificationOptions = {
   const normalized: NormalizedOptions = {
     maxStates: boundedOption(options.maxStates, DEFAULT_MAX_STATES, MAX_STATES_CEILING, 'maxStates', boundNotes),
     maxPermutationEvents: boundedOption(options.maxPermutationEvents, DEFAULT_MAX_PERMUTATION_EVENTS, MAX_PERMUTATION_EVENTS_CEILING, 'maxPermutationEvents', boundNotes),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
   }
   const hashSpec = options.hashSpec ?? DEFAULT_HASH_SPEC
   const metadataKeys = metadataKeysOf(input)
@@ -4051,6 +4059,8 @@ export interface CompositionOptions {
   maxStates?: number
   /** Hash specification used for the per-machine modelHash. Defaults to the current published spec (`v1`). */
   hashSpec?: HashSpec
+  /** The tool run's abort signal: the product walk checks it, so a deadline settles the call instead of finishing it. */
+  signal?: AbortLike
 }
 
 export interface CompositionSummary {
@@ -4352,8 +4362,11 @@ export function runCompositionVerification(machinesInput: unknown[], options: Co
     coEnabledNodes.set(event, 0)
   }
   const c1Findings: Finding[] = []
+  let seenNodes = 0
   while (queue.length > 0) {
     const node = queue.shift()!
+    if ((seenNodes++ & 255) === 0) checkAbort(options.signal, 'exploring the composition')
+
     const key = keyOf(node)
     if (visited.has(key)) continue
     visited.add(key)

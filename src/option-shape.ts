@@ -61,7 +61,10 @@ export function requireObjectOption(value: unknown, option: string, errorCode: s
  */
 export function optionRefusal(error: unknown, errorCode: string, schema: string): Record<string, unknown> {
   const message = error instanceof Error ? error.message : String(error)
-  const code = error instanceof OptionShapeError ? error.errorCode : errorCode
+  // An error that names its own code describes itself better than the caller's default: a call stopped by its deadline is
+  // not an option whose shape is wrong, and reporting it as one sends the reader to the arguments.
+  const own = error instanceof Error && typeof (error as Error & { code?: unknown }).code === 'string' ? String((error as Error & { code?: unknown }).code) : undefined
+  const code = error instanceof OptionShapeError ? error.errorCode : own ?? errorCode
   return {
     ok: false,
     ran: false,

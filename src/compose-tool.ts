@@ -71,7 +71,7 @@ export const modelComposeTool = defineTool({
   // can produce and still ends the call.
   timeoutMs: 60_000,
   isConcurrencySafe: () => true,
-  async execute(args) {
+  async execute(args, exec) {
     try {
       // `machines` is declared `json`, so a string reached `machinesInput.forEach` as a raw TypeError. The
       // array-ness is the tool's contract; check it here and refuse with a code that names the option.
@@ -86,6 +86,8 @@ export const modelComposeTool = defineTool({
         shared: args.shared as SharedLocation[] | undefined,
         accesses: args.accesses as SharedAccess[] | undefined,
         maxStates: args.maxStates,
+        // The deadline is honoured by the product walk, not by the host: `timeoutMs` says this tool forwards the signal.
+        signal: exec?.signal,
       }) as unknown as JsonValue
     } catch (error) {
       return optionRefusal(error, 'COMPOSE_OPTION_INVALID', REPORT_SCHEMAS.compose) as unknown as JsonValue

@@ -124,6 +124,7 @@ const SUITES = [
   'tests/refusal-schema/run.mjs',
   'tests/view-agreement/run.mjs',
   'tests/shape-dispatch/run.mjs',
+  'tests/abort/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1081,6 +1082,13 @@ const MUTATIONS = [
     file: 'src/render/svg.ts',
     from: "      case 'hexagon':",
     to: "      case 'hexagon-unused':",
+  },
+  {
+    id: 'M133',
+    what: 'the search ignores the deadline and finishes work nobody is waiting for',
+    file: 'src/abort.ts',
+    from: '  if (signal === undefined || !signal.aborted) return',
+    to: '  return',
   },
 ]
 
