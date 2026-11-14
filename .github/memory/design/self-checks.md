@@ -375,6 +375,35 @@ delta 无条件回退到 `report.summary`，而 summary 没有 delta 键，于�
 | 门禁命令 | 116 |
 | 变异点 | 114 |
 
+## 3.15 第十一段：十项未量面的清账（第 161–169 轮，里程碑）
+
+上一段列了“还没量过的面”，这一段逐项清完。**十项全部覆盖**，其中四项查出真缺陷。
+
+| # | 面 | 守卫 | 结果 |
+|---|---|---|---|
+| 1 | `diagram_render --out` 写盘 | `tests/diagram-out` | **缺陷**：写盘失败抛异常而非拒收 |
+| 2 | 卡片渲染块 | `tests/card-blocks` | 无缺陷；一条断言被变异点证伪后加强 |
+| 3 | 导出 `extras` | `tests/export-extras` | **缺陷**：PRISM 为空性质写一行空文件；终态兼禁止无警告 |
+| 4 | UML 哈希 | `tests/uml-hash` | **缺陷**：`uml_render` 不报 `hashSpec`/`modelHash` |
+| 5 | gate 配置面 | `tests/gate-config` | 无缺陷；变异点先打偏（改的是私有 `gateText`） |
+| 6 | 工具 `timeoutMs` | `tests/tool-timeouts` | **缺陷**：组合族 10s 上限 < 默认上限允许的 18s |
+| 7 | `reportView` 全族 | `tests/report-views`（扩名单） | 无缺陷；六族全一致 |
+| 8 | 端到端路径 | `tests/full-path` | 无缺陷；**加进门禁被 `suite-registry` 否掉** |
+| 9 | 中文 locale 内容 | `tests/locale-pairs`（扩断言） | 无缺陷；“含中文”≠“是中文” |
+| 10 | `docs/` 步骤顺序 | `tests/release-steps` | 无缺陷；四条顺序断言全成立 |
+
+### 里程碑基线（第 169 轮实测）
+
+| 指标 | 数值 |
+|---|---|
+| 门禁命令 | 125 |
+| 变异点 | 126 |
+
+### 这一段的两条教训
+
+1. **“加强断言”有时需要先被变异点证伪**：卡片首行只断言“含 added/removed”时，把 `delta` 抹掉仍通过；改成显示**报告里的真实数字**才抓得住。
+2. **仓库自己的规则会拦住我**：把 `full-suite.mjs` 加进门禁，被 `suite-registry` 的“根级模块不是套件”判红——正确做法是让**套件去跑运行器**。
+
 ## 4. 这一阶段修掉的真实缺陷
 
 - `use-case` 关键字不在检测扫描里：一个表里写着 parseable 的家族**根本到不了**；
