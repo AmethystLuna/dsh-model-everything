@@ -126,8 +126,10 @@ Three modules are held at 100% on statements, functions and lines - `presentatio
 `routing.js` - and a change that drops one of those numbers is a change that needs a case or a deleted line.
 `presentation.js` sits at 96.8% branches: what is left is the unused arm of three ternaries inside the card
 helper, which a reading of the numbers says is not worth a case. That is recorded rather than smoothed over -
-the sentence above used to claim branches too, and the claim was wrong. The rest of the tree is not gated, because most of its uncovered paths are family-specific
-refusals that `tests/negatives` already decides by behaviour.
+the sentence above used to claim branches too, and the claim was wrong.
+
+The rest of the tree is not gated, because most of its uncovered paths are family-specific refusals that
+`tests/negatives` already decides by behaviour.
 
 Read it as a question, not a score: a branch with no test is either a path worth covering or a condition
 that cannot happen. Both are findings - the first wants a case, the second wants the branch removed. Two
