@@ -100,7 +100,13 @@ export const umlRenderTool = defineTool({
         notation: result.notation,
         kind: result.diagram,
         diagram: result.primary,
-        hashes: { diagram: createHash('sha256').update(result.primary).digest('hex') },
+        // The spec beside the hash, and the hash of the model the text was drawn from: a reader who has the diagram needs both to say which
+        // model it shows and whether the two hashes are comparable. A bare `diagram` hash answers neither.
+        hashes: {
+          hashSpec: DEFAULT_HASH_SPEC,
+          modelHash: valueHash(args.model),
+          diagram: createHash('sha256').update(result.primary).digest('hex'),
+        },
         warnings: result.warnings,
       } as unknown as JsonValue
     } catch (error) {

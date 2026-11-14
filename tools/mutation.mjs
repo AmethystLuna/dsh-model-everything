@@ -115,6 +115,7 @@ const SUITES = [
   'tests/diagram-review/run.mjs',
   'tests/diagram-out/run.mjs',
   'tests/card-blocks/run.mjs',
+  'tests/uml-hash/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -981,6 +982,13 @@ const MUTATIONS = [
     file: 'src/render/plantuml-reference.ts',
     from: "  if (/^>/.test(String(match[5]).trim())) return 'a sequence message (`->>`) is not something this renderer draws'",
     to: '  void 0',
+  },
+  {
+    id: 'M120',
+    what: 'a rendered diagram reports the hash of some other model',
+    file: 'src/uml-tool.ts',
+    from: '          modelHash: valueHash(args.model),',
+    to: '          modelHash: valueHash({ schemaVersion: 1, init: \'x\', states: [], transitions: [] }),',
   },
 ]
 
