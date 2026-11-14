@@ -98,6 +98,46 @@ test('every reference names where it is cited, and no entry is a fragment', () =
   if (fragments.length > 0) throw new Error('the list carries fragments of a citation rather than works: ' + fragments.join(' | '))
 })
 
+// The release checklist told the releaser to run `npm ci`, which stops with `ETARGET` before installing anything: this
+// package's peer range names a `dsh` the public registry does not have. CI had already learned the flag; the checklist
+// had not, and nothing compared them. It does now.
+test('the release checklist installs the way CI does', () => {
+  const workflow = readFileSync(repo + '.github/workflows/dsh-bundle.yml', 'utf8')
+  const ci = /run: (npm ci[^\n]*)/.exec(workflow)?.[1]?.trim()
+  if (ci === undefined) throw new Error('the workflow has no npm ci step to compare against')
+  const checklist = readFileSync(repo + 'RELEASE.md', 'utf8')
+  const install = /^- \[ \] `(npm ci[^`]*)`/m.exec(checklist)?.[1]
+  if (install === undefined) throw new Error('the release checklist has no install step')
+  if (install !== ci) throw new Error('the checklist says `' + install + '` while CI runs `' + ci + '`')
+  // And the half a reader is asked to run first thing is the same one, so the guide cannot drift from either.
+  for (const name of ['CONTRIBUTING.md', 'docs/contributing/guide.zh-CN.md']) {
+    if (!readFileSync(repo + name, 'utf8').includes(ci)) throw new Error(name + ' does not carry `' + ci + '`')
+  }
+})
+
+// The compatibility record lists what the installed copy must contain, and that list is a claim about the
+// package: it said "7 skills" after the eighth shipped, and it never mentioned the drawing row or its lib file.
+// Counted here, so the next one cannot drift.
+test('the compatibility record counts what the package ships', () => {
+  const text = readFileSync(repo + 'DSH-COMPATIBILITY.md', 'utf8')
+  const claim = /#\s+(\d+) skills with SKILL\.md/.exec(text)?.[1]
+  if (claim === undefined) throw new Error('the record no longer states a skill count; this check would pass vacuously')
+  const skills = readdirSync(repo + 'skills', { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .filter((entry) => existsSync(repo + 'skills/' + entry.name + '/SKILL.md')).length
+  if (Number(claim) !== skills) throw new Error('the record says ' + claim + ' skills; the package ships ' + String(skills))
+  // Every row the bundle inserts, and every lib entry it links to, is named by the record.
+  const rows = [...readFileSync(repo + 'cordis.patch.yml', 'utf8').matchAll(/^\s+- id: (.+)$/gm)].map((match) => match[1].trim())
+  if (rows.length !== 3) throw new Error('the bundle inserts ' + String(rows.length) + ' rows; the record describes three')
+  for (const row of rows) {
+    const suffix = row.replace('dsh-model-everything', '').replace(/^-/, '')
+    const lib = 'lib/' + (suffix === '' ? 'index' : suffix) + '.js'
+    if (!existsSync(repo + lib)) throw new Error('the row ' + row + ' has no ' + lib)
+    if (suffix !== '' && !text.includes(lib)) throw new Error('the record does not name ' + lib)
+  }
+  if (!text.includes(String(rows.length) + ' rows') && !text.includes('three rows')) throw new Error('the record does not say how many rows the bundle inserts')
+})
+
 if (failures > 0) {
   console.log('documentation tests failed:', failures)
   process.exit(1)

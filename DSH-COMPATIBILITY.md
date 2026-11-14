@@ -39,8 +39,8 @@ dsh plugin --profile scratch add "file:<this-repo>"
 dsh --profile scratch --dump-config
 
 # 4) the package contents are what the bundle promises
-#    7 skills with SKILL.md, locale/{en,zh}.json, gate/package.json + gate/locale/*,
-#    lib/gate.js, lib/index.js
+#    8 skills with SKILL.md, locale/{en,zh}.json, gate/package.json + gate/locale/*,
+#    diagram/package.json + diagram/locale/*, lib/index.js, lib/gate.js, lib/diagram.js
 
 # 5) start: headless boot with a deliberately invalid API key.
 #    Expected: the whole tree loads and the app reaches the model-provider stage,

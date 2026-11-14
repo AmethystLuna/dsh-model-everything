@@ -20,7 +20,9 @@ be stale the moment the first release lands.
 ## 0. Pre-flight
 
 - [ ] `git status` is clean, and the release commit is on the branch you mean to ship
-- [ ] `npm ci`
+- [ ] `npm ci --legacy-peer-deps`
+  The flag is not a convenience: this package's `peerDependencies` name `dsh@^0.1.7-…`, which no version on the public
+  registry satisfies, so a plain `npm ci` stops with `ETARGET` before it installs anything. CI runs the same command.
 - [ ] `npm run bump -- <x.y.z>`
 - [ ] `npm run bump -- --check && npm run bump -- --audit`
 - [ ] `npm run typecheck`
