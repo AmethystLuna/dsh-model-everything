@@ -1013,6 +1013,13 @@ const MUTATIONS = [
     from: '  if (resolved.full) return JSON.stringify(value as JsonValue)',
     to: '  if (resolved.full) return JSON.stringify({ ...(value as Record<string, unknown>), verdictReason: undefined })',
   },
+  {
+    id: 'M124',
+    what: 'the combined smoke path stops reporting a deadline miss',
+    file: 'src/engine.ts',
+    from: 'A14_DEADLINE_MISSED',
+    to: 'A14_DEADLINE_MISSED_UNUSED',
+  },
 ]
 
 const argument = process.argv[2]
