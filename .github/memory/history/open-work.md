@@ -29,16 +29,6 @@ dsh 对 `timeoutMs` 的契约是：**声明它=声明本工具把 `exec.signal` 
 把 `exec.signal` 传进去。守它是 `tests/abort`（此刻只覆盖两条）。判据：任一工具在 aborted 信号下必须回
 `ran: false` + `errorCode: TOOL_ABORTED` + 族 `schema`，而不是跑完再回一份报告。
 
-### 0b. inspect 状态里的八个布尔是同一个事实（待改）
-
-`src/index.ts` 的 `registerTool()` 把八个“某工具是否注册”的布尔全部写在一个 `try` 里：第九个 `register` 抛错时，
-八个都会报 `false`，**包括已经注册成功的那些**。状态查询因此会把“部分失败”报成“全都没装”。
-
-改法：每个工具单独 `try` 并各自记一个结果，另加 `missingTools: string[]` 说出失败的是哪几个；
-守它的套件读 `status` 并对齐 `missingTools`。判据：让第九个注册抛错，状态必须点名那一个，其余仍为 true。
-
-## 未完成
-
 ### 1. 要不要拆成多个组件（待定）
 
 现状：一个包、一行 loader 条目、一个总开关（本插件自己的 `config.enabled`；dsh 那一侧的开关是行级
