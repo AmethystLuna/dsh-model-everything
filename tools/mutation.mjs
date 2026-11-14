@@ -1006,6 +1006,13 @@ const MUTATIONS = [
     from: '  timeoutMs: 60_000,',
     to: '  timeoutMs: 5_000,',
   },
+  {
+    id: 'M123',
+    what: 'the full view drops the reason the body states',
+    file: 'src/report-view.ts',
+    from: '  if (resolved.full) return JSON.stringify(value as JsonValue)',
+    to: '  if (resolved.full) return JSON.stringify({ ...(value as Record<string, unknown>), verdictReason: undefined })',
+  },
 ]
 
 const argument = process.argv[2]

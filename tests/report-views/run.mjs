@@ -3,7 +3,11 @@
 // They answer different questions, so they may differ in size and in detail - but never in the conclusion. A reader who switches to `full` to
 // hand the report to `report_diff` must not get a different verdict, and the body must not lose the reason or the first thing to do.
 import { renderReportText } from '../../lib/report-view.js'
-import { runVerification } from '../../lib/engine.js'
+import { runCompositionVerification, runVerification } from '../../lib/engine.js'
+import { runDataVerification } from '../../lib/data-engine.js'
+import { runDesignReview } from '../../lib/design-engine.js'
+import { diffReports } from '../../lib/baseline.js'
+import { runConcurrencyScan } from '../../lib/concurrency.js'
 import { reviewUml } from '../../lib/uml.js'
 
 let failures = 0
@@ -21,6 +25,20 @@ const REPORTS = {
   'a review that fails': reviewUml({ model: { schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b' }], transitions: [{ from: 'a', event: 'go', to: 'b' }] } }),
   'a review that passes': reviewUml({ model: { schemaVersion: 1, init: 'a', states: [{ id: 'a' }, { id: 'b' }], transitions: [{ from: 'a', event: 'go', to: 'b' }, { from: 'b', event: 'back', to: 'a' }] } }),
   'a machine that fails': runVerification({ schemaVersion: 1, init: 's0', states: [{ id: 's0' }, { id: 's1', terminal: true }], transitions: [{ from: 's0', event: 'go', to: 's1' }, { from: 's1', event: 'back', to: 's0' }] }),
+  // The roster is every family that states a verdict, because the two views are one contract and a family missing from here is a family whose
+  // body nobody compares with its object.
+  'a composition that fails': runCompositionVerification(
+    [{ schemaVersion: 1, init: 'i', states: [{ id: 'i' }, { id: 'd', terminal: true }], transitions: [{ from: 'i', event: 'go', to: 'd' }] },
+     { schemaVersion: 1, init: 'i', states: [{ id: 'i' }, { id: 'd', terminal: true }], transitions: [{ from: 'i', event: 'go', to: 'd' }] }],
+    { rendezvous: ['never'] }),
+  'a data model that fails': runDataVerification(
+    { schemaVersion: 1, entities: [{ name: 'A', fields: [{ name: 'id', type: 'int', required: true }], primaryKey: ['id'] }], relationships: [] },
+    { beforeModel: { schemaVersion: 1, entities: [{ name: 'A', fields: [{ name: 'id', type: 'int', required: true }, { name: 'gone', type: 'text' }], primaryKey: ['id'] }], relationships: [] } }),
+  'a design that fails': runDesignReview({ schemaVersion: 1, architecture: { nodes: ['a', 'b'], edges: [['a', 'b'], ['b', 'a']] } }),
+  'a scan that finds an absolute claim': runConcurrencyScan('The cache is guarded by a mutex, so it is thread-safe.'),
+  'a delta with an added error': diffReports(
+    runVerification({ schemaVersion: 1, init: 'i', states: [{ id: 'i' }, { id: 'd', terminal: true }], transitions: [{ from: 'i', event: 'go', to: 'd' }] }),
+    runVerification({ schemaVersion: 1, init: 's0', states: [{ id: 's0' }, { id: 's1', terminal: true }], transitions: [{ from: 's0', event: 'go', to: 's1' }, { from: 's1', event: 'back', to: 's0' }] })),
 }
 
 test('the full view is the report itself, and it parses back to the same conclusion', () => {
