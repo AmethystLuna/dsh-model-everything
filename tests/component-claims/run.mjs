@@ -56,6 +56,20 @@ test('the drawing switch is described as read at mount, not as live', () => {
   }
 })
 
+test('the entry file has no reader nothing calls', () => {
+  // A helper with no caller is a claim that something resolves, and `resolveInteraction` was one: the config comment
+  // said it was "its only reader" while nothing called it. The cluster is gone; a new one would have to be called.
+  const entry = read('src/index.ts')
+  for (const name of ['resolveInteraction', 'lastApprovalPolicy', 'planModeActive', 'readSessionEvents']) {
+    if (entry.includes('function ' + name)) throw new Error(name + ' is defined again')
+  }
+})
+
+test('the config field that nothing consults says so', () => {
+  const entry = read('src/index.ts')
+  if (!/Nothing in this bundle consults it/.test(entry)) throw new Error('the interaction field reads as if something used it')
+})
+
 if (failures > 0) {
   console.log('component-claims tests failed:', failures)
   process.exit(1)

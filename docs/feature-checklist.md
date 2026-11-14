@@ -340,7 +340,7 @@ And the gates around it:
 | `view-agreement` | 2 | the card and the text state the same verdict |
 | `shape-dispatch` | 4 | the union was read, so the checks below mean something |
 | `abort` | 4 | a verification whose deadline passed settles without a report |
-| `component-claims` | 4 | the gate header states the default the schema declares |
+| `component-claims` | 6 | the gate header states the default the schema declares |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |

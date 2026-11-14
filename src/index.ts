@@ -68,8 +68,11 @@ export type InteractionMode = 'ask' | 'auto' | 'follow-approval'
 
 export interface Config {
   /**
-   * How an offer to run a tool resolves: `ask` and `auto` are fixed, while `follow-approval`
-   * reads the session's approval policy per call. `resolveInteraction` is its only reader.
+   * How an offer to run a tool would resolve, reported in the inspect status.
+   *
+   * Nothing in this bundle consults it: every tool reads and reports, so none makes an offer to run anything. It stays
+   * because a deployment may set it and the status echoes it; wiring it or removing it is a decision for a version that
+   * can call the change what it is.
    *
    * There is deliberately no on/off key here. A row is switched off by the loader row that
    * mounts it (`disabled`, or the plugin manager), which removes the tools and the skills
@@ -82,59 +85,6 @@ export interface Config {
 export const Config = z.object({
   interaction: z.union(['ask', 'auto', 'follow-approval']).default('follow-approval'),
 })
-
-
-interface SessionEventLike {
-  type: string
-  data?: Record<string, unknown>
-}
-
-/**
- * Minimum session-store surface this plugin reads. DSH 0.1.2-alpha.4 replaced
- * the `Session.events` getter with on-demand reads (`seq`, `eventAt()`,
- * `snapshotEvents()`); releases up to 0.1.2-alpha.3 expose `events` as the
- * full log snapshot. Read through a structural union so one build serves every
- * declared DSH release.
- */
-interface SessionEventSource {
-  events?: readonly SessionEventLike[]
-  snapshotEvents?: () => readonly SessionEventLike[]
-}
-
-function readSessionEvents(session: Session): readonly SessionEventLike[] {
-  const source = session as unknown as SessionEventSource
-  if (typeof source.snapshotEvents === 'function') {
-    const snapshot = source.snapshotEvents()
-    if (Array.isArray(snapshot)) return snapshot
-  }
-  if (Array.isArray(source.events)) return source.events
-  return []
-}
-
-function lastApprovalPolicy(session: Session): 'ask' | 'never' | undefined {
-  const events = readSessionEvents(session)
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index]
-    if (event.type === 'approval/policy') {
-      return event.data?.policy === 'never' ? 'never' : 'ask'
-    }
-  }
-  return undefined
-}
-
-function planModeActive(session: Session): boolean {
-  const events = readSessionEvents(session)
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index]
-    if (event.type === 'plan/mode') return event.data?.active === true
-  }
-  return false
-}
-
-function resolveInteraction(config: Config, session: Session): 'ask' | 'auto' {
-  if (config.interaction === 'ask' || config.interaction === 'auto') return config.interaction
-  return lastApprovalPolicy(session) === 'never' ? 'auto' : 'ask'
-}
 
 
 interface ToolRegistryLike {

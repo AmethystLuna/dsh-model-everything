@@ -27,8 +27,11 @@ export declare const inject: string[];
 export type InteractionMode = 'ask' | 'auto' | 'follow-approval';
 export interface Config {
     /**
-     * How an offer to run a tool resolves: `ask` and `auto` are fixed, while `follow-approval`
-     * reads the session's approval policy per call. `resolveInteraction` is its only reader.
+     * How an offer to run a tool would resolve, reported in the inspect status.
+     *
+     * Nothing in this bundle consults it: every tool reads and reports, so none makes an offer to run anything. It stays
+     * because a deployment may set it and the status echoes it; wiring it or removing it is a decision for a version that
+     * can call the change what it is.
      *
      * There is deliberately no on/off key here. A row is switched off by the loader row that
      * mounts it (`disabled`, or the plugin manager), which removes the tools and the skills
