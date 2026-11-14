@@ -18,5 +18,14 @@ export declare class OptionShapeError extends Error {
 export declare function requireArrayOption(value: unknown, option: string, errorCode: string): void;
 /** An option the engine reads with `Object.entries`: a string has entries, and they are not the ones meant. */
 export declare function requireObjectOption(value: unknown, option: string, errorCode: string): void;
-/** The refusal a tool returns for a shape it could not read. */
-export declare function optionRefusal(error: unknown, errorCode: string): Record<string, unknown>;
+/**
+ * The refusal a tool returns for a shape it could not read.
+ *
+ * It carries the family's `schema` like every other answer does. Without one the body printed a fallback id that is in no
+ * registry, so a consumer keying on `schema` was told the report was of a family that does not exist.
+ * @param error - the thrown shape error, or anything else the caller caught.
+ * @param errorCode - the code to use when the error did not carry one.
+ * @param schema - the family's versioned schema id.
+ * @returns the refusal payload.
+ */
+export declare function optionRefusal(error: unknown, errorCode: string, schema: string): Record<string, unknown>;

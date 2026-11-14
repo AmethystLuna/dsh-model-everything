@@ -5,6 +5,7 @@ import { oneOf } from './model-file.js'
 import { optionRefusal, requireArrayOption, requireObjectOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
 import { reportCallView, reportCard, reportResultView } from './presentation.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export const DATAMODEL_VERIFY_TOOL_NAME = 'model_datamodel_verify'
 
@@ -91,7 +92,7 @@ export const modelDataModelVerifyTool = defineTool({
         backupPairs: args.backupPairs as Array<{ id: string; sourceEntity: string; targetEntity: string; mapping: Record<string, string> }> | undefined,
       }) as unknown as JsonValue
     } catch (error) {
-      return optionRefusal(error, 'DATA_OPTION_INVALID') as unknown as JsonValue
+      return optionRefusal(error, 'DATA_OPTION_INVALID', REPORT_SCHEMAS.datamodel) as unknown as JsonValue
     }
   },
 })

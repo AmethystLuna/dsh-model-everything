@@ -5,6 +5,7 @@ import { reportCallView, reportCard, reportResultView } from './presentation.js'
 import type { SharedAccess, SharedLocation } from './engine.js'
 import { OptionShapeError, optionRefusal, requireArrayOption } from './option-shape.js'
 import { renderReportText } from './report-view.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export const COMPOSE_TOOL_NAME = 'model_compose_verify'
 
@@ -87,7 +88,7 @@ export const modelComposeTool = defineTool({
         maxStates: args.maxStates,
       }) as unknown as JsonValue
     } catch (error) {
-      return optionRefusal(error, 'COMPOSE_OPTION_INVALID') as unknown as JsonValue
+      return optionRefusal(error, 'COMPOSE_OPTION_INVALID', REPORT_SCHEMAS.compose) as unknown as JsonValue
     }
   },
 })

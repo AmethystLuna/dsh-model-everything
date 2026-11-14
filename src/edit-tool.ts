@@ -115,7 +115,7 @@ export const modelEditTool = defineTool({
               : [],
       } as unknown as JsonValue
     } catch (error) {
-      return optionRefusal(error, 'EDIT_OPTION_INVALID') as unknown as JsonValue
+      return optionRefusal(error, 'EDIT_OPTION_INVALID', REPORT_SCHEMAS.edit) as unknown as JsonValue
     }
   },
 })

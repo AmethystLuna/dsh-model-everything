@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto'
 
 import { canonicalJson } from './engine.js'
 import { OptionShapeError } from './option-shape.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export interface AutomatonTransition {
   from: string
@@ -359,7 +360,7 @@ export function verifyAutomaton(input: unknown, options: { other?: unknown; rela
     ran: true,
     verdict,
     verdictReason: reason,
-    schema: 'model-everything/automaton/v1',
+    schema: REPORT_SCHEMAS.automaton,
     automaton: { states: automaton.states.length, transitions: automaton.transitions.length, alphabet: automaton.alphabet.length, deterministic },
     findings,
     ...(witness === undefined ? {} : { witness }),

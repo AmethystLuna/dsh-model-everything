@@ -187,7 +187,9 @@ function findingLines(findings: ViewFinding[], options: Required<ReportViewOptio
 
 /** `ok`/`verdict` header fields, shared by every report family. */
 function headerLines(report: Record_, options: Required<ReportViewOptions>): string[] {
-  const schema = text(report.schema) ?? 'model-everything/report'
+  // A payload with no schema says so. The old fallback named a family that is in no registry, so a reader who keys on
+  // `schema` was told a report was of a kind that does not exist.
+  const schema = text(report.schema) ?? '(no schema)'
   const verdict = text(report.verdict)
   const ok = report.ok
   const summary = record(report.summary) ?? {}

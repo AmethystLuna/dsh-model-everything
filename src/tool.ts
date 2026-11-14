@@ -5,6 +5,7 @@ import { renderReportText } from './report-view.js'
 import { reportCallView, reportCard, reportResultView } from './presentation.js'
 import { OptionShapeError, optionRefusal, requireObjectOption } from './option-shape.js'
 import { oneOf } from './model-file.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export const MODEL_VERIFY_TOOL_NAME = 'model_verify'
 
@@ -104,7 +105,7 @@ export const modelVerifyTool = defineTool({
         stateMapping: mapping as Record<string, string> | undefined,
       }) as unknown as JsonValue
     } catch (error) {
-      return optionRefusal(error, 'VERIFY_OPTION_INVALID') as unknown as JsonValue
+      return optionRefusal(error, 'VERIFY_OPTION_INVALID', REPORT_SCHEMAS.verify) as unknown as JsonValue
     }
   },
 })

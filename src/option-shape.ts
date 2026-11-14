@@ -49,8 +49,17 @@ export function requireObjectOption(value: unknown, option: string, errorCode: s
   }
 }
 
-/** The refusal a tool returns for a shape it could not read. */
-export function optionRefusal(error: unknown, errorCode: string): Record<string, unknown> {
+/**
+ * The refusal a tool returns for a shape it could not read.
+ *
+ * It carries the family's `schema` like every other answer does. Without one the body printed a fallback id that is in no
+ * registry, so a consumer keying on `schema` was told the report was of a family that does not exist.
+ * @param error - the thrown shape error, or anything else the caller caught.
+ * @param errorCode - the code to use when the error did not carry one.
+ * @param schema - the family's versioned schema id.
+ * @returns the refusal payload.
+ */
+export function optionRefusal(error: unknown, errorCode: string, schema: string): Record<string, unknown> {
   const message = error instanceof Error ? error.message : String(error)
   const code = error instanceof OptionShapeError ? error.errorCode : errorCode
   return {
@@ -58,6 +67,7 @@ export function optionRefusal(error: unknown, errorCode: string): Record<string,
     ran: false,
     verdict: 'fail',
     verdictReason: 'the tool did not run: ' + message,
+    schema,
     errorCode: code,
     error: message,
   }

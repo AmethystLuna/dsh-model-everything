@@ -121,6 +121,7 @@ const SUITES = [
   'tests/full-path/run.mjs',
   'tests/release-steps/run.mjs',
   'tests/config-live/run.mjs',
+  'tests/refusal-schema/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1050,6 +1051,13 @@ const MUTATIONS = [
     file: 'src/live-config.ts',
     from: "  return typeof probe.volatile === 'function' ? (probe.volatile() as T) : field",
     to: '  return field',
+  },
+  {
+    id: 'M129',
+    what: 'a shape refusal stops naming the family schema',
+    file: 'src/option-shape.ts',
+    from: '    schema,',
+    to: '    schema: undefined,',
   },
 ]
 

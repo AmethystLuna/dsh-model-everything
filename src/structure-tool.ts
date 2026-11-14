@@ -90,7 +90,7 @@ export const umlStructureTool = defineTool({
           ...(args.matrix === undefined ? {} : { matrix: args.matrix }),
         }) as unknown as JsonValue
       } catch (error) {
-        return optionRefusal(error, 'STRUCTURE_OPTION_INVALID') as unknown as JsonValue
+        return optionRefusal(error, 'STRUCTURE_OPTION_INVALID', REPORT_SCHEMAS.structure) as unknown as JsonValue
       }
     }
     if (args.repoPath !== undefined) {
@@ -111,7 +111,7 @@ export const umlStructureTool = defineTool({
           ...(args.matrix === undefined ? {} : { matrix: args.matrix }),
         }) as unknown as JsonValue
       } catch (error) {
-        return optionRefusal(error, 'STRUCTURE_OPTION_INVALID') as unknown as JsonValue
+        return optionRefusal(error, 'STRUCTURE_OPTION_INVALID', REPORT_SCHEMAS.structure) as unknown as JsonValue
       }
     }
     if (args.diagram === undefined) {

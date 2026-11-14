@@ -12,6 +12,7 @@ import type { JsonValue } from './json-value.js'
 import { optionRefusal } from './option-shape.js'
 import { renderReportText } from './report-view.js'
 import { reportCallView, reportCard, reportResultView } from './presentation.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export const MODEL_AUTOMATON_TOOL_NAME = 'model_automaton_verify'
 
@@ -68,7 +69,7 @@ export const modelAutomatonTool = defineTool({
         ...(args.relation === undefined ? {} : { relation: args.relation as AutomatonRelation }),
       }) as unknown as JsonValue
     } catch (error) {
-      return optionRefusal(error, 'AUTOMATON_OPTION_INVALID') as unknown as JsonValue
+      return optionRefusal(error, 'AUTOMATON_OPTION_INVALID', REPORT_SCHEMAS.automaton) as unknown as JsonValue
     }
   },
 })
