@@ -79,21 +79,24 @@ does not consult. The probe therefore runs from the dsh tree and lends the copy 
 | 0.2.1-rc.2 | 2026-10-18 | pass | pass (`enabled: true`) | pass | pass | pass (`model_interleaving_scan`, 5 findings) | pass |
 | 0.2.1-rc.2 | 2026-10-18 | pass (by name, `^0.1.0`) | pass | pass (same bytes) | pass | pass (`model_verify` → `pass`) | pass |
 | 0.2.1-rc.4 | 2026-10-27 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass | pass | pass (`diagram_render` + `diagram_review` + `diagram_diff` from the installed copy) | pass |
-| 0.2.2-rc.1 | 2026-11-05 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass (skills and locale in the tarball) | pass (web boot, no "entry did not activate") | not run this round (see below) | pass |
+| 0.2.2-rc.1 | 2026-11-05 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass (skills and locale in the tarball) | pass (web boot, no "entry did not activate") | **pass** (`model_verify`, 2026-11-14) | pass |
+| 0.2.2-rc.3 | 2026-11-14 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass | pass | pass (`model_verify`, 11 checks) | pass |
 
-The 0.2.2-rc.1 row is an **incomplete round**, and says so rather than borrowing
-confidence from its neighbours. What it measured: the release installs from a
-tarball into a fresh profile, `--dump-config` carries all three rows with the gate
-`enabled: true`, the tarball ships eight `SKILL.md` files and the locale files, the
-web app boots and serves without any entry failing to activate, and the removal
-leaves no row behind. What it did **not** measure: a real tool call from the
-installed copy. A plain `import` of the installed package cannot stand in for that
-check - pnpm gives the copy no `node_modules` of its own, so its `@deepseek-ai/*`
-imports resolve only through the host's loader tree, and the entry's full import
-graph needs packages that tree does not carry at that path. The round from
-0.2.1-rc.4 remains the last call-level measurement; the same engine and tool
-wrappers run here (`npm run test:engine`, forty-odd suites), which is why the
-release is marked compatible and this paragraph is not.
+### The 0.2.2 line: both releases the registry offers, and what changed under them
+
+0.2.2-rc.1 is the registry's `latest` and 0.2.2-rc.3 is `next`, so both were run rather than one standing in for the other.
+Both rounds are the full six steps against a `file:` install, and both returned a real report from the installed copy:
+`model_verify` on `examples/control-dispatcher.json`, `pass_with_findings`, schema `model-everything/verify/v1`, 11 checks.
+
+**What 0.2.2 changed, and what it broke in this round's harness.** `tools.execute` no longer reaches a tool directly: the
+host resolves a *tool executor* from the composition first, and a bare `ToolRuntime` throws `TOOL_EXECUTOR_UNAVAILABLE`
+when nothing registered one. The probe now contributes a two-method pass-through executor - the smallest thing that is
+still the host's own dispatch path, and the log line says `DISPATCH: host` - and falls back to the definition only if a
+host refuses even that. The plugin needed no change: the failure was in the harness, and it is recorded here because the
+next round meets the same wall on any host past 0.2.2.
+
+Still not measured, and therefore still not claimed: a **tarball** install on the 0.2.2 line (both rounds above are
+`file:` installs), and the web app's boot on 0.2.2-rc.3 (the rc.1 row carries that from the tarball round).
 
 The last two rows before it are **the published artifact**. The first installed the tarball
 `npm pack` produced; the second let the profile resolve `dsh-model-everything` from
