@@ -1025,8 +1025,8 @@ const MUTATIONS = [
     id: 'M125',
     what: 'the Chinese card carries the English sentence instead of its own',
     file: 'gate/locale/zh.json',
-    from: '"description": "在会话的第一条模型步注入一条路由提示',
-    to: '"description": "Injects a routing message into the first model step',
+    from: "\"description\": \"在会话的第一条模型步注入一条路由提示：先加载哪个技能、每个工具做什么以及它不证明什么、怎么读一份报告。默认开，可在插件页关掉。\"",
+    to: "\"description\": \"Injects a routing message into the first model step.\"",
   },
 ]
 
