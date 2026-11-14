@@ -1182,6 +1182,13 @@ const MUTATIONS = [
     from: '      for (const update of Array.isArray(entry.updates) ? entry.updates : []) {',
     to: '      for (const update of entry.updates ?? []) {',
   },
+  {
+    id: 'M146',
+    what: 'a note is left at the outer level and drawn below the whole boundary',
+    file: 'src/render/from-plantuml.ts',
+    from: '    group.members.push(note)',
+    to: '    void note',
+  },
 ]
 
 const argument = process.argv[2]

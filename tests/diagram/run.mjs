@@ -1289,6 +1289,21 @@ test('the acceptance corpus comes out clean', () => {
   if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
+// A note belongs beside the box it annotates, and inside the boundary that box sits in. Written outside the boundary,
+// it used to be laid out a rank below the whole group - attached to nothing a reader could see.
+test('a note written outside a boundary joins the boundary its box is in', () => {
+  const source = '@startuml\nfolder "核心" {\n  component "订单" as order\n}\nnote right of order : 订单聚合根\n@enduml'
+  const r = render({ source }, {}, { scheme: 'default' })
+  const group = r.canvas.shapes.find((shape) => shape.kind === 'group')
+  const note = r.canvas.shapes.find((shape) => shape.kind === 'box' && String(shape.label).includes('订单聚合'))
+  const order = r.canvas.shapes.find((shape) => shape.kind === 'box' && String(shape.label) === '订单')
+  if (group === undefined || note === undefined || order === undefined) throw new Error('the drawing is missing a shape')
+  if (note.y !== order.y) throw new Error('the note is not on the box\'s row: ' + String(note.y) + ' against ' + String(order.y))
+  if (note.x <= order.x) throw new Error('`right of` did not put the note on the right')
+  const inside = note.x >= group.x && note.x + note.width <= group.x + group.width
+  if (!inside) throw new Error('the note is outside the boundary its box is in')
+})
+
 // Two boxes on top of each other is the one defect a reader sees before reading anything, and the corpus check above
 // could not see it: it asserted refusals, routing and label collisions, and a picture with two boxes drawn at the same
 // point passed all three. Measured: a left-to-right flow whose first group holds two nodes and whose second holds one

@@ -112,4 +112,9 @@ export const ACCEPTANCE = [
     "W · 状态机（Mermaid 的 stateDiagram-v2）",
     "stateDiagram-v2\n  [*] --> pending\n  pending --> paid : 支付\n  paid --> shipped : 出库\n  shipped --> done : 签收\n  paid --> refunding : 退款\n  refunding --> done\n  done --> [*]"
   ]
+  ,
+  [
+    "X · 注释写在分组里（note 跟着自己的盒子）",
+    "@startuml\nfolder \"接入\" {\n  component \"网关\" as gw\n  component \"鉴权\" as auth\n}\nfolder \"核心\" {\n  component \"订单\" as order\n}\ngw --> auth\nauth --> order\nnote right of order : 订单聚合根\n@enduml"
+  ]
 ]
