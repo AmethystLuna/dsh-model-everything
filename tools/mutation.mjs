@@ -1189,6 +1189,13 @@ const MUTATIONS = [
     from: '    group.members.push(note)',
     to: '    void note',
   },
+  {
+    id: 'M147',
+    what: 'a group rectangle is turned twice again, so a member escapes its boundary',
+    file: 'src/render/place.ts',
+    from: "    return { id, group: true, ...size }",
+    to: "    return { id, group: true, ...extent(size.width, size.height) }",
+  },
 ]
 
 const argument = process.argv[2]

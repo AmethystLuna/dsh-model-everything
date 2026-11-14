@@ -374,7 +374,7 @@ And the gates around it:
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
 | `automaton` | 29 | a well-formed automaton with a reachable accepting state passes |
-| `diagram` | 108 | a flowchart becomes boxes and labelled arrows |
+| `diagram` | 109 | a flowchart becomes boxes and labelled arrows |
 | `plantuml-corpus` | 64 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
 | `render` | 177 | every verdict earns its own role |

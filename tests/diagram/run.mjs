@@ -1289,6 +1289,31 @@ test('the acceptance corpus comes out clean', () => {
   if (dirty.length > 0) throw new Error(dirty.join(' | '))
 })
 
+// Every member of a boundary is drawn inside it. The overlap case above was found because a member escaped its group;
+// this is the assertion that names the defect directly, so the next one fails as "outside its boundary" instead of as a
+// collision that only some drawings show.
+test('every member of a boundary is drawn inside it', () => {
+  const escaped = []
+  for (const [name, source] of ACCEPTANCE) {
+    const r = render({ source }, {}, { scheme: 'default' })
+    const boxes = new Map(r.canvas.shapes.filter((shape) => shape.kind === 'box').map((shape) => [String(shape.id ?? shape.label), shape]))
+    const rects = new Map(r.canvas.shapes.filter((shape) => shape.kind === 'group').map((shape) => [String(shape.id), shape]))
+    for (const group of r.diagram.groups ?? []) {
+      const rect = rects.get(group.id)
+      if (rect === undefined) continue
+      for (const member of group.members) {
+        const box = boxes.get(member)
+        if (box === undefined) continue
+        const inside =
+          box.x >= rect.x - 0.5 && box.x + box.width <= rect.x + rect.width + 0.5 &&
+          box.y >= rect.y - 0.5 && box.y + box.height <= rect.y + rect.height + 0.5
+        if (!inside) escaped.push(name + ': ' + member + ' is outside ' + String(rect.label))
+      }
+    }
+  }
+  if (escaped.length > 0) throw new Error(escaped.slice(0, 3).join(' | '))
+})
+
 // A note belongs beside the box it annotates, and inside the boundary that box sits in. Written outside the boundary,
 // it used to be laid out a rank below the whole group - attached to nothing a reader could see.
 test('a note written outside a boundary joins the boundary its box is in', () => {
