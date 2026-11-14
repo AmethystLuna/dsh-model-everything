@@ -1013,7 +1013,9 @@ export function validateModel(input: unknown): { ok: true; model: LogicModelV1 }
   if (Array.isArray(root.transitions)) {
     for (const entry of root.transitions as TransitionSpec[]) {
       walkGuardReferences(entry.guard, variableNames, errors, bad)
-      for (const update of entry.updates ?? []) {
+      // `Array.isArray`: the structural pass above already reported a non-array `updates`, and iterating it here threw
+      // a TypeError instead of returning that error list - an invalid model has to be refused, not crash the caller.
+      for (const update of Array.isArray(entry.updates) ? entry.updates : []) {
         if (!variableNames.has(update.variable)) bad('transitions.updates', 'references unknown variable ' + update.variable)
         if (update.op !== 'set' && update.value !== undefined && update.value === 0) {
           // zero delta is harmless; no finding

@@ -128,6 +128,7 @@ const SUITES = [
   'tests/component-claims/run.mjs',
   'tests/code-inventory/run.mjs',
   'tests/model-file/run.mjs',
+  'tests/uml-complex/run.mjs',
   'tests/annotation/run.mjs',
   'tests/annotation-editor/run.mjs',
   'tests/diagram-mount/run.mjs',
@@ -1173,6 +1174,13 @@ const MUTATIONS = [
     file: 'src/annotation.ts',
     from: "    setValue(composer, current.trim() === '' ? text : current.replace(/\\s*$/, '') + '\\n\\n' + text)",
     to: '    setValue(composer, text)',
+  },
+  {
+    id: 'M145',
+    what: 'a machine with a non-array updates list crashes the validator instead of refusing it',
+    file: 'src/engine.ts',
+    from: '      for (const update of Array.isArray(entry.updates) ? entry.updates : []) {',
+    to: '      for (const update of entry.updates ?? []) {',
   },
 ]
 
