@@ -92,4 +92,24 @@ export const ACCEPTANCE = [
     "S · 组合（横排 + 嵌套包 + together + 隐藏边）",
     "@startuml\nleft to right direction\npackage \"接入\" as edge {\n  component \"网关\" as gw\n}\npackage \"应用\" as app {\n  together {\n    component \"订单\" as order\n    component \"库存\" as stock\n  }\n}\ncomponent \"计价\" as price\ncomponent \"数据库\" as db\ngw --> order\ngw --> stock\norder --> price : 计算\nstock -[hidden]-> price\nprice --> db : 落库\n@enduml"
   ]
+  ,
+  [
+    "T · 一行多连接（Mermaid 的 a & b --> c）",
+    "flowchart TD\n  a[网关] & b[缓存] --> c[服务]\n  c --> d[数据库]"
+  ]
+  ,
+  [
+    "U · 子图（subgraph 带标签与方向）",
+    "flowchart LR\n  subgraph edge[接入层]\n    gw[网关]\n    auth[鉴权]\n  end\n  subgraph core[核心]\n    order[订单]\n  end\n  gw --> auth\n  auth --> order"
+  ]
+  ,
+  [
+    "V · folder 块与两种注释（行为 + 自由）",
+    "@startuml\nfolder \"接入\" {\n  component \"网关\" as gw\n  component \"鉴权\" as auth\n}\nfolder \"核心\" {\n  component \"订单\" as order\n}\ngw --> auth\nauth --> order\nnote right of order : 订单聚合根\nnote \"跨区复制\" as repl\nrepl .. order\n@enduml"
+  ]
+  ,
+  [
+    "W · 状态机（Mermaid 的 stateDiagram-v2）",
+    "stateDiagram-v2\n  [*] --> pending\n  pending --> paid : 支付\n  paid --> shipped : 出库\n  shipped --> done : 签收\n  paid --> refunding : 退款\n  refunding --> done\n  done --> [*]"
+  ]
 ]
