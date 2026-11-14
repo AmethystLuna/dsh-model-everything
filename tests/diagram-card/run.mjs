@@ -124,6 +124,18 @@ await test('the body a model reads starts with the family the payload states', a
   }
 })
 
+await test('the card helper answers nothing for a payload it cannot describe', async () => {
+  // The three early returns: no verdict and no numbers, a verdict with no reason, and a drawing with no refusals.
+  const { drawingResultView } = await import('../../lib/presentation.js')
+  const view = drawingResultView('labelled')
+  if (view({}, { meta: { nothing: true } }) !== undefined) throw new Error('a payload with nothing to say still produced a card')
+  const bare = view({}, { meta: { verdict: 'pass' } })
+  if (bare === undefined) throw new Error('a verdict alone produced no card')
+  if (/—/.test(bare.content[0].text)) throw new Error('a verdict with no reason printed a separator: ' + bare.content[0].text)
+  const clean = view({}, { meta: { nodes: 3, edges: 2, refused: [], measured: null } })
+  if (/refused/.test(clean.content[0].text)) throw new Error('a drawing that refused nothing says it refused something')
+})
+
 if (failures > 0) {
   console.log('diagram-card tests failed:', failures)
   process.exit(1)
