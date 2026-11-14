@@ -200,6 +200,7 @@
     "external",
     "feature-checklist",
     "fixtures",
+    "full-path",
     "gate",
     "gate-config",
     "gate-text",

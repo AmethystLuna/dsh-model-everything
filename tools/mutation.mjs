@@ -118,6 +118,7 @@ const SUITES = [
   'tests/uml-hash/run.mjs',
   'tests/gate-config/run.mjs',
   'tests/tool-timeouts/run.mjs',
+  'tests/full-path/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1015,10 +1016,10 @@ const MUTATIONS = [
   },
   {
     id: 'M124',
-    what: 'the combined smoke path stops reporting a deadline miss',
+    what: 'the deadline check stops reporting a miss, so the smoke path loses a family',
     file: 'src/engine.ts',
-    from: 'A14_DEADLINE_MISSED',
-    to: 'A14_DEADLINE_MISSED_UNUSED',
+    from: "code: 'A14_DEADLINE_MISS',",
+    to: "code: 'A14_DEADLINE_MISS_UNUSED',",
   },
 ]
 

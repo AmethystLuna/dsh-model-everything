@@ -190,7 +190,7 @@ node tests/card-blocks/run.mjs
 node tests/uml-hash/run.mjs
 node tests/gate-config/run.mjs
 node tests/tool-timeouts/run.mjs
-node tests/full-suite.mjs
+node tests/full-path/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -326,7 +326,7 @@ And the gates around it:
 | `uml-hash` | 4 | a rendered diagram names the model it shows, under a stated scheme |
 | `gate-config` | 5 | the gate is on unless a deployment says otherwise, and the switch is live |
 | `tool-timeouts` | 3 | every tool module declares a timeout |
-| `full-suite.mjs` | 34 | SM D1-D4: added VERIFY detected as behavior delta |
+| `full-path` | 3 | the combined path exits zero |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 5 | the declaration carries a range, a release map and a profile list |
