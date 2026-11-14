@@ -49,6 +49,9 @@ export function readArrow(line: string): ArrowParts | string | undefined {
   const match = ARROW.exec(line)
   if (match === null) return undefined
   const left = reference(match[1])
+  // `->>` is a sequence message: the second chevron is not part of this grammar, and without this the arrow matched a single `>` and
+  // left the rest as the right-hand name - a message line became a box called `> B`.
+  if (/^>/.test(String(match[5]).trim())) return 'a sequence message (`->>`) is not something this renderer draws'
   const right = reference(match[5])
   const leftMark = match[2]
   const rightMark = match[4]

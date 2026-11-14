@@ -975,6 +975,13 @@ const MUTATIONS = [
     from: "  for (const index of forbidden) queries.push('A[] not ModelEverything.' + stateIds[index])",
     to: '  void forbidden',
   },
+  {
+    id: 'M119',
+    what: 'a sequence message is read as an arrow with a box named after its tail',
+    file: 'src/render/plantuml-reference.ts',
+    from: "  if (/^>/.test(String(match[5]).trim())) return 'a sequence message (`->>`) is not something this renderer draws'",
+    to: '  void 0',
+  },
 ]
 
 const argument = process.argv[2]

@@ -78,6 +78,19 @@ test('a decoration on an endpoint is not part of its name', () => {
   if (arrow.label !== 'many') throw new Error('label: ' + arrow.label)
 })
 
+test('a sequence message is refused rather than read as a box', () => {
+  // `->>` has a second chevron this grammar does not know. The arrow used to match a single `>` and leave the rest as the right-hand name,
+  // so `A ->> B: hi` drew a box called `> B` - the fourth answer, where a line is read into something wrong.
+  for (const line of ['A ->> B: hi', 'A -->> B', 'A ->> B']) {
+    const parsed = readArrow(line)
+    if (typeof parsed !== 'string') throw new Error(line + ' was read as ' + JSON.stringify(parsed))
+    if (!/sequence/.test(parsed)) throw new Error(line + ': ' + parsed)
+  }
+  // The single-chevron arrows around it are untouched.
+  if (read('a --> b').to.id !== 'b') throw new Error('a plain arrow changed')
+  if (read('a -> b').to.id !== 'b') throw new Error('a thin arrow changed')
+})
+
 if (failures > 0) {
   console.log('arrow tests failed:', failures)
   process.exit(1)

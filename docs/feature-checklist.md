@@ -359,7 +359,7 @@ And the gates around it:
 | `skill-table` | 8 | the parser lists were read, so the checks below mean something |
 | `names` | 9 | a bare name is left alone |
 | `clearance` | 7 | only an interior run can be moved |
-| `arrows` | 8 | a plain arrow points from the left name to the right one |
+| `arrows` | 9 | a plain arrow points from the left name to the right one |
 | `directives` | 13 | a preprocessor directive is dropped with a reason |
 | `declaration` | 10 | a plain declaration declares one element with its own name |
 | `boundary` | 7 | a closing brace closes, and nothing else does |
