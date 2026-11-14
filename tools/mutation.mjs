@@ -117,6 +117,7 @@ const SUITES = [
   'tests/card-blocks/run.mjs',
   'tests/uml-hash/run.mjs',
   'tests/gate-config/run.mjs',
+  'tests/tool-timeouts/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -997,6 +998,13 @@ const MUTATIONS = [
     file: 'src/gate.ts',
     from: "A check that nothing ran is not a passing check.${extra === '' ? '' : '\\n\\n' + extra}",
     to: "A check that nothing ran is not a passing check.${''}",
+  },
+  {
+    id: 'M122',
+    what: 'a composition gets less time than a report diff',
+    file: 'src/compose-tool.ts',
+    from: '  timeoutMs: 60_000,',
+    to: '  timeoutMs: 5_000,',
   },
 ]
 

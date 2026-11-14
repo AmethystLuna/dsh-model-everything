@@ -258,6 +258,7 @@
     "tool-defaults",
     "tool-routing",
     "tool-schema",
+    "tool-timeouts",
     "tools",
     "toolset",
     "translation",

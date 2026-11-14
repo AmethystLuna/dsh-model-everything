@@ -189,6 +189,7 @@ node tests/diagram-out/run.mjs
 node tests/card-blocks/run.mjs
 node tests/uml-hash/run.mjs
 node tests/gate-config/run.mjs
+node tests/tool-timeouts/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -323,6 +324,7 @@ And the gates around it:
 | `card-blocks` | 5 | a card is one text block, so a view has nothing to lay out |
 | `uml-hash` | 4 | a rendered diagram names the model it shows, under a stated scheme |
 | `gate-config` | 5 | the gate is on unless a deployment says otherwise, and the switch is live |
+| `tool-timeouts` | 3 | every tool module declares a timeout |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 5 | the declaration carries a range, a release map and a profile list |
