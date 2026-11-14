@@ -270,3 +270,14 @@ skips one of these shows up as a red gate naming the number, which is how the to
   snapshot is the only case today) or to a temporary path it removes.
 - Read the suites as the specification of the report contract: if a field matters to a
   caller, some suite here should fail when it changes.
+
+## A mutation point has to be a line a drawing suite decides
+
+`tools/mutation.mjs` runs only the suites on its `SUITES` list, because the other thirty-seven are about reports, docs,
+skills or the client, and no drawing mutation can reach them. A docs guard is therefore **not** a mutation point: the
+routing-map check was registered as `M151`, the harness could not run its suite (it sits in `NOT_DRAWING`), and the line
+read `MISSED` while the guard was working. It was withdrawn rather than left red, and the guard was verified by running
+the suite against the patched generator by hand: it fails, by name.
+
+So: a mutation must name a line whose failure a **drawing** suite reports. A text diff over generated docs is verified by
+running the generator against a patched copy, not by a mutation point.
