@@ -284,12 +284,19 @@ export function place(diagram: Diagram, top: number): Placement {
   }
 
   const groupLayouts = new Map<string, LevelLayout>()
+  // A group is measured once, and the layout that was measured is the one placed inside its rectangle. Measuring it
+  // again produced a second layout: the size came from the first (two columns) and the contents from the second
+  // (two rows), so a member sat outside the boundary that was supposed to contain it.
+  const groupSizes = new Map<string, { width: number; height: number }>()
   const measureGroup = (id: string): { width: number; height: number } => {
+    const cached = groupSizes.get(id)
+    if (cached !== undefined) return cached
     const inside = buildLevel(id)
     const size = {
       width: Math.max(MIN_NODE_WIDTH, inside.width) + GROUP_PADDING * 2,
       height: inside.height + GROUP_HEADER + GROUP_PADDING * 2,
     }
+    groupSizes.set(id, size)
     groupLayouts.set(id, inside)
     return size
   }
@@ -301,7 +308,10 @@ export function place(diagram: Diagram, top: number): Placement {
       return { id, group: false, ...extent(text.width, text.height) }
     }
     const size = measureGroup(id)
-    return { id, group: true, ...extent(size.width, size.height) }
+    // Not `extent`: a group's size is measured from its own layout, which was built through `extent` already, so it is
+    // in the layout's space. Turning it again swapped the rectangle's sides, and a member of a turned group (a
+    // left-to-right flow with a subgraph holding two nodes) sat outside the boundary drawn around it.
+    return { id, group: true, ...size }
   }
 
   const entitiesIn = (scope: string | undefined): Entity[] => {

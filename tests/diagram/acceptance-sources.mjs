@@ -99,6 +99,11 @@ export const ACCEPTANCE = [
   ]
   ,
   [
+    "U · 子图（subgraph 带标签与方向）",
+    "flowchart LR\n  subgraph edge[接入层]\n    gw[网关]\n    auth[鉴权]\n  end\n  subgraph core[核心]\n    order[订单]\n  end\n  gw --> auth\n  auth --> order"
+  ]
+  ,
+[
     "V · folder 块与两种注释（行为 + 自由）",
     "@startuml\nfolder \"接入\" {\n  component \"网关\" as gw\n  component \"鉴权\" as auth\n}\nfolder \"核心\" {\n  component \"订单\" as order\n}\ngw --> auth\nauth --> order\nnote right of order : 订单聚合根\nnote \"跨区复制\" as repl\nrepl .. order\n@enduml"
   ]
