@@ -90,6 +90,17 @@ await test('the escape hatch writes the invalid model, and says what it is', asy
   if (report.modelValid !== false) throw new Error('the report hides that the model is invalid')
 })
 
+await test('ops that are not a list are refused by name, not thrown as a TypeError', async () => {
+  // `ops` is declared `json`, so a string reaches the editor: the refusal has to name the option and the code.
+  const path = freshFile('ops-shape')
+  for (const ops of ['nope', 5, null]) {
+    const report = await editTool.execute({ modelPath: path, ops })
+    if (report.ran !== false) throw new Error(JSON.stringify(ops) + ' ran')
+    if (report.errorCode !== 'EDIT_OPTION_INVALID') throw new Error(JSON.stringify(ops) + ' answered ' + String(report.errorCode))
+    if (report.schema !== 'model-everything/edit/v1') throw new Error('schema: ' + String(report.schema))
+  }
+})
+
 if (failures > 0) {
   console.log('edit-refusals tests failed:', failures)
   process.exit(1)

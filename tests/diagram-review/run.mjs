@@ -55,6 +55,18 @@ await test('the measured numbers are the ones the findings are about', async () 
   if (report.measured.widest?.size !== 9) throw new Error('widest ' + JSON.stringify(report.measured.widest))
 })
 
+await test('an empty source is a finding with its own code, not an empty review', async () => {
+  // "produced no nodes" and "there was no source" are different answers: the second is the caller's input, the first is the
+  // text's. Without the code the two read alike, and a review of nothing looks like a review.
+  for (const source of ['', '   ', '\n\t\n']) {
+    const report = await reviewTool.execute({ source })
+    if (report.ok !== false) throw new Error('an empty source reviewed clean')
+    if (report.verdict !== 'fail') throw new Error('verdict: ' + String(report.verdict))
+    const codes = (report.findings ?? []).map((finding) => finding.code)
+    if (!codes.includes('D0_NO_SOURCE')) throw new Error(JSON.stringify(source) + ' reported ' + codes.join(','))
+  }
+})
+
 if (failures > 0) {
   console.log('diagram-review tests failed:', failures)
   process.exit(1)

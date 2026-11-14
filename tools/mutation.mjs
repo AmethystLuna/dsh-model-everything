@@ -1134,6 +1134,13 @@ const MUTATIONS = [
     from: "      lines.push('drawn: ' + String(value.nodes) + ' box(es) · ' + String(value.edges ?? 0) + ' arrow(s)' + (refused === 0 ? '' : ' · ' + String(refused) + ' line(s) refused'))",
     to: "      lines.push('drawn: ' + String(value.nodes) + ' box(es) · ' + String(value.edges ?? 0) + ' arrow(s)')",
   },
+  {
+    id: 'M140',
+    what: 'a new finding code ships with no test naming it',
+    file: 'src/structure.ts',
+    from: "UML020_ISOLATED_NODE",
+    to: "UML020_ISOLATED_NODE_UNNAMED",
+  },
 ]
 
 const argument = process.argv[2]

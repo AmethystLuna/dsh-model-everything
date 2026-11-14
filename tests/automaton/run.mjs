@@ -59,24 +59,24 @@ const anyNonEmpty = {
 
 const codes = (report) => report.findings.map((finding) => finding.code)
 
-test('a well-formed automaton with a reachable accepting state passes', () => {
+await test('a well-formed automaton with a reachable accepting state passes', () => {
   const report = verifyAutomaton(endsWithA)
   if (report.verdict !== 'pass') throw new Error('expected pass, got ' + report.verdict + ' ' + report.verdictReason)
 })
 
-test('equivalence is decided across state names and alphabet order', () => {
+await test('equivalence is decided across state names and alphabet order', () => {
   const report = verifyAutomaton(endsWithA, { other: endsWithARenamed })
   if (report.verdict !== 'pass') throw new Error('renaming must not change the language, got ' + report.verdictReason)
 })
 
-test('a real difference fails, and the witness is the shortest word', () => {
+await test('a real difference fails, and the witness is the shortest word', () => {
   const report = verifyAutomaton(endsWithA, { other: anyNonEmpty })
   if (report.verdict !== 'fail') throw new Error('expected fail')
   if (JSON.stringify(report.witness?.word) !== JSON.stringify(['b'])) throw new Error('witness: ' + JSON.stringify(report.witness))
   if (!codes(report).includes('AUT006_NOT_EQUIVALENT')) throw new Error('codes: ' + codes(report).join(','))
 })
 
-test('subset and superset are different questions, and both are answered', () => {
+await test('subset and superset are different questions, and both are answered', () => {
   const subset = verifyAutomaton(endsWithA, { other: anyNonEmpty, relation: 'subset' })
   if (subset.verdict !== 'pass') throw new Error('endsWithA is contained in anyNonEmpty: ' + subset.verdictReason)
   const superset = verifyAutomaton(endsWithA, { other: anyNonEmpty, relation: 'superset' })
@@ -84,7 +84,7 @@ test('subset and superset are different questions, and both are answered', () =>
   if (!codes(superset).includes('AUT008_NOT_SUPERSET')) throw new Error('codes: ' + codes(superset).join(','))
 })
 
-test('an alphabet mismatch is an error, not a silent comparison', () => {
+await test('an alphabet mismatch is an error, not a silent comparison', () => {
   const other = {
     states: ['t0', 't1'],
     alphabet: ['a'],
@@ -100,13 +100,13 @@ test('an alphabet mismatch is an error, not a silent comparison', () => {
   if (!codes(report).includes('AUT005_ALPHABET_MISMATCH')) throw new Error('codes: ' + codes(report).join(','))
 })
 
-test('a state nothing reaches is reported as unreachable', () => {
+await test('a state nothing reaches is reported as unreachable', () => {
   const orphan = { ...endsWithA, states: [...endsWithA.states, 'lost'], transitions: [...endsWithA.transitions, { from: 'lost', symbol: 'a', to: 'lost' }] }
   const report = verifyAutomaton(orphan)
   if (!codes(report).includes('AUT001_UNREACHABLE_STATE')) throw new Error('codes: ' + codes(report).join(','))
 })
 
-test('a reachable state that cannot reach acceptance is a trap', () => {
+await test('a reachable state that cannot reach acceptance is a trap', () => {
   const trapped = {
     states: ['s0', 's1', 's2'],
     alphabet: ['a'],
@@ -122,13 +122,13 @@ test('a reachable state that cannot reach acceptance is a trap', () => {
   if (!codes(report).includes('AUT001_UNREACHABLE_STATE')) throw new Error('codes: ' + codes(report).join(','))
 })
 
-test('an automaton that accepts nothing says so', () => {
+await test('an automaton that accepts nothing says so', () => {
   const empty = { ...endsWithA, accepting: [] }
   const report = verifyAutomaton(empty)
   if (!codes(report).includes('AUT004_EMPTY_LANGUAGE')) throw new Error('codes: ' + codes(report).join(','))
 })
 
-test('an NFA is determinised and the nondeterminism is stated', () => {
+await test('an NFA is determinised and the nondeterminism is stated', () => {
   const nfa = {
     states: ['s0', 's1'],
     alphabet: ['a'],
@@ -144,7 +144,7 @@ test('an NFA is determinised and the nondeterminism is stated', () => {
   if (!codes(report).includes('AUT003_NONDETERMINISTIC')) throw new Error('codes: ' + codes(report).join(','))
 })
 
-test('a malformed automaton is refused with the field named', () => {
+await test('a malformed automaton is refused with the field named', () => {
   let refused
   try {
     verifyAutomaton({ states: ['a'], alphabet: ['x'], transitions: [{ from: 'a', symbol: 'y', to: 'a' }], init: 'a', accepting: [] })
@@ -163,7 +163,7 @@ test('a malformed automaton is refused with the field named', () => {
 // an alphabet that cannot be compared, an NFA that has to be determinised, a product that hits its cap -
 // because a refusal that names the wrong field is worse than a refusal.
 
-test('every malformed field is refused by name', () => {
+await test('every malformed field is refused by name', () => {
   const cases = [
     [{}, 'states'],
     [{ states: [], alphabet: ['a'], transitions: [], init: 's', accepting: [] }, 'states'],
@@ -188,7 +188,7 @@ test('every malformed field is refused by name', () => {
   }
 })
 
-test('an empty automaton object and a non-object are both refused', () => {
+await test('an empty automaton object and a non-object are both refused', () => {
   for (const input of [null, 'text', 42, [], { states: 'x' }]) {
     let refused = false
     try {
@@ -200,7 +200,7 @@ test('an empty automaton object and a non-object are both refused', () => {
   }
 })
 
-test('a second automaton that is malformed is refused rather than compared', () => {
+await test('a second automaton that is malformed is refused rather than compared', () => {
   const good = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: ['s'] }
   let message = ''
   try {
@@ -211,13 +211,13 @@ test('a second automaton that is malformed is refused rather than compared', () 
   if (!message.includes('second automaton')) throw new Error('the refusal does not say which side is wrong: ' + message)
 })
 
-test('a self-loop-only automaton is universal and says nothing else', () => {
+await test('a self-loop-only automaton is universal and says nothing else', () => {
   const report = verifyAutomaton({ states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: ['s'] })
   if (report.verdict !== 'pass') throw new Error('expected pass, got ' + report.verdictReason)
   if (report.automaton.deterministic !== true) throw new Error('a single edge per symbol is deterministic')
 })
 
-test('a state no accepting state can be reached from is a trap', () => {
+await test('a state no accepting state can be reached from is a trap', () => {
   const report = verifyAutomaton({
     states: ['s', 'dead'],
     alphabet: ['a'],
@@ -232,7 +232,7 @@ test('a state no accepting state can be reached from is a trap', () => {
   if (!codes.includes('AUT002_TRAP_STATE')) throw new Error('codes: ' + codes.join(','))
 })
 
-test('subset holds when the second automaton is universal', () => {
+await test('subset holds when the second automaton is universal', () => {
   const first = { states: ['s', 't'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 't' }, { from: 't', symbol: 'a', to: 't' }], init: 's', accepting: ['t'] }
   const universal = { states: ['u'], alphabet: ['a'], transitions: [{ from: 'u', symbol: 'a', to: 'u' }], init: 'u', accepting: ['u'] }
   const subset = verifyAutomaton(first, { other: universal, relation: 'subset' })
@@ -241,7 +241,7 @@ test('subset holds when the second automaton is universal', () => {
   if (superset.verdict !== 'pass') throw new Error('the universal language contains the first: ' + superset.verdictReason)
 })
 
-test('the empty language is contained in every language', () => {
+await test('the empty language is contained in every language', () => {
   const empty = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: [] }
   const universal = { states: ['u'], alphabet: ['a'], transitions: [{ from: 'u', symbol: 'a', to: 'u' }], init: 'u', accepting: ['u'] }
   const report = verifyAutomaton(empty, { other: universal, relation: 'subset' })
@@ -251,7 +251,7 @@ test('the empty language is contained in every language', () => {
 })
 
 
-test('an init that names no state is refused with the name', () => {
+await test('an init that names no state is refused with the name', () => {
   let message = ''
   try {
     verifyAutomaton({ states: ['s'], alphabet: ['a'], transitions: [], init: 'nowhere', accepting: [] })
@@ -261,7 +261,7 @@ test('an init that names no state is refused with the name', () => {
   if (!message.includes('nowhere')) throw new Error('the refusal does not name the state: ' + message)
 })
 
-test('an incomplete automaton is completed with a sink, not crashed on', () => {
+await test('an incomplete automaton is completed with a sink, not crashed on', () => {
   // `b` has no outgoing edge anywhere: the deterministic form needs a sink for it, and the sink must not
   // show up as an invented state in the report.
   const report = verifyAutomaton({
@@ -279,7 +279,7 @@ test('an incomplete automaton is completed with a sink, not crashed on', () => {
   if (unreachable.some((message) => message.includes('sink'))) throw new Error('the sink leaked into the findings: ' + unreachable.join('|'))
 })
 
-test('a subset failure carries the word the second machine rejects', () => {
+await test('a subset failure carries the word the second machine rejects', () => {
   const first = { states: ['s', 't'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 't' }, { from: 't', symbol: 'a', to: 't' }], init: 's', accepting: ['t'] }
   const none = { states: ['u'], alphabet: ['a'], transitions: [{ from: 'u', symbol: 'a', to: 'u' }], init: 'u', accepting: [] }
   const report = verifyAutomaton(first, { other: none, relation: 'subset' })
@@ -287,7 +287,7 @@ test('a subset failure carries the word the second machine rejects', () => {
   if (report.witness === undefined || report.witness.word.length === 0) throw new Error('no witness word: ' + JSON.stringify(report.witness))
 })
 
-test('a superset failure whose witness is the empty word says so', () => {
+await test('a superset failure whose witness is the empty word says so', () => {
   const silent = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: [] }
   const acceptsEmpty = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: ['s'] }
   const report = verifyAutomaton(silent, { other: acceptsEmpty, relation: 'superset' })
@@ -296,7 +296,7 @@ test('a superset failure whose witness is the empty word says so', () => {
   if (!detail.includes('the empty word')) throw new Error('the empty-word witness is not named: ' + detail)
 })
 
-test('a product past its cap is undecided rather than equal', () => {
+await test('a product past its cap is undecided rather than equal', () => {
   // The cap counts product STATES. Two machines that advance on different letters keep every pair
   // reachable, so the pair space is the full square - past ten thousand here.
   const size = 110
@@ -319,7 +319,7 @@ test('a product past its cap is undecided rather than equal', () => {
 })
 
 
-test('an isolated state is reported as unreachable', () => {
+await test('an isolated state is reported as unreachable', () => {
   const report = verifyAutomaton({
     states: ['s', 'lost'],
     alphabet: ['a'],
@@ -331,7 +331,7 @@ test('an isolated state is reported as unreachable', () => {
   if (!unreachable.some((message) => message.includes('lost'))) throw new Error('the isolated state was not reported: ' + unreachable.join('|'))
 })
 
-test('an equivalence failure names the side that accepted the word', () => {
+await test('an equivalence failure names the side that accepted the word', () => {
   const universal = { states: ['u'], alphabet: ['a'], transitions: [{ from: 'u', symbol: 'a', to: 'u' }], init: 'u', accepting: ['u'] }
   const silent = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: [] }
   const report = verifyAutomaton(silent, { other: universal })
@@ -341,7 +341,7 @@ test('an equivalence failure names the side that accepted the word', () => {
 
 
 
-test('a subset failure whose witness is the empty word says so', () => {
+await test('a subset failure whose witness is the empty word says so', () => {
   const acceptsEmpty = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: ['s'] }
   const silent = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: [] }
   const report = verifyAutomaton(acceptsEmpty, { other: silent, relation: 'subset' })
@@ -352,7 +352,7 @@ test('a subset failure whose witness is the empty word says so', () => {
 
 
 
-test('an equivalence failure in the other direction names its side too', () => {
+await test('an equivalence failure in the other direction names its side too', () => {
   const universal = { states: ['u'], alphabet: ['a'], transitions: [{ from: 'u', symbol: 'a', to: 'u' }], init: 'u', accepting: ['u'] }
   const silent = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: [] }
   const report = verifyAutomaton(universal, { other: silent })
@@ -363,7 +363,7 @@ test('an equivalence failure in the other direction names its side too', () => {
 
 
 
-test('an equivalence witness can be a non-empty word', () => {
+await test('an equivalence witness can be a non-empty word', () => {
   const onlyA = { states: ['s', 't'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 't' }, { from: 't', symbol: 'a', to: 't' }], init: 's', accepting: ['t'] }
   const nothing = { states: ['s'], alphabet: ['a'], transitions: [{ from: 's', symbol: 'a', to: 's' }], init: 's', accepting: [] }
   const report = verifyAutomaton(onlyA, { other: nothing })
@@ -372,6 +372,34 @@ test('an equivalence witness can be a non-empty word', () => {
   if (!String(finding.detail).includes('shortest witness: a')) throw new Error('the word is not shown: ' + String(finding.detail))
 })
 
+
+await test('a malformed automaton is refused with its own code, not a TypeError', () => {
+  // The input is declared `json`, so anything reaches the engine: a string states nothing, and a null has no fields.
+  for (const bad of ['nope', null, 5, { states: 'x' }]) {
+    let refused
+    try {
+      verifyAutomaton(bad)
+    } catch (error) {
+      refused = error
+    }
+    if (refused === undefined) throw new Error('accepted ' + JSON.stringify(bad))
+    // `OptionShapeError` carries its code as `errorCode`; the abort helper uses `code`. Read whichever the throw carries.
+    const code = refused.errorCode ?? refused.code
+    if (String(code) !== 'AUTOMATON_INVALID') throw new Error(JSON.stringify(bad) + ' answered ' + String(code))
+  }
+})
+
+await test('the tool turns that refusal into a report with its family and no findings', () => {
+  return (async () => {
+    const { modelAutomatonTool } = await import('../../lib/automaton-tool.js')
+    const out = await modelAutomatonTool.execute({ automaton: null })
+    if (out.ran !== false) throw new Error('it ran')
+    if (out.errorCode !== 'AUTOMATON_INVALID') throw new Error('code: ' + String(out.errorCode))
+    if (out.schema !== 'model-everything/automaton/v1') throw new Error('schema: ' + String(out.schema))
+    // The catch-all this tool also declares is for a throw nobody predicted; this input takes the stated path.
+    if (out.errorCode === 'AUTOMATON_OPTION_INVALID') throw new Error('the catch-all answered a case the engine states')
+  })()
+})
 
 if (failures > 0) {
   console.log('automaton tests failed:', failures)

@@ -7,9 +7,9 @@
 import { runDesignReview, designFeatures, DESIGN_CODE_LEVEL } from '../../lib/design-engine.js'
 
 let failures = 0
-function test(name, fn) {
+async function test(name, fn) {
   try {
-    fn()
+    await fn()
     console.log('PASS', name)
   } catch (error) {
     failures += 1
@@ -65,7 +65,7 @@ const cycle = design({ architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'
 expectPresent('a dependency cycle', cycle, 'DES1_CYCLE')
 expectAbsent('the same graph with the cycle cut', design({ architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c']] } }), 'DES1_CYCLE')
 
-test('design: a cycle reports the fewest edges that break it, and says the count is a minimum', () => {
+await test('design: a cycle reports the fewest edges that break it, and says the count is a minimum', () => {
   const report = runDesignReview(cycle)
   const finding = report.violations.find((entry) => entry.code === 'DES1_CYCLE')
   if (finding === undefined) throw new Error('missing the cycle finding')
@@ -81,7 +81,7 @@ test('design: a cycle reports the fewest edges that break it, and says the count
 
 // The decision table for that count: what the exact search must answer on shapes whose
 // minimum is known by hand, including the two where the peel's leftover differs from it.
-test('design: the minimum feedback arc set matches the known answer on five shapes', () => {
+await test('design: the minimum feedback arc set matches the known answer on five shapes', () => {
   const table = [
     ['a DAG needs nothing removed', { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c']] }, 0],
     // The peel leaves 3 here; the minimum is 1.
@@ -100,7 +100,7 @@ test('design: the minimum feedback arc set matches the known answer on five shap
   }
 })
 
-test('design: past the exact limit the count is reported as an upper bound, and says so', () => {
+await test('design: past the exact limit the count is reported as an upper bound, and says so', () => {
   // A ring of sixteen nodes: the cyclic part is past the search limit, so the report must
   // stop claiming a minimum and say which number it is giving instead.
   const ring = Array.from({ length: 16 }, (_, index) => 'n' + String(index))
@@ -113,7 +113,7 @@ test('design: past the exact limit the count is reported as an upper bound, and 
   if (!String(finding.detail).includes('NP-hard')) throw new Error('the detail must say why it is not decided: ' + String(finding.detail))
 })
 
-test('design: cutting the reported edges really makes the graph acyclic', () => {
+await test('design: cutting the reported edges really makes the graph acyclic', () => {
   // The claim the report makes, checked rather than trusted: remove what it named and see
   // whether a cycle is left. This is the metamorphic half of the decision table above.
   const shapes = [
@@ -175,7 +175,7 @@ expectAbsent('a ring, where no node is load-bearing', design({
   architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] },
 }), 'DES4_LOAD_BEARING_ELEMENT')
 
-test('design: a load-bearing element is a signal and never decides the verdict', () => {
+await test('design: a load-bearing element is a signal and never decides the verdict', () => {
   const report = runDesignReview(hub)
   if (report.verdict !== 'pass_with_findings') throw new Error('a hub alone must not fail the design: ' + report.verdict)
   if (report.summary.errors !== 0) throw new Error('errors: ' + String(report.summary.errors))
@@ -185,7 +185,7 @@ test('design: a load-bearing element is a signal and never decides the verdict',
 // The two emitters are asserted apart, on inputs that carry one and not the other. Asserting
 // only "the code appears somewhere" lets either one be broken without a suite going red -
 // which is what the mutation check found when it emptied each loop in turn.
-test('design: an articulation point is reported on a graph with no bridge', () => {
+await test('design: an articulation point is reported on a graph with no bridge', () => {
   // Two triangles meeting at one node: every edge lies on a cycle, so no edge is a bridge, and
   // removing the shared node separates the halves.
   const report = runDesignReview(design({
@@ -196,7 +196,7 @@ test('design: an articulation point is reported on a graph with no bridge', () =
   if (points.length !== 1 || !String(points[0].message).includes(' m ')) throw new Error('the articulation point must be reported alone: ' + JSON.stringify(report.signals.map((finding) => finding.message)))
 })
 
-test('design: a bridge is reported even when no node is an articulation point', () => {
+await test('design: a bridge is reported even when no node is an articulation point', () => {
   // One edge between two nodes: it is the only path, and removing either endpoint leaves a
   // single node - still connected - so neither endpoint is an articulation point.
   const report = runDesignReview(design({ architecture: { nodes: ['a', 'b'], edges: [['a', 'b']] } }))
@@ -406,7 +406,7 @@ expectAbsent('a wildcard rule source', design({
 
 // ------------------------------------------------------------------ the report --
 
-test('design: skipped checks are named, not silently passed', () => {
+await test('design: skipped checks are named, not silently passed', () => {
   const report = runDesignReview(design())
   const skipped = report.facts.checksSkipped
   for (const id of ['DES2', 'DES3', 'DES5', 'DES6', 'DES7', 'DES8', 'DES9', 'DES10', 'DES11']) {
@@ -420,7 +420,7 @@ test('design: skipped checks are named, not silently passed', () => {
   if (!report.nextSteps.some((step) => /declare/i.test(step))) throw new Error('the report must say what to declare: ' + JSON.stringify(report.nextSteps))
 })
 
-test('design: the shape facts are stable and complete', () => {
+await test('design: the shape facts are stable and complete', () => {
   const model = design({
     architecture: { nodes: ['a', 'b', 'c'], edges: [['a', 'b'], ['b', 'a'], ['b', 'c']] },
     declare: { boundaries: [{ name: 'x', members: ['a', 'b', 'c'] }] },
@@ -437,7 +437,7 @@ test('design: the shape facts are stable and complete', () => {
   if (facts.nodes !== 3 || facts.edges !== 3) throw new Error('counts: ' + JSON.stringify(facts))
 })
 
-test('design: every code the engine declares has a case in this suite', () => {
+await test('design: every code the engine declares has a case in this suite', () => {
   const declared = new Set(Object.keys(DESIGN_CODE_LEVEL))
   // The suites above produce each of these; a code added without a case must fail here.
   const covered = new Set([
@@ -451,7 +451,7 @@ test('design: every code the engine declares has a case in this suite', () => {
   if (unknown.length > 0) throw new Error('cases for codes the engine does not declare: ' + unknown.join(', '))
 })
 
-test('design: features are computed from the graph the model declares', () => {
+await test('design: features are computed from the graph the model declares', () => {
   const features = designFeatures(design({ architecture: { nodes: ['a', 'b', 'c', 'd'], edges: [['a', 'b'], ['c', 'd']] } }))
   if (features.components !== 2) throw new Error('components: ' + String(features.components))
   if (features.cyclomatic !== 2 - 4 + 2 * 2) throw new Error('cyclomatic: ' + String(features.cyclomatic))
@@ -460,7 +460,7 @@ test('design: features are computed from the graph the model declares', () => {
 
 // ---------------------------------------------------------------- the refusals --
 
-test('design: the validator refuses by field', () => {
+await test('design: the validator refuses by field', () => {
   const refusals = [
     ['must be an object with schemaVersion', 'not a model'],
     ['schemaVersion must be 1', { schemaVersion: 2, architecture: { nodes: [], edges: [] } }],
@@ -491,13 +491,37 @@ test('design: the validator refuses by field', () => {
   if (refused.modelHash !== '') throw new Error('a refused model has no hash: ' + refused.modelHash)
 })
 
-test('design: an underscore key is metadata and does not change the answer', () => {
+await test('design: an underscore key is metadata and does not change the answer', () => {
   const plain = design()
   const annotated = { ...plain, _note: 'carried, not reviewed' }
   const left = runDesignReview(plain)
   const right = runDesignReview(annotated)
   if (left.modelHash !== right.modelHash) throw new Error('metadata must not enter the hash')
   if (JSON.stringify(codesOf(left)) !== JSON.stringify(codesOf(right))) throw new Error('metadata must not change the findings')
+})
+
+await test('a model that is not a design is a design-invalid finding, not a crash', () => {
+  // The validation failure rides in a check's findings, not at the top level: the report still has the shape a reader
+  // routes on, and the code says which rule the model broke.
+  const report = runDesignReview({ schemaVersion: 2, architecture: { nodes: [], edges: [] } })
+  const codes = codesOf(report)
+  if (!codes.includes('DESIGN_INVALID')) throw new Error('codes: ' + codes.join(','))
+  if (report.verdict !== 'fail') throw new Error('verdict: ' + report.verdict)
+})
+
+await test('no model and no path is a refusal that names the input, and it is not the catch-all', async () => {
+  // The tool has two codes for a missing input: DESIGN_INPUT for the documented case, and the catch-all
+  // DESIGN_OPTION_INVALID for a throw nobody predicted. The guard shadows the catch-all, so this pins the shadow:
+  // if the guard were removed, the answer would change to this suite's failure rather than to a stated input refusal.
+  const run = async () => {
+    const { designTool: tool } = await import('../../lib/design-tool.js')
+    const report = await tool.execute({})
+    if (report.errorCode !== 'DESIGN_INPUT') throw new Error('code: ' + String(report.errorCode))
+    if (report.schema !== 'model-everything/design/v1') throw new Error('schema: ' + String(report.schema))
+    // The catch-all is not reached; its existence is what a reader of the source sees, and this case says so.
+    if (report.errorCode === 'DESIGN_OPTION_INVALID') throw new Error('the catch-all answered the documented case')
+  }
+  return run()
 })
 
 if (failures > 0) {

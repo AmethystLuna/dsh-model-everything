@@ -199,6 +199,7 @@ node tests/shape-dispatch/run.mjs
 node tests/abort/run.mjs
 node tests/component-claims/run.mjs
 node tests/status-per-tool/run.mjs
+node tests/code-inventory/run.mjs
 node tests/export-extras/run.mjs
 node tests/version/run.mjs
 node tests/compatibility/run.mjs
@@ -276,7 +277,7 @@ And the gates around it:
 | Suite | Checked | Holds |
 |---|---|---|
 | `engine` | 0 | (read the file) |
-| `design-engine` | 13 | design: a cycle reports the fewest edges that break it, and says the count is a minimum |
+| `design-engine` | 15 | design: a cycle reports the fewest edges that break it, and says the count is a minimum |
 | `catalog` | 8 | catalog: every skill row fits the budget, so nothing it needs is cut off |
 | `data-engine` | 15 | valid data model passes |
 | `concurrency` | 10 | flags absolute concurrency claims and risk keywords |
@@ -296,7 +297,7 @@ And the gates around it:
 | `intent` | 5 | an intent an action serves is accepted |
 | `check-status` | 2 | a cap that leaves a check nothing to decide reports skip, not pass |
 | `summary-counters` | 4 | a verification report counts what its checks carry |
-| `edit-refusals` | 5 | an ops that is not a list is refused and writes nothing |
+| `edit-refusals` | 6 | an ops that is not a list is refused and writes nothing |
 | `export-warnings` | 3 | every invariant a format cannot translate is named in its warnings |
 | `diff-families` | 6 | two reports of different families are refused, naming both |
 | `diff-next-steps` | 5 | every state says something to do |
@@ -328,7 +329,7 @@ And the gates around it:
 | `diagram-card` | 7 | a drawing card carries the source it was drawn from |
 | `diagram-diff` | 5 | an added node is an info change and the delta passes |
 | `reading-shapes` | 4 | the automaton family reports top-level findings and a next step |
-| `diagram-review` | 5 | a drawing inside every budget passes and states what it measured |
+| `diagram-review` | 6 | a drawing inside every budget passes and states what it measured |
 | `diagram-out` | 4 | a drawing asked for on disk is there, and is the markup that was returned |
 | `card-blocks` | 5 | a card is one text block, so a view has nothing to lay out |
 | `uml-hash` | 4 | a rendered diagram names the model it shows, under a stated scheme |
@@ -343,6 +344,7 @@ And the gates around it:
 | `abort` | 6 | a verification whose deadline passed settles without a report |
 | `component-claims` | 6 | the gate header states the default the schema declares |
 | `status-per-tool` | 3 | when every tool registers, the status says so and names nothing missing |
+| `code-inventory` | 3 | the sources and the tests were read, so the inventory below means something |
 | `export-extras` | 5 | a model with nothing to state gets an empty properties file, not a filler |
 | `version` | 3 | the version the manifests declare is one string |
 | `compatibility` | 6 | the declaration carries a range, a release map and a profile list |
@@ -361,7 +363,7 @@ And the gates around it:
 | `routing-map` | 4 | the routing map is the one the catalog produces now |
 | `report-reading` | 6 | the mind map is the one the engines produce now |
 | `structure` | 27 | parse: declarations, aliases, labels, containers and nesting |
-| `automaton` | 27 | a well-formed automaton with a reachable accepting state passes |
+| `automaton` | 29 | a well-formed automaton with a reachable accepting state passes |
 | `diagram` | 106 | a flowchart becomes boxes and labelled arrows |
 | `plantuml-corpus` | 64 | left to right direction lays the chain out along a row |
 | `client` | 43 | the declared client export is the built bundle the loader can execute |
