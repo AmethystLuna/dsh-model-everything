@@ -1059,6 +1059,13 @@ const MUTATIONS = [
     from: '    schema,',
     to: '    schema: undefined,',
   },
+  {
+    id: 'M130',
+    what: 'a drawing report stops naming its family, so it is diffed against a machine',
+    file: 'src/diagram-review-tool.ts',
+    from: '      schema: REPORT_SCHEMAS.diagramReview,',
+    to: '      schema: undefined,',
+  },
 ]
 
 const argument = process.argv[2]

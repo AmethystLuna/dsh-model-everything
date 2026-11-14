@@ -66,6 +66,7 @@ test('two runs of the same report compare, and the delta is clean', () => {
   if (report.currentVerdict !== 'pass') throw new Error('currentVerdict ' + String(report.currentVerdict))
 })
 
+
 if (failures > 0) {
   console.log('diff-families tests failed:', failures)
   process.exit(1)

@@ -8,6 +8,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { render, type Notation } from './render/index.js'
 import { checkBudget, DEFAULT_LIMITS, type BudgetLimits } from './render/budget.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export const DIAGRAM_REVIEW_TOOL_NAME = 'diagram_review'
 
@@ -81,6 +82,7 @@ export const diagramReviewTool = defineTool({
     const notation = args.notation === 'mermaid' || args.notation === 'plantuml' ? (args.notation as Notation) : 'auto'
     if (source.trim() === '') {
       return {
+        schema: REPORT_SCHEMAS.diagramReview,
         ok: false,
         verdict: 'fail' as const,
         findings: [{ code: 'D0_NO_SOURCE', severity: 'error', message: 'source is empty: pass the diagram text to review' }],
@@ -91,6 +93,7 @@ export const diagramReviewTool = defineTool({
     const rendered = render({ source, notation })
     const report = checkBudget(rendered.diagram, limitsOf(args))
     return {
+      schema: REPORT_SCHEMAS.diagramReview,
       ok: report.verdict !== 'fail',
       verdict: report.verdict,
       // Plain JSON fields: a finding whose `group` is absent must not carry an undefined key.

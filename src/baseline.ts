@@ -206,6 +206,8 @@ export function diffReports(baseline: unknown, current: unknown): BaselineReport
   }
   const beforeFamily = familyOf(beforeRecord)
   const afterFamily = familyOf(afterRecord)
+  // One side silent stays accepted on purpose: a caller may build a report by hand, and `tests/baseline` pins that a
+  // partial side still compares. The protection against mixing two families is that every tool now states its schema.
   if (beforeFamily !== undefined && afterFamily !== undefined && beforeFamily !== afterFamily) {
     throw new Error('cannot compare a ' + beforeFamily + ' report with a ' + afterFamily + ' report: they do not share a finding vocabulary, so every finding on one side would read as resolved or added on the other. Compare two runs of the same tool.')
   }

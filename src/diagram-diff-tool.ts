@@ -8,6 +8,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { render, type Notation } from './render/index.js'
 import { diffStructure } from './render/diff.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 export const DIAGRAM_DIFF_TOOL_NAME = 'diagram_diff'
 
@@ -67,6 +68,7 @@ export const diagramDiffTool = defineTool({
     const problems = [before.problem, after.problem].filter((problem): problem is string => problem !== undefined)
     if (before.diagram === undefined || after.diagram === undefined) {
       return {
+        schema: REPORT_SCHEMAS.diagramDiff,
         ok: false,
         verdict: 'fail' as const,
         changes: problems.map((problem) => ({ code: 'D1_SIDE_UNREADABLE', severity: 'error', kind: 'removed', subject: '-', message: problem })),
@@ -78,6 +80,7 @@ export const diagramDiffTool = defineTool({
     }
     const report = diffStructure(before.diagram, after.diagram)
     return {
+      schema: REPORT_SCHEMAS.diagramDiff,
       ok: report.verdict !== 'fail',
       verdict: report.verdict,
       changes: report.changes.map((change) => ({

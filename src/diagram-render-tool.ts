@@ -9,6 +9,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { render, type Notation } from './render/index.js'
 import { schemeNames, type PaletteScheme } from './render/palette.js'
 import { writeSvg } from './render/write.js'
+import { REPORT_SCHEMAS } from './engine.js'
 
 /** Past this many pixels a drawing no longer fits a window, and the report says so. */
 const WIDE_DRAWING = 4000
@@ -111,6 +112,7 @@ export const diagramRenderTool = defineTool({
       // One shape for every answer, so the output contract has nothing to special-case: the fields a successful render adds are present here
       // with neutral values, rather than missing and read as `undefined` by whatever consumes them.
       return {
+        schema: REPORT_SCHEMAS.diagramRender,
         ok: false,
         notation: 'mermaid',
         nodes: 0,
@@ -147,6 +149,7 @@ export const diagramRenderTool = defineTool({
     }
 
     return {
+      schema: REPORT_SCHEMAS.diagramRender,
       ok: rendered.refused.length === 0 && writeProblem === undefined,
       notation: rendered.notation,
       nodes: rendered.diagram.nodes.length,

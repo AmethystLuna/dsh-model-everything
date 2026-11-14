@@ -316,6 +316,9 @@ export declare const REPORT_SCHEMAS: {
     readonly baseline: 'model-everything/baseline/v1';
     readonly edit: 'model-everything/edit/v1';
     readonly automaton: 'model-everything/automaton/v1';
+    readonly diagramRender: 'model-everything/diagram/render/v1';
+    readonly diagramReview: 'model-everything/diagram/review/v1';
+    readonly diagramDiff: 'model-everything/diagram/diff/v1';
 };
 export type ReportSchema = typeof REPORT_SCHEMAS[keyof typeof REPORT_SCHEMAS];
 /**

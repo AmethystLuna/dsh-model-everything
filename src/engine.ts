@@ -487,6 +487,11 @@ export const REPORT_SCHEMAS = {
   baseline: 'model-everything/baseline/v1',
   edit: 'model-everything/edit/v1',
   automaton: 'model-everything/automaton/v1',
+  // The drawing family states a schema too. Without one, `report_diff` accepted a drawing review beside a machine
+  // verification and reported the difference as if the two shared a finding vocabulary.
+  diagramRender: 'model-everything/diagram/render/v1',
+  diagramReview: 'model-everything/diagram/review/v1',
+  diagramDiff: 'model-everything/diagram/diff/v1',
 } as const
 
 export type ReportSchema = typeof REPORT_SCHEMAS[keyof typeof REPORT_SCHEMAS]

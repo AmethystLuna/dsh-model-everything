@@ -6,11 +6,14 @@ import { REPORT_SCHEMAS, runCompositionVerification, runVerification } from '../
 import { runDataVerification } from '../../lib/data-engine.js'
 import { runDesignReview } from '../../lib/design-engine.js'
 import { diffReports } from '../../lib/baseline.js'
+import { diagramRenderTool } from '../../lib/diagram-render-tool.js'
+import { diagramReviewTool } from '../../lib/diagram-review-tool.js'
+import { diagramDiffTool } from '../../lib/diagram-diff-tool.js'
 
 let failures = 0
-function test(name, body) {
+async function test(name, body) {
   try {
-    body()
+    await body()
     console.log('PASS', name)
   } catch (error) {
     failures += 1
@@ -28,9 +31,14 @@ const REPORTS = {
   datamodel: runDataVerification(TABLE),
   design: runDesignReview(DESIGN),
   baseline: diffReports(runVerification(MACHINE), runVerification(MACHINE)),
+  // The drawing family states its own schema. Without a row here, the mixed diff below compared a drawing
+  // review beside a machine verification as if the two shared a vocabulary.
+  diagramRender: await diagramRenderTool.execute({ source: 'stateDiagram-v2\n  A --> B', notation: 'mermaid' }),
+  diagramReview: await diagramReviewTool.execute({ source: 'stateDiagram-v2\n  A --> B', notation: 'mermaid' }),
+  diagramDiff: await diagramDiffTool.execute({ before: 'stateDiagram-v2\n  A --> B', after: 'stateDiagram-v2\n  A --> C', notation: 'mermaid' }),
 }
 
-test('every name in the registry is unique', () => {
+await test('every name in the registry is unique', () => {
   const seen = new Map()
   for (const [key, value] of Object.entries(REPORT_SCHEMAS)) {
     if (seen.has(value)) throw new Error(value + ' is used by ' + String(seen.get(value)) + ' and ' + key)
@@ -38,19 +46,19 @@ test('every name in the registry is unique', () => {
   }
 })
 
-test('every name is a versioned identifier of this plugin', () => {
+await test('every name is a versioned identifier of this plugin', () => {
   for (const [key, value] of Object.entries(REPORT_SCHEMAS)) {
     if (!/^model-everything\/[a-z-]+(\/[a-z-]+)?\/v\d+$/.test(String(value))) throw new Error(key + ': ' + String(value))
   }
 })
 
-test('each report carries the schema registered for its family', () => {
+await test('each report carries the schema registered for its family', () => {
   for (const [key, report] of Object.entries(REPORTS)) {
     if (report.schema !== REPORT_SCHEMAS[key]) throw new Error(key + ': ' + String(report.schema) + ' against ' + String(REPORT_SCHEMAS[key]))
   }
 })
 
-test('a report never carries a schema the registry does not list', () => {
+await test('a report never carries a schema the registry does not list', () => {
   const known = new Set(Object.values(REPORT_SCHEMAS))
   for (const [key, report] of Object.entries(REPORTS)) {
     if (!known.has(report.schema)) throw new Error(key + ' reports ' + String(report.schema) + ', which is not registered')

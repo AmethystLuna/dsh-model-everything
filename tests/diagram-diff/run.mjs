@@ -51,7 +51,9 @@ await test('the report states no verdictReason and no nextSteps, which the skill
   if ('verdictReason' in report) throw new Error('the family gained a verdictReason: the skill says it has none')
   if ('nextSteps' in report) throw new Error('the family gained nextSteps: the skill says it has none')
   const keys = Object.keys(report).sort().join(',')
-  if (keys !== 'changes,measured,ok,verdict') throw new Error('the shape moved: ' + keys)
+  // The schema is part of the shape: a caller decides how to read a payload by it, and a diff with no family could be
+// compared against a report of another family.
+if (keys !== 'changes,measured,ok,schema,verdict') throw new Error('the shape moved: ' + keys)
 })
 
 await test('the measurement says how big each side is', async () => {
