@@ -995,8 +995,8 @@ const MUTATIONS = [
     id: 'M121',
     what: 'a deployment sentence is appended after the closing restatement',
     file: 'src/gate.ts',
-    from: '  return extra === \'\' ? config.gateContent : config.gateContent + \'\\n\\n\' + extra',
-    to: '  return config.gateContent + \'\\n\\n\' + extra',
+    from: "A check that nothing ran is not a passing check.${extra === '' ? '' : '\\n\\n' + extra}",
+    to: "A check that nothing ran is not a passing check.${''}",
   },
 ]
 
