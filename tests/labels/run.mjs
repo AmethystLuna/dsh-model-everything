@@ -53,10 +53,26 @@ test('a crowded run is given up for a clear shorter one', () => {
   if (placed.run !== 1) throw new Error('it stayed on the blocked run: ' + String(placed.run))
 })
 
+test('the line comes before the step aside: a clear run beats a side spot on a crowded one', () => {
+  // The order the two passes exist for. A long run is blocked by a foreign edge along its whole length, and a shorter
+  // run of the same edge is clear on its own line. Stepping off the long run would also find a clear spot - but a label
+  // beside a crowded line reads as that line's label only by luck, while one on its own leg sits on its own edge.
+  const points = route([0, 0], [200, 0], [200, 40])
+  const placed = placeLabel('go', points, covers({ routes: [[{ x1: -20, y1: 0, x2: 220, y2: 0 }]] }))
+  if (placed.run !== 1) throw new Error('it stayed on the blocked run: ' + String(placed.run))
+  if (placed.collisions !== 0) throw new Error('the chosen spot is not clear: ' + JSON.stringify(placed))
+})
+
 test('with nothing clear, text over an edge is preferred to text over a box', () => {
+  // Nothing clear at all: a box above and a box below, nine pixels away on each side (the fixture counts a two-pixel pad,
+  // so this is the gap that fits the label exactly), and the label's own line between them. Every spot the search may
+  // take covers something, so the fallback ranking decides - and the one place that covers only the line is the answer.
   const points = route([0, 0], [200, 0])
   const placed = placeLabel('go', points, covers({
-    boxes: [{ x: -10, y: -40, width: 220, height: 30 }],
+    boxes: [
+      { x: -10, y: -40, width: 220, height: 31 },
+      { x: -10, y: 9, width: 220, height: 31 },
+    ],
     routes: [[{ x1: -10, y1: 0, x2: 210, y2: 0 }]],
   }))
   if (placed.boxes > placed.edges) throw new Error('it covered a box when an edge would do')

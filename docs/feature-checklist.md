@@ -390,7 +390,7 @@ And the gates around it:
 | `lift` | 7 | the last leg is read, and a route too short has none |
 | `repair` | 4 | a path that does not cross is not repaired |
 | `ports` | 7 | two ports on a side with room keep the full separation |
-| `labels` | 4 | a label with nothing in the way sits on its longest run |
+| `labels` | 5 | a label with nothing in the way sits on its longest run |
 | `blocks` | 6 | a block\ |
 | `skill-table` | 8 | the parser lists were read, so the checks below mean something |
 | `names` | 9 | a bare name is left alone |

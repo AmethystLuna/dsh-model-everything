@@ -1210,6 +1210,13 @@ const MUTATIONS = [
     from: '    for (const other of builder.groups) if (other.id !== groupId) other.members = other.members.filter((member) => member !== note)',
     to: '    void groupId',
   },
+  {
+    id: 'M150',
+    what: 'the second pass runs inside the first, so a side spot beats a clear run',
+    file: 'src/render/labels.ts',
+    from: '    for (const along of walkOf(run)) {\n      const found = trySpot(runIndex, run, along, 0)',
+    to: '    for (const along of walkOf(run)) {\n      const found = trySpot(runIndex, run, along, LABEL_STEP)',
+  },
 ]
 
 const argument = process.argv[2]

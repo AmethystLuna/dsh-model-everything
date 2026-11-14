@@ -108,42 +108,60 @@ export function placeLabel(
   }
 
   let best: (LabelPlacement & LabelSpot) | undefined
-  for (const [runIndex, run] of runs.entries()) {
-    const dx = run.to.x - run.from.x
-    const dy = run.to.y - run.from.y
-    const ux = dx / run.length
-    const uy = dy / run.length
+  /** One spot on one run: where the label would sit, and what it would cover there. */
+  const trySpot = (runIndex: number, run: { from: Point; to: Point }, along: number, across: number) => {
+    const ux = (run.to.x - run.from.x) / Math.hypot(run.to.x - run.from.x, run.to.y - run.from.y)
+    const uy = (run.to.y - run.from.y) / Math.hypot(run.to.x - run.from.x, run.to.y - run.from.y)
     const middle = { x: (run.from.x + run.to.x) / 2, y: (run.from.y + run.to.y) / 2 }
-    // The walk is bounded so the label's own rectangle stays on the run that names it: a mask that hangs off the
-    // end of its segment would be half over the next thing and would not read as sitting on this edge.
+    const spot = spotAt(middle.x + ux * along - uy * across, middle.y + uy * along + ux * across)
+    const placement = collisionsAt(spot, runIndex)
+    if (placement.collisions === 0) return { ...spot, ...placement }
+    if (
+      best === undefined ||
+      placement.collisions < best.collisions ||
+      (placement.collisions === best.collisions && placement.boxes + placement.labels < best.boxes + best.labels)
+    ) {
+      best = { ...spot, ...placement }
+    }
+    return undefined
+  }
+
+  /** The offsets along a run a label may take: bounded so its own rectangle stays on the segment that names it. */
+  const walkOf = (run: { from: Point; to: Point }): number[] => {
+    const ux = (run.to.x - run.from.x) / Math.hypot(run.to.x - run.from.x, run.to.y - run.from.y)
+    const uy = (run.to.y - run.from.y) / Math.hypot(run.to.x - run.from.x, run.to.y - run.from.y)
     const along = (Math.abs(ux) * width) / 2 + (Math.abs(uy) * height) / 2
-    const bound = Math.max(0, run.length / 2 - along)
+    const bound = Math.max(0, Math.hypot(run.to.x - run.from.x, run.to.y - run.from.y) / 2 - along)
     const walk: number[] = [0]
     for (let step = LABEL_STEP; step <= bound + 0.001; step += LABEL_STEP) walk.push(step, -step)
-    // Beside the line as well as along it. A label that has nowhere clear on a short run used to take the spot with the
-    // fewest collisions, which on a turned drawing is where the next box and its labels already are; stepping off the
-    // line a few pixels is what a reader does with a crowded edge, and the along-run spots are still tried first.
-    const steps: Array<{ along: number; across: number }> = walk.map((offset) => ({ along: offset, across: 0 }))
-    // Two steps aside, in the order a reader looks: the line itself first, then just off it. Deeper searches move a label
-    // further from the edge it names and, on a crowded drawing, decide differently which run the label belongs to - so the
-    // bound is the drawing's preference, not a tuning knob.
-    for (const across of [LABEL_STEP, -LABEL_STEP, LABEL_STEP * 2, -LABEL_STEP * 2]) {
-      for (const offset of walk) steps.push({ along: offset, across })
+    return walk
+  }
+
+  // First pass: every run is asked to host the label **on its own line**, in the drawing's order of preference -
+  // longest run first, its midpoint before its ends. A run that cannot host it is given up for the next one, which is
+  // the rule that keeps a label on the shorter leg of its own edge rather than beside a crowded longer one.
+  for (const [runIndex, run] of runs.entries()) {
+    for (const along of walkOf(run)) {
+      const found = trySpot(runIndex, run, along, 0)
+      if (found !== undefined) return found
     }
-    for (const { along: offset, across } of steps) {
-      const spot = spotAt(middle.x + ux * offset - uy * across, middle.y + uy * offset + ux * across)
-      const placement = collisionsAt(spot, runIndex)
-      // A clear place is the answer, and the first one is the preferred one: the search order is already the
-      // drawing's preference - longest run, own midpoint, then either side.
-      if (placement.collisions === 0) return { ...spot, ...placement }
-      if (
-        best === undefined ||
-        placement.collisions < best.collisions ||
-        (placement.collisions === best.collisions && placement.boxes + placement.labels < best.boxes + best.labels)
-      ) {
-        best = { ...spot, ...placement }
+  }
+
+  // Second pass: no run could host it on its own line, so the label steps off the line - the way a reader writing on
+  // a crowded drawing does. The ladder is sized against what actually blocks it (the label's own height and the step)
+  // rather than a fixed count, so a label wider than the gap between two boxes can still clear them.
+  const ladder: number[] = []
+  // Eight steps: far enough to clear a box that sits beside the line, near enough that the label still reads as this
+  // edge's. Measured: deeper ladders changed no drawing in the acceptance corpus and no case in the sweeps.
+  for (let step = 1; step <= 8; step += 1) ladder.push(LABEL_STEP * step, -LABEL_STEP * step)
+  for (const [runIndex, run] of runs.entries()) {
+    for (const across of ladder) {
+      for (const along of walkOf(run)) {
+        const found = trySpot(runIndex, run, along, across)
+        if (found !== undefined) return found
       }
     }
   }
+
   return best as LabelPlacement & LabelSpot
 }
