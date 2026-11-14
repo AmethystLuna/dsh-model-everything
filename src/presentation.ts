@@ -143,15 +143,25 @@ export function reportCard(value: unknown, family: string): ReportCard {
     .map((entry) => ({ kind: String(entry.kind ?? '?'), what: String(entry.what ?? ''), ...(typeof entry.detail === 'string' && entry.detail !== '' ? { detail: entry.detail } : {}) }))
   const firstAddedRaw = (array(report.added).map((entry) => record(entry)).find((entry) => entry !== undefined && String(entry.severity ?? '') === 'error')
     ?? array(report.added).map((entry) => record(entry)).find((entry) => entry !== undefined))
+  // A delta has no `findings` array: it has `added`. Counting the first and not the second gave a failing card `errors: 0`
+  // while its own reason said "3 new finding(s) (1 error)" - the two readings of one report disagreeing.
+  const deltaPresent = Array.isArray(report.added) || Array.isArray(report.removed) || Array.isArray(report.changed)
+  const addedEntries = array(report.added)
+    .map((entry) => record(entry))
+    .filter((entry): entry is Record<string, unknown> => entry !== undefined)
+  const addedErrors = addedEntries.filter((entry) => severity(entry) === 'error').length
+  const addedWarnings = addedEntries.filter((entry) => severity(entry) === 'warning').length
   return {
     ...(typeof report.verdict === 'string' ? { verdict: report.verdict } : {}),
     ...(typeof report.verdictReason === 'string' ? { verdictReason: shorten(report.verdictReason) } : {}),
-    errors: summaryErrors ?? errors.length,
-    warnings: summaryWarnings ?? warnings.length,
+    errors: summaryErrors ?? (deltaPresent ? delta?.addedErrors ?? addedErrors : errors.length),
+    warnings: summaryWarnings ?? (deltaPresent ? addedWarnings : warnings.length),
     ...(checksRun === undefined ? {} : { checksRun }),
-    first: first === undefined
-      ? null
-      : { code: String(first.code ?? 'UNKNOWN'), severity: severity(first), message: shorten(String(first.message ?? '')) },
+    first: deltaPresent && firstAddedRaw !== undefined
+      ? { code: String(firstAddedRaw.code ?? 'UNKNOWN'), severity: severity(firstAddedRaw), message: shorten(String(firstAddedRaw.message ?? '')) }
+      : first === undefined
+        ? null
+        : { code: String(first.code ?? 'UNKNOWN'), severity: severity(first), message: shorten(String(first.message ?? '')) },
     next: next === undefined ? null : shorten(next),
     family,
     ...(route === undefined ? {} : { route: { owns: route.owns, instead: route.notFor.tool } }),

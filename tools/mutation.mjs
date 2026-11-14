@@ -122,6 +122,7 @@ const SUITES = [
   'tests/release-steps/run.mjs',
   'tests/config-live/run.mjs',
   'tests/refusal-schema/run.mjs',
+  'tests/view-agreement/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1065,6 +1066,13 @@ const MUTATIONS = [
     file: 'src/diagram-review-tool.ts',
     from: '      schema: REPORT_SCHEMAS.diagramReview,',
     to: '      schema: undefined,',
+  },
+  {
+    id: 'M131',
+    what: 'a delta card counts no errors while its own reason names one',
+    file: 'src/presentation.ts',
+    from: '    errors: summaryErrors ?? (deltaPresent ? delta?.addedErrors ?? addedErrors : errors.length),',
+    to: '    errors: summaryErrors ?? errors.length,',
   },
 ]
 
