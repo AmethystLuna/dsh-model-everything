@@ -119,6 +119,7 @@ const SUITES = [
   'tests/gate-config/run.mjs',
   'tests/tool-timeouts/run.mjs',
   'tests/full-path/run.mjs',
+  'tests/release-steps/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1027,6 +1028,13 @@ const MUTATIONS = [
     file: 'gate/locale/zh.json',
     from: "\"description\": \"在会话的第一条模型步注入一条路由提示：先加载哪个技能、每个工具做什么以及它不证明什么、怎么读一份报告。默认开，可在插件页关掉。\"",
     to: "\"description\": \"Injects a routing message into the first model step.\"",
+  },
+  {
+    id: 'M126',
+    what: 'the checklist asks for a build before it asks for a clean tree',
+    file: 'RELEASE.md',
+    from: "- [ ] `git status` is clean, and the release commit is on the branch you mean to ship",
+    to: "- [ ] `npm ci` installs the dependencies",
   },
 ]
 
