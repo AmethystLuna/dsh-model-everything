@@ -198,6 +198,13 @@ export interface UmlReviewReport {
 /** Canonical guard text. Rendering wraps every composite node in parentheses, and the parser flattens same-operator chains, so render∘parse is the identity. */
 export declare function guardText(node: GuardNode): string;
 /**
+ * The intents each action can serve.
+ *
+ * `fidelity` is a review job: render produces a diagram, and a diagram nothing has
+ * compared back to its model proves nothing about it.
+ */
+export declare function intentsFor(action: UmlIntentAction): readonly UmlIntent[];
+/**
  * Refuse a view the requested notation cannot draw, before any work. The entry check
  * every caller already used now asks the engine and the registry.
  */

@@ -1090,6 +1090,13 @@ const MUTATIONS = [
     from: '  if (signal === undefined || !signal.aborted) return',
     to: '  return',
   },
+  {
+    id: 'M134',
+    what: 'a parse offers every intent again, including the two it cannot serve',
+    file: 'src/uml.ts',
+    from: "  parse: ['verify'],",
+    to: "  parse: ['present', 'verify', 'fidelity'],",
+  },
 ]
 
 const argument = process.argv[2]

@@ -726,9 +726,7 @@ if (uml !== undefined) {
   // exists in the schema is a parameter that does not exist.
   const entryCases = [
     ['uml_render sequence + verify', uml.umlRenderTool, { model, kind: 'sequence', intent: 'verify' }, 'UML_INTENT_UNSERVABLE'],
-    ['uml_render + fidelity', uml.umlRenderTool, { model, intent: 'fidelity' }, 'UML_INTENT_MISMATCH'],
     ['uml_render plantuml/activity', uml.umlRenderTool, { model, notation: 'plantuml', kind: 'activity' }, 'UML_VIEW_UNREPRESENTABLE'],
-    ['uml_parse + present', uml.umlParseTool, { diagram: 'stateDiagram-v2\n  [*] --> A\n  A --> [*]\n', intent: 'present' }, 'UML_INTENT_MISMATCH'],
     ['uml_review sequence + fidelity', uml.umlReviewTool, { model, kind: 'sequence', intent: 'fidelity' }, 'UML_INTENT_UNSERVABLE'],
   ]
   try {
@@ -738,6 +736,27 @@ if (uml !== undefined) {
         throw new Error(label + ': expected a refusal ' + code + ', got ok=' + String(out.ok) + ' errorCode=' + String(out.errorCode))
       }
     }
+    // A value the action cannot serve is not offered at all. It used to be offered and refused by `execute`, which
+    // made two thirds of `uml_parse`'s enum a dead end a caller could only learn by trying.
+    for (const [label, tool, expected] of [
+      ['uml_render', uml.umlRenderTool, ['present', 'verify']],
+      ['uml_parse', uml.umlParseTool, ['verify']],
+      ['uml_review', uml.umlReviewTool, ['present', 'verify', 'fidelity']],
+    ]) {
+      // `defineTool` compiles the parameter map into a JSON schema, so the enum lives under `properties`.
+      const offered = tool.parameters?.properties?.intent
+      const values = Array.isArray(offered?.enum) ? offered.enum : undefined
+      if (JSON.stringify(values) !== JSON.stringify(expected)) throw new Error(label + ' offers ' + JSON.stringify(values) + ', not ' + JSON.stringify(expected))
+    }
+    let outside
+    try {
+      await uml.umlParseTool.execute({ diagram: 'stateDiagram-v2\n  [*] --> A\n  A --> [*]\n', intent: 'present' })
+    } catch (error) {
+      outside = error
+    }
+    if (outside === undefined) throw new Error('an intent the parse action cannot serve reached execute')
+    if (String(outside.code) !== 'INVALID_ARGS') throw new Error('it answered ' + String(outside.code) + ', not INVALID_ARGS')
+
     // The opt-in half: the same calls without an intent still run.
     for (const [label, tool, args] of [
       ['uml_render sequence without intent', uml.umlRenderTool, { model, kind: 'sequence' }],

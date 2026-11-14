@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import type { JsonValue } from './json-value.js'
 import { REPORT_SCHEMAS, DEFAULT_HASH_SPEC, valueHash, refusalVerdict, verdictOf, verdictOfFindings, type VerdictSummary } from './engine.js'
 import {
-  renderUml, parseUml, parseFindings, reviewUml, explainLabels, checkUmlIntent, UmlError, UML_DIAGRAMS,
+  renderUml, parseUml, parseFindings, reviewUml, explainLabels, checkUmlIntent, intentsFor, UmlError, UML_DIAGRAMS,
   type UmlDiagram, type UmlFinding, type UmlIntent, type UmlNotation, type UmlParseResult,
 } from './uml.js'
 import { renderReportText } from './report-view.js'
@@ -48,11 +48,30 @@ const kindParameter = {
   description: 'UML diagram family. Default state. A family the chosen notation cannot express is refused with the reason, never approximated silently.',
 } as const
 
-const intentParameter = {
-  type: 'string',
-  enum: ['present', 'verify', 'fidelity'],
-  description: 'What the artifact is for, declared up front: present = a human will read it; verify = it must be readable as a model by the verification engine; fidelity = the render-and-reparse proof is the point. A view that cannot serve the declared intent is refused before any work, with errorCode UML_INTENT_UNSERVABLE, UML_VIEW_UNREPRESENTABLE or UML_INTENT_MISMATCH. Omit it and nothing changes.',
-} as const
+/**
+ * The intents one action may be asked for, read from the capability table rather than restated.
+ *
+ * `uml_parse` offered all three and serves one: `present` and `fidelity` were refused by the engine on every call, so two
+ * thirds of the enum was a dead end a caller could only learn by trying. The enum is the table's row now - a value the
+ * action cannot serve is not offered, and adding a row to the table changes the schema with it.
+ * @param action - which action's row to publish.
+ * @returns the parameter schema for that action.
+ */
+function intentParameterFor(action: 'render' | 'parse' | 'review') {
+  const served = intentsFor(action)
+  const names: Record<string, string> = {
+    present: 'a human will read it',
+    verify: 'it must be readable as a model by the verification engine',
+    fidelity: 'the render-and-reparse proof is the point',
+  }
+  return {
+    type: 'string' as const,
+    enum: [...served],
+    description:
+      'What the artifact is for, declared up front: ' +
+      served.map((intent) => intent + ' = ' + (names[intent] ?? intent)).join('; ') + '.',
+  }
+}
 
 const reportOutput = (family: string) => ({
   schema: { type: 'json' as const, description: 'The result: diagram source, a family model, or a modelling review report with findings, round-trip fidelity and next steps.' },
@@ -78,7 +97,7 @@ export const umlRenderTool = defineTool({
     notation: notationParameter,
     kind: kindParameter,
     maxSteps: { type: 'integer', description: 'Cap on the sequence trace length when rendering kind=sequence. Default 60.' },
-    intent: intentParameter,
+    intent: intentParameterFor('render'),
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_RENDER_TOOL_NAME),
@@ -123,7 +142,7 @@ export const umlParseTool = defineTool({
   parameters: {
     diagram: { type: 'string', required: true, description: 'The UML source text to read.' },
     notation: notationParameter,
-    intent: intentParameter,
+    intent: intentParameterFor('parse'),
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_PARSE_TOOL_NAME),
@@ -176,7 +195,7 @@ export const umlReviewTool = defineTool({
     kind: kindParameter,
     roundTrip: { type: 'boolean', description: 'Render and re-read the model to prove the diagram carries it. Default true.' },
     maxSteps: { type: 'integer', description: 'Cap on the sequence trace used for the fidelity check.' },
-    intent: intentParameter,
+    intent: intentParameterFor('review'),
     reportView: reportViewParameter,
   },
   output: reportOutput(UML_REVIEW_TOOL_NAME),

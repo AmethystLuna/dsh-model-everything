@@ -42,7 +42,7 @@
       "body": 8497
     }
   ],
-  "toolChars": 34105,
+  "toolChars": 33366,
   "tools": [
     {
       "name": "model_automaton_verify",
@@ -86,15 +86,15 @@
     },
     {
       "name": "uml_parse",
-      "chars": 1837
+      "chars": 1541
     },
     {
       "name": "uml_render",
-      "chars": 2375
+      "chars": 2121
     },
     {
       "name": "uml_review",
-      "chars": 2372
+      "chars": 2183
     },
     {
       "name": "model_verify",
@@ -114,8 +114,8 @@
     }
   ],
   "perTurn": {
-    "chars": 37809,
-    "tokens": 9452
+    "chars": 37070,
+    "tokens": 9268
   },
   "routing": {
     "rowsWithSibling": 8,

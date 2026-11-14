@@ -456,6 +456,10 @@ const ACTION_PRODUCES: Record<UmlIntentAction, string> = {
  * `fidelity` is a review job: render produces a diagram, and a diagram nothing has
  * compared back to its model proves nothing about it.
  */
+export function intentsFor(action: UmlIntentAction): readonly UmlIntent[] {
+  return ACTION_INTENTS[action]
+}
+
 const ACTION_INTENTS: Record<UmlIntentAction, readonly UmlIntent[]> = {
   render: ['present', 'verify'],
   parse: ['verify'],
