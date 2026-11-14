@@ -18,7 +18,8 @@
  * routed, and the catalog line is cut at 500 characters, so a domain the request names can be
  * invisible at the moment of choosing. The cost is a fixed message in every session, which is
  * why the switch is live and documented: turn it off where the bundle's default is wrong. The
- * component's own `enabled` script default is off, so a bare `app.add(gate)` injects nothing.
+ * default is ON - a bare `add(gate)` injects the routing message - and the bundle's row names it
+ * explicitly so a reader of `cordis.patch.yml` can see the value rather than infer it.
  *
  * What it does not do. It routes; it checks nothing. It cannot make a skill load, and it
  * does not restate the doctrine - the skill bodies carry that, and duplicating them here

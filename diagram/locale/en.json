@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Diagram drawing",
+    "description": "Draws Mermaid and PlantUML sources and reports every line it could not draw, by number. Its own switch: a deployment that wants only the checks can leave this row off. Turning it off registers no drawing tool until the plugin mounts again."
+  }
+}

@@ -2,7 +2,7 @@
 //
 // `tests/gate` pins the titles, so a renamed card is caught. What it cannot catch is a key that exists in one language and not the other: the page
 // then shows an empty line in Thai and a sentence in English, and nothing anywhere reports it.
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 let failures = 0
@@ -28,10 +28,16 @@ const leaves = (value, prefix = '') => {
 
 const valueAt = (value, path) => path.split('.').reduce((inner, key) => (inner ?? {})[key], value)
 
-const PAIRS = [
-  ['locale/en.json', 'locale/zh.json'],
-  ['gate/locale/en.json', 'gate/locale/zh.json'],
-].filter(([en]) => readdirSync(join(repo, en, '..')).length > 0)
+// Every component row of the bundle, read from `cordis.patch.yml`: a row the Plugins page shows without a card has no
+// title and no description, and the diagram row was one until this list was derived instead of typed.
+const ROWS = [...readFileSync(repo + 'cordis.patch.yml', 'utf8').matchAll(/name:\s*'dsh-model-everything(?:\/([a-z-]+))?'/g)]
+  .map((match) => match[1])
+  .filter((sub, index, all) => all.indexOf(sub) === index)
+
+const PAIRS = ROWS
+  .map((sub) => (sub === undefined ? 'locale' : sub + '/locale'))
+  .filter((base) => existsSync(join(repo, base, 'en.json')) || existsSync(join(repo, base, 'zh.json')))
+  .map((base) => [base + '/en.json', base + '/zh.json'])
 
 test('both languages of every card name the same keys', () => {
   if (PAIRS.length === 0) throw new Error('no locale pair was found')

@@ -165,6 +165,7 @@
     "client",
     "client-bundle",
     "compatibility",
+    "component-claims",
     "components",
     "compose-inputs",
     "concurrency",

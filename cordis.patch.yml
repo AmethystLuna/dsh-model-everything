@@ -19,9 +19,11 @@
       config:
         enabled: true
 
-# The third component draws. It carries no engine and no tools of its own beyond `diagram_render`, so a
-# deployment that only wants pictures of its Mermaid and PlantUML sources can leave the rows above disabled.
-# `enabled` is live: the Plugins page switch turns it off without a restart.
+# The third component draws: the drawing tool, the structure review and the containment diff, and an annotate
+# command. It carries no engine of its own, so a deployment that only wants pictures of its Mermaid and PlantUML
+# sources can leave the rows above disabled.
+# `enabled` is projected to the Plugins page and read when the component mounts: switching it off registers no
+# drawing tool until the plugin mounts again.
 - insert:
     - id: dsh-model-everything-diagram
       name: 'dsh-model-everything/diagram'

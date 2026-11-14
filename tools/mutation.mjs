@@ -125,6 +125,7 @@ const SUITES = [
   'tests/view-agreement/run.mjs',
   'tests/shape-dispatch/run.mjs',
   'tests/abort/run.mjs',
+  'tests/component-claims/run.mjs',
   'tests/export-extras/run.mjs',
   'tests/version/run.mjs',
   'tests/compatibility/run.mjs',
@@ -1096,6 +1097,13 @@ const MUTATIONS = [
     file: 'src/uml.ts',
     from: "  parse: ['verify'],",
     to: "  parse: ['present', 'verify', 'fidelity'],",
+  },
+  {
+    id: 'M135',
+    what: 'the drawing row loses its card, so the Plugins page shows a bare id',
+    file: 'diagram/locale/en.json',
+    from: '"title": "Diagram drawing",',
+    to: '"title": "",',
   },
 ]
 
