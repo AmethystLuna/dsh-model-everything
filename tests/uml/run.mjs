@@ -13,6 +13,7 @@ import { validateProfileModel, reviewProfileModel, profileModule, PROFILE_FINDIN
 import { validateCompositeModel, reviewCompositeModel, COMPOSITE_FINDING_CODES } from '../../lib/uml.js'
 import { validateCommunicationModel, reviewCommunicationModel, COMMUNICATION_FINDING_CODES } from '../../lib/uml.js'
 import { validateInteractionOverviewModel, reviewInteractionOverviewModel, INTERACTION_OVERVIEW_FINDING_CODES } from '../../lib/uml.js'
+const syntaxModule = await import('../../lib/uml-syntax.js')
 
 let failures = 0
 function test(name, fn) {
@@ -2195,6 +2196,45 @@ test('overview: every code the family declares is produced by its own case', () 
   if (refusal === undefined || !refusal.message.includes('exactly one initial node')) {
     throw new Error('UML069 must stay unreachable from the review: ' + String(refusal))
   }
+})
+
+// ------------------------------------------- the structure families, and what mermaid refuses --
+
+test('a structure family mermaid cannot draw is refused by name, and names a nearer view', () => {
+  // Only `class` has a mermaid view. The refusal has to say which notation cannot draw which family, or a reader
+  // concludes the family does not exist.
+  const model = { schemaVersion: 1, family: 'component', nodes: [{ id: 'A', kind: 'component' }], edges: [] }
+  let refusal
+  try { renderUml(model, 'mermaid', 'component') } catch (error) { refusal = error }
+  if (refusal === undefined) throw new Error('mermaid drew a component diagram')
+  // `UmlError` carries its code as `code`; the capability table reports the same word as `errorCode`.
+  const code = refusal.code ?? refusal.errorCode
+  if (String(code) !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('code: ' + String(code))
+  if (!/architecture-beta|C4/.test(String(refusal.message))) throw new Error('the refusal names no nearer view: ' + String(refusal.message))
+})
+
+test('the structure module own mermaid refusal is shadowed by the capability table', () => {
+  // Two lines of defence: `umlCapability` refuses the (notation, family) cell before the module runs, and the module
+  // refuses again. The first is what a caller meets, so the second is pinned by its shadow rather than by a call that
+  // cannot reach it.
+  const { umlCapability } = syntaxModule
+  const capability = umlCapability('mermaid', 'component', 'render')
+  if (capability.ok) throw new Error('the capability table allows a cell the module refuses')
+  if (String(capability.errorCode) !== 'UML_VIEW_UNREPRESENTABLE') throw new Error('code: ' + String(capability.errorCode))
+})
+
+test('a structure model with parents renders as nesting, and reads back with them', () => {
+  // The parent directive and the children map are what make nesting survive the round trip.
+  const model = {
+    schemaVersion: 1, family: 'component',
+    nodes: [{ id: 'outer', kind: 'component' }, { id: 'inner', kind: 'component', parent: 'outer' }],
+    edges: [],
+  }
+  const out = renderUml(model, 'plantuml', 'component')
+  if (!/parent/.test(out.primary)) throw new Error('no parent directive: ' + out.primary)
+  const back = parseUml(out.primary, 'plantuml')
+  const inner = back.model.nodes.find((node) => node.id === 'inner')
+  if (inner === undefined || inner.parent !== 'outer') throw new Error('the parent did not come back: ' + JSON.stringify(inner))
 })
 
 // ---------------------------------------------- the class family in mermaid, and its aliases --

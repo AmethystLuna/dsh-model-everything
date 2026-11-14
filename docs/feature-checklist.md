@@ -284,7 +284,7 @@ And the gates around it:
 | `catalog` | 8 | catalog: every skill row fits the budget, so nothing it needs is cut off |
 | `data-engine` | 15 | valid data model passes |
 | `concurrency` | 10 | flags absolute concurrency claims and risk keywords |
-| `uml` | 102 | render: mermaid state diagram carries directives, guards and terminal marks |
+| `uml` | 105 | render: mermaid state diagram carries directives, guards and terminal marks |
 | `uml-families` | 4 | every family with a faithful notation is detected from a minimal source |
 | `uml-capability` | 5 | a cell the table calls unrepresentable refuses both actions |
 | `uml-docs` | 5 | every family the skill names is a family the engine has |
@@ -300,7 +300,7 @@ And the gates around it:
 | `intent` | 5 | an intent an action serves is accepted |
 | `check-status` | 2 | a cap that leaves a check nothing to decide reports skip, not pass |
 | `summary-counters` | 4 | a verification report counts what its checks carry |
-| `edit-refusals` | 10 | an ops that is not a list is refused and writes nothing |
+| `edit-refusals` | 13 | an ops that is not a list is refused and writes nothing |
 | `export-warnings` | 3 | every invariant a format cannot translate is named in its warnings |
 | `diff-families` | 6 | two reports of different families are refused, naming both |
 | `diff-next-steps` | 5 | every state says something to do |

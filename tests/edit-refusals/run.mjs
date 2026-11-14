@@ -132,6 +132,31 @@ await test('a batch that would leave the model invalid names the operation it st
   if (!/Operation 2/.test(String(report.error))) throw new Error('it did not blame the second operation: ' + String(report.error))
 })
 
+await test('a transition that already exists is refused, not duplicated', async () => {
+  const path = freshFile('duplicate-transition')
+  const report = await editTool.execute({ modelPath: path, ops: [{ addTransition: ['s0', 'go', 's1'] }] })
+  if (report.errorCode !== 'EDIT_OPTION_INVALID') throw new Error('code: ' + String(report.errorCode))
+  if (!/already exists/.test(String(report.error))) throw new Error('the refusal does not say why: ' + String(report.error))
+})
+
+await test('a patch that is not an object is refused by name', async () => {
+  const path = freshFile('patch-shape')
+  for (const patch of ['nope', 5, ['a']]) {
+    // The patch is the third element itself, not an object holding it: `{ patch }` would be a valid object of fields.
+    const report = await editTool.execute({ modelPath: path, ops: [{ updateTransition: ['s0', 'go', patch] }] })
+    if (report.errorCode !== 'EDIT_OPTION_INVALID') throw new Error(JSON.stringify(patch) + ' answered ' + String(report.errorCode))
+  }
+})
+
+await test('an operation whose own application throws is refused with its position', async () => {
+  // `removeState` of a state that is not there throws inside the op loop, which is a different refusal from a batch
+  // that stops validating: the message names the operation, not the validation.
+  const path = freshFile('op-throws')
+  const report = await editTool.execute({ modelPath: path, ops: [{ removeState: 'ghost' }] })
+  if (report.errorCode !== 'EDIT_OPTION_INVALID') throw new Error('code: ' + String(report.errorCode))
+  if (!/operation 1/.test(String(report.error))) throw new Error('position missing: ' + String(report.error))
+})
+
 if (failures > 0) {
   console.log('edit-refusals tests failed:', failures)
   process.exit(1)

@@ -300,7 +300,9 @@ export function applyEdits(path: unknown, operations: unknown, options: { allowI
     // The loop walks the **normalised** operations: a shorthand entry (`{removeState: 'x'}`) has no `op` field of its own, so replaying the raw
     // input threw on the first entry and blamed it - naming `(undefined)` and pointing at operation 1 whatever the real culprit was.
     for (const [index, raw] of normalized.entries()) {
-      try { applyOperation(partial, raw) } catch { firstBad = index; break }
+      // No try here: the loop above already applied every operation to the same starting model, so an operation that
+      // throws would have thrown there. The replay is for the validation step, which is the only thing that can differ.
+      applyOperation(partial, raw)
       if (!validateModel(partial).ok) { firstBad = index; break }
     }
     const where = firstBad < 0 ? '' : ` Operation ${String(firstBad + 1)} (${String(normalized[firstBad]?.op)}) is where it first stops validating.`
