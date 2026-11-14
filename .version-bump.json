@@ -12,6 +12,7 @@
       "lib",
       "RELEASE.md",
       "DSH-COMPATIBILITY.md",
+      "CHANGELOG.md",
       "scripts/bump-version.mjs",
       ".github",
       "archive"
