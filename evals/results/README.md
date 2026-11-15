@@ -6,7 +6,9 @@ Numbers only, with the round they came from. The reasoning is in
 
 Every round is **3 trials per case per condition**, on the same model and the same harness.
 `A` is the bare agent, `C` is the plugin installed with the gate injection on. Token counts are the
-harness's own accounting for a session, so they include the cached prefix.
+harness's own accounting for a session, in three buckets: `input` (cache miss), `output`, and
+`cacheRead` (the cached prefix). `total` is input + output + reasoning, so the cached prefix is **not** in
+it; rounds 1-16 quote `total`.
 
 ## Round 1 - three small fixtures (2026-10-20)
 
@@ -272,3 +274,64 @@ Mean: A 164,415, C 144,845 - **0.88x**, against 0.93x at round 14 and 0.95x at r
 
 Three runs of this case now: the plugin passed nine of nine trials, the baseline six of nine, and the
 ratio moved from 0.95 to 0.88 while its fixed cost grew. The added text did not eat the advantage.
+
+## Round 17 - the 0.7.0 artifact on dsh 0.2.2-rc.3, with the token buckets split (2026-11-15)
+
+Same method: three cases, three trials, A and C, isolated homes. dsh 0.2.2-rc.3; the plugin packed from
+`v0.7.0` (`npm pack`) and installed as a tarball. Model: `deepseek-flash`.
+
+| case | A total (median) | C total (median) | ratio | A raw / C raw | trials passed A / C |
+|---|---|---|---|---|---|
+| job-runner | 9,280 | 49,553 | 5.3x | 142,208 / 1,113,716 | 3/3 · 3/3 |
+| plugin-structure | 36,337 | 79,628 | 2.2x | 700,145 / 2,020,551 | 2/3 · 3/3 |
+| lwip-tcp | 151,974 | 166,504 | 1.1x | 9,954,788 / 9,798,912 | 1/3 · 1/3 |
+
+`total` is input + output; `raw` adds the cached prefix. Over the nine sessions per condition: A 611,551
+`total` / 10,797,141 `raw`, C 869,947 / 12,933,179 - **1.42x** on `total`, **1.20x** on `raw`.
+
+Where the tokens go (nine sessions per condition):
+
+| condition | cache hit | cache miss | output | raw | hit rate |
+|---|---|---|---|---|---|
+| A | 10,185,590 (94.3%) | 345,392 (3.2%) | 266,159 (2.5%) | 10,797,141 | 96.7% |
+| C | 12,063,232 (93.3%) | 518,600 (4.0%) | 351,347 (2.7%) | 12,933,179 | 95.9% |
+
+Of the plugin's added volume, 87.9% is cache hits, 8.1% misses and 4.0% output. The volume sits in the
+cheapest bucket, so volume shares are not cost shares. At the provider's list prices for `deepseek-flash`
+(cache hit : cache miss : output = 1 : 50 : 200) the same sessions split like this:
+
+| condition | hit | miss | output |
+|---|---|---|---|
+| A | 12.6% | 21.4% | 66.0% |
+| C | 11.1% | 24.0% | 64.9% |
+
+The plugin's cost multiplier is **1.34x** in miss-equivalent tokens (A 1,613,740, C 2,165,253) - between
+the 1.42x of `total` and the 1.20x of `raw`. Peak and off-peak prices differ by 2x, but every bucket scales
+together, so the shares do not move.
+
+What the added volume is: a fixed prefix, re-read every step. On the small fixture the first prompt is
+6,591 tokens without the plugin and 9,244 with it - tool definitions, skill catalog and the gate message.
+Loading a skill adds its body once (the `model-everything` body is 34 KB, about 10k tokens), and every
+later step re-reads it from cache. Per step:
+
+| case | A cache read / step | C cache read / step | C / A |
+|---|---|---|---|
+| job-runner | 7,909 | 32,119 | 4.1x |
+| plugin-structure | 19,051 | 38,753 | 2.0x |
+| lwip-tcp | 82,472 | 86,268 | 1.05x |
+
+The multiplier falls as the fixture grows, because on a large tree the baseline's own reads fill the prefix
+too. The plugin also adds steps (160 -> 184), which is the other half of the cost.
+
+Two limits, stated rather than smoothed:
+
+- **The protocol case ran into the 420s cap.** Four of the six lwip trials timed out, two per condition.
+  Their `total` is what the session spent before the cap, and the 1/3 pass column is the cap rather than a
+  wrong answer. The case was already at the edge in round 16 (42-43 steps).
+- **The structure case was run twice.** The first pass seeded nothing: the fixture directory was still
+  `plugin-src` while the case is `plugin-structure`, so both conditions searched the filesystem instead of
+  the fixture - round 9's defect again. Those numbers are void and are not in the table; the table holds
+  the re-run with `fixtures/plugin-structure/`.
+
+A's one structure failure was a judged answer that said both "no named rule is violated" and "there is one
+real violation"; C passed all three trials.

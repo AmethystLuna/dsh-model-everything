@@ -207,3 +207,19 @@ B 层两条新夹具（测试全绿、文档断言为假）：`job-runner`（`on
 三套语料与归因脚本在 scratch 区 `dme-eval` 任务目录：`make-cases.mjs`（8 夹具）、`make-cases-hard2.mjs`（3 大夹具）、`run-eval.mjs`（跑一组）、`attribute.mjs`（逐帧归因，用 `zstd -d` 解多帧 trace）。语料先跑真值再出题，`cases-hard/TRUTH.txt` 与 `cases-hard2/TRUTH.txt` 是跑出来的结论。
 
 **已知的量具缺陷**：判分模型 `max_tokens` 默认 200，rubric 稍长就吐不出 PASS/FAIL → 已在 vendored 副本里改成可配（`EVAL_JUDGE_MAX_TOKENS`）；r1 的 4 条控制用例在 Windows 上恒失败（用例写 `bash`，profile 的 shell 工具是 `pwsh`）。
+
+## 2026-11-15：缓存构成（round 17）
+
+同一套方法在 0.7.0 / dsh 0.2.2-rc.3 上重跑三用例，这次把 harness 的 token 分桶（cache hit / miss / output）。九次会话合计：
+
+| 条件 | cache hit | cache miss | output | 原始总量 | 命中率 |
+|---|---|---|---|---|---|
+| A | 10,185,590（94.3%） | 345,392（3.2%） | 266,159（2.5%） | 10,797,141 | 96.7% |
+| C | 12,063,232（93.3%） | 518,600（4.0%） | 351,347（2.7%） | 12,933,179 | 95.9% |
+
+- 体积的 94% 是缓存命中，但按 `deepseek-flash` 的单价（命中 : 未命中 : 输出 = 1 : 50 : 200）折算，输出占 65–66% 的钱，命中只占 11–12%。**只看 volume 会高估插件，只看 `total` 会低估它**：C/A 在 `total` 上是 1.42x、原始量 1.20x、按价折算 1.34x。
+- 插件增加的 2.14M 原始 token 里 87.9% 是命中、8.1% 未命中、4.0% 输出——多出来的主要是「同一条前缀每步重读」。
+- 每步缓存前缀：job-runner 7.9k → 32.1k（4.1x）、structure 19.1k → 38.8k（2.0x）、lwip 82.5k → 86.3k（1.05x）。夹具越大，插件的前缀占比越小；小任务上固定前缀就是主要成本。
+- 首轮 prompt：无插件 6,591，有插件 9,244（工具定义 + 技能目录 + gate 消息）；加载技能后再加约 10k（`model-everything` 正文 34 KB），此后每步从缓存重读。
+
+结论：**要压成本，先压「每步重读的前缀」**——加载一次的技能正文和工具定义会按步数计费；其次是步数。继续瘦报告正文的收益仍然有限（报告只占体积的 2–3%）。数字与限定条件见 `evals/results/README.md` 的 round 17。

@@ -19,7 +19,9 @@ Nothing here ships: `package.json` lists what the npm package carries, and `eval
 The runner is not in this repository: it drives a real `dsh` process per trial and lives outside the
 package. What a round needs from the corpus is the case file and its fixture, in the shape above:
 `name`, `prompt`, and an `assert` block with `turn_end`, `max_steps`, `max_tokens` and an
-`output_judge.rubric`.
+`output_judge.rubric`. The fixture directory is named after the case: a fixture under any other name
+seeds nothing, and the round measures a search of the filesystem. That defect voided round 9, and the
+first pass of round 17's structure case.
 
 Two conditions matter, and both are needed for a comparison to mean anything:
 
