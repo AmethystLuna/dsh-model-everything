@@ -358,3 +358,31 @@ Two limits, stated rather than smoothed:
 
 A's one structure failure was a judged answer that said both "no named rule is violated" and "there is one
 real violation"; C passed all three trials.
+
+## Round 18 - the fair bill: lwIP with delegation removed from both conditions (2026-11-15)
+
+Round 17's lwIP comparison was not fair. A delegated to subagents in two of three trials, and those child
+sessions never reach `report.json`. This round takes the choice away from both sides - `tool-subagent` and
+`tool-subagent-fork` disabled in both homes - raises the attempt cap to 900s so sessions finish, and runs
+the lwIP case six times per condition. Neither condition produced a child session, and all twelve trials
+ended `completed`.
+
+| condition | pass | steps (sum) | total (median) | raw (median) | cost units (median) | hit / miss / out (sum) |
+|---|---|---|---|---|---|---|
+| A | 6/6 | 233 | 148,121 | 2,757,885 | 397,339 | 15,857,280 / 495,675 / 394,319 |
+| C | 6/6 | 208 | 172,495 | 3,119,567 | 467,914 | 17,678,976 / 584,221 / 443,660 |
+
+Sums: A raw 16,747,274 and cost 2,390,097; C raw 18,706,857 and cost 2,712,441 - **1.12x on `raw`, 1.15x
+on `total`, 1.13x in cost**. The plugin takes 11% fewer steps (233 -> 208) and pays 27% more per step
+(10,258 -> 13,041): cache read per step 68,057 -> 84,995 (+25%), output per step 1,692 -> 2,133 (+26%).
+
+Of the 322,344 added units, **61.2% is output, 27.5% is cache miss and 11.3% is cache hit**; the mix in the
+two conditions is the same (hit 94.5-94.7%, miss 3.0-3.1%, output 2.4%).
+
+One trial makes the fixed cost visible. C's third trial in the first batch spent 199,886 `total` over 40
+steps and called **no plugin tool at all**; it is the most expensive of the twelve. What it paid for is the
+mounting overhead - tool definitions, skill catalog and the gate message - not a verification call.
+
+This is the number to quote for a big task: **about 1.13x in cost for the same 6/6**. Round 17's 0.74x
+came from counting A's subagent sessions and not C's (there were none), and its main-session 1.02x came
+from the reverse omission; neither is a fair bill.
