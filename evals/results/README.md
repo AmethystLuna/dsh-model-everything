@@ -297,7 +297,8 @@ Where the tokens go (nine sessions per condition):
 | C | 12,063,232 (93.3%) | 518,600 (4.0%) | 351,347 (2.7%) | 12,933,179 | 95.9% |
 
 Of the plugin's added volume, 87.9% is cache hits, 8.1% misses and 4.0% output. The volume sits in the
-cheapest bucket, so volume shares are not cost shares. At the provider's list prices for `deepseek-flash`
+cheapest bucket, so volume shares are not cost shares. In cost terms the increment inverts: of the added
+551,513 miss-equivalent tokens, **61.8% is output, 31.4% is cache miss and 6.8% is cache hit**. At the provider's list prices for `deepseek-flash`
 (cache hit : cache miss : output = 1 : 50 : 200) the same sessions split like this:
 
 | condition | hit | miss | output |
