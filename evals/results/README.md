@@ -289,6 +289,20 @@ Same method: three cases, three trials, A and C, isolated homes. dsh 0.2.2-rc.3;
 `total` is input + output; `raw` adds the cached prefix. Over the nine sessions per condition: A 611,551
 `total` / 10,797,141 `raw`, C 869,947 / 12,933,179 - **1.42x** on `total`, **1.20x** on `raw`.
 
+Those totals are main sessions only. The harness reads one session file per attempt, and in this round A
+delegated to subagents four times - one on `plugin-structure`, three on `lwip-tcp` - in child sessions with
+`origin: subagent` that `report.json` never sees:
+
+| accounting | output | cache miss | cache hit | raw | cost units |
+|---|---|---|---|---|---|
+| A, main sessions | 266,159 | 345,392 | 10,185,590 | 10,797,141 | 1,613,740 |
+| A, plus four subagent sessions | 343,274 | 522,150 | 12,604,022 | 13,469,446 | 2,147,326 |
+| C | 351,347 | 518,600 | 12,063,232 | 12,933,179 | 2,165,253 |
+
+Counted, the two conditions land within one per cent: **C/A 0.96x on `raw`, 1.01x on `total` and 1.01x in
+list-price cost**. By case: job-runner 3.60x, plugin-structure 1.55x, lwip-tcp 0.74x. The main-session-only
+ratios above are the harness's own view, not the whole bill.
+
 Where the tokens go (nine sessions per condition):
 
 | condition | cache hit | cache miss | output | raw | hit rate |
@@ -296,9 +310,10 @@ Where the tokens go (nine sessions per condition):
 | A | 10,185,590 (94.3%) | 345,392 (3.2%) | 266,159 (2.5%) | 10,797,141 | 96.7% |
 | C | 12,063,232 (93.3%) | 518,600 (4.0%) | 351,347 (2.7%) | 12,933,179 | 95.9% |
 
-Of the plugin's added volume, 87.9% is cache hits, 8.1% misses and 4.0% output. The volume sits in the
-cheapest bucket, so volume shares are not cost shares. In cost terms the increment inverts: of the added
-551,513 miss-equivalent tokens, **61.8% is output, 31.4% is cache miss and 6.8% is cache hit**. At the provider's list prices for `deepseek-flash`
+Counting only the main sessions, the plugin adds 2.14M raw tokens - 87.9% cache hits, 8.1% misses, 4.0%
+output - and 551,513 miss-equivalent units of cost, of which **61.8% is output, 31.4% is cache miss and 6.8%
+is cache hit**. Once the child sessions count there is no increment left: the two conditions differ by four
+per cent of raw volume in A's favour and by less than one per cent in cost, with the same mix. At the provider's list prices for `deepseek-flash`
 (cache hit : cache miss : output = 1 : 50 : 200) the same sessions split like this:
 
 | condition | hit | miss | output |
@@ -306,9 +321,10 @@ cheapest bucket, so volume shares are not cost shares. In cost terms the increme
 | A | 12.6% | 21.4% | 66.0% |
 | C | 11.1% | 24.0% | 64.9% |
 
-The plugin's cost multiplier is **1.34x** in miss-equivalent tokens (A 1,613,740, C 2,165,253) - between
-the 1.42x of `total` and the 1.20x of `raw`. Peak and off-peak prices differ by 2x, but every bucket scales
-together, so the shares do not move.
+The plugin's cost multiplier is **1.34x** on the main sessions (A 1,613,740, C 2,165,253) and **1.01x**
+once the child sessions count (A 2,147,326). With them, A's cost shares move to 11.7% / 24.3% / 63.9%, the
+same shape as C. Peak and off-peak prices differ by 2x, but every bucket scales together, so the shares do
+not move.
 
 What the added volume is: a fixed prefix, re-read every step. On the small fixture the first prompt is
 6,591 tokens without the plugin and 9,244 with it - tool definitions, skill catalog and the gate message.
@@ -323,6 +339,12 @@ later step re-reads it from cache. Per step:
 
 The multiplier falls as the fixture grows, because on a large tree the baseline's own reads fill the prefix
 too. The plugin also adds steps (160 -> 184), which is the other half of the cost.
+
+Output grew for its own reason. On the main sessions the increase is 80% reasoning text, 19% tool-call
+arguments and under one per cent answer text: reasoning characters 811,757 -> 1,034,991, arguments
+28,102 -> 81,580, final-answer characters flat. The skill asks for claim enumeration and model construction,
+so each step thinks longer, and the plugin's calls carry a model or a path list in their arguments. With the
+child sessions counted, output is 343,274 against 351,347 - 2.4%, not 32%.
 
 Two limits, stated rather than smoothed:
 
