@@ -379,6 +379,14 @@ on `total`, 1.13x in cost**. The plugin takes 11% fewer steps (233 -> 208) and p
 Of the 322,344 added units, **61.2% is output, 27.5% is cache miss and 11.3% is cache hit**; the mix in the
 two conditions is the same (hit 94.5-94.7%, miss 3.0-3.1%, output 2.4%).
 
+Where the extra output comes from: reasoning is 93-96% of what either condition writes. C's reasoning is
+6,255 characters per step against A's 5,176 (+21%), and 8% longer in total because it takes fewer steps;
+reasoning carries about 60% of the added output, tool arguments 27% (69,457 characters against 27,363) and
+the answer text 6%. The plugin reads less and models more: 176 reads against 209, 100 greps against 138, 19
+`model_verify` calls, and `model-everything` loaded in all six trials (A loaded a skill once, the
+sandbox-diagnosis artifact). The reasoning is about the model and the report - what to encode, whether a
+warning matters, whether to rebuild - not about walking the code.
+
 One trial makes the fixed cost visible. C's third trial in the first batch spent 199,886 `total` over 40
 steps and called **no plugin tool at all**; it is the most expensive of the twelve. What it paid for is the
 mounting overhead - tool definitions, skill catalog and the gate message - not a verification call.
