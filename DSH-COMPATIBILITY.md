@@ -81,12 +81,14 @@ does not consult. The probe therefore runs from the dsh tree and lends the copy 
 | 0.2.1-rc.4 | 2026-10-27 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass | pass | pass (`diagram_render` + `diagram_review` + `diagram_diff` from the installed copy) | pass |
 | 0.2.2-rc.1 | 2026-11-05 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass (skills and locale in the tarball) | pass (web boot, no "entry did not activate") | **pass** (`model_verify`, 2026-11-14) | pass |
 | 0.2.2-rc.3 | 2026-11-14 | pass | pass (three rows: tools, gate `enabled: true`, diagram) | pass | pass | pass (`model_verify`, 11 checks) | pass |
+| 0.2.2-rc.5 | 2026-11-19 | pass | pass (three rows: plugin, gate `enabled: true`, diagram `enabled: true`) | pass | pass | not probed (headless round) | pass |
 
-### The 0.2.2 line: both releases the registry offers, and what changed under them
+### The 0.2.2 line: the releases the registry offers, and what changed under them
 
-0.2.2-rc.1 is the registry's `latest` and 0.2.2-rc.3 is `next`, so both were run rather than one standing in for the other.
-Both rounds are the full six steps against a `file:` install, and both returned a real report from the installed copy:
+0.2.2-rc.1 is the registry's `latest` and 0.2.2-rc.3 is `next`; 0.2.2-rc.5 is published but carries neither tag. All three were run rather than one standing in for the other.
+The rc.1 and rc.3 rounds are the full six steps against a `file:` install, and both returned a real report from the installed copy:
 `model_verify` on `examples/control-dispatcher.json`, `pass_with_findings`, schema `model-everything/verify/v1`, 11 checks.
+The rc.5 round was headless: install, mount, contents, boot and uninstall, with no tool call.
 
 **What 0.2.2 changed, and what it broke in this round's harness.** `tools.execute` no longer reaches a tool directly: the
 host resolves a *tool executor* from the composition first, and a bare `ToolRuntime` throws `TOOL_EXECUTOR_UNAVAILABLE`
@@ -95,8 +97,9 @@ still the host's own dispatch path, and the log line says `DISPATCH: host` - and
 host refuses even that. The plugin needed no change: the failure was in the harness, and it is recorded here because the
 next round meets the same wall on any host past 0.2.2.
 
-Still not measured, and therefore still not claimed: a **tarball** install on the 0.2.2 line (both rounds above are
-`file:` installs), and the web app's boot on 0.2.2-rc.3 (the rc.1 row carries that from the tarball round).
+Still not measured, and therefore still not claimed: a **tarball** install on the 0.2.2 line (every round above is a
+`file:` install), the web app's boot on 0.2.2-rc.3 and 0.2.2-rc.5 (the rc.1 row carries that from the tarball round),
+and a tool call from the installed copy on 0.2.2-rc.5.
 
 The last two rows before it are **the published artifact**. The first installed the tarball
 `npm pack` produced; the second let the profile resolve `dsh-model-everything` from
